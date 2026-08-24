@@ -1,6 +1,6 @@
 import { SQL, TABLES } from "./sql.js";
 import { query, exec, execMany } from "./db.js";
-import { nowIso } from "./format.js";
+import { nowIso, hoyISO } from "./format.js";
 import { CONTRACT, insertSql } from "./contract.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
@@ -44,6 +44,28 @@ export const listPeriods = () => query(SQL.listPeriods);
 export const listAllByDay = (pid) => query(SQL.listAllByDay, [pid]);
 export const getTransaction = async (id) => (await query(SQL.getTransaction, [id]))[0] ?? null;
 export const countUncategorized = async (pid) => (await query(SQL.countUncategorized, [pid]))[0].n;
+export const pendingShared = () => query(SQL.pendingShared);
+export const pendingSharedTotalCents = async () => (await query(SQL.pendingSharedTotal))[0].total_cents;
+
+/** Liquida un gasto compartido pendiente: crea el refund de la parte de Sara (categoría/comercio
+ *  del gasto original, hoy, cuenta de destino elegida) enlazado por refId. Reutiliza sara_amount_cents
+ *  de pendingShared (ya calculado con el pct EFECTIVO del propio periodo del gasto, no el abierto)
+ *  en vez de recalcular el pct aquí. El settled=1 del original lo pone addTransaction({refId}) solo. */
+export async function settleShared(txId, accountId) {
+  const row = (await pendingShared()).find((r) => r.id === txId);
+  if (!row) throw new Error("Gasto compartido no encontrado o ya liquidado");
+  await addTransaction({
+    type: "refund",
+    amountCents: row.sara_amount_cents,
+    date: hoyISO(),
+    categoryId: row.category_id,
+    accountId,
+    merchant: row.merchant,
+    note: "Liquidación",
+    isShared: false,
+    refId: txId,
+  });
+}
 
 /** Actualiza los campos editables de un movimiento (mismas claves camelCase que addTransaction).
  *  Los campos ausentes conservan el valor actual (no se pisan con defaults): p.ej. si el formulario

@@ -1,6 +1,10 @@
-import { getOpenPeriod, spentOfPeriod, incomeOfPeriod, listByDay, allCategoriesById } from "../repo.js";
+import {
+  getOpenPeriod, spentOfPeriod, incomeOfPeriod, listByDay, allCategoriesById,
+  pendingShared, pendingSharedTotalCents,
+} from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtEUR, fmtDiaLargo, hoyISO } from "../format.js";
+import { fmtEUR, fmtDiaLargo, fmtDiaCorto, hoyISO } from "../format.js";
+import { renderLiquidar } from "./liquidar.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const pctFmt = new Intl.NumberFormat("es-ES", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -42,21 +46,54 @@ function txRowHtml(r, byId) {
     </div>`;
 }
 
-/** Pantalla Inicio: cabecera del periodo abierto (gastado, ingresos, ahorrado, tasa)
- *  y sus movimientos agrupados por día. */
+/** Bloque "Con Sara": pendiente de que devuelva, de TODOS los periodos (pendingShared/-Total
+ *  cubren cualquier gasto compartido sin liquidar, no solo el del periodo abierto). Se oculta
+ *  entero si no hay nada pendiente. */
+function conSaraHtml(period, sharedRows, sharedTotal) {
+  if (sharedRows.length === 0 && sharedTotal === 0) return "";
+  const miPct = period.my_share_pct;
+  const n = sharedRows.length;
+  const masAntiguo = sharedRows[0]?.date;
+  return `
+    <div class="card" style="display:flex;flex-direction:column;gap:14px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="font-size:15px;font-weight:700;">Con Sara</div>
+        <div style="font-size:11px;font-weight:600;color:var(--text-2);background:#1b1e21;border-radius:8px;padding:5px 9px;">
+          Este periodo: ${miPct} / ${100 - miPct}
+        </div>
+      </div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;">
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <div style="font-size:11px;color:var(--text-3);">Pendiente de que te devuelva</div>
+          <div class="num text-red" style="font-size:30px;font-weight:600;letter-spacing:-0.02em;">${fmtEUR(sharedTotal)}</div>
+        </div>
+        <button type="button" id="con-sara-liquidar" style="height:40px;padding:0 14px;border-radius:14px;
+          background:#1b1e21;color:var(--text-2);border:0;font-size:13px;font-weight:600;cursor:pointer;
+          -webkit-tap-highlight-color:transparent;">Liquidar</button>
+      </div>
+      ${n > 0 ? `<div style="font-size:11px;color:var(--text-3);">
+        ${n} gasto${n === 1 ? "" : "s"} sin liquidar · el más antiguo del ${fmtDiaCorto(masAntiguo)}
+      </div>` : ""}
+    </div>`;
+}
+
+/** Pantalla Inicio: cabecera del periodo abierto (gastado, ingresos, ahorrado, tasa),
+ *  bloque "Con Sara" (pendiente/liquidar) y sus movimientos agrupados por día. */
 export async function renderInicio(container) {
-  let period, spent, income, rows, byId;
+  let period, spent, income, rows, byId, sharedRows, sharedTotal;
   try {
     period = await getOpenPeriod();
     if (!period) {
       container.innerHTML = `<div class="banner-aviso red">No hay ningún periodo abierto.</div>`;
       return;
     }
-    [spent, income, rows, byId] = await Promise.all([
+    [spent, income, rows, byId, sharedRows, sharedTotal] = await Promise.all([
       spentOfPeriod(period.id),
       incomeOfPeriod(period.id),
       listByDay(period.id),
       allCategoriesById(),
+      pendingShared(),
+      pendingSharedTotalCents(),
     ]);
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">No se pudo cargar Inicio: ${escHtml(e.message)}</div>`;
@@ -110,6 +147,11 @@ export async function renderInicio(container) {
       </div>
     </div>
 
+    ${conSaraHtml(period, sharedRows, sharedTotal)}
+
     ${movimientosHtml}
   `;
+
+  const liquidarBtn = container.querySelector("#con-sara-liquidar");
+  if (liquidarBtn) liquidarBtn.onclick = () => renderLiquidar(container, () => renderInicio(container));
 }

@@ -58,5 +58,17 @@ export const SQL = {
     ) THEN 1 ELSE 0 END, updated_at=? WHERE id=?`,
   countUncategorized: `SELECT COUNT(*) AS n FROM transactions
     WHERE period_id=? AND deleted=0 AND category_id='' AND type IN ('expense','income','refund')`,
+  // Gastos compartidos sin liquidar de TODOS los periodos (no solo el abierto): el bloque "Con
+  // Sara" y la pantalla Liquidar deben poder saldar algo pendiente de un periodo ya cerrado.
+  // type='expense' es necesario: is_shared/settled también existen en income/refund (ver
+  // registro.js needsCategory), y solo un gasto genera una deuda pendiente de que Sara devuelva.
+  pendingShared: `SELECT t.id, t.date, t.amount_cents, t.merchant, t.category_id,
+      t.amount_cents - ${MY_AMOUNT} AS sara_amount_cents
+    FROM transactions t JOIN periods p ON p.id=t.period_id
+    WHERE t.type='expense' AND t.is_shared=1 AND t.settled=0 AND t.deleted=0
+    ORDER BY t.date ASC`,
+  pendingSharedTotal: `SELECT COALESCE(SUM(t.amount_cents - ${MY_AMOUNT}),0) AS total_cents
+    FROM transactions t JOIN periods p ON p.id=t.period_id
+    WHERE t.type='expense' AND t.is_shared=1 AND t.settled=0 AND t.deleted=0`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"];

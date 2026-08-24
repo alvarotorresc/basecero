@@ -6,3 +6,6 @@ export const hoyISO = () => new Date().toLocaleDateString("sv-SE"); // YYYY-MM-D
 export const nowIso = () => new Date().toISOString().slice(0, 19) + "Z";
 export const fmtDiaLargo = (iso) =>
   new Date(iso + "T12:00:00").toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+// Formato corto ("12 ago") — filas de Liquidar y el pie del bloque "Con Sara" en Inicio.
+export const fmtDiaCorto = (iso) =>
+  new Date(iso + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" });
