@@ -17,6 +17,12 @@ export function initDb() {
     pending.delete(id);
     error ? p.reject(new Error(error)) : p.resolve(rest);
   };
+  // Sin esto, un fallo al cargar/ejecutar db-worker.js (p.ej. 404) deja las
+  // promesas pendientes (incluida la de init) colgadas para siempre.
+  worker.onerror = (e) => {
+    const err = new Error("Error en el worker de base de datos: " + (e.message || "desconocido"));
+    for (const [id, p] of pending) { pending.delete(id); p.reject(err); }
+  };
   return call("init");
 }
 export const query = (sql, params = []) => call("query", sql, params).then((r) => r.rows);

@@ -62,13 +62,16 @@ export async function renderRegistro(container, onDone) {
     }
     const [, dec] = state.raw.split(",");
     if (dec && dec.length >= 2) return; // coma: máx. 2 decimales
-    setRaw(state.raw + k);
+    // evita ceros a la izquierda sin sentido ("05") cuando aún no hay coma
+    setRaw(state.raw === "0" ? k : state.raw + k);
   }
 
   function render() {
     const cats = categoriesFor();
     const myCents = state.isShared ? Math.round((state.cents * pct) / 100) : state.cents;
     const saraCents = state.isShared ? state.cents - myCents : 0;
+
+    const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
 
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
@@ -158,6 +161,8 @@ export async function renderRegistro(container, onDone) {
 
       <button type="button" class="btn-primary" id="reg-save">${state.tipo === "expense" ? "Guardar gasto" : "Guardar ingreso"}</button>
     `;
+
+    if (prevChipsScroll) container.querySelector(".chips-scroll").scrollLeft = prevChipsScroll;
 
     wire();
   }

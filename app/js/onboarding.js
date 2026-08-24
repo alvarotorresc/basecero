@@ -1,6 +1,8 @@
 import { openFirstPeriod } from "./repo.js";
 import { hoyISO } from "./format.js";
 
+const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
 // "agosto de 2026" (Intl es-ES) -> "Agosto 2026"
 function nombrePorDefecto() {
   const raw = new Date().toLocaleDateString("es-ES", { month: "long", year: "numeric" });
@@ -36,13 +38,17 @@ export function showOnboarding(container) {
         <p style="font-size:11px; color:var(--text-3); margin-top:-6px;">Sara pagará el resto.</p>
       </div>
 
+      <div id="ob-error" class="banner-aviso red" style="display:none; margin-top:14px;"></div>
+
       <button class="btn-primary" id="ob-submit" style="margin-top:20px;">Abrir periodo</button>
     `;
 
     const btn = container.querySelector("#ob-submit");
+    const errorBox = container.querySelector("#ob-error");
     btn.onclick = async () => {
       btn.disabled = true;
       btn.textContent = "Abriendo…";
+      errorBox.style.display = "none";
       try {
         const name = container.querySelector("#ob-name").value.trim() || nombrePorDefecto();
         const startDate = container.querySelector("#ob-date").value || hoyISO();
@@ -53,7 +59,8 @@ export function showOnboarding(container) {
       } catch (e) {
         btn.disabled = false;
         btn.textContent = "Abrir periodo";
-        alert("No se pudo abrir el periodo: " + e.message);
+        errorBox.innerHTML = escHtml("No se pudo abrir el periodo: " + e.message);
+        errorBox.style.display = "flex";
       }
     };
   });
