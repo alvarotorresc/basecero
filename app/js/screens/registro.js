@@ -162,7 +162,10 @@ export async function renderRegistro(container, onDone) {
       <button type="button" class="btn-primary" id="reg-save">${state.tipo === "expense" ? "Guardar gasto" : "Guardar ingreso"}</button>
     `;
 
-    if (prevChipsScroll) container.querySelector(".chips-scroll").scrollLeft = prevChipsScroll;
+    if (prevChipsScroll != null) {
+      const chipsEl = container.querySelector(".chips-scroll");
+      if (chipsEl) chipsEl.scrollLeft = prevChipsScroll;
+    }
 
     wire();
   }

@@ -1,4 +1,4 @@
-const CACHE = "bc-v3";
+const CACHE = "bc-v4";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon.svg",
   "css/tokens.css", "css/app.css", "vendor/pure.js", "vendor/fonts/fonts.css",
   "vendor/fonts/LDIbaomQNQcsA88c7O9yZ4KMCoOg4IA6-91aHEjcWuA_qU79TR_V.woff2",
@@ -16,7 +16,10 @@ self.addEventListener("install", (e) => {
   // cache: "reload" evita que una versión nueva de CACHE reutilice respuestas
   // ya obsoletas de la caché HTTP del navegador para los mismos archivos.
   e.waitUntil(caches.open(CACHE)
-    .then((c) => Promise.all(SHELL.map((url) => fetch(url, { cache: "reload" }).then((r) => c.put(url, r)))))
+    .then((c) => Promise.all(SHELL.map((url) => fetch(url, { cache: "reload" }).then((r) => {
+      if (!r.ok) throw new Error("SHELL fetch " + r.status + ": " + url);
+      return c.put(url, r);
+    }))))
     .then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", (e) => {
