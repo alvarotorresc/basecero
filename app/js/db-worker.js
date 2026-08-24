@@ -9,6 +9,7 @@ async function init() {
     const pool = await sqlite3.installOpfsSAHPoolVfs({ name: "basecero" });
     db = new pool.OpfsSAHPoolDb("/basecero.sqlite3");
   } catch (e) {
+    console.warn("OPFS no disponible, usando memoria:", e);
     storage = "memory";
     db = new sqlite3.oo1.DB(":memory:", "c");
   }
@@ -17,7 +18,14 @@ async function init() {
   const seeded = db.selectValue("SELECT COUNT(*) FROM accounts");
   if (seeded === 0) {
     const now = new Date().toISOString().slice(0, 19) + "Z";
-    for (const { sql, rows } of seedStatements(now)) for (const r of rows) db.exec({ sql, bind: r });
+    db.exec("BEGIN");
+    try {
+      for (const { sql, rows } of seedStatements(now)) for (const r of rows) db.exec({ sql, bind: r });
+      db.exec("COMMIT");
+    } catch (e) {
+      db.exec("ROLLBACK");
+      throw e;
+    }
   }
   return { storage };
 }

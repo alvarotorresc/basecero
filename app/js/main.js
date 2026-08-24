@@ -19,16 +19,24 @@ export function nav(tab) {
 }
 
 async function boot() {
-  const { storage } = await initDb();
-  if (storage === "memory") {
+  try {
+    const { storage } = await initDb();
+    if (storage === "memory") {
+      const aviso = document.createElement("div");
+      aviso.className = "banner-aviso";
+      aviso.textContent = "⚠ Este navegador no soporta almacenamiento persistente: tus datos NO se guardarán al cerrar.";
+      document.body.prepend(aviso);
+    }
+    try { await navigator.storage?.persist?.(); } catch {}
+    if (!(await getOpenPeriod())) await showOnboarding(screen);
+    nav("inicio");
+  } catch (err) {
+    console.error(err);
     const aviso = document.createElement("div");
-    aviso.className = "banner-aviso";
-    aviso.textContent = "⚠ Este navegador no soporta almacenamiento persistente: tus datos NO se guardarán al cerrar.";
+    aviso.className = "banner-aviso red";
+    aviso.textContent = "⚠ BaseCero no ha podido arrancar: " + (err?.message || err) + ". Recarga la página.";
     document.body.prepend(aviso);
   }
-  try { await navigator.storage?.persist?.(); } catch {}
-  if (!(await getOpenPeriod())) await showOnboarding(screen);
-  nav("inicio");
 }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => nav(b.dataset.tab)));

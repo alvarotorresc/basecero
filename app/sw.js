@@ -1,4 +1,5 @@
-const CACHE = "bc-v4";
+const CACHE = "bc-v5";
+// sqlite3-opfs-async-proxy.js queda fuera a propósito: solo lo usa el VFS "opfs" clásico (requiere COOP/COEP), no el sahpool que usamos.
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon.svg",
   "css/tokens.css", "css/app.css", "vendor/pure.js", "vendor/fonts/fonts.css",
   "vendor/fonts/LDIbaomQNQcsA88c7O9yZ4KMCoOg4IA6-91aHEjcWuA_qU79TR_V.woff2",
@@ -15,6 +16,7 @@ const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon.svg",
 self.addEventListener("install", (e) => {
   // cache: "reload" evita que una versión nueva de CACHE reutilice respuestas
   // ya obsoletas de la caché HTTP del navegador para los mismos archivos.
+  // Nota: la escritura en caché no es atómica entre archivos; un install fallido puede dejar entradas frescas huérfanas que el siguiente install/activate corrige.
   e.waitUntil(caches.open(CACHE)
     .then((c) => Promise.all(SHELL.map((url) => fetch(url, { cache: "reload" }).then((r) => {
       if (!r.ok) throw new Error("SHELL fetch " + r.status + ": " + url);
