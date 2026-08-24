@@ -1,11 +1,11 @@
 let worker = null, seq = 0;
 const pending = new Map();
 
-function call(op, sql, params) {
+function call(op, extra = {}) {
   return new Promise((resolve, reject) => {
     const id = ++seq;
     pending.set(id, { resolve, reject });
-    worker.postMessage({ id, op, sql, params });
+    worker.postMessage({ id, op, ...extra });
   });
 }
 
@@ -25,5 +25,6 @@ export function initDb() {
   };
   return call("init");
 }
-export const query = (sql, params = []) => call("query", sql, params).then((r) => r.rows);
-export const exec = (sql, params = []) => call("exec", sql, params).then(() => {});
+export const query = (sql, params = []) => call("query", { sql, params }).then((r) => r.rows);
+export const exec = (sql, params = []) => call("exec", { sql, params }).then(() => {});
+export const execMany = (stmts) => call("execMany", { stmts }).then(() => {});

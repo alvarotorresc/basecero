@@ -1,6 +1,7 @@
 import { SQL, TABLES } from "./sql.js";
-import { query, exec } from "./db.js";
+import { query, exec, execMany } from "./db.js";
 import { nowIso } from "./format.js";
+import { CONTRACT, insertSql } from "./contract.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -27,8 +28,17 @@ export const listAccounts = () => query(SQL.listAccounts);
 export const allCategoriesById = async () =>
   Object.fromEntries((await query(SQL.allCategories)).map((c) => [c.id, c]));
 
-export async function exportAllJson() {
+export async function dumpAllTables() {
   const out = {};
   for (const t of TABLES) out[t] = await query(SQL.dumpTable(t));
   return out;
+}
+
+export const exportAllJson = () => dumpAllTables();
+
+export async function replaceAll(data) {
+  const stmts = [...TABLES].reverse().map((t) => ({ sql: `DELETE FROM ${t}` }));
+  for (const t of TABLES)
+    for (const row of data[t]) stmts.push({ sql: insertSql(t), bind: CONTRACT[t].cols.map((c) => row[c]) });
+  await execMany(stmts);
 }

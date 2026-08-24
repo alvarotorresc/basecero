@@ -3,7 +3,8 @@ import { getOpenPeriod } from "./repo.js";
 import { showOnboarding } from "./onboarding.js";
 import { renderInicio } from "./screens/inicio.js";
 import { renderRegistro } from "./screens/registro.js";
-import { renderProximamente, renderAjustes } from "./screens/placeholder.js";
+import { renderProximamente } from "./screens/placeholder.js";
+import { renderAjustes } from "./screens/ajustes.js";
 
 const screen = document.getElementById("screen");
 const RUTAS = {

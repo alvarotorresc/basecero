@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { openDb, seedMinimal, dumpAll, X } from "./helpers.mjs";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../../app/js/xlsx.js";
+import { insertSql, CONTRACT } from "../../app/js/contract.js";
 
 test("export: pestaña por tabla, euros, bools y cabeceras sin _cents", () => {
   const db = openDb(); seedMinimal(db);
@@ -107,4 +108,36 @@ test("import: nullable numeric columns round-trip como null", () => {
   assert.strictEqual(goal.target_amount_cents, null);
   assert.strictEqual(goal.target_months, null);
   assert.strictEqual(goal.target_pct, null);
+});
+
+test("ROUND-TRIP: export → import → mismos datos", () => {
+  const db = openDb(); seedMinimal(db);
+  // enriquecer: transacción de cada tipo, regla, goal y budget
+  const T2 = "2026-08-02T00:00:00Z";
+  const tx = (id, type, cents, extra = {}) => db.prepare(insertSql("transactions")).run(...CONTRACT.transactions.cols.map((c) =>
+    ({ id, date: "2026-08-02", period_id: "per-1", type, amount_cents: cents, account_id: "acc-n26",
+       counter_account_id: "", category_id: type === "transfer" || type === "adjustment" ? "" : "cat-casa-alquiler",
+       merchant: "M", note: "", is_shared: 0, share_pct_override: null, settled: 0, ref_id: "", rule_id: "",
+       external_id: "", status: "pending", created_at: T2, updated_at: T2, deleted: 0, ...extra })[c]));
+  tx("tx-e", "expense", 900, { is_shared: 1 });
+  tx("tx-i", "income", 215000, { category_id: "cat-nomina" });
+  tx("tx-t", "transfer", 5000, { counter_account_id: "acc-revolut" });
+  tx("tx-r", "refund", 360, { ref_id: "tx-e" });
+  tx("tx-a", "adjustment", -123);
+  db.prepare(insertSql("recurring_rules")).run("rr-1","Alquiler","expense",90000,"cat-casa-alquiler","acc-n26","","monthly",1,null,1,1,T2,T2,0);
+  db.prepare(insertSql("goals")).run("goal-1","Fondo emergencia","emergency_fund",null,6,null,"","acc-revolut","",1,T2,T2,0);
+  db.prepare(insertSql("budgets")).run("bud-1","per-1","cat-casa",70000,T2,T2,0);
+
+  const original = dumpAll(db);
+  const buf = X.write(rowsToWorkbook(X, original), { type: "buffer", bookType: "xlsx" });
+  const { data, errors } = workbookToRows(X, X.read(buf, { type: "buffer" }));
+  assert.deepEqual(errors, []);
+  assert.deepEqual(validateImport(data), []);
+
+  const db2 = openDb();   // aplicar el import como lo hará replaceAll
+  for (const t of Object.keys(CONTRACT)) {
+    db2.prepare(`DELETE FROM ${t}`).run();
+    for (const row of data[t]) db2.prepare(insertSql(t)).run(...CONTRACT[t].cols.map((c) => row[c]));
+  }
+  assert.deepEqual(dumpAll(db2), original);
 });

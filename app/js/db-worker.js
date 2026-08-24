@@ -31,7 +31,7 @@ async function init() {
 }
 
 self.onmessage = async (e) => {
-  const { id, op, sql, params } = e.data;
+  const { id, op, sql, params, stmts } = e.data;
   try {
     if (op === "init") { const r = await init(); postMessage({ id, ...r }); return; }
     if (op === "query") {
@@ -40,6 +40,14 @@ self.onmessage = async (e) => {
       postMessage({ id, rows }); return;
     }
     if (op === "exec") { db.exec({ sql, bind: params ?? [] }); postMessage({ id, rows: [] }); return; }
+    if (op === "execMany") {
+      db.exec("BEGIN");
+      try {
+        for (const s of stmts) db.exec({ sql: s.sql, bind: s.bind ?? [] });
+        db.exec("COMMIT");
+      } catch (e) { db.exec("ROLLBACK"); throw e; }
+      postMessage({ id, rows: [] }); return;
+    }
     postMessage({ id, error: "op desconocida: " + op });
   } catch (err) { postMessage({ id, error: String(err && err.message || err) }); }
 };
