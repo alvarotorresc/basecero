@@ -130,7 +130,9 @@ function processN26Csv(text) {
       sheet.getRange(m.rowNum, ix["updated_at"]).setValue(now);
       m.externalId = r.externalId;
     } else if (d.action === "create") {
-      var newRow = sheet.getLastRow() + 1;
+      var idVals = sheet.getRange(2, ix["id"], Math.max(1, sheet.getLastRow() - 1), 1)
+        .getValues().map(function (r) { return r[0]; });
+      var newRow = 2 + bcFirstEmptyIndex(idVals);
       var set = function (colName, value) {
         sheet.getRange(newRow, ix[colName]).setValue(value);
       };

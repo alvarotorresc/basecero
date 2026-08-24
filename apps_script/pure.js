@@ -100,9 +100,16 @@ function bcResolvePickerToId(picker, categories) {
   return "";
 }
 
+function bcFirstEmptyIndex(values) {
+  for (var i = 0; i < values.length; i++) {
+    if (values[i] === "" || values[i] === null || values[i] === undefined) return i;
+  }
+  return values.length;
+}
+
 if (typeof module !== "undefined") {
   module.exports = { bcUlid: bcUlid, bcBuildExternalId: bcBuildExternalId,
     bcParseCsvLine: bcParseCsvLine, bcParseN26Csv: bcParseN26Csv,
     bcDaysBetween: bcDaysBetween, bcDecideImportAction: bcDecideImportAction,
-    bcResolvePickerToId: bcResolvePickerToId };
+    bcResolvePickerToId: bcResolvePickerToId, bcFirstEmptyIndex: bcFirstEmptyIndex };
 }

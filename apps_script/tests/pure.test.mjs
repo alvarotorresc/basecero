@@ -53,3 +53,9 @@ test("picker → id", () => {
   assert.equal(p.bcResolvePickerToId("Ropa y cuidado personal", cats), "cat-ropa");
   assert.equal(p.bcResolvePickerToId("No existe", cats), "");
 });
+
+test("firstEmptyIndex: primera posición vacía o length", () => {
+  assert.equal(p.bcFirstEmptyIndex(["a", "b", "", "c"]), 2);
+  assert.equal(p.bcFirstEmptyIndex([]), 0);
+  assert.equal(p.bcFirstEmptyIndex(["a", "b"]), 2);
+});
