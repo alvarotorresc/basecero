@@ -27,6 +27,8 @@ export const BOOL_COLS = {
   budgets: ["deleted"], meta: [],
 };
 
+export const NULLABLE_NUM = new Set(["share_pct_override","due_day","due_month","target_amount_cents","target_months","target_pct"]);
+
 // optional=true → '' permitido (FK vacía). ref_id/rule_id/parent_id/counter_account_id son opcionales por contrato.
 export const FKS = [
   { table: "categories", col: "parent_id", ref: "categories", optional: true },

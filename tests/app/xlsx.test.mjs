@@ -78,3 +78,33 @@ test("validate: importe no positivo salvo adjustment", () => {
   d.transactions[0] = { ...base, type: "adjustment", amount_cents: -500, category_id: "" };
   assert.deepEqual(validateImport(d), []);
 });
+
+test("import: nullable numeric columns round-trip como null", () => {
+  const T = "2026-08-01T00:00:00Z";
+  const db = openDb(); seedMinimal(db);
+
+  // Insert test rows with null values
+  const ins = (sql, ...p) => db.prepare(sql).run(...p);
+  ins(`INSERT INTO transactions (id,date,period_id,type,amount_cents,account_id,counter_account_id,category_id,merchant,note,is_shared,share_pct_override,settled,ref_id,rule_id,external_id,status,created_at,updated_at,deleted)
+       VALUES ('tx-null','2026-08-01','per-1','expense',1000,'acc-n26','','cat-casa-alquiler','','',0,NULL,0,'','','','pending',?,?,0)`, T, T);
+  ins(`INSERT INTO recurring_rules (id,name,type,amount_cents,category_id,account_id,counter_account_id,frequency,due_day,due_month,is_shared,is_active,created_at,updated_at,deleted)
+       VALUES ('rr-null','Test','expense',1000,'cat-casa-alquiler','acc-n26','','monthly',NULL,NULL,0,1,?,?,0)`, T, T);
+  ins(`INSERT INTO goals (id,name,type,target_amount_cents,target_months,target_pct,target_date,account_id,category_id,is_active,created_at,updated_at,deleted)
+       VALUES ('goal-null','Test','savings_target',NULL,NULL,NULL,'','','',1,?,?,0)`, T, T);
+
+  const dump = dumpAll(db);
+  const wb = rowsToWorkbook(X, dump);
+  const { data } = workbookToRows(X, wb);
+
+  const tx = data.transactions.find((r) => r.id === "tx-null");
+  assert.strictEqual(tx.share_pct_override, null);
+
+  const rr = data.recurring_rules.find((r) => r.id === "rr-null");
+  assert.strictEqual(rr.due_day, null);
+  assert.strictEqual(rr.due_month, null);
+
+  const goal = data.goals.find((r) => r.id === "goal-null");
+  assert.strictEqual(goal.target_amount_cents, null);
+  assert.strictEqual(goal.target_months, null);
+  assert.strictEqual(goal.target_pct, null);
+});

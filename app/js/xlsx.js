@@ -1,4 +1,4 @@
-import { CONTRACT, ENUMS, BOOL_COLS, FKS, eurToCents, centsToEur, xlsxHeader, toIsoDate } from "./contract.js";
+import { CONTRACT, ENUMS, BOOL_COLS, NULLABLE_NUM, FKS, eurToCents, centsToEur, xlsxHeader, toIsoDate } from "./contract.js";
 
 // dump: { tabla: [{col: valor SQLite}] } → workbook con una pestaña por tabla.
 // Sin dashboards y sin columnas "_": el dump ya solo trae columnas del contrato.
@@ -38,12 +38,13 @@ export function workbookToRows(X, wb) {
         for (const [h, v] of Object.entries(r)) {
           const col = byHeader[h];
           if (!col) continue;                                   // "_account", desconocidas… se ignoran
-          if (col.endsWith("_cents")) row[col] = v === "" ? null : eurToCents(v);
+          if (NULLABLE_NUM.has(col) && v === "") row[col] = null;
+          else if (col.endsWith("_cents")) row[col] = v === "" ? null : eurToCents(v);
           else if (bools.has(col)) row[col] = v === true || v === "TRUE" || v === 1 ? 1 : 0;
           else if (DATE_COLS.has(col)) row[col] = toIsoDate(v);
           else row[col] = v;
         }
-        for (const c of cols) if (!(c in row)) row[c] = c === "share_pct_override" ? null : (c.endsWith("_cents") ? null : "");
+        for (const c of cols) if (!(c in row)) row[c] = NULLABLE_NUM.has(c) ? null : (c.endsWith("_cents") ? null : "");
         return row;
       });
   }
