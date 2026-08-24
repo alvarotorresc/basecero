@@ -14,8 +14,10 @@ export const SQL = {
       ELSE 0 END),0) AS spent_cents
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.period_id=? AND t.deleted=0`,
-  recentForRefund: `SELECT t.id, t.date, t.amount_cents, t.merchant, t.category_id, t.is_shared, t.settled
-    FROM transactions t WHERE t.deleted=0 AND t.type='expense'
+  recentForRefund: `SELECT t.id, t.date, t.amount_cents, t.merchant, t.category_id, t.is_shared, t.settled,
+      t.share_pct_override, p.my_share_pct AS period_pct
+    FROM transactions t JOIN periods p ON p.id=t.period_id
+    WHERE t.deleted=0 AND t.type='expense'
       AND (t.period_id=? OR (t.is_shared=1 AND t.settled=0))
     ORDER BY t.date DESC, t.created_at DESC LIMIT 15`,
   incomeOfPeriod: `SELECT COALESCE(SUM(CASE WHEN t.type='income' THEN t.amount_cents ELSE 0 END),0) AS income_cents

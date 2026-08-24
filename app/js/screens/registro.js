@@ -102,7 +102,11 @@ export async function renderRegistro(container, onDone, prefill) {
       // Solo precarga categoría + importe de la parte de Sara; el refund de
       // liquidación en sí NO se marca compartido (mismo criterio que Task 7
       // settleShared: is_shared=0, ya es el 100% de lo que Sara debe).
-      const myPart = Math.round((row.amount_cents * pct) / 100);
+      // Usa el pct EFECTIVO del gasto enlazado (su propio override, o el pct
+      // de SU periodo), no el del periodo abierto: el gasto puede venir de un
+      // periodo cerrado con reparto distinto o llevar su propio override.
+      const rowPct = row.share_pct_override ?? row.period_pct ?? 100;
+      const myPart = Math.round((row.amount_cents * rowPct) / 100);
       const saraPart = row.amount_cents - myPart;
       state.raw = centsToRaw(saraPart);
       state.cents = saraPart;
