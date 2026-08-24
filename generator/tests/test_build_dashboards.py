@@ -27,9 +27,9 @@ def test_resumen(wb):
 
 def test_patrimonio(wb):
     ws = wb["Patrimonio y objetivos"]
-    assert "VLOOKUP(\"acc-n26\"" in str(ws["B3"].value)
-    assert str(ws["B7"].value).startswith("=SUM(")   # patrimonio neto
-    assert "REPT" in str(ws["D31"].value)            # barra de objetivos, fila 1 de plantilla
+    assert "accounts!$A2" in str(ws["B3"].value)
+    assert str(ws["B16"].value).startswith("=SUM(")  # patrimonio neto
+    assert "REPT" in str(ws["D35"].value)            # barra de objetivos, fila 1 de plantilla
 
 def test_prevision(wb):
     ws = wb["Previsión"]

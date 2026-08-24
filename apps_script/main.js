@@ -51,47 +51,52 @@ function bcCategoriesForPicker() {
 // Trigger INSTALABLE (Editor GAS > Triggers > onEditInstalable, evento "Al editar").
 function onEditInstalable(e) {
   var sheet = e.range.getSheet();
-  if (BC_DATA_SHEETS.indexOf(sheet.getName()) < 0 || e.range.getRow() < 2) return;
+  if (BC_DATA_SHEETS.indexOf(sheet.getName()) < 0) return;
   var ix = bcHeaderIndex(sheet);
-  var row = e.range.getRow();
-  var now = bcNowIso();
-  if (sheet.getRange(row, ix["id"]).getValue() === "") {
-    sheet.getRange(row, ix["id"]).setValue(bcUlid());
-    sheet.getRange(row, ix["created_at"]).setValue(now);
-    if (ix["deleted"]) sheet.getRange(row, ix["deleted"]).setValue(false);
-  }
-  sheet.getRange(row, ix["updated_at"]).setValue(now);
-  if (sheet.getName() !== "transactions") return;
-  if (sheet.getRange(row, ix["date"]).getValue() === "") {
-    sheet.getRange(row, ix["date"]).setValue(
-      Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"));
-  }
-  if (sheet.getRange(row, ix["period_id"]).getValue() === "") {
-    sheet.getRange(row, ix["period_id"]).setValue(bcOpenPeriodId());
-  }
-  if (sheet.getRange(row, ix["status"]).getValue() === "") {
-    sheet.getRange(row, ix["status"]).setValue("pending");
-  }
-  var pares = [["_account", "account_id", "accounts"],
-               ["_counter_account", "counter_account_id", "accounts"],
-               ["_rule", "rule_id", "recurring_rules"]];
-  pares.forEach(function (par) {
-    var visible = sheet.getRange(row, ix[par[0]]).getValue();
-    if (visible !== "" && sheet.getRange(row, ix[par[1]]).getValue() === "") {
-      sheet.getRange(row, ix[par[1]]).setValue(bcLookupIdByName(par[2], visible));
+  var startRow = e.range.getRow();
+  var endRow = e.range.getRow() + e.range.getNumRows() - 1;
+  for (var row = startRow; row <= endRow; row++) {
+    if (row < 2) continue;
+    var now = bcNowIso();
+    if (sheet.getRange(row, ix["id"]).getValue() === "") {
+      sheet.getRange(row, ix["id"]).setValue(bcUlid());
+      sheet.getRange(row, ix["created_at"]).setValue(now);
+      if (ix["deleted"]) sheet.getRange(row, ix["deleted"]).setValue(false);
     }
-  });
-  var picker = sheet.getRange(row, ix["_category"]).getValue();
-  if (picker !== "" && sheet.getRange(row, ix["category_id"]).getValue() === "") {
-    sheet.getRange(row, ix["category_id"]).setValue(
-      bcResolvePickerToId(picker, bcCategoriesForPicker()));
+    sheet.getRange(row, ix["updated_at"]).setValue(now);
+    if (sheet.getName() !== "transactions") continue;
+    if (sheet.getRange(row, ix["date"]).getValue() === "") {
+      sheet.getRange(row, ix["date"]).setValue(
+        Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"));
+    }
+    if (sheet.getRange(row, ix["period_id"]).getValue() === "") {
+      sheet.getRange(row, ix["period_id"]).setValue(bcOpenPeriodId());
+    }
+    if (sheet.getRange(row, ix["status"]).getValue() === "") {
+      sheet.getRange(row, ix["status"]).setValue("pending");
+    }
+    var pares = [["_account", "account_id", "accounts"],
+                 ["_counter_account", "counter_account_id", "accounts"],
+                 ["_rule", "rule_id", "recurring_rules"]];
+    pares.forEach(function (par) {
+      var visible = sheet.getRange(row, ix[par[0]]).getValue();
+      if (visible !== "" && sheet.getRange(row, ix[par[1]]).getValue() === "") {
+        sheet.getRange(row, ix[par[1]]).setValue(bcLookupIdByName(par[2], visible));
+      }
+    });
+    var picker = sheet.getRange(row, ix["_category"]).getValue();
+    if (picker !== "" && sheet.getRange(row, ix["category_id"]).getValue() === "") {
+      sheet.getRange(row, ix["category_id"]).setValue(
+        bcResolvePickerToId(picker, bcCategoriesForPicker()));
+    }
   }
 }
 
 function abrirDialogoImport() {
   var html = HtmlService.createHtmlOutput(
     '<textarea id="t" rows="15" style="width:100%"></textarea><br>' +
-    '<button onclick="google.script.run.withSuccessHandler(function(m){' +
+    '<button onclick="google.script.run.withFailureHandler(function(e){' +
+    'document.body.innerHTML=\'Error: \'+e.message;}).withSuccessHandler(function(m){' +
     'document.body.innerHTML=m;}).processN26Csv(' +
     'document.getElementById(\'t\').value)">Importar</button>')
     .setWidth(520).setHeight(360);
@@ -102,13 +107,17 @@ function processN26Csv(text) {
   var sheet = SpreadsheetApp.getActive().getSheetByName("transactions");
   var ix = bcHeaderIndex(sheet);
   var last = sheet.getLastRow();
+  var n26Id = bcLookupIdByName("accounts", "N26");
   var existing = [];
   if (last >= 2) {
     var vals = sheet.getRange(2, 1, last - 1, sheet.getLastColumn()).getValues();
     vals.forEach(function (v, i) {
       if (v[ix["id"] - 1] === "") return;
+      if (v[ix["account_id"] - 1] !== n26Id) return;
       existing.push({ id: v[ix["id"] - 1], rowNum: i + 2,
-        dateIso: String(v[ix["date"] - 1]).slice(0, 10),
+        dateIso: bcNormalizeDateIso(v[ix["date"] - 1], function (d) {
+          return Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyy-MM-dd");
+        }),
         type: v[ix["type"] - 1],
         amountCents: Math.round((parseFloat(v[ix["amount"] - 1]) || 0) * 100) *
           (v[ix["type"] - 1] === "expense" ? -1 : 1),
@@ -141,7 +150,7 @@ function processN26Csv(text) {
       set("type", r.amountCents < 0 ? "expense" : "income");
       set("amount", Math.abs(r.amountCents) / 100);
       set("_account", "N26"); set("account_id", bcLookupIdByName("accounts", "N26"));
-      set("merchant", r.partnerName); set("note", r.paymentReference);
+      set("merchant", bcSanitizeCell(r.partnerName)); set("note", bcSanitizeCell(r.paymentReference));
       set("external_id", r.externalId); set("status", "reconciled");
       set("created_at", now); set("updated_at", now); set("deleted", false);
       existing.push({ id: "nuevo", rowNum: newRow, dateIso: r.bookingDate,

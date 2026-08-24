@@ -67,9 +67,11 @@ siguiente sección).
    marcar desde el móvil.
 
 Tras esto, el menú **BaseCero > Importar CSV de N26…** (creado por
-`onOpen()`) y el autorrelleno de `id`, `period_id`, `status`, timestamps y
-las columnas `_account`/`_counter_account`/`_category`/`_rule` (creado por
-`onEditInstalable`) ya deberían funcionar en cualquier fila nueva.
+`onOpen()`) y el autorrelleno de `id`, `period_id`, `status` y timestamps
+(creado por `onEditInstalable`) ya deberían funcionar en cualquier fila
+nueva. Las columnas `_account`/`_counter_account`/`_category`/`_rule` las
+rellena el usuario eligiendo de un desplegable, y es el trigger quien
+resuelve a partir de ellas los `*_id` ocultos correspondientes.
 
 ## Checklist de QA manual (marcar en el primer uso)
 
@@ -103,6 +105,9 @@ las columnas `_account`/`_counter_account`/`_category`/`_rule` (creado por
 - El objetivo (`goal`) de tipo `savings_rate` muestra siempre una barra de
   progreso fija al 100 %; hay que comparar a ojo con la tasa de ahorro real
   del bloque "Resumen del periodo".
+- La barra de un objetivo `spending_cap` muestra el % gastado sobre el
+  límite, pero no se pone en rojo al superarlo (el "en rojo" del §7.2 de la
+  spec no está implementado en la hoja del MVP).
 - Solo los `refund` **sin** `ref_id` restan gasto de su categoría; los que sí
   tienen `ref_id` (devolución de un gasto compartido) solo son entrada de
   caja, para no contar el gasto dos veces.

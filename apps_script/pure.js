@@ -50,6 +50,9 @@ function bcParseN26Csv(text) {
     ref: head.indexOf("Payment Reference"),
     amount: head.indexOf("Amount (EUR)"),
   };
+  if (ix.date === -1 || ix.partner === -1 || ix.ref === -1 || ix.amount === -1) {
+    throw new Error("Cabecera CSV de N26 no reconocida");
+  }
   var rows = [];
   for (var i = 1; i < lines.length; i++) {
     var f = bcParseCsvLine(lines[i]);
@@ -65,6 +68,17 @@ function bcParseN26Csv(text) {
 
 function bcDaysBetween(isoA, isoB) {
   return Math.abs(new Date(isoA + "T00:00:00Z") - new Date(isoB + "T00:00:00Z")) / 86400000;
+}
+
+function bcNormalizeDateIso(value, formatFn) {
+  if (value && typeof value.getTime === "function") return formatFn(value);
+  return String(value).slice(0, 10);
+}
+
+function bcSanitizeCell(s) {
+  var t = String(s === undefined || s === null ? "" : s);
+  if (t.length > 0 && (t.charAt(0) === "=" || t.charAt(0) === "+" || t.charAt(0) === "@")) return "'" + t;
+  return t;
 }
 
 function bcDecideImportAction(row, existing) {
@@ -111,5 +125,6 @@ if (typeof module !== "undefined") {
   module.exports = { bcUlid: bcUlid, bcBuildExternalId: bcBuildExternalId,
     bcParseCsvLine: bcParseCsvLine, bcParseN26Csv: bcParseN26Csv,
     bcDaysBetween: bcDaysBetween, bcDecideImportAction: bcDecideImportAction,
-    bcResolvePickerToId: bcResolvePickerToId, bcFirstEmptyIndex: bcFirstEmptyIndex };
+    bcResolvePickerToId: bcResolvePickerToId, bcFirstEmptyIndex: bcFirstEmptyIndex,
+    bcNormalizeDateIso: bcNormalizeDateIso, bcSanitizeCell: bcSanitizeCell };
 }

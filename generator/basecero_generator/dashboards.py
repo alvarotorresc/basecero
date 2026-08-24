@@ -29,7 +29,7 @@ def _resumen(wb):
     ws["B3"] = '=IFERROR(INDEX(periods!$A:$A,MATCH($B$1,periods!$B:$B,0)-1),"")'
     e, d, z, cc, n, q, r2, v, k = (tr("amount"), tr("type"), tr("deleted"), tr("period_id"),
         tr("is_shared"), tr("_sara_amount"), tr("settled"), tr("external_id"), tr("category_id"))
-    ws["A5"], ws["B5"] = "Ingresos", (f'=SUMIFS({e},{cc},$B$2,{d},"income",{z},FALSE)')
+    ws["A5"], ws["B5"] = "Ingresos", (f'=SUMIFS({e},{cc},$B$2,{d},"income",{z},"<>TRUE")')
     ws["A6"], ws["B6"] = "Gasto (mi parte)", "=" + _gasto("", "$B$2")
     ws["A7"], ws["B7"] = "Ahorro €", "=B5-B6"
     ws["A8"], ws["B8"] = "Tasa de ahorro", '=IF(B5=0,"",B7/B5)'
@@ -58,32 +58,34 @@ def _resumen(wb):
 def _patrimonio(wb):
     ws = _sheet(wb, "Patrimonio y objetivos")
     ws["A1"] = "Cuentas"
-    for i, acc in enumerate(seeds.SEED_ACCOUNTS):
-        r = 3 + i
-        ws.cell(row=r, column=1, value=acc["name"])
-        ws.cell(row=r, column=2, value="=" + saldo_expr(f'"{acc["id"]}"'))
-    ws["A7"], ws["B7"] = "PATRIMONIO NETO", "=SUM(B3:B6)"
-    ws["A7"].font = B
-    ws["A9"] = "Evolución por periodo"
+    for i in range(12):                      # 12 cuentas de plantilla
+        r, ar = 3 + i, 2 + i
+        ws.cell(row=r, column=1, value=f'=IF(accounts!$B{ar}="","",accounts!$B{ar})')
+        ws.cell(row=r, column=2, value=(
+            f'=IF(accounts!$B{ar}="","",{saldo_expr(f"accounts!$A{ar}")})'))
+    ws["A16"], ws["B16"] = "PATRIMONIO NETO", "=SUM(B3:B14)"
+    ws["A16"].font = B
+    ws["A18"] = "Evolución por periodo"
     b, e, d, z = tr("date"), tr("amount"), tr("type"), tr("deleted")
     for i in range(12):                      # 12 periodos de serie
-        r, pr = 10 + i, 2 + i
+        r, pr = 19 + i, 2 + i
         ws.cell(row=r, column=1, value=f'=IF(periods!$B{pr}="","",periods!$B{pr})')
         ws.cell(row=r, column=2, value=(
             f'=IF(periods!$D{pr}="","",SUM(accounts!$D$2:$D$100)'
             f'+SUMPRODUCT(({b}<=periods!$D{pr})*(({d}="income")+({d}="refund")+({d}="adjustment"))*({z}=FALSE)*{e})'
             f'-SUMPRODUCT(({b}<=periods!$D{pr})*({d}="expense")*({z}=FALSE)*{e}))'))
-    ws["A29"] = "Objetivos"
-    ws["B28"] = '=IFERROR(INDEX(periods!$A:$A,MATCH("open",periods!$E:$E,0)),"")'
-    gasto_medio = (f'((SUMPRODUCT(({tr("period_id")}<>$B$28)*({tr("type")}="expense")*({tr("deleted")}=FALSE)*{tr("_my_amount")})'
-                   f'-SUMPRODUCT(({tr("period_id")}<>$B$28)*({tr("type")}="refund")*({tr("ref_id")}="")*({tr("deleted")}=FALSE)*{tr("amount")}))'
+    ws["A32"], ws["B32"] = "Periodo abierto", \
+        '=IFERROR(INDEX(periods!$A:$A,MATCH("open",periods!$E:$E,0)),"")'
+    ws["A33"] = "Objetivos"
+    gasto_medio = (f'((SUMPRODUCT(({tr("period_id")}<>$B$32)*({tr("type")}="expense")*({tr("deleted")}=FALSE)*{tr("_my_amount")})'
+                   f'-SUMPRODUCT(({tr("period_id")}<>$B$32)*({tr("type")}="refund")*({tr("ref_id")}="")*({tr("deleted")}=FALSE)*{tr("amount")}))'
                    f'/MAX(1,COUNTIF(periods!$E:$E,"closed")))')
     for j, t in enumerate(["Objetivo", "Tipo", "Progreso", "Barra"], 1):
-        ws.cell(row=30, column=j, value=t).font = B
+        ws.cell(row=34, column=j, value=t).font = B
     for i in range(10):                      # 10 goals de plantilla
-        r, gr = 31 + i, 2 + i
+        r, gr = 35 + i, 2 + i
         saldo = saldo_expr(f"goals!$H{gr}")
-        gasto_cap = _gasto(f"goals!$I{gr}", "$B$28")
+        gasto_cap = _gasto(f"goals!$I{gr}", "$B$32")
         ws.cell(row=r, column=1, value=f'=IF(goals!$B{gr}="","",goals!$B{gr})')
         ws.cell(row=r, column=2, value=f'=IF(goals!$B{gr}="","",goals!$C{gr})')
         ws.cell(row=r, column=3, value=(

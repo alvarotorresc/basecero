@@ -19,12 +19,12 @@ def tr(name):
 def saldo_expr(id_expr):
     e, g, i_, d, z = tr("amount"), tr("account_id"), tr("counter_account_id"), tr("type"), tr("deleted")
     return (f'VLOOKUP({id_expr},accounts!$A:$D,4,FALSE)'
-            f'+SUMIFS({e},{g},{id_expr},{d},"income",{z},FALSE)'
-            f'+SUMIFS({e},{g},{id_expr},{d},"refund",{z},FALSE)'
-            f'-SUMIFS({e},{g},{id_expr},{d},"expense",{z},FALSE)'
-            f'-SUMIFS({e},{g},{id_expr},{d},"transfer",{z},FALSE)'
-            f'+SUMIFS({e},{i_},{id_expr},{d},"transfer",{z},FALSE)'
-            f'+SUMIFS({e},{g},{id_expr},{d},"adjustment",{z},FALSE)')
+            f'+SUMIFS({e},{g},{id_expr},{d},"income",{z},"<>TRUE")'
+            f'+SUMIFS({e},{g},{id_expr},{d},"refund",{z},"<>TRUE")'
+            f'-SUMIFS({e},{g},{id_expr},{d},"expense",{z},"<>TRUE")'
+            f'-SUMIFS({e},{g},{id_expr},{d},"transfer",{z},"<>TRUE")'
+            f'+SUMIFS({e},{i_},{id_expr},{d},"transfer",{z},"<>TRUE")'
+            f'+SUMIFS({e},{g},{id_expr},{d},"adjustment",{z},"<>TRUE")')
 
 def _head(ws, names, color):
     ws.sheet_properties.tabColor = color

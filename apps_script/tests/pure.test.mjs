@@ -59,3 +59,19 @@ test("firstEmptyIndex: primera posición vacía o length", () => {
   assert.equal(p.bcFirstEmptyIndex([]), 0);
   assert.equal(p.bcFirstEmptyIndex(["a", "b"]), 2);
 });
+
+test("normalizeDateIso: Date usa formatFn, string se recorta a YYYY-MM-DD", () => {
+  const fakeFormat = (d) => "2026-08-19";
+  assert.equal(p.bcNormalizeDateIso(new Date(2026, 7, 19), fakeFormat), "2026-08-19");
+  assert.equal(p.bcNormalizeDateIso("2026-08-19T00:00:00", fakeFormat), "2026-08-19");
+});
+
+test("sanitizeCell: neutraliza inyección de fórmulas, deja el resto intacto", () => {
+  assert.equal(p.bcSanitizeCell("=IMPORTXML(1)"), "'=IMPORTXML(1)");
+  assert.equal(p.bcSanitizeCell("Mercadona"), "Mercadona");
+  assert.equal(p.bcSanitizeCell(null), "");
+});
+
+test("parseN26Csv: cabecera no reconocida lanza error", () => {
+  assert.throws(() => p.bcParseN26Csv('"foo","bar"\n"1","2"'));
+});
