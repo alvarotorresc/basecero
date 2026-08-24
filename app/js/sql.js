@@ -36,5 +36,22 @@ export const SQL = {
   listAccounts: `SELECT id, name, type FROM accounts WHERE deleted=0 AND is_archived=0 ORDER BY display_order`,
   allCategories: `SELECT id, name, parent_id FROM categories WHERE deleted=0`,
   dumpTable: (t) => `SELECT * FROM ${t}`,   // solo para exportAllJson; t viene de la lista fija de tablas
+
+  // my_share_pct se añade sobre el SELECT literal del brief: el detalle de Movimientos lo
+  // necesita para mostrar el reparto real (mismo criterio que registro.js), no un 100% fijo.
+  listPeriods: `SELECT id, name, start_date, end_date, status, my_share_pct FROM periods WHERE deleted=0 ORDER BY start_date DESC`,
+  listAllByDay: `SELECT t.id, t.date, t.type, t.amount_cents, t.category_id, t.merchant, t.note, t.is_shared,
+      t.account_id, t.counter_account_id, t.share_pct_override, t.ref_id, t.rule_id, t.status,
+      ${MY_AMOUNT} AS my_amount_cents
+    FROM transactions t JOIN periods p ON p.id=t.period_id
+    WHERE t.period_id=? AND t.deleted=0
+    ORDER BY t.date DESC, t.created_at DESC`,
+  getTransaction: `SELECT * FROM transactions WHERE id=? AND deleted=0`,
+  updateTransaction: `UPDATE transactions SET type=?, amount_cents=?, date=?, category_id=?, account_id=?,
+    counter_account_id=?, merchant=?, note=?, is_shared=?, share_pct_override=?, ref_id=?, rule_id=?, status=?,
+    updated_at=? WHERE id=?`,
+  softDeleteTransaction: `UPDATE transactions SET deleted=1, updated_at=? WHERE id=?`,
+  countUncategorized: `SELECT COUNT(*) AS n FROM transactions
+    WHERE period_id=? AND deleted=0 AND category_id='' AND type IN ('expense','income','refund')`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"];

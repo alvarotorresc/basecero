@@ -40,6 +40,44 @@ export const listAccounts = () => query(SQL.listAccounts);
 export const allCategoriesById = async () =>
   Object.fromEntries((await query(SQL.allCategories)).map((c) => [c.id, c]));
 
+export const listPeriods = () => query(SQL.listPeriods);
+export const listAllByDay = (pid) => query(SQL.listAllByDay, [pid]);
+export const getTransaction = async (id) => (await query(SQL.getTransaction, [id]))[0] ?? null;
+export const countUncategorized = async (pid) => (await query(SQL.countUncategorized, [pid]))[0].n;
+
+/** Actualiza los campos editables de un movimiento (mismas claves camelCase que addTransaction).
+ *  Los campos ausentes conservan el valor actual (no se pisan con defaults): p.ej. si el formulario
+ *  no expone `status`, la fila mantiene su status ('pending'/'reconciled') tal cual estaba. */
+export async function updateTransaction(id, fields) {
+  const cur = await getTransaction(id);
+  if (!cur) throw new Error("Movimiento no encontrado");
+  const f = {
+    type: fields.type ?? cur.type,
+    amountCents: fields.amountCents ?? cur.amount_cents,
+    date: fields.date ?? cur.date,
+    categoryId: fields.categoryId ?? cur.category_id,
+    accountId: fields.accountId ?? cur.account_id,
+    counterAccountId: fields.counterAccountId ?? cur.counter_account_id,
+    merchant: fields.merchant ?? cur.merchant,
+    note: fields.note ?? cur.note,
+    isShared: fields.isShared ?? !!cur.is_shared,
+    sharePctOverride: fields.sharePctOverride !== undefined ? fields.sharePctOverride : cur.share_pct_override,
+    refId: fields.refId ?? cur.ref_id,
+    ruleId: fields.ruleId ?? cur.rule_id,
+    status: fields.status ?? cur.status,
+  };
+  const t = nowIso();
+  await exec(SQL.updateTransaction, [
+    f.type, f.amountCents, f.date, f.categoryId ?? "", f.accountId, f.counterAccountId ?? "",
+    bcSanitizeCell(f.merchant ?? ""), bcSanitizeCell(f.note ?? ""), f.isShared ? 1 : 0,
+    f.sharePctOverride, f.refId ?? "", f.ruleId ?? "", f.status, t, id,
+  ]);
+}
+
+export async function softDeleteTransaction(id) {
+  await exec(SQL.softDeleteTransaction, [nowIso(), id]);
+}
+
 export async function dumpAllTables() {
   const out = {};
   for (const t of TABLES) out[t] = await query(SQL.dumpTable(t));
