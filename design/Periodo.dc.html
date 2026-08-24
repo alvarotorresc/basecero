@@ -1,0 +1,238 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="crossorigin">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #0b0c0e; font-family: 'Plus Jakarta Sans', 'Helvetica Neue', Arial, sans-serif; color: #e7e9ec; -webkit-font-smoothing: antialiased; }
+    a { color: #2f6bff; text-decoration: none; }
+    a:hover { color: #6b95ff; }
+  </style>
+</helmet>
+
+<div style="width: 390px; height: 1320px; background: #0b0c0e; padding: 20px 20px 24px; display: flex; flex-direction: column; gap: 16px;">
+
+  <!-- cabecera -->
+  <div style="display: flex; align-items: center; gap: 12px;">
+    <div style="width: 36px; height: 36px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 1px solid #23272b; border-radius: 12px; background: #151719;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9aa1a9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5l-7 7 7 7"></path></svg>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 2px;">
+      <div style="font-size: 17px; font-weight: 700; letter-spacing: -0.01em;">Nuevo periodo</div>
+      <div style="font-size: 11px; color: #656c74;">Paso único · se guarda al abrirlo</div>
+    </div>
+  </div>
+
+  <!-- cierre del periodo anterior -->
+  <div style="background: #151719; border: 1px solid #23272b; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+      <div style="display: flex; flex-direction: column; gap: 3px;">
+        <div style="font-size: 15px; font-weight: 700;">Cierras Agosto 2026</div>
+        <div style="font-size: 11px; color: #656c74;">27 jul – 26 ago · 47 movimientos</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 5px; background: #14261d; border-radius: 10px; padding: 6px 9px; flex-shrink: 0;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5 10-11"></path></svg>
+        <div style="font-size: 11px; font-weight: 700; color: #4ade80;">Cuadrado</div>
+      </div>
+    </div>
+    <div style="height: 1px; background: #23272b;"></div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <div style="font-size: 11px; color: #656c74;">Gastado</div>
+        <div style="font-family: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums;">1.762,40 €</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <div style="font-size: 11px; color: #656c74;">Ahorrado</div>
+        <div style="font-family: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif; font-size: 15px; font-weight: 600; color: #4ade80; font-variant-numeric: tabular-nums;">387,60 €</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <div style="font-size: 11px; color: #656c74;">Tasa de ahorro</div>
+        <div style="font-family: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums;">18,0 %</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- datos del periodo nuevo -->
+  <div style="background: #151719; border: 1px solid #23272b; border-radius: 22px; padding: 4px 16px; display: flex; flex-direction: column;">
+
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0;">
+      <div style="display: flex; flex-direction: column; gap: 3px;">
+        <div style="font-size: 14px; font-weight: 600;">Empieza el</div>
+        <div style="font-size: 11px; color: #656c74;">El día que te entra la nómina</div>
+      </div>
+      <div style="height: 42px; display: flex; align-items: center; gap: 8px; padding: 0 13px; background: #1b1e21; border-radius: 14px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa1a9" stroke-width="1.7" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="3.5"></rect><path d="M8 3v4M16 3v4M3.5 10h17"></path></svg>
+        <div style="font-family: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif; font-size: 14px; font-weight: 600;">27 ago 2026</div>
+      </div>
+    </div>
+
+    <div style="height: 1px; background: #1d2124;"></div>
+
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0;">
+      <div style="display: flex; flex-direction: column; gap: 3px;">
+        <div style="font-size: 14px; font-weight: 600;">Nombre</div>
+        <div style="font-size: 11px; color: #656c74;">Generado automáticamente</div>
+      </div>
+      <div style="height: 42px; display: flex; align-items: center; padding: 0 13px; background: #1b1e21; border-radius: 14px;">
+        <div style="font-size: 14px; font-weight: 600;">Septiembre 2026</div>
+      </div>
+    </div>
+
+    <div style="height: 1px; background: #1d2124;"></div>
+
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0;">
+      <div style="display: flex; flex-direction: column; gap: 3px;">
+        <div style="font-size: 14px; font-weight: 600;">Pagas de lo compartido</div>
+        <div style="font-size: 11px; color: #656c74;">Sara pagará el 40 % restante</div>
+      </div>
+      <div style="height: 42px; display: flex; align-items: center; gap: 10px; padding: 0 13px; background: #1b1e21; border: 1px solid #2f6bff; border-radius: 14px;">
+        <div style="font-family: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums;">60 %</div>
+        <div style="width: 1px; height: 18px; background: #2a2f34;"></div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7aa2ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9.5L12 5.5l4 4M8 14.5l4 4 4-4"></path></svg>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- presupuestos -->
+  <div style="display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 15px; font-weight: 700;">¿Cuánto quieres gastar este periodo?</div>
+      <div style="font-size: 11px; color: #656c74; line-height: 1.5; text-wrap: pretty;">Pon un límite solo donde te sirva. Si lo dejas vacío, esa categoría irá sin presupuesto.</div>
+    </div>
+
+    <div style="background: #151719; border: 1px solid #23272b; border-radius: 22px; padding: 4px 16px; display: flex; flex-direction: column;">
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 13px 0;">
+        <div style="width: 40px; height: 40px; border-radius: 14px; background: #1b1f33; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#8b9ff5" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.6L12 4.2l8 6.4V19a1.6 1.6 0 01-1.6 1.6H5.6A1.6 1.6 0 014 19z"></path><path d="M9.6 20.6v-5.8h4.8v5.8"></path></svg>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+          <div style="font-size: 14px; font-weight: 600;">Casa</div>
+          <div style="font-size: 11px; color: #656c74;">Mes pasado: 690 €</div>
+        </div>
+        <div style="height: 42px; width: 92px; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; padding: 0 12px; background: #1b1e21; border-radius: 14px;">
+          <div style="font-family: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums;">700 €</div>
+        </div>
+      </div>
+
+      <div style="height: 1px; background: #1d2124;"></div>
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 13px 0;">
+        <div style="width: 40px; height: 40px; border-radius: 14px; background: #16261c; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#58d68d" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h2.2l2.3 10.2a1.8 1.8 0 001.8 1.4h7.4a1.8 1.8 0 001.8-1.4L20 8H6"></path><circle cx="9.5" cy="19.5" r="1.2"></circle><circle cx="16.5" cy="19.5" r="1.2"></circle></svg>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+          <div style="font-size: 14px; font-weight: 600;">Alimentación</div>
+          <div style="font-size: 11px; color: #656c74;">Mes pasado: 312 €</div>
+        </div>
+        <div style="height: 42px; width: 92px; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; padding: 0 12px; background: #1b1e21; border-radius: 14px;">
+          <div style="font-family: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums;">350 €</div>
+        </div>
+      </div>
+
+      <div style="height: 1px; background: #1d2124;"></div>
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 13px 0;">
+        <div style="width: 40px; height: 40px; border-radius: 14px; background: #2a2016; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#f0a868" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v6a2.6 2.6 0 005.2 0V3"></path><path d="M8.6 11.6V21"></path><path d="M18.4 3c-1.6 1.4-2.4 3.2-2.4 5.4 0 1.8.8 2.8 2.4 3V21"></path></svg>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+          <div style="font-size: 14px; font-weight: 600;">Restauración</div>
+          <div style="font-size: 11px; color: #656c74;">Mes pasado: 184 €</div>
+        </div>
+        <div style="height: 42px; width: 92px; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; padding: 0 12px; background: #1b1e21; border-radius: 14px;">
+          <div style="font-family: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums;">200 €</div>
+        </div>
+      </div>
+
+      <div style="height: 1px; background: #1d2124;"></div>
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 13px 0;">
+        <div style="width: 40px; height: 40px; border-radius: 14px; background: #14252a; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#56c6de" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 16.2h15.6v-3.8l-1.7-4.1a1.6 1.6 0 00-1.5-1H7.4a1.6 1.6 0 00-1.5 1l-1.7 4.1z"></path><path d="M6 16.2v2.4h2.6v-2.4M15.4 16.2v2.4H18v-2.4"></path></svg>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+          <div style="font-size: 14px; font-weight: 600;">Transporte</div>
+          <div style="font-size: 11px; color: #656c74;">Mes pasado: 122 €</div>
+        </div>
+        <div style="height: 42px; width: 92px; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; padding: 0 12px; background: #1b1e21; border-radius: 14px;">
+          <div style="font-family: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums;">130 €</div>
+        </div>
+      </div>
+
+      <div style="height: 1px; background: #1d2124;"></div>
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 13px 0;">
+        <div style="width: 40px; height: 40px; border-radius: 14px; background: #2a1a24; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#e68ab0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.8l2.5 5.1 5.6.8-4.05 3.95L17 19.2 12 16.6 7 19.2l.95-5.55L3.9 9.7l5.6-.8z"></path></svg>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+          <div style="font-size: 14px; font-weight: 600;">Ocio</div>
+          <div style="font-size: 11px; color: #656c74;">Mes pasado: 96 €</div>
+        </div>
+        <div style="height: 42px; width: 92px; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; padding: 0 12px; background: #1b1e21; border: 1px solid #2f6bff; border-radius: 14px;">
+          <div style="font-family: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums;">150 €</div>
+        </div>
+      </div>
+
+      <div style="height: 1px; background: #1d2124;"></div>
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 13px 0;">
+        <div style="width: 40px; height: 40px; border-radius: 14px; background: #221b30; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#b08be8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="12.4" rx="2.6"></rect><path d="M8.6 21h6.8"></path><path d="M10.6 9.4l3.6 2.2-3.6 2.2z"></path></svg>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+          <div style="font-size: 14px; font-weight: 600;">Suscripciones</div>
+          <div style="font-size: 11px; color: #656c74;">Mes pasado: 35 €</div>
+        </div>
+        <div style="height: 42px; width: 92px; flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; padding: 0 12px; background: #17191c; border: 1px dashed #2a2f34; border-radius: 14px;">
+          <div style="font-size: 12px; color: #656c74;">Sin límite</div>
+        </div>
+      </div>
+
+      <div style="height: 1px; background: #1d2124;"></div>
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 14px 0;">
+        <div style="width: 40px; height: 40px; border-radius: 14px; background: #16233f; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7aa2ff" stroke-width="2" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13"></path></svg>
+        </div>
+        <div style="font-size: 14px; font-weight: 600; color: #7aa2ff;">Añadir límite a otra categoría</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- total y confirmación -->
+  <div style="background: #151719; border: 1px solid #23272b; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;">
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <div style="font-size: 12px; font-weight: 600; color: #9aa1a9;">Presupuestado</div>
+        <div style="font-family: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif; font-size: 28px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums;">1.530 €</div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 5px;">
+        <div style="font-size: 11px; color: #656c74;">Ingresos previstos</div>
+        <div style="font-family: 'Space Grotesk', 'Helvetica Neue', Arial, sans-serif; font-size: 15px; font-weight: 600; color: #9aa1a9; font-variant-numeric: tabular-nums;">2.150 €</div>
+      </div>
+    </div>
+    <div style="height: 8px; background: #1e2225; border-radius: 999px; overflow: hidden;">
+      <div style="width: 71%; height: 8px; background: #2f6bff; border-radius: 999px;"></div>
+    </div>
+    <div style="font-size: 11px; color: #656c74; line-height: 1.5; text-wrap: pretty;">Quedan <span style="color: #4ade80; font-weight: 700;">620 €</span> sin asignar: de ahí salen la cuota del coche, las provisiones y lo que ahorres.</div>
+    <div style="height: 56px; background: #2f6bff; border-radius: 18px; display: flex; align-items: center; justify-content: center;">
+      <div style="font-size: 16px; font-weight: 700; color: #ffffff;">Abrir periodo</div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>
