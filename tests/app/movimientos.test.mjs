@@ -99,6 +99,64 @@ test("softDeleteTransaction: excluye la fila de listAllByDay y de spentOfPeriod"
   assert.equal(db.prepare(SQL.spentOfPeriod).get("per-1").spent_cents, 1000);
 });
 
+/** Reproduce exactamente la secuencia de repo.softDeleteTransaction para un refund enlazado:
+ *  softDelete + unsettleIfNoActiveRefunds (mismo bind order que la ruling del controller). */
+function softDeleteRefund(db, refundId, refId, t) {
+  db.prepare(SQL.softDeleteTransaction).run(t, refundId);
+  db.prepare(SQL.unsettleIfNoActiveRefunds).run(refId, refundId, t, refId);
+}
+
+test("softDelete de un refund enlazado revierte settled=0 del gasto original", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const gastoId = ins(db, { type: "expense", cents: 9000, shared: 1 });
+  db.prepare("UPDATE transactions SET settled=1 WHERE id=?").run(gastoId); // como haría addTransaction({refId})
+  const refundId = ins(db, { type: "refund", cents: 3600, shared: 0, ref: gastoId });
+
+  softDeleteRefund(db, refundId, gastoId, T2);
+
+  const gasto = db.prepare("SELECT settled, updated_at FROM transactions WHERE id=?").get(gastoId);
+  assert.equal(gasto.settled, 0);
+  assert.equal(gasto.updated_at, T2);
+
+  const refund = db.prepare("SELECT deleted FROM transactions WHERE id=?").get(refundId);
+  assert.equal(refund.deleted, 1);
+});
+
+test("softDelete de un refund con OTRO refund activo enlazado NO revierte settled", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const gastoId = ins(db, { type: "expense", cents: 9000, shared: 1 });
+  db.prepare("UPDATE transactions SET settled=1 WHERE id=?").run(gastoId);
+  const refund1 = ins(db, { type: "refund", cents: 1800, shared: 0, ref: gastoId });
+  const refund2 = ins(db, { type: "refund", cents: 1800, shared: 0, ref: gastoId });
+
+  softDeleteRefund(db, refund1, gastoId, T2);
+  assert.equal(
+    db.prepare("SELECT settled FROM transactions WHERE id=?").get(gastoId).settled, 1,
+    "queda refund2 activo: el gasto sigue liquidado",
+  );
+
+  softDeleteRefund(db, refund2, gastoId, T2);
+  assert.equal(
+    db.prepare("SELECT settled FROM transactions WHERE id=?").get(gastoId).settled, 0,
+    "sin refunds activos: el gasto vuelve a settled=0",
+  );
+});
+
+test("softDelete de un gasto normal (no refund) se comporta igual que antes: solo deleted+updated_at", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const id = ins(db, { type: "expense", cents: 4000, settled: 0 });
+
+  db.prepare(SQL.softDeleteTransaction).run(T2, id); // ruta plana, sin unsettleIfNoActiveRefunds
+
+  const row = db.prepare("SELECT deleted, updated_at, settled FROM transactions WHERE id=?").get(id);
+  assert.equal(row.deleted, 1);
+  assert.equal(row.updated_at, T2);
+  assert.equal(row.settled, 0);
+});
+
 test("countUncategorized: cuenta solo expense/income/refund sin categoría y no borradas", () => {
   const db = openDb();
   seedMinimal(db);

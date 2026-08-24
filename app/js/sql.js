@@ -51,6 +51,11 @@ export const SQL = {
     counter_account_id=?, merchant=?, note=?, is_shared=?, share_pct_override=?, ref_id=?, rule_id=?, status=?,
     updated_at=? WHERE id=?`,
   softDeleteTransaction: `UPDATE transactions SET deleted=1, updated_at=? WHERE id=?`,
+  // Al borrar un refund enlazado (ref_id), revierte settled=1 del gasto original SOLO si no queda
+  // ningún otro refund activo (no borrado, type='refund') apuntando a él — bind: [refId, refundIdBorrado, now, refId].
+  unsettleIfNoActiveRefunds: `UPDATE transactions SET settled = CASE WHEN EXISTS(
+      SELECT 1 FROM transactions r WHERE r.ref_id=? AND r.type='refund' AND r.deleted=0 AND r.id<>?
+    ) THEN 1 ELSE 0 END, updated_at=? WHERE id=?`,
   countUncategorized: `SELECT COUNT(*) AS n FROM transactions
     WHERE period_id=? AND deleted=0 AND category_id='' AND type IN ('expense','income','refund')`,
 };

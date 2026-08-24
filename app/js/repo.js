@@ -74,8 +74,20 @@ export async function updateTransaction(id, fields) {
   ]);
 }
 
+/** Borra (soft) un movimiento. Si es un refund enlazado a un gasto (ref_id), revierte el
+ *  settled=1 de ese gasto EN LA MISMA operación — salvo que quede algún otro refund activo
+ *  apuntándole (p.ej. si alguna vez se permiten varios refunds parciales sobre el mismo gasto). */
 export async function softDeleteTransaction(id) {
-  await exec(SQL.softDeleteTransaction, [nowIso(), id]);
+  const cur = await getTransaction(id);
+  const t = nowIso();
+  if (cur && cur.type === "refund" && cur.ref_id) {
+    await execMany([
+      { sql: SQL.softDeleteTransaction, bind: [t, id] },
+      { sql: SQL.unsettleIfNoActiveRefunds, bind: [cur.ref_id, id, t, cur.ref_id] },
+    ]);
+  } else {
+    await exec(SQL.softDeleteTransaction, [t, id]);
+  }
 }
 
 export async function dumpAllTables() {
