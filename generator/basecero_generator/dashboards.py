@@ -75,7 +75,8 @@ def _patrimonio(wb):
             f'-SUMPRODUCT(({b}<=periods!$D{pr})*({d}="expense")*({z}=FALSE)*{e}))'))
     ws["A29"] = "Objetivos"
     ws["B28"] = '=IFERROR(INDEX(periods!$A:$A,MATCH("open",periods!$E:$E,0)),"")'
-    gasto_medio = (f'(SUMPRODUCT(({tr("type")}="expense")*({tr("deleted")}=FALSE)*{tr("_my_amount")})'
+    gasto_medio = (f'((SUMPRODUCT(({tr("period_id")}<>$B$28)*({tr("type")}="expense")*({tr("deleted")}=FALSE)*{tr("_my_amount")})'
+                   f'-SUMPRODUCT(({tr("period_id")}<>$B$28)*({tr("type")}="refund")*({tr("ref_id")}="")*({tr("deleted")}=FALSE)*{tr("amount")}))'
                    f'/MAX(1,COUNTIF(periods!$E:$E,"closed")))')
     for j, t in enumerate(["Objetivo", "Tipo", "Progreso", "Barra"], 1):
         ws.cell(row=30, column=j, value=t).font = B
@@ -103,7 +104,9 @@ def _prevision(wb):
         '=IFERROR(INDEX(periods!$A:$A,MATCH("open",periods!$E:$E,0)),"")'
     ws["A2"], ws["B2"] = "Mi % este periodo", \
         '=IFERROR(VLOOKUP($B$1,periods!$A:$F,6,FALSE),100)'
-    for j, t in enumerate(["Regla", "Frecuencia", "¿Aplica este mes?", "Mi importe", "", "Estado"], 1):
+    ws["C1"], ws["D1"] = "Mes del periodo", \
+        '=IFERROR(MONTH(VLOOKUP($B$1,periods!$A:$C,3,FALSE)+15),MONTH(TODAY()))'
+    for j, t in enumerate(["Regla", "Frecuencia", "¿Aplica este mes?", "Mi importe", "Tipo", "Estado"], 1):
         ws.cell(row=3, column=j, value=t).font = B
     u, cc, k, e = tr("rule_id"), tr("period_id"), tr("category_id"), tr("amount")
     for i in range(20):                      # 20 reglas de plantilla
@@ -113,18 +116,20 @@ def _prevision(wb):
         ws.cell(row=r, column=3, value=(
             f'=IF(recurring_rules!$B{rr}="","",IF(recurring_rules!$L{rr}=FALSE,"no",'
             f'IF(OR(recurring_rules!$H{rr}="monthly",recurring_rules!$H{rr}="weekly"),"sí",'
-            f'IF(recurring_rules!$H{rr}="yearly",IF(recurring_rules!$J{rr}=MONTH(TODAY()),"sí","no"),'
-            f'IF(MOD(MONTH(TODAY())-recurring_rules!$J{rr},3)=0,"sí","no")))))'))
+            f'IF(recurring_rules!$J{rr}="","no",'
+            f'IF(recurring_rules!$H{rr}="yearly",IF(recurring_rules!$J{rr}=$D$1,"sí","no"),'
+            f'IF(MOD($D$1-recurring_rules!$J{rr},3)=0,"sí","no"))))))'))
         ws.cell(row=r, column=4, value=(
             f'=IF(recurring_rules!$B{rr}="","",IF(recurring_rules!$K{rr}=TRUE,'
             f'ROUND(recurring_rules!$D{rr}*$B$2/100,2),recurring_rules!$D{rr}))'))
+        ws.cell(row=r, column=5, value=f'=IF(recurring_rules!$B{rr}="","",recurring_rules!$C{rr})')
         ws.cell(row=r, column=6, value=(
             f'=IF(recurring_rules!$B{rr}="","",'
             f'IF(OR(COUNTIFS({u},recurring_rules!$A{rr},{cc},$B$1)>0,'
             f'COUNTIFS({k},recurring_rules!$E{rr},{e},recurring_rules!$D{rr},{cc},$B$1)>0),'
             f'"✅ pagado","⏳ pendiente"))'))
     ws["A26"], ws["B26"] = "Comprometido restante", \
-        '=SUMPRODUCT(($C$4:$C$23="sí")*($F$4:$F$23="⏳ pendiente")*($D$4:$D$23))'
+        '=SUMPRODUCT(($C$4:$C$23="sí")*($F$4:$F$23="⏳ pendiente")*($E$4:$E$23<>"income")*($D$4:$D$23))'
     n, q, r2, d, z = tr("is_shared"), tr("_sara_amount"), tr("settled"), tr("type"), tr("deleted")
     ws["A27"], ws["B27"] = "Pendiente de Sara", \
         f'=SUMPRODUCT(({n}=TRUE)*({r2}=FALSE)*({d}="expense")*({z}=FALSE)*{q})'
