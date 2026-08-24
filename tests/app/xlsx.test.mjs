@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { openDb, seedMinimal, dumpAll, X } from "./helpers.mjs";
-import { rowsToWorkbook } from "../../app/js/xlsx.js";
+import { rowsToWorkbook, workbookToRows, validateImport } from "../../app/js/xlsx.js";
 
 test("export: pestaña por tabla, euros, bools y cabeceras sin _cents", () => {
   const db = openDb(); seedMinimal(db);
@@ -14,4 +14,67 @@ test("export: pestaña por tabla, euros, bools y cabeceras sin _cents", () => {
   const prestamo = rows.find((r) => r.id === "acc-prestamo");
   assert.equal(prestamo.opening_balance, -6000);
   assert.equal(X.utils.sheet_to_json(wb.Sheets.transactions, { defval: "" }).length, 0); // pestaña presente aunque vacía
+});
+
+function wbFromSeed(mutate) {
+  const db = openDb(); seedMinimal(db);
+  const dump = dumpAll(db);
+  if (mutate) mutate(dump);
+  return rowsToWorkbook(X, dump);
+}
+
+test("import: round de parseo devuelve formato SQLite e ignora extras", () => {
+  const wb = wbFromSeed();
+  // pestaña extra (dashboard) y columna extra "_account" deben ignorarse
+  X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([["Resumen"]]), "Resumen del periodo");
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  const n26 = data.accounts.find((r) => r.id === "acc-n26");
+  assert.equal(n26.opening_balance_cents, 100000);
+  assert.equal(n26.is_archived, 0);
+  assert.equal(data.periods[0].start_date, "2026-07-27");
+});
+
+test("import: falta una pestaña del contrato → error", () => {
+  const wb = wbFromSeed();
+  delete wb.Sheets.budgets; wb.SheetNames = wb.SheetNames.filter((n) => n !== "budgets");
+  const { errors } = workbookToRows(X, wb);
+  assert.match(errors[0], /budgets/);
+});
+
+const parse = (mutate) => workbookToRows(X, wbFromSeed(mutate)).data;
+
+test("validate: base semilla válida", () => { assert.deepEqual(validateImport(parse()), []); });
+test("validate: schema_version distinta de 1", () => {
+  const d = parse((x) => { x.meta.find((m) => m.key === "schema_version").value = "2"; });
+  assert.match(validateImport(d)[0], /schema_version/);
+});
+test("validate: created_with dual — acepta hoja y pwa, rechaza otros", () => {
+  const ok = parse((x) => { x.meta.find((m) => m.key === "created_with").value = "basecero-sheets-mvp"; });
+  assert.deepEqual(validateImport(ok), []);
+  const bad = parse((x) => { x.meta.find((m) => m.key === "created_with").value = "otra-app"; });
+  assert.match(validateImport(bad)[0], /created_with/);
+});
+test("validate: enum inválido", () => {
+  const d = parse((x) => { x.accounts[0].type = "bitcoin"; });
+  assert.match(validateImport(d)[0], /accounts.*type/s);
+});
+test("validate: FK rota", () => {
+  const d = parse((x) => { x.categories.find((c) => c.id === "cat-casa-alquiler").parent_id = "cat-nope"; });
+  assert.match(validateImport(d)[0], /parent_id/);
+});
+test("validate: dos periodos open", () => {
+  const d = parse((x) => { x.periods.push({ ...x.periods[0], id: "per-2", name: "Otro" }); });
+  assert.match(validateImport(d)[0], /open/);
+});
+test("validate: importe no positivo salvo adjustment", () => {
+  const d = parse();
+  const base = { id: "tx-1", date: "2026-08-01", period_id: "per-1", type: "expense", amount_cents: 0,
+    account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler", merchant: "", note: "",
+    is_shared: 0, share_pct_override: null, settled: 0, ref_id: "", rule_id: "", external_id: "",
+    status: "pending", created_at: "x", updated_at: "x", deleted: 0 };
+  d.transactions.push(base);
+  assert.match(validateImport(d)[0], /amount/);
+  d.transactions[0] = { ...base, type: "adjustment", amount_cents: -500, category_id: "" };
+  assert.deepEqual(validateImport(d), []);
 });
