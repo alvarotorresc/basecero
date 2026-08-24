@@ -73,6 +73,28 @@ test("pendingShared: calcula sara_amount_cents con el pct del PROPIO periodo de 
   assert.equal(total, 4000 + 5000 + 1000, "el income compartido NO debe sumar al total pendiente");
 });
 
+test("pendingShared: un reparto 100/0 (pct del periodo o override) da sara_amount_cents=0 y se excluye", () => {
+  const db = openDb();
+  seedMinimal(db);
+  db.prepare(`INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
+    VALUES ('per-100','Periodo 100/0','2026-05-27','2026-06-27','closed',100,'',?,?,0)`).run(T, T);
+
+  // periodo con my_share_pct=100 (permitido en el onboarding): sara = 0 → no debe aparecer
+  const soloYo = ins(db, { id: "solo-yo", period: "per-100", cents: 10000, shared: 1 });
+  // per-1 (60/40) pero con override=100: el override manda, sara = 0 → tampoco debe aparecer
+  const overrideCien = ins(db, { id: "override-cien", period: "per-1", cents: 10000, shared: 1, override: 100 });
+  // control: un compartido normal SÍ debe aparecer
+  const normal = ins(db, { id: "normal", period: "per-1", cents: 10000, shared: 1 });
+
+  const rows = db.prepare(SQL.pendingShared).all();
+  assert.deepEqual(rows.map((r) => r.id), [normal]);
+  assert.equal(rows.find((r) => r.id === soloYo), undefined);
+  assert.equal(rows.find((r) => r.id === overrideCien), undefined);
+
+  const total = db.prepare(SQL.pendingSharedTotal).get().total_cents;
+  assert.equal(total, 4000, "solo 'normal' (60/40 de 10000) debe sumar; los 100/0 no aportan nada");
+});
+
 test("settleShared: crea el refund con importe/categoría/comercio de la parte de Sara y el original queda settled", () => {
   const db = openDb();
   seedMinimal(db);

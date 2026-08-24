@@ -62,13 +62,18 @@ export const SQL = {
   // Sara" y la pantalla Liquidar deben poder saldar algo pendiente de un periodo ya cerrado.
   // type='expense' es necesario: is_shared/settled también existen en income/refund (ver
   // registro.js needsCategory), y solo un gasto genera una deuda pendiente de que Sara devuelva.
+  // t.amount_cents - MY_AMOUNT > 0 excluye repartos 100/0 (pct o override): con sara_amount_cents=0
+  // no hay nada que liquidar, y dejar la fila entrar rompería el CHECK amount_cents>0 del refund
+  // en settleShared (ver fix report en task-7-report.md).
   pendingShared: `SELECT t.id, t.date, t.amount_cents, t.merchant, t.category_id,
       t.amount_cents - ${MY_AMOUNT} AS sara_amount_cents
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.type='expense' AND t.is_shared=1 AND t.settled=0 AND t.deleted=0
+      AND t.amount_cents - ${MY_AMOUNT} > 0
     ORDER BY t.date ASC`,
   pendingSharedTotal: `SELECT COALESCE(SUM(t.amount_cents - ${MY_AMOUNT}),0) AS total_cents
     FROM transactions t JOIN periods p ON p.id=t.period_id
-    WHERE t.type='expense' AND t.is_shared=1 AND t.settled=0 AND t.deleted=0`,
+    WHERE t.type='expense' AND t.is_shared=1 AND t.settled=0 AND t.deleted=0
+      AND t.amount_cents - ${MY_AMOUNT} > 0`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"];
