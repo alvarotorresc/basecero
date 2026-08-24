@@ -1,6 +1,6 @@
 import {
   addTransaction, getOpenPeriod, listExpenseLeafCategories, listIncomeCategories,
-  listAccounts, allCategoriesById,
+  listAccounts, allCategoriesById, recentForRefund,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtEUR, hoyISO } from "../format.js";
@@ -8,12 +8,27 @@ import { fmtEUR, hoyISO } from "../format.js";
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "back"];
 const ICON_BACK = `<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 5.5H9.2L3.5 12l5.7 6.5H20a1 1 0 001-1v-11a1 1 0 00-1-1z"></path><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"></path></svg>`;
 
+const TIPOS = [
+  { id: "expense", label: "Gasto" },
+  { id: "income", label: "Ingreso" },
+  { id: "transfer", label: "Transfer." },
+  { id: "refund", label: "Devolución" },
+  { id: "adjustment", label: "Ajuste" },
+];
+const SAVE_LABEL = {
+  expense: "Guardar gasto", income: "Guardar ingreso", transfer: "Guardar transferencia",
+  refund: "Guardar devolución", adjustment: "Guardar ajuste",
+};
+const needsCategory = (tipo) => tipo === "expense" || tipo === "income" || tipo === "refund";
+
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const centsToRaw = (cents) => (cents ? (Math.abs(cents) / 100).toFixed(2).replace(".", ",") : "");
 
-/** Monta la pantalla completa de registro rápido de un movimiento.
- *  onDone() se llama tanto al cerrar (✕) como tras guardar con éxito. */
-export async function renderRegistro(container, onDone) {
+/** Monta la pantalla completa de registro rápido de un movimiento (5 tipos).
+ *  onDone() se llama tanto al cerrar (✕) como tras guardar con éxito.
+ *  prefill opcional (Task 11): {type, amountCents, categoryId, accountId, merchant, ruleId, isShared}. */
+export async function renderRegistro(container, onDone, prefill) {
   let period, expenseCats, incomeCats, accountsAll, byId;
   try {
     [period, expenseCats, incomeCats, accountsAll, byId] = await Promise.all([
@@ -28,23 +43,37 @@ export async function renderRegistro(container, onDone) {
     return;
   }
 
+  let refundCandidates = [];
+  if (period) {
+    try { refundCandidates = await recentForRefund(period.id); } catch { refundCandidates = []; }
+  }
+
   const accounts = accountsAll.filter((a) => a.type !== "liability");
   const pct = period?.my_share_pct ?? 100;
 
   const state = {
-    tipo: "expense",
-    raw: "",
-    cents: 0,
-    categoryId: null,
-    accountId: "acc-n26",
-    isShared: false,
+    tipo: prefill?.type ?? "expense",
+    raw: centsToRaw(prefill?.amountCents),
+    cents: prefill?.amountCents ?? 0,
+    categoryId: prefill?.categoryId ?? null,
+    accountId: prefill?.accountId ?? "acc-n26",
+    counterAccountId: "",
+    isShared: prefill?.isShared ?? false,
     fecha: hoyISO(),
-    merchant: "",
+    merchant: prefill?.merchant ?? "",
     note: "",
+    refId: "",
+    ruleId: prefill?.ruleId ?? "",
+    adjustmentSign: "+",
+    refundPickerOpen: false,
   };
   let errorMsg = "";
 
-  const categoriesFor = () => (state.tipo === "expense" ? expenseCats : incomeCats);
+  const categoriesFor = () => {
+    if (state.tipo === "income") return incomeCats;
+    if (needsCategory(state.tipo)) return expenseCats;
+    return [];
+  };
 
   function setRaw(next) {
     state.raw = next;
@@ -66,6 +95,101 @@ export async function renderRegistro(container, onDone) {
     setRaw(state.raw === "0" ? k : state.raw + k);
   }
 
+  function selectRefundRow(row) {
+    state.refId = row.id;
+    state.categoryId = row.category_id;
+    if (row.is_shared) {
+      // Solo precarga categoría + importe de la parte de Sara; el refund de
+      // liquidación en sí NO se marca compartido (mismo criterio que Task 7
+      // settleShared: is_shared=0, ya es el 100% de lo que Sara debe).
+      const myPart = Math.round((row.amount_cents * pct) / 100);
+      const saraPart = row.amount_cents - myPart;
+      state.raw = centsToRaw(saraPart);
+      state.cents = saraPart;
+    }
+    state.refundPickerOpen = false;
+    errorMsg = "";
+    render();
+  }
+
+  function clearRefundLink() {
+    state.refId = "";
+    render();
+  }
+
+  function validationError() {
+    if (state.tipo === "transfer") {
+      if (state.cents <= 0) return "Introduce un importe.";
+      if (!state.counterAccountId || state.counterAccountId === state.accountId)
+        return "Elige dos cuentas distintas (origen y destino).";
+      return "";
+    }
+    if (state.tipo === "adjustment") return state.cents <= 0 ? "Introduce un importe." : "";
+    // expense / income / refund
+    if (state.cents <= 0 && !state.categoryId) return "Introduce un importe y elige una categoría.";
+    if (state.cents <= 0) return "Introduce un importe.";
+    if (!state.categoryId) return "Elige una categoría.";
+    return "";
+  }
+
+  function renderRefundPicker() {
+    const linked = state.refId ? refundCandidates.find((r) => r.id === state.refId) : null;
+    if (linked) {
+      const label = linked.merchant || byId[linked.category_id]?.name || "Gasto";
+      return `
+      <div class="card" style="padding:12px 14px; margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div style="min-width:0;">
+          <div style="font-size:10px; color:var(--text-3);">Vinculado a</div>
+          <div style="font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            ${escHtml(label)} · ${fmtEUR(linked.amount_cents)}
+          </div>
+        </div>
+        <button type="button" id="reg-refund-unlink" class="icon-btn" aria-label="Quitar vínculo">✕</button>
+      </div>`;
+    }
+    return `
+    <div style="margin-bottom:18px;">
+      <button type="button" id="reg-refund-toggle" class="refund-toggle">¿Devuelve un gasto? ${state.refundPickerOpen ? "▲" : "▼"}</button>
+      ${state.refundPickerOpen ? `
+      <div class="card refund-list" style="padding:4px 14px; margin-top:8px;">
+        ${refundCandidates.length === 0
+          ? `<div style="padding:14px 0; font-size:13px; color:var(--text-3);">No hay gastos recientes.</div>`
+          : refundCandidates.map((r) => `
+            <button type="button" class="refund-row" data-refund-row="${escAttr(r.id)}">
+              <span style="flex:1; min-width:0; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                ${escHtml(r.merchant || byId[r.category_id]?.name || "Gasto")}${r.is_shared ? " · compartido" : ""}
+              </span>
+              <span class="num">${fmtEUR(r.amount_cents)}</span>
+            </button>`).join("")}
+      </div>` : ""}
+    </div>`;
+  }
+
+  function renderAccountsSection() {
+    if (state.tipo === "transfer") {
+      return `
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+        <div class="section-title">Desde</div>
+        <div class="chips">
+          ${accounts.map((a) => `<button type="button" class="chip${state.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+        <div class="section-title">Hacia</div>
+        <div class="chips">
+          ${accounts.filter((a) => a.id !== state.accountId).map((a) => `<button type="button" class="chip${state.counterAccountId === a.id ? " active" : ""}" data-counter-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
+        </div>
+      </div>`;
+    }
+    return `
+    <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+      <div class="section-title">${state.tipo === "refund" ? "Cuenta destino" : "Cuenta"}</div>
+      <div class="chips">
+        ${accounts.map((a) => `<button type="button" class="chip${state.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
+      </div>
+    </div>`;
+  }
+
   function render() {
     const cats = categoriesFor();
     const myCents = state.isShared ? Math.round((state.cents * pct) / 100) : state.cents;
@@ -80,19 +204,20 @@ export async function renderRegistro(container, onDone) {
       </div>
 
       <div class="segmented" style="margin-bottom:18px;">
-        <button type="button" data-tipo="expense" class="${state.tipo === "expense" ? "active" : ""}">Gasto</button>
-        <button type="button" data-tipo="income" class="${state.tipo === "income" ? "active" : ""}">Ingreso</button>
+        ${TIPOS.map((t) => `<button type="button" data-tipo="${t.id}" class="${state.tipo === t.id ? "active" : ""}">${t.label}</button>`).join("")}
       </div>
 
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
         <div class="section-title">Importe</div>
-        <div class="amount-display">
-          <span class="num">${escHtml(state.raw || "0")}</span>
+        <div class="amount-display" style="align-items:center;">
+          ${state.tipo === "adjustment" ? `<button type="button" class="icon-btn" id="reg-sign" aria-label="Cambiar signo" style="font-size:18px; font-weight:700;">${state.adjustmentSign}</button>` : ""}
+          <span class="num">${state.tipo === "adjustment" && state.adjustmentSign === "-" ? "−" : ""}${escHtml(state.raw || "0")}</span>
           <span class="amount-currency">€</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
       </div>
 
+      ${cats.length ? `
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
         <div class="section-title">Categoría</div>
         <div class="chips-scroll">
@@ -105,14 +230,11 @@ export async function renderRegistro(container, onDone) {
             </button>`;
           }).join("")}
         </div>
-      </div>
+      </div>` : ""}
 
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">Cuenta</div>
-        <div class="chips">
-          ${accounts.map((a) => `<button type="button" class="chip${state.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
-        </div>
-      </div>
+      ${renderAccountsSection()}
+
+      ${state.tipo === "refund" ? renderRefundPicker() : ""}
 
       <div style="display:flex; gap:8px; margin-bottom:12px;">
         <label class="field field-stack" style="flex:1;">
@@ -129,6 +251,7 @@ export async function renderRegistro(container, onDone) {
         <input type="text" id="reg-note" value="${escAttr(state.note)}" placeholder="Opcional">
       </label>
 
+      ${needsCategory(state.tipo) ? `
       <div class="card" style="padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
           <span style="font-size:15px; font-weight:600;">Compartido con Sara</span>
@@ -148,7 +271,7 @@ export async function renderRegistro(container, onDone) {
             <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtEUR(saraCents)}</div>
           </div>
         </div>` : ""}
-      </div>
+      </div>` : ""}
 
       <div class="keypad" style="margin-bottom:18px;">
         ${KEYS.map((k) => k === "back"
@@ -159,7 +282,7 @@ export async function renderRegistro(container, onDone) {
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
-      <button type="button" class="btn-primary" id="reg-save">${state.tipo === "expense" ? "Guardar gasto" : "Guardar ingreso"}</button>
+      <button type="button" class="btn-primary" id="reg-save">${SAVE_LABEL[state.tipo]}</button>
     `;
 
     if (prevChipsScroll != null) {
@@ -177,6 +300,9 @@ export async function renderRegistro(container, onDone) {
       b.onclick = () => {
         state.tipo = b.dataset.tipo;
         state.categoryId = null;
+        state.refId = "";
+        state.refundPickerOpen = false;
+        state.counterAccountId = "";
         errorMsg = "";
         render();
       };
@@ -197,27 +323,55 @@ export async function renderRegistro(container, onDone) {
     container.querySelectorAll("[data-acc]").forEach((b) => {
       b.onclick = () => {
         state.accountId = b.dataset.acc;
+        if (state.counterAccountId === state.accountId) state.counterAccountId = "";
         render();
       };
     });
+
+    container.querySelectorAll("[data-counter-acc]").forEach((b) => {
+      b.onclick = () => {
+        state.counterAccountId = b.dataset.counterAcc;
+        render();
+      };
+    });
+
+    const signBtn = container.querySelector("#reg-sign");
+    if (signBtn) signBtn.onclick = () => {
+      state.adjustmentSign = state.adjustmentSign === "+" ? "-" : "+";
+      render();
+    };
+
+    const refundToggle = container.querySelector("#reg-refund-toggle");
+    if (refundToggle) refundToggle.onclick = () => {
+      state.refundPickerOpen = !state.refundPickerOpen;
+      render();
+    };
+
+    container.querySelectorAll("[data-refund-row]").forEach((b) => {
+      b.onclick = () => {
+        const row = refundCandidates.find((r) => r.id === b.dataset.refundRow);
+        if (row) selectRefundRow(row);
+      };
+    });
+
+    const unlinkBtn = container.querySelector("#reg-refund-unlink");
+    if (unlinkBtn) unlinkBtn.onclick = () => clearRefundLink();
 
     container.querySelector("#reg-merchant").oninput = (e) => { state.merchant = e.target.value; };
     container.querySelector("#reg-note").oninput = (e) => { state.note = e.target.value; };
     container.querySelector("#reg-fecha").onchange = (e) => { state.fecha = e.target.value || hoyISO(); };
 
-    container.querySelector("#reg-shared").onchange = (e) => {
+    const sharedToggle = container.querySelector("#reg-shared");
+    if (sharedToggle) sharedToggle.onchange = (e) => {
       state.isShared = e.target.checked;
       render();
     };
 
     container.querySelector("#reg-save").onclick = async () => {
       const btn = container.querySelector("#reg-save");
-      if (state.cents <= 0 || !state.categoryId) {
-        errorMsg = !state.categoryId && state.cents <= 0
-          ? "Introduce un importe y elige una categoría."
-          : state.cents <= 0
-            ? "Introduce un importe."
-            : "Elige una categoría.";
+      const msg = validationError();
+      if (msg) {
+        errorMsg = msg;
         render();
         const savedBtn = container.querySelector("#reg-save");
         savedBtn.classList.add("shake");
@@ -226,15 +380,19 @@ export async function renderRegistro(container, onDone) {
       }
       btn.disabled = true;
       try {
+        const withCategory = needsCategory(state.tipo);
         await addTransaction({
           type: state.tipo,
-          amountCents: state.cents,
+          amountCents: state.tipo === "adjustment" && state.adjustmentSign === "-" ? -state.cents : state.cents,
           date: state.fecha,
-          categoryId: state.categoryId,
+          categoryId: withCategory ? state.categoryId : "",
           accountId: state.accountId,
+          counterAccountId: state.tipo === "transfer" ? state.counterAccountId : "",
           merchant: state.merchant,
           note: state.note,
-          isShared: state.isShared,
+          isShared: withCategory ? state.isShared : false,
+          refId: state.tipo === "refund" ? state.refId : "",
+          ruleId: state.ruleId,
         });
         onDone();
       } catch (e) {

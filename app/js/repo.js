@@ -10,18 +10,30 @@ export async function openFirstPeriod({ name, startDate, sharePct }) {
   await exec(SQL.insertPeriod, [bcUlid(), name, startDate, sharePct, t, t]);
 }
 
-export async function addTransaction({ type, amountCents, date, categoryId, accountId, merchant, note, isShared }) {
+export async function addTransaction({
+  type, amountCents, date, categoryId, accountId, merchant, note, isShared,
+  counterAccountId = "", sharePctOverride = null, refId = "", ruleId = "", externalId = "", status = "pending",
+}) {
   const p = await getOpenPeriod();
   if (!p) throw new Error("No hay ningún periodo abierto");
   const t = nowIso();
-  await exec(SQL.insertTransaction, [bcUlid(), date, p.id, type, amountCents, accountId,
-    categoryId, bcSanitizeCell(merchant ?? ""), bcSanitizeCell(note ?? ""),
-    isShared ? 1 : 0, null, t, t]);
+  const insertStmt = {
+    sql: SQL.insertTransaction,
+    bind: [bcUlid(), date, p.id, type, amountCents, accountId, counterAccountId,
+      categoryId ?? "", bcSanitizeCell(merchant ?? ""), bcSanitizeCell(note ?? ""),
+      isShared ? 1 : 0, sharePctOverride, 0, refId, ruleId, externalId, status, t, t],
+  };
+  if (refId) {
+    await execMany([insertStmt, { sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [t, refId] }]);
+  } else {
+    await exec(insertStmt.sql, insertStmt.bind);
+  }
 }
 
 export const spentOfPeriod = async (pid) => (await query(SQL.spentOfPeriod, [pid]))[0].spent_cents;
 export const incomeOfPeriod = async (pid) => (await query(SQL.incomeOfPeriod, [pid]))[0].income_cents;
 export const listByDay = (pid) => query(SQL.listByDay, [pid]);
+export const recentForRefund = (pid) => query(SQL.recentForRefund, [pid]);
 export const listExpenseLeafCategories = () => query(SQL.listExpenseLeafCategories);
 export const listIncomeCategories = () => query(SQL.listIncomeCategories);
 export const listAccounts = () => query(SQL.listAccounts);

@@ -7,13 +7,17 @@ export const SQL = {
     VALUES (?,?,?,'','open',?,'',?,?,0)`,
   insertTransaction: `INSERT INTO transactions (id,date,period_id,type,amount_cents,account_id,counter_account_id,
     category_id,merchant,note,is_shared,share_pct_override,settled,ref_id,rule_id,external_id,status,created_at,updated_at,deleted)
-    VALUES (?,?,?,?,?,?,'',?,?,?,?,?,0,'','','','pending',?,?,0)`,
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
   spentOfPeriod: `SELECT COALESCE(SUM(CASE
       WHEN t.type='expense' THEN ${MY_AMOUNT}
-      WHEN t.type='refund' AND t.ref_id='' THEN -t.amount_cents
+      WHEN t.type='refund' AND t.ref_id='' THEN -${MY_AMOUNT}
       ELSE 0 END),0) AS spent_cents
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.period_id=? AND t.deleted=0`,
+  recentForRefund: `SELECT t.id, t.date, t.amount_cents, t.merchant, t.category_id, t.is_shared, t.settled
+    FROM transactions t WHERE t.deleted=0 AND t.type='expense'
+      AND (t.period_id=? OR (t.is_shared=1 AND t.settled=0))
+    ORDER BY t.date DESC, t.created_at DESC LIMIT 15`,
   incomeOfPeriod: `SELECT COALESCE(SUM(CASE WHEN t.type='income' THEN t.amount_cents ELSE 0 END),0) AS income_cents
     FROM transactions t WHERE t.period_id=? AND t.deleted=0`,
   listByDay: `SELECT t.id, t.date, t.type, t.amount_cents, t.category_id, t.merchant, t.note, t.is_shared,

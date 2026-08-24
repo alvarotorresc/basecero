@@ -70,7 +70,7 @@ main#screen {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ===== control segmentado (Gasto | Ingreso) ===== */
+/* ===== control segmentado (chips de tipo de movimiento, scroll horizontal) ===== */
 .segmented {
   display: flex;
   gap: 4px;
@@ -78,10 +78,14 @@ main#screen {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.segmented::-webkit-scrollbar { display: none; }
 .segmented button {
-  flex: 1 1 0;
+  flex: 0 0 auto;
   height: 38px;
+  padding: 0 16px;
   border: 0;
   border-radius: 10px;
   background: none;
@@ -89,12 +93,47 @@ main#screen {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
   -webkit-tap-highlight-color: transparent;
 }
 .segmented button.active {
   background: var(--accent);
   color: #fff;
 }
+
+/* ===== selector "¿Devuelve un gasto?" (pantalla Registro, tipo devolución) ===== */
+.refund-toggle {
+  width: 100%;
+  height: 48px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.refund-list {
+  max-height: 240px;
+  overflow-y: auto;
+}
+.refund-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  height: 48px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.refund-row:last-child { border-bottom: 0; }
 
 /* ===== display del importe (pantalla Registro) ===== */
 .amount-display {

@@ -16,10 +16,10 @@ function db() {
 }
 const tx = (d, over = {}) => {
   const v = { id: "t" + Math.floor(Math.random() * 1e9), date: "2026-08-20", period: "p1", type: "expense",
-    cents: 4520, account: "acc-n26", category: "cat-alimentacion-supermercado", merchant: "Mercadona",
-    note: "", shared: 0, override: null, ...over };
-  d.prepare(SQL.insertTransaction).run(v.id, v.date, v.period, v.type, v.cents, v.account,
-    v.category, v.merchant, v.note, v.shared, v.override, T, T);
+    cents: 4520, account: "acc-n26", counterAccount: "", category: "cat-alimentacion-supermercado", merchant: "Mercadona",
+    note: "", shared: 0, override: null, settled: 0, ref: "", rule: "", external: "", status: "pending", ...over };
+  d.prepare(SQL.insertTransaction).run(v.id, v.date, v.period, v.type, v.cents, v.account, v.counterAccount,
+    v.category, v.merchant, v.note, v.shared, v.override, v.settled, v.ref, v.rule, v.external, v.status, T, T);
   return v.id;
 };
 
