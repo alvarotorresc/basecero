@@ -1,0 +1,36 @@
+import { initDb } from "./db.js";
+import { getOpenPeriod } from "./repo.js";
+import { showOnboarding } from "./onboarding.js";
+import { renderInicio } from "./screens/inicio.js";
+import { renderRegistro } from "./screens/registro.js";
+import { renderProximamente, renderAjustes } from "./screens/placeholder.js";
+
+const screen = document.getElementById("screen");
+const RUTAS = {
+  inicio: () => renderInicio(screen),
+  movimientos: () => renderProximamente(screen, "Movimientos"),
+  patrimonio: () => renderProximamente(screen, "Patrimonio"),
+  ajustes: () => renderAjustes(screen),
+};
+
+export function nav(tab) {
+  document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  RUTAS[tab]();
+}
+
+async function boot() {
+  const { storage } = await initDb();
+  if (storage === "memory") {
+    const aviso = document.createElement("div");
+    aviso.className = "banner-aviso";
+    aviso.textContent = "⚠ Este navegador no soporta almacenamiento persistente: tus datos NO se guardarán al cerrar.";
+    document.body.prepend(aviso);
+  }
+  try { await navigator.storage?.persist?.(); } catch {}
+  if (!(await getOpenPeriod())) await showOnboarding(screen);
+  nav("inicio");
+}
+
+document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => nav(b.dataset.tab)));
+document.getElementById("btn-registro").onclick = () => renderRegistro(screen, () => nav("inicio"));
+boot();

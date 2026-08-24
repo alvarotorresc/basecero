@@ -53,6 +53,67 @@ main#screen {
   color: var(--text-2);
 }
 
+/* ===== botón icono (p.ej. cerrar pantalla) ===== */
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===== control segmentado (Gasto | Ingreso) ===== */
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.segmented button {
+  flex: 1 1 0;
+  height: 38px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.segmented button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ===== display del importe (pantalla Registro) ===== */
+.amount-display {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  line-height: 1;
+}
+.amount-display .num {
+  font-size: 56px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.amount-display .amount-currency {
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+
 /* ===== barra de pestañas + FAB ===== */
 .tabbar {
   position: fixed;
@@ -148,6 +209,8 @@ main#screen {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 16px;
+  line-height: 1;
   background: color-mix(in srgb, var(--cat, var(--accent)) 18%, transparent);
   color: var(--cat, var(--accent));
 }
@@ -161,6 +224,50 @@ main#screen {
 .chip.active .chip-icon {
   background: rgba(255, 255, 255, 0.18);
   color: #fff;
+}
+
+/* chips de categoría en 2 filas con scroll horizontal (pantalla Registro) */
+.chips-scroll {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(2, auto);
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.chips-scroll::-webkit-scrollbar { display: none; }
+
+/* variante vertical de chip: icono arriba, nombre debajo (categorías en Registro) */
+.chip-v {
+  flex: 0 0 auto;
+  width: 74px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 4px;
+  border-radius: 15px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.chip-v span:last-child {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.chip-v.active {
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
 }
 
 /* ===== teclado numérico ===== */
@@ -398,3 +505,29 @@ main#screen {
   border-color: color-mix(in srgb, var(--red) 35%, var(--border));
 }
 .banner-aviso.red svg { color: var(--red); }
+
+/* el aviso de almacenamiento no persistente se antepone a body (fuera de #screen):
+   franja roja tenue fija arriba, a todo lo ancho del layout */
+body > .banner-aviso {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  z-index: 30;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--red) 14%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--red) 35%, var(--border));
+  border-top: 0;
+}
+body:has(> .banner-aviso) main#screen { margin-top: 46px; }
+
+/* ===== animación de aviso (importe/categoría inválidos al guardar) ===== */
+@keyframes bc-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+.shake { animation: bc-shake 0.4s; }
