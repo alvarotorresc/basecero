@@ -1,6 +1,7 @@
-import { dumpAllTables, replaceAll, exportAllJson } from "../repo.js";
+import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod } from "../repo.js";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
-import { hoyISO } from "../format.js";
+import { hoyISO, fmtDiaCorto } from "../format.js";
+import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
@@ -18,8 +19,43 @@ function downloadXlsx(dump, filename) {
   download(new Blob([arr], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
 }
 
-/** Pantalla de Ajustes: export/import de la hoja .xlsx (motor de fase 2) + copia JSON de emergencia. */
-export function renderAjustes(container) {
+function periodoCardHtml(period) {
+  if (!period) return "";
+  // start_date puede quedar en el futuro (se puede abrir el periodo unos días antes de que
+  // empiece): en ese caso no hay "días transcurridos" que mostrar, así que se omite ese tramo
+  // en vez de enseñar un número negativo.
+  const dias = Math.floor((new Date(hoyISO() + "T12:00:00") - new Date(period.start_date + "T12:00:00")) / 86400000) + 1;
+  const diasTxt = dias >= 1 ? ` · ${dias} día${dias === 1 ? "" : "s"}` : "";
+  return `
+  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
+    <div class="section-title">Periodo</div>
+    <div class="card" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <div style="font-size:15px;font-weight:700">${escHtml(period.name)}</div>
+          <div style="font-size:11px;color:var(--text-3)">
+            Abierto el ${fmtDiaCorto(period.start_date)}${diasTxt} · reparto ${period.my_share_pct} / ${100 - period.my_share_pct}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;background:#1b1e21;border-radius:10px;padding:6px 9px;flex-shrink:0">
+          <div style="width:7px;height:7px;border-radius:4px;background:var(--green)"></div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-2)">Abierto</div>
+        </div>
+      </div>
+      <button type="button" class="btn-primary" id="btn-cerrar-periodo">Cerrar periodo y abrir el siguiente</button>
+      <div style="font-size:11px;color:var(--text-3);line-height:1.5">
+        Al cerrar fijarás la fecha final y elegirás el reparto con Sara del periodo nuevo. Ábrelo el día que entre la nómina.
+      </div>
+    </div>
+  </div>`;
+}
+
+/** Pantalla de Ajustes: export/import de la hoja .xlsx (motor de fase 2), cierre del periodo
+ *  abierto (asistente unificado de Task 8) y copia JSON de emergencia. */
+export async function renderAjustes(container) {
+  let openPeriod = null;
+  try { openPeriod = await getOpenPeriod(); } catch { openPeriod = null; }
+
   const state = { errors: null, pending: null, busy: false };
 
   function render() {
@@ -52,6 +88,8 @@ export function renderAjustes(container) {
         </div>` : ""}
       </div>
 
+      ${periodoCardHtml(openPeriod)}
+
       <div class="card">
         <p style="font-weight:600;margin-bottom:4px">Copia de emergencia</p>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
@@ -76,6 +114,18 @@ export function renderAjustes(container) {
 
     container.querySelector("#btn-xlsx-import").onclick = () => {
       container.querySelector("#xlsx-file-input").click();
+    };
+
+    const cerrarBtn = container.querySelector("#btn-cerrar-periodo");
+    if (cerrarBtn) cerrarBtn.onclick = () => {
+      document.body.classList.add("onboarding");
+      renderPeriodoNuevo(container, {
+        mode: "next",
+        onDone: () => {
+          document.body.classList.remove("onboarding");
+          renderAjustes(container);
+        },
+      });
     };
 
     container.querySelector("#xlsx-file-input").onchange = async (e) => {

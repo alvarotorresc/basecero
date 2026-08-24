@@ -75,5 +75,23 @@ export const SQL = {
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.type='expense' AND t.is_shared=1 AND t.settled=0 AND t.deleted=0
       AND t.amount_cents - ${MY_AMOUNT} > 0`,
+
+  closePeriod: `UPDATE periods SET end_date=?, status='closed', updated_at=? WHERE id=?`,
+  // Suma por categoría RAÍZ de gasto (parent_id='') el gasto de toda su subárbol (ella misma +
+  // hijas directas): child.id=root.id cubre el gasto registrado directamente en la raíz, y
+  // child.parent_id=root.id el de sus hijas. Resta refunds sueltos (ref_id='') prorrateados,
+  // igual criterio que spentOfPeriod. La reutilizan Tasks 9 (Presupuesto) y 12 (gráficas).
+  spentByRootCategory: `SELECT root.id AS root_id, root.name,
+    COALESCE(SUM(CASE WHEN t.type='expense' THEN ${MY_AMOUNT}
+                 WHEN t.type='refund' AND t.ref_id='' THEN -${MY_AMOUNT} ELSE 0 END),0) AS spent_cents
+  FROM categories root
+  LEFT JOIN categories child ON (child.id=root.id OR child.parent_id=root.id) AND child.deleted=0
+  LEFT JOIN transactions t ON t.category_id=child.id AND t.period_id=? AND t.deleted=0
+  LEFT JOIN periods p ON p.id=t.period_id
+  WHERE root.parent_id='' AND root.flow='expense' AND root.deleted=0 AND root.is_archived=0
+  GROUP BY root.id ORDER BY spent_cents DESC`,
+  insertBudget: `INSERT INTO budgets (id,period_id,category_id,amount_cents,created_at,updated_at,deleted)
+    VALUES (?,?,?,?,?,?,0)`,
+  budgetsOfPeriod: `SELECT b.id, b.category_id, b.amount_cents FROM budgets b WHERE b.period_id=? AND b.deleted=0`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"];

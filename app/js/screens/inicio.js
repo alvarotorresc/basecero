@@ -5,6 +5,7 @@ import {
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtEUR, fmtDiaLargo, fmtDiaCorto, hoyISO } from "../format.js";
 import { renderLiquidar } from "./liquidar.js";
+import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const pctFmt = new Intl.NumberFormat("es-ES", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -119,10 +120,10 @@ export async function renderInicio(container) {
 
   container.innerHTML = `
     <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
-      <div style="display:flex;flex-direction:column;gap:3px;">
+      <button type="button" id="inicio-periodo-header" style="all:unset;cursor:pointer;display:flex;flex-direction:column;gap:3px;-webkit-tap-highlight-color:transparent;">
         <div style="font-size:24px;font-weight:700;letter-spacing:-0.02em;">${escHtml(period.name)}</div>
         <div style="font-size:12px;color:var(--text-2);">Desde el ${fmtDiaLargo(period.start_date)}</div>
-      </div>
+      </button>
 
       <div style="display:flex;flex-direction:column;gap:6px;">
         <div class="section-title">Gastado</div>
@@ -154,4 +155,15 @@ export async function renderInicio(container) {
 
   const liquidarBtn = container.querySelector("#con-sara-liquidar");
   if (liquidarBtn) liquidarBtn.onclick = () => renderLiquidar(container, () => renderInicio(container));
+
+  container.querySelector("#inicio-periodo-header").onclick = () => {
+    document.body.classList.add("onboarding");
+    renderPeriodoNuevo(container, {
+      mode: "next",
+      onDone: () => {
+        document.body.classList.remove("onboarding");
+        renderInicio(container);
+      },
+    });
+  };
 }

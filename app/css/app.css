@@ -573,6 +573,53 @@ body > .banner-aviso {
 }
 body:has(> .banner-aviso) main#screen { margin-top: 46px; }
 
+/* ===== asistente de Nuevo periodo (Task 8) ===== */
+/* stepper del % compartido ("Pagas de lo compartido") */
+.stepper-btn {
+  width: 20px;
+  height: 19px;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font-size: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.stepper-btn:active { color: var(--accent); }
+
+/* input € de cada presupuesto por categoría: vacío = "Sin límite", estilo punteado */
+.budget-input {
+  height: 42px;
+  width: 92px;
+  flex-shrink: 0;
+  padding: 0 24px 0 10px;
+  background: #1b1e21;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  color: var(--text);
+  font: 600 15px var(--font-num);
+  text-align: right;
+  outline: none;
+}
+.budget-input.is-empty {
+  background: #17191c;
+  border: 1px dashed var(--border);
+  color: var(--text-3);
+  font: 500 12px var(--font-ui);
+  text-align: center;
+  padding: 0 10px;
+}
+.budget-input::-webkit-outer-spin-button,
+.budget-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.budget-input[type="number"] { -moz-appearance: textfield; }
+
+/* chrome oculto durante el asistente de periodo (onboarding y cierre normal, ver main.js nav()) */
+body.onboarding .tabbar,
+body.onboarding .fab { display: none; }
+
 /* ===== animación de aviso (importe/categoría inválidos al guardar) ===== */
 @keyframes bc-shake {
   10%, 90% { transform: translateX(-1px); }

@@ -16,6 +16,9 @@ const RUTAS = {
 };
 
 export function nav(tab) {
+  // Durante el asistente de Nuevo periodo (onboarding o cierre normal) el chrome está oculto
+  // (ver app.css `body.onboarding`): ignora cualquier navegación mientras dure.
+  if (document.body.classList.contains("onboarding")) return;
   document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   RUTAS[tab]();
 }

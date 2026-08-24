@@ -1,13 +1,26 @@
 import { SQL, TABLES } from "./sql.js";
 import { query, exec, execMany } from "./db.js";
-import { nowIso, hoyISO } from "./format.js";
+import { nowIso, hoyISO, prevDayIso } from "./format.js";
 import { CONTRACT, insertSql } from "./contract.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
-export async function openFirstPeriod({ name, startDate, sharePct }) {
+/** Cierra el periodo abierto (si existe: en el primer periodo no hay nada que cerrar) con
+ *  end_date = día anterior a startDate, abre el nuevo y crea sus budgets — TODO en un único
+ *  execMany (ver task-8-brief.md). budgets: [{categoryId, amountCents}]. La usa tanto el
+ *  asistente de cierre normal como el onboarding (modo 'first', sin periodo previo). */
+export async function openNextPeriod({ name, startDate, sharePct, budgets = [] }) {
+  const current = await getOpenPeriod();
   const t = nowIso();
-  await exec(SQL.insertPeriod, [bcUlid(), name, startDate, sharePct, t, t]);
+  const newId = bcUlid();
+  const stmts = [];
+  if (current) stmts.push({ sql: SQL.closePeriod, bind: [prevDayIso(startDate), t, current.id] });
+  stmts.push({ sql: SQL.insertPeriod, bind: [newId, name, startDate, sharePct, t, t] });
+  for (const b of budgets) {
+    stmts.push({ sql: SQL.insertBudget, bind: [bcUlid(), newId, b.categoryId, b.amountCents, t, t] });
+  }
+  await execMany(stmts);
+  return newId;
 }
 
 export async function addTransaction({
@@ -46,6 +59,8 @@ export const getTransaction = async (id) => (await query(SQL.getTransaction, [id
 export const countUncategorized = async (pid) => (await query(SQL.countUncategorized, [pid]))[0].n;
 export const pendingShared = () => query(SQL.pendingShared);
 export const pendingSharedTotalCents = async () => (await query(SQL.pendingSharedTotal))[0].total_cents;
+export const spentByRootCategory = (pid) => query(SQL.spentByRootCategory, [pid]);
+export const budgetsOfPeriod = (pid) => query(SQL.budgetsOfPeriod, [pid]);
 
 /** Liquida un gasto compartido pendiente: crea el refund de la parte de Sara (categoría/comercio
  *  del gasto original, hoy, cuenta de destino elegida) enlazado por refId. Reutiliza sara_amount_cents
