@@ -176,6 +176,7 @@ export async function renderAjustes(container) {
 
     container.querySelector("#xlsx-file-input").onchange = async (e) => {
       const file = e.target.files[0];
+      e.target.value = ""; // permite re-seleccionar el MISMO fichero (p.ej. tras corregirlo y reintentar)
       if (!file) return;
       state.busy = true; render();
       try {
