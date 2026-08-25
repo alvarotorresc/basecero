@@ -162,5 +162,14 @@ export const SQL = {
   updateGoal: `UPDATE goals SET name=?, type=?, target_amount_cents=?, target_months=?, target_pct=?,
     target_date=?, account_id=?, category_id=?, is_active=?, updated_at=? WHERE id=?`,
   softDeleteGoal: `UPDATE goals SET deleted=1, updated_at=? WHERE id=?`,
+
+  // Import CSV N26 (Task 15). n26Existing trae las transacciones NO borradas de la cuenta N26
+  // para que n26.js las re-firme en memoria (bcDecideImportAction espera amountCents CON signo,
+  // aquí siempre viene positivo por el CHECK de la tabla) sin una query por fila del CSV.
+  // reconcileTx SOLO toca external_id/status/updated_at — nunca amount/date/category/merchant,
+  // así una fila manual conciliada conserva su categoría y comercio tal cual los metió el usuario.
+  n26Existing: `SELECT id, date, type, amount_cents, external_id, status FROM transactions
+    WHERE account_id='acc-n26' AND deleted=0`,
+  reconcileTx: `UPDATE transactions SET external_id=?, status='reconciled', updated_at=? WHERE id=?`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"];

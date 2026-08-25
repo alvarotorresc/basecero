@@ -515,6 +515,12 @@ export async function updateGoal(id, fields) {
 
 export const softDeleteGoal = (id) => exec(SQL.softDeleteGoal, [nowIso(), id]);
 
+// ---- Import CSV N26 (Task 15) -----------------------------------------------
+
+// Lo consume n26.js para re-firmar en memoria las transacciones existentes de acc-n26 antes de
+// decidir cada fila del CSV (bcDecideImportAction) — un único query, no uno por fila.
+export const n26Existing = () => query(SQL.n26Existing);
+
 export async function dumpAllTables() {
   const out = {};
   for (const t of TABLES) out[t] = await query(SQL.dumpTable(t));

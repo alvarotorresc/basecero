@@ -3,6 +3,7 @@ import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
 import { hoyISO, fmtDiaCorto } from "../format.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 import { renderRecurrentes } from "./recurrentes.js";
+import { importN26Csv } from "../n26.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
@@ -52,12 +53,13 @@ function periodoCardHtml(period) {
 }
 
 /** Pantalla de Ajustes: export/import de la hoja .xlsx (motor de fase 2), cierre del periodo
- *  abierto (asistente unificado de Task 8) y copia JSON de emergencia. */
+ *  abierto (asistente unificado de Task 8), import de CSV de N26 (Task 15, tarjeta "Banco") y
+ *  copia JSON de emergencia. */
 export async function renderAjustes(container) {
   let openPeriod = null;
   try { openPeriod = await getOpenPeriod(); } catch { openPeriod = null; }
 
-  const state = { errors: null, pending: null, busy: false };
+  const state = { errors: null, pending: null, busy: false, n26Result: null, n26Error: null };
 
   function render() {
     container.innerHTML = `
@@ -92,6 +94,20 @@ export async function renderAjustes(container) {
       ${periodoCardHtml(openPeriod)}
 
       <div class="card" style="margin-bottom:12px">
+        <p style="font-weight:600;margin-bottom:4px">Banco</p>
+        <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
+          Importa el extracto CSV de N26: crea los movimientos que faltan y concilia los que ya
+          registraste a mano (mismo importe y sentido, ±3 días). Las duplicadas se saltan solas.</p>
+        <button type="button" id="btn-n26-import" style="${BTN_SECONDARY}" ${state.busy ? "disabled" : ""}>Importar CSV de N26</button>
+        <input type="file" id="n26-file-input" accept=".csv" style="display:none">
+
+        ${state.n26Result ? `
+        <div class="banner-aviso" style="margin-top:12px;display:block"><p>${escHtml(state.n26Result)}</p></div>` : ""}
+        ${state.n26Error ? `
+        <div class="banner-aviso red" style="margin-top:12px;display:block"><p>${escHtml(state.n26Error)}</p></div>` : ""}
+      </div>
+
+      <div class="card" style="margin-bottom:12px">
         <button type="button" id="btn-recurrentes" style="${BTN_SECONDARY}">Gastos e ingresos recurrentes</button>
       </div>
 
@@ -123,6 +139,27 @@ export async function renderAjustes(container) {
 
     container.querySelector("#btn-recurrentes").onclick = () => {
       renderRecurrentes(container, () => renderAjustes(container));
+    };
+
+    container.querySelector("#btn-n26-import").onclick = () => {
+      container.querySelector("#n26-file-input").click();
+    };
+
+    container.querySelector("#n26-file-input").onchange = async (e) => {
+      const file = e.target.files[0];
+      e.target.value = ""; // permite re-seleccionar el MISMO fichero (p.ej. para probar el dedupe)
+      if (!file) return;
+      state.busy = true; state.n26Result = null; state.n26Error = null; render();
+      try {
+        const res = await importN26Csv(await file.text());
+        state.n26Result = `Nuevas: ${res.created} · Conciliadas: ${res.reconciled} · `
+          + `Duplicadas (saltadas): ${res.skipped}. Revisa la bandeja «sin categorizar» en `
+          + `Movimientos y reclasifica a devolución los Bizum de Sara.`;
+      } catch (err) {
+        state.n26Error = err.message;
+      } finally {
+        state.busy = false; render();
+      }
     };
 
     const cerrarBtn = container.querySelector("#btn-cerrar-periodo");
