@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#0b0c0e"/>
+  <g transform="translate(256,256) scale(0.7) translate(-256,-256)">
+    <text x="246" y="266" text-anchor="middle" dominant-baseline="central"
+          font-family="sans-serif" font-weight="700" font-size="300" fill="#2f6bff">B</text>
+    <circle cx="380" cy="146" r="28" fill="#4ade80"/>
+  </g>
+</svg>
