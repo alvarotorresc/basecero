@@ -192,7 +192,7 @@ function goalRowHtml(g) {
       </div>
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
         <div style="font-size:11px;color:${stateColor ?? "var(--text-3)"};">${escHtml(subtitle)}</div>
-        <div style="font-size:11px;font-weight:700;color:${stateColor ?? "var(--text-2)"};">${Math.round(pct)} %</div>
+        <div style="font-size:11px;font-weight:700;color:${stateColor ?? "var(--text-2)"};white-space:nowrap;">${Math.round(pct)} %</div>
       </div>
     </button>`;
 }
