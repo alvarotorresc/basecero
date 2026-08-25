@@ -189,7 +189,11 @@ export async function renderAjustes(container) {
         }
         const currentDump = await dumpAllTables();
         state.errors = null;
-        state.pending = { data, currentDump, currentCount: currentDump.transactions.length };
+        // dumpAllTables trae TODAS las filas (incluidas las soft-deleted, necesario para el
+        // backup JSON completo) — el aviso de "movimientos actuales" antes de un reemplazo
+        // destructivo debe contar solo las visibles, si no infla la cifra con lo ya borrado.
+        const activeCount = currentDump.transactions.filter((t) => !t.deleted).length;
+        state.pending = { data, currentDump, currentCount: activeCount };
       } catch (err) {
         state.errors = [`No se pudo leer el archivo: ${err.message}`]; state.pending = null;
       } finally {
