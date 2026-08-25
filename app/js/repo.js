@@ -8,7 +8,9 @@ export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[
 
 /** Cierra el periodo abierto (si existe: en el primer periodo no hay nada que cerrar) con
  *  end_date = día anterior a startDate, abre el nuevo y crea sus budgets — TODO en un único
- *  execMany (ver task-8-brief.md). budgets: [{categoryId, amountCents}]. La usa tanto el
+ *  execMany: o quedan las tres cosas hechas, o ninguna (si algo falla a medias, closePeriod
+ *  dejaría un periodo cerrado sin sucesor abierto, violando la invariante de que siempre hay
+ *  como mucho un periodo open). budgets: [{categoryId, amountCents}]. La usa tanto el
  *  asistente de cierre normal como el onboarding (modo 'first', sin periodo previo). */
 export async function openNextPeriod({ name, startDate, sharePct, budgets = [] }) {
   const current = await getOpenPeriod();
@@ -301,8 +303,8 @@ export async function netWorthAt(dateIso) {
 }
 
 // Abreviaturas de 3 letras en español para las etiquetas de la sparkline de Patrimonio — FIJAS
-// (no Intl.DateTimeFormat) para que no dependan de la versión de ICU del entorno: en Node 22
-// { month:"short" } da "sept" para septiembre, no "sep" (ver comprobación en task-13-report.md).
+// (no Intl.DateTimeFormat) para que no dependan de la versión de ICU del entorno: comprobado que
+// en Node 22 { month:"short" } da "sept" para septiembre (4 letras), no "sep".
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 export const shortMonthLabel = (iso) => MESES_CORTOS[new Date(iso + "T12:00:00").getMonth()];
 

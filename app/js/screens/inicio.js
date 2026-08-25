@@ -217,11 +217,11 @@ function categoriaDonutRowHtml(name, color, spentCents, limitCents) {
  *  "falta" un trozo. Mostrando la suma de lo categorizado, el número del centro SIEMPRE coincide
  *  con el 100% del anillo.
  *
- *  "Ver presupuesto →" es el ÚNICO punto de entrada a la pantalla Presupuesto (ver
- *  task-12-report.md, fix tras revisión): NO puede depender de que haya algo que dibujar en el
- *  donut. Si no hay gasto categorizado todavía (periodo recién abierto, todo sin categorizar,
- *  refunds que dejan las raíces a 0/negativo...) pero el periodo SÍ tiene presupuestos, se
- *  muestra una tarjeta reducida con solo la cabecera + el enlace, sin donut ni lista — mismo
+ *  "Ver presupuesto →" es el ÚNICO punto de entrada a la pantalla Presupuesto: NO puede depender
+ *  de que haya algo que dibujar en el donut. Si no hay gasto categorizado todavía (periodo
+ *  recién abierto, todo sin categorizar, refunds que dejan las raíces a 0/negativo...) pero el
+ *  periodo SÍ tiene presupuestos, se muestra una tarjeta reducida con solo la cabecera + el
+ *  enlace, sin donut ni lista — mismo
  *  `id`/handler que la variante completa. Solo si tampoco hay presupuestos la tarjeta entera se
  *  oculta (nada que mostrar Y nada a lo que entrar, igual criterio que conSaraHtml/previsionHtml). */
 function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupuesto) {
