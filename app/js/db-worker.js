@@ -1,5 +1,6 @@
 import sqlite3InitModule from "../vendor/sqlite-wasm/jswasm/sqlite3.mjs";
 import { seedStatements } from "./seeds.js";
+import { classifyStorageFailure } from "./format.js";
 
 let db = null, storage = "opfs";
 
@@ -10,7 +11,8 @@ async function init() {
     db = new pool.OpfsSAHPoolDb("/basecero.sqlite3");
   } catch (e) {
     console.warn("OPFS no disponible, usando memoria:", e);
-    storage = "memory";
+    // "locked" = otra pestaña/PWA tiene la BD abierta (recuperable); el resto, sin soporte real.
+    storage = classifyStorageFailure(e) === "locked" ? "locked" : "memory";
     db = new sqlite3.oo1.DB(":memory:", "c");
   }
   const schema = await (await fetch(new URL("./schema.sql", import.meta.url))).text();

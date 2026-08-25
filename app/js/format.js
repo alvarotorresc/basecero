@@ -6,6 +6,17 @@ export const hoyISO = () => new Date().toLocaleDateString("sv-SE"); // YYYY-MM-D
 export const nowIso = () => new Date().toISOString().slice(0, 19) + "Z";
 export const fmtDiaLargo = (iso) =>
   new Date(iso + "T12:00:00").toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+
+// opfs-sahpool solo admite una instancia de la app: otra pestaña/PWA con la BD
+// abierta hace fallar createSyncAccessHandle con NoModificationAllowedError.
+// Ese fallo es recuperable ("locked": cierra la otra y reintenta); el resto
+// significa que OPFS no está disponible de verdad ("unsupported").
+export function classifyStorageFailure(e) {
+  const name = e?.name ?? "";
+  const msg = String(e?.message ?? e ?? "");
+  if (name === "NoModificationAllowedError" || msg.includes("Access Handle")) return "locked";
+  return "unsupported";
+}
 // Formato corto ("12 ago") — filas de Liquidar y el pie del bloque "Con Sara" en Inicio.
 export const fmtDiaCorto = (iso) =>
   new Date(iso + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" });

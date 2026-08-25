@@ -26,7 +26,19 @@ export function nav(tab) {
 async function boot() {
   try {
     const { storage } = await initDb();
-    if (storage === "memory") {
+    if (storage === "locked") {
+      // Otra pestaña o la PWA instalada ya tienen la base abierta (opfs-sahpool
+      // es de instancia única): recuperable cerrando la otra y reintentando.
+      const aviso = document.createElement("div");
+      aviso.className = "banner-aviso red";
+      aviso.textContent = "⚠ BaseCero ya está abierta en otra pestaña o ventana. Ciérrala y reintenta; mientras tanto, lo que hagas aquí NO se guardará. ";
+      const btn = document.createElement("button");
+      btn.textContent = "Reintentar";
+      btn.style.cssText = "margin-left:8px;padding:4px 12px;border-radius:8px;border:1px solid currentColor;background:none;color:inherit;font:inherit;cursor:pointer";
+      btn.onclick = () => location.reload();
+      aviso.appendChild(btn);
+      document.body.prepend(aviso);
+    } else if (storage === "memory") {
       const aviso = document.createElement("div");
       aviso.className = "banner-aviso";
       aviso.textContent = "⚠ Este navegador no soporta almacenamiento persistente: tus datos NO se guardarán al cerrar.";
