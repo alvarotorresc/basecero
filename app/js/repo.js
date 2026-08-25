@@ -1,6 +1,6 @@
 import { SQL, TABLES } from "./sql.js";
 import { query, exec, execMany } from "./db.js";
-import { nowIso, hoyISO, prevDayIso } from "./format.js";
+import { nowIso, hoyISO, prevDayIso, fmtEUR } from "./format.js";
 import { CONTRACT, insertSql } from "./contract.js";
 import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
 
@@ -246,6 +246,174 @@ export async function previsionOfPeriod(period) {
     pendienteSaraCents,
     disponibleCents: saldoN26Cents - comprometidoCents + pendienteSaraCents,
   };
+}
+
+// ---- Patrimonio (Task 13) --------------------------------------------------
+
+export const listAllAccounts = () => query(SQL.listAllAccounts);
+export const listClosedPeriods = () => query(SQL.listClosedPeriods);
+export const listGoals = () => query(SQL.listGoals);
+
+/** Saldo de todas las cuentas activas (no archivadas) a una fecha, en orden de display_order —
+ *  tarjeta "Cuentas" de Patrimonio. Una accountBalanceCents por cuenta: SQL.accountBalance
+ *  (Task 11) ya está pensada para una cuenta a la vez (subquery con account_id=? fijo), no hay
+ *  una única query que las traiga todas juntas. */
+export async function balancesAt(dateIso) {
+  const accounts = await listAllAccounts();
+  const balances = await Promise.all(accounts.map((a) => accountBalanceCents(a.id, dateIso)));
+  return accounts.map((a, i) => ({ id: a.id, name: a.name, type: a.type, balance_cents: balances[i] }));
+}
+
+/** Suma de balances = patrimonio neto (el pasivo resta solo, por tener opening/movimientos en
+ *  negativo — no hace falta tratarlo distinto). PURA a propósito: la alimenta directamente
+ *  tests/app/patrimonio.test.mjs con balances calculados a mano vía SQL.accountBalance, mismo
+ *  patrón que repo.fillLast7Days (no hay Worker disponible en Node para probar balancesAt tal
+ *  cual). */
+export const netWorthOfBalances = (balances) => balances.reduce((sum, b) => sum + b.balance_cents, 0);
+
+export async function netWorthAt(dateIso) {
+  return netWorthOfBalances(await balancesAt(dateIso));
+}
+
+// Abreviaturas de 3 letras en español para las etiquetas de la sparkline de Patrimonio — FIJAS
+// (no Intl.DateTimeFormat) para que no dependan de la versión de ICU del entorno: en Node 22
+// { month:"short" } da "sept" para septiembre, no "sep" (ver comprobación en task-13-report.md).
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+export const shortMonthLabel = (iso) => MESES_CORTOS[new Date(iso + "T12:00:00").getMonth()];
+
+/** Serie de patrimonio neto: un punto por periodo CERRADO (a su end_date, no su start_date) +
+ *  el punto de HOY — tarjeta "Patrimonio neto" de Patrimonio. Con 0 periodos cerrados devuelve
+ *  un único punto; quien pinta la sparkline decide ocultarla con <2 puntos (screens/patrimonio.js).
+ *  Los netWorthAt de cada punto van en paralelo (Promise.all preserva el orden de llegada aunque
+ *  resuelvan en otro orden): con muchos periodos cerrados, esperar uno a uno por el Worker sería
+ *  lento sin necesidad — cada punto es independiente de los demás. */
+export async function netWorthSeries() {
+  const closed = await listClosedPeriods();
+  const points = await Promise.all([
+    ...closed.map(async (p) => ({ label: shortMonthLabel(p.end_date), cents: await netWorthAt(p.end_date) })),
+    (async () => ({ label: shortMonthLabel(hoyISO()), cents: await netWorthAt(hoyISO()) }))(),
+  ]);
+  return points;
+}
+
+/** Gasto medio (spentOfPeriod) de los periodos CERRADOS — es el target del goal emergency_fund
+ *  (target_months × este promedio). 0 si no hay ninguno cerrado todavía: goalProgress ya trata
+ *  avgSpentCents=0 como "sin datos", pct 0 sin dividir por cero. */
+export async function avgSpentOfClosedPeriods() {
+  const closed = await listClosedPeriods();
+  if (closed.length === 0) return 0;
+  const spents = await Promise.all(closed.map((p) => spentOfPeriod(p.id)));
+  return Math.round(spents.reduce((s, c) => s + c, 0) / spents.length);
+}
+
+const fmtDecimal1 = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+// den<=0 -> 0 en vez de NaN/Infinity: mismo criterio que budgetStatus (presupuesto.js), pero sin
+// importarla desde repo.js (capa de datos no depende de una pantalla) — 3 líneas, se duplica aquí.
+const safeDiv = (num, den) => (den > 0 ? (num / den) * 100 : 0);
+
+// "antes de mayo 2027" (mes en minúscula, mitad de frase) — a diferencia de
+// format.js#nombrePorDefecto (que capitaliza para usarlo como NOMBRE de periodo), aquí no aplica.
+const fmtMesAnio = (iso) =>
+  new Date(iso + "T12:00:00").toLocaleDateString("es-ES", { month: "long", year: "numeric" }).replace(" de ", " ");
+
+/** Progreso de UN goal activo según su tipo (contrato §7.2) — función PURA: toda la información
+ *  ya viene resuelta en `ctx` (repo.goalsWithProgress hace las queries UNA vez y arma ctx antes
+ *  de llamar aquí por cada goal; ver tests/app/patrimonio.test.mjs, que la prueba tipo a tipo
+ *  con ctx mínimos, sin tocar la base de datos). pct SIN capar (igual criterio que
+ *  presupuesto.js#budgetStatus: el número grande muestra el % real: quien pinta la barra la capa
+ *  a 100).
+ *
+ *  level ('ok'/'warn'/'over'): SOLO spending_cap llega a 'over' — es el único tipo con un techo
+ *  real que no conviene cruzar (mismos umbrales que budgetStatus: ok<85, warn>=85, over>100).
+ *  Las huchas de acumulación (emergency_fund, savings_target, provision) siempre van 'ok':
+ *  llenarlas de más nunca es malo, no existe un "te has pasado" para una hucha. savings_rate no
+ *  tiene techo tampoco, pero sí un objetivo que puede no alcanzarse aún este periodo: 'ok' si ya
+ *  lo iguala o supera, 'warn' si no. */
+export function goalProgress(goal, ctx) {
+  const {
+    balanceByAccount = {}, accountNameById = {}, avgSpentCents = 0,
+    spentByCategory = {}, savingsRatePct = 0,
+  } = ctx;
+
+  if (goal.type === "emergency_fund") {
+    const currentCents = balanceByAccount[goal.account_id] ?? 0;
+    const targetCents = (goal.target_months ?? 0) * avgSpentCents;
+    const pct = safeDiv(currentCents, targetCents);
+    const accName = accountNameById[goal.account_id] ?? "";
+    const subtitle = avgSpentCents > 0
+      ? `Hucha en ${accName} · cubre ${fmtDecimal1.format(currentCents / avgSpentCents)} meses de gasto`
+      : `Hucha en ${accName} · todavía sin periodos cerrados para calcular el gasto medio`;
+    return { goal, currentCents, targetCents, pct, level: "ok", subtitle };
+  }
+
+  if (goal.type === "savings_target") {
+    const currentCents = balanceByAccount[goal.account_id] ?? 0;
+    const targetCents = goal.target_amount_cents ?? 0;
+    const pct = safeDiv(currentCents, targetCents);
+    const accName = accountNameById[goal.account_id] ?? "";
+    const fecha = goal.target_date ? ` · antes de ${fmtMesAnio(goal.target_date)}` : "";
+    return { goal, currentCents, targetCents, pct, level: "ok", subtitle: `Hucha en ${accName}${fecha}` };
+  }
+
+  if (goal.type === "provision") {
+    const currentCents = balanceByAccount[goal.account_id] ?? 0;
+    const targetCents = goal.target_amount_cents ?? 0;
+    const pct = safeDiv(currentCents, targetCents);
+    const monthlyCents = Math.round(targetCents / 12);
+    return { goal, currentCents, targetCents, pct, level: "ok", subtitle: `Provisión · ${fmtEUR(monthlyCents)} al mes` };
+  }
+
+  if (goal.type === "spending_cap") {
+    // spentByCategory viene de spentByRootCategory (root_id): si goal.category_id apunta a una
+    // categoría HIJA en vez de a su raíz, no hay match -> 0/0 -> pct 0 -> 'ok' en silencio, sin
+    // ningún aviso. Handoff para la Task 14: el formulario de "Nuevo objetivo" debe restringir el
+    // selector de categoría de spending_cap a categorías RAÍZ de gasto (parent_id='').
+    const currentCents = spentByCategory[goal.category_id] ?? 0;
+    const targetCents = goal.target_amount_cents ?? 0;
+    const pct = safeDiv(currentCents, targetCents);
+    const level = pct > 100 ? "over" : pct >= 85 ? "warn" : "ok";
+    const remaining = targetCents - currentCents;
+    const subtitle = level === "over"
+      ? `Superado por ${fmtEUR(-remaining)}`
+      : `Te quedan ${fmtEUR(remaining)} para el cierre del periodo`;
+    return { goal, currentCents, targetCents, pct, level, subtitle };
+  }
+
+  // savings_rate: currentCents/targetCents guardan PUNTOS PORCENTUALES, no céntimos (el nombre
+  // del campo se mantiene igual para los 5 tipos — así lo pide la interfaz del brief de la Task 13).
+  const currentCents = savingsRatePct;
+  const targetCents = goal.target_pct ?? 0;
+  const pct = safeDiv(currentCents, targetCents);
+  const level = currentCents >= targetCents ? "ok" : "warn";
+  return { goal, currentCents, targetCents, pct, level, subtitle: "Tasa de ahorro del periodo abierto" };
+}
+
+/** Progreso de todos los goals activos — tarjeta "Objetivos" de Patrimonio. Arma el ctx UNA vez
+ *  (saldos de las cuentas con hucha usadas por algún goal, gasto medio de los cerrados, gasto por
+ *  categoría raíz del periodo abierto, tasa de ahorro del periodo abierto) y llama a goalProgress
+ *  por goal — evita repetir esas queries una vez por goal. Sin periodo abierto (caso raro: solo
+ *  justo tras el primer arranque, antes del onboarding) spending_cap/savings_rate quedan a 0. */
+export async function goalsWithProgress() {
+  const [goals, accounts, avgSpentCents, openPeriod] = await Promise.all([
+    listGoals(), listAllAccounts(), avgSpentOfClosedPeriods(), getOpenPeriod(),
+  ]);
+
+  const accountIds = [...new Set(goals.map((g) => g.account_id).filter(Boolean))];
+  const balances = await Promise.all(accountIds.map((id) => accountBalanceCents(id, hoyISO())));
+  const balanceByAccount = Object.fromEntries(accountIds.map((id, i) => [id, balances[i]]));
+  const accountNameById = Object.fromEntries(accounts.map((a) => [a.id, a.name]));
+
+  let spentByCategory = {}, savingsRatePct = 0;
+  if (openPeriod) {
+    const [rootRows, spent, income] = await Promise.all([
+      spentByRootCategory(openPeriod.id), spentOfPeriod(openPeriod.id), incomeOfPeriod(openPeriod.id),
+    ]);
+    spentByCategory = Object.fromEntries(rootRows.map((r) => [r.root_id, r.spent_cents]));
+    savingsRatePct = income > 0 ? ((income - spent) / income) * 100 : 0;
+  }
+
+  const ctx = { balanceByAccount, accountNameById, avgSpentCents, spentByCategory, savingsRatePct };
+  return goals.map((g) => goalProgress(g, ctx));
 }
 
 export async function dumpAllTables() {

@@ -133,5 +133,12 @@ export const SQL = {
       ELSE 0 END) FROM transactions t
     WHERE t.deleted=0 AND (t.account_id=a.id OR t.counter_account_id=a.id) AND t.date<=?),0) AS balance_cents
   FROM accounts a WHERE a.id=?`,
+
+  // Patrimonio (Task 13). listAllAccounts es a propósito el mismo shape que listAccounts (no
+  // filtra type, incluye el pasivo): un nombre propio para el caso de uso de Patrimonio, que
+  // SIEMPRE quiere las 3 cuentas (no solo las de "elige cuenta" de un formulario).
+  listAllAccounts: `SELECT id, name, type FROM accounts WHERE deleted=0 AND is_archived=0 ORDER BY display_order`,
+  listClosedPeriods: `SELECT * FROM periods WHERE status='closed' AND deleted=0 ORDER BY start_date`,
+  listGoals: `SELECT * FROM goals WHERE is_active=1 AND deleted=0 ORDER BY created_at`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"];

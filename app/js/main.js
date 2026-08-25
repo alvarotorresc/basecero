@@ -4,14 +4,14 @@ import { showOnboarding } from "./onboarding.js";
 import { renderInicio } from "./screens/inicio.js";
 import { renderRegistro } from "./screens/registro.js";
 import { renderMovimientos } from "./screens/movimientos.js";
-import { renderProximamente } from "./screens/placeholder.js";
+import { renderPatrimonio } from "./screens/patrimonio.js";
 import { renderAjustes } from "./screens/ajustes.js";
 
 const screen = document.getElementById("screen");
 const RUTAS = {
   inicio: () => renderInicio(screen),
   movimientos: () => renderMovimientos(screen),
-  patrimonio: () => renderProximamente(screen, "Patrimonio"),
+  patrimonio: () => renderPatrimonio(screen),
   ajustes: () => renderAjustes(screen),
 };
 
