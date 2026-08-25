@@ -316,23 +316,24 @@ export async function renderRecurrentes(container, onBack) {
     };
 
     container.querySelectorAll("[data-cat]").forEach((b) => {
-      b.onclick = () => { f.categoryId = b.dataset.cat; errorMsg = ""; render(); };
+      b.onclick = () => { f.categoryId = b.dataset.cat; errorMsg = ""; state.deleteConfirm = false; render(); };
     });
 
     container.querySelectorAll("[data-acc]").forEach((b) => {
       b.onclick = () => {
         f.accountId = b.dataset.acc;
         if (f.counterAccountId === f.accountId) f.counterAccountId = "";
+        state.deleteConfirm = false;
         render();
       };
     });
 
     container.querySelectorAll("[data-counter-acc]").forEach((b) => {
-      b.onclick = () => { f.counterAccountId = b.dataset.counterAcc; render(); };
+      b.onclick = () => { f.counterAccountId = b.dataset.counterAcc; state.deleteConfirm = false; render(); };
     });
 
     container.querySelectorAll("[data-freq]").forEach((b) => {
-      b.onclick = () => { f.frequency = b.dataset.freq; errorMsg = ""; render(); };
+      b.onclick = () => { f.frequency = b.dataset.freq; errorMsg = ""; state.deleteConfirm = false; render(); };
     });
 
     container.querySelector("#rec-day").oninput = (e) => { f.dueDay = e.target.value; state.deleteConfirm = false; };
