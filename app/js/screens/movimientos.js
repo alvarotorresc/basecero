@@ -1,6 +1,6 @@
 import {
   listPeriods, listAllByDay, getTransaction, updateTransaction, softDeleteTransaction, countUncategorized,
-  listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById,
+  listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById, hasActiveLinkedRefund,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtEUR, fmtDiaLargo, hoyISO } from "../format.js";
@@ -161,6 +161,11 @@ export async function renderMovimientos(container) {
     if (row.type === "refund" && row.ref_id) {
       try { state.linkedRefund = await getTransaction(row.ref_id); } catch { state.linkedRefund = null; }
     }
+    // Task 17 ronda 2 (controller ruling, finding A): un gasto ya liquidado con Sara (settled=1
+    // Y con un refund activo enlazado) bloquea importe/compartido — editar el importe aquí sin
+    // tocar el refund deja la deuda con Sara mal calculada y sin nada pendiente que lo delate.
+    state.detail.settledLocked = row.type === "expense" && !!row.settled
+      && (await hasActiveLinkedRefund(id).catch(() => false));
     state.view = "detail";
     errorMsg = "";
     render();
@@ -221,6 +226,7 @@ export async function renderMovimientos(container) {
     const cats = categoriesFor(d.type);
     const myCents = d.isShared ? Math.round((d.cents * pct) / 100) : d.cents;
     const saraCents = d.isShared ? d.cents - myCents : 0;
+    const locked = !!d.settledLocked;
 
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
 
@@ -231,12 +237,17 @@ export async function renderMovimientos(container) {
         <span style="width:36px;"></span>
       </div>
 
+      ${locked ? `
+      <div class="banner-aviso" style="margin-bottom:18px;">
+        <p>Liquidado con Sara. Para editar el importe, borra antes su liquidación en Movimientos.</p>
+      </div>` : ""}
+
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
         <div class="section-title">Importe</div>
         <div class="amount-display" style="align-items:center;">
-          ${d.type === "adjustment" ? `<button type="button" class="icon-btn" id="mov-sign" aria-label="Cambiar signo" style="font-size:18px; font-weight:700;">${d.sign}</button>` : ""}
-          <input type="text" inputmode="decimal" id="mov-raw" value="${escAttr(d.raw)}" placeholder="0"
-            style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
+          ${d.type === "adjustment" ? `<button type="button" class="icon-btn" id="mov-sign" aria-label="Cambiar signo" style="font-size:18px; font-weight:700;" ${locked ? "disabled" : ""}>${d.sign}</button>` : ""}
+          <input type="text" inputmode="decimal" id="mov-raw" value="${escAttr(d.raw)}" placeholder="0" ${locked ? "disabled" : ""}
+            style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;${locked ? "opacity:.5;" : ""}">
           <span class="amount-currency">€</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
@@ -284,10 +295,10 @@ export async function renderMovimientos(container) {
 
       ${needsCategory(d.type) ? `
       <div class="card" style="padding:0 16px; margin-bottom:18px;">
-        <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
+        <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:${locked ? "default" : "pointer"};${locked ? "opacity:.5;" : ""}">
           <span style="font-size:15px; font-weight:600;">Compartido con Sara</span>
           <span class="toggle">
-            <input type="checkbox" id="mov-shared" ${d.isShared ? "checked" : ""}>
+            <input type="checkbox" id="mov-shared" ${d.isShared ? "checked" : ""} ${locked ? "disabled" : ""}>
             <span class="toggle-track"><span class="toggle-knob"></span></span>
           </span>
         </label>

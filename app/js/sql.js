@@ -56,6 +56,11 @@ export const SQL = {
   unsettleIfNoActiveRefunds: `UPDATE transactions SET settled = CASE WHEN EXISTS(
       SELECT 1 FROM transactions r WHERE r.ref_id=? AND r.type='refund' AND r.deleted=0 AND r.id<>?
     ) THEN 1 ELSE 0 END, updated_at=? WHERE id=?`,
+  // Task 17 ronda 2 (controller ruling, finding A): ¿tiene `txId` algún refund activo (no
+  // borrado) que lo enlace por ref_id? Guarda tanto la UI (bloquea importe/compartido en
+  // Movimientos) como updateTransaction (rechaza el cambio aunque alguien salte la UI).
+  hasActiveLinkedRefund: `SELECT 1 FROM transactions r
+    WHERE r.ref_id=? AND r.type='refund' AND r.deleted=0 LIMIT 1`,
   countUncategorized: `SELECT COUNT(*) AS n FROM transactions
     WHERE period_id=? AND deleted=0 AND category_id='' AND type IN ('expense','income','refund')`,
   // Gastos compartidos sin liquidar de TODOS los periodos (no solo el abierto): el bloque "Con

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SQL } from "../../app/js/sql.js";
+import { sharedFieldsLocked } from "../../app/js/repo.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
 const T = "2026-08-24T18:00:00Z";
@@ -144,4 +145,64 @@ test("el refund de liquidación NO altera spentOfPeriod: tiene ref_id, así que 
 
   const despues = db.prepare(SQL.spentOfPeriod).get("per-1").spent_cents;
   assert.equal(despues, antes, "el refund de liquidación (ref_id != '') no debe restar ni sumar nada");
+});
+
+// ---- Task 17 ronda 2 (controller ruling, finding A): guard de "gasto liquidado" ---------
+
+test("SQL.hasActiveLinkedRefund: true solo con un refund ACTIVO que apunte por ref_id", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const gastoId = ins(db, { id: "gasto-1", cents: 8000, shared: 1 });
+  const otroGastoId = ins(db, { id: "gasto-2", cents: 3000, shared: 1 });
+
+  // sin ningún refund todavía
+  assert.equal(db.prepare(SQL.hasActiveLinkedRefund).get(gastoId), undefined);
+
+  const refundId = settleShared(db, gastoId, "acc-n26", T2);
+  assert.ok(db.prepare(SQL.hasActiveLinkedRefund).get(gastoId), "con el refund activo, debe encontrarlo");
+  assert.equal(db.prepare(SQL.hasActiveLinkedRefund).get(otroGastoId), undefined, "no debe colarse a otro gasto");
+
+  db.prepare("UPDATE transactions SET deleted=1 WHERE id=?").run(refundId);
+  assert.equal(db.prepare(SQL.hasActiveLinkedRefund).get(gastoId), undefined,
+    "un refund BORRADO no cuenta como enlace activo (mismo criterio que unsettleIfNoActiveRefunds)");
+});
+
+test("sharedFieldsLocked: pura, sin DB — replica exactamente lo que updateTransaction debe bloquear", () => {
+  const settledExpense = { type: "expense", settled: 1, amount_cents: 4550, is_shared: 1, share_pct_override: null };
+
+  // no settled → nunca bloquea, aunque cambie el importe
+  assert.equal(sharedFieldsLocked(
+    { ...settledExpense, settled: 0 },
+    { amountCents: 6000, isShared: true, sharePctOverride: null },
+  ), false, "un gasto NO liquidado no se bloquea");
+
+  // settled pero type != 'expense' (p.ej. un refund) → nunca bloquea
+  assert.equal(sharedFieldsLocked(
+    { ...settledExpense, type: "refund" },
+    { amountCents: 6000, isShared: true, sharePctOverride: null },
+  ), false, "el guard es solo para expense — is_shared/settled también existen en refund/income");
+
+  // settled + expense + MISMO importe/compartido/override (solo cambia categoría/nota/fecha) → no bloquea
+  assert.equal(sharedFieldsLocked(
+    settledExpense,
+    { amountCents: 4550, isShared: true, sharePctOverride: null },
+  ), false, "editar categoría/fecha/nota/comercio sin tocar importe/compartido/reparto debe seguir funcionando");
+
+  // settled + expense + importe distinto → bloquea
+  assert.equal(sharedFieldsLocked(
+    settledExpense,
+    { amountCents: 6000, isShared: true, sharePctOverride: null },
+  ), true, "cambiar el importe de un gasto liquidado debe bloquearse");
+
+  // settled + expense + is_shared distinto (desmarcar "Compartido con Sara") → bloquea
+  assert.equal(sharedFieldsLocked(
+    settledExpense,
+    { amountCents: 4550, isShared: false, sharePctOverride: null },
+  ), true, "desmarcar compartido en un gasto liquidado debe bloquearse");
+
+  // settled + expense + share_pct_override distinto → bloquea
+  assert.equal(sharedFieldsLocked(
+    settledExpense,
+    { amountCents: 4550, isShared: true, sharePctOverride: 90 },
+  ), true, "cambiar el reparto de un gasto liquidado debe bloquearse");
 });

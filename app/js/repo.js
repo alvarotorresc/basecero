@@ -57,6 +57,23 @@ export const allCategoriesById = async () =>
 export const listPeriods = () => query(SQL.listPeriods);
 export const listAllByDay = (pid) => query(SQL.listAllByDay, [pid]);
 export const getTransaction = async (id) => (await query(SQL.getTransaction, [id]))[0] ?? null;
+// Task 17 ronda 2 (finding A): ¿`id` tiene algún refund activo enlazado por ref_id? La usa
+// tanto Movimientos (bloquear importe/compartido en la UI) como updateTransaction (rechazar
+// el cambio server-side aunque alguien salte la UI).
+export const hasActiveLinkedRefund = async (id) => (await query(SQL.hasActiveLinkedRefund, [id])).length > 0;
+
+/** ¿Debe bloquearse un update por el guard de "gasto liquidado" (Task 17 ronda 2, finding A)?
+ *  Pura y sin DB (mismo patrón que prevision.js: así se testea sin worker/sqlite de por
+ *  medio). `f` son los campos YA RESUELTOS de updateTransaction (con los defaults de `cur`
+ *  aplicados para lo que el caller no mandó) — comparar `f` contra `cur` es lo que hace que
+ *  un save que NO toca importe/compartido/reparto (solo categoría/fecha/nota/comercio) no se
+ *  bloquee aunque el gasto esté settled. El caller aún debe comprobar hasActiveLinkedRefund. */
+export function sharedFieldsLocked(cur, f) {
+  if (cur.type !== "expense" || !cur.settled) return false;
+  return f.amountCents !== cur.amount_cents
+    || !!f.isShared !== !!cur.is_shared
+    || f.sharePctOverride !== cur.share_pct_override;
+}
 export const countUncategorized = async (pid) => (await query(SQL.countUncategorized, [pid]))[0].n;
 export const pendingShared = () => query(SQL.pendingShared);
 export const pendingSharedTotalCents = async () => (await query(SQL.pendingSharedTotal))[0].total_cents;
@@ -137,6 +154,14 @@ export async function updateTransaction(id, fields) {
     ruleId: fields.ruleId ?? cur.rule_id,
     status: fields.status ?? cur.status,
   };
+  // Task 17 ronda 2 (controller ruling, finding A): un gasto ya liquidado (settled=1) con un
+  // refund activo enlazado no puede cambiar de importe/compartido/reparto — si no, el refund
+  // se queda congelado con el importe viejo y la deuda con Sara se pierde en silencio. Guarda
+  // server-side (no solo UI, que ya bloquea los campos): un save que NO toca esos campos
+  // (solo categoría/fecha/nota/comercio) sigue funcionando con normalidad.
+  if (sharedFieldsLocked(cur, f) && (await hasActiveLinkedRefund(id))) {
+    throw new Error("Movimiento liquidado con Sara: borra su liquidación en Movimientos antes de cambiar el importe o el reparto.");
+  }
   const t = nowIso();
   await exec(SQL.updateTransaction, [
     f.type, f.amountCents, f.date, f.categoryId ?? "", f.accountId, f.counterAccountId ?? "",
