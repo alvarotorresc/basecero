@@ -127,6 +127,51 @@ export async function softDeleteTransaction(id) {
   }
 }
 
+export const listRules = () => query(SQL.listRules);
+export const getRule = async (id) => (await query(SQL.getRule, [id]))[0] ?? null;
+
+/** Crea una regla recurrente. fields camelCase (ver recurrentes.js): is_active por defecto
+ *  activa (1) si no se indica, igual criterio que el DEFAULT 1 del schema. name pasa por
+ *  bcSanitizeCell como merchant/note de addTransaction: es texto libre tecleado por el usuario
+ *  que via exportAllJson acaba en una celda .xlsx (mismo riesgo de inyección de fórmula). */
+export async function createRule(fields) {
+  const t = nowIso();
+  await exec(SQL.insertRule, [
+    bcUlid(), bcSanitizeCell(fields.name), fields.type, fields.amountCents,
+    fields.categoryId ?? "", fields.accountId, fields.counterAccountId ?? "",
+    fields.frequency, fields.dueDay ?? null, fields.dueMonth ?? null,
+    fields.isShared ? 1 : 0, fields.isActive === false ? 0 : 1,
+    t, t,
+  ]);
+}
+
+/** Actualiza los campos editables de una regla (mismas claves camelCase que createRule).
+ *  Los campos ausentes conservan el valor actual — mismo criterio que repo.updateTransaction. */
+export async function updateRule(id, fields) {
+  const cur = await getRule(id);
+  if (!cur) throw new Error("Regla no encontrada");
+  const f = {
+    name: fields.name ?? cur.name,
+    type: fields.type ?? cur.type,
+    amountCents: fields.amountCents ?? cur.amount_cents,
+    categoryId: fields.categoryId !== undefined ? fields.categoryId : cur.category_id,
+    accountId: fields.accountId ?? cur.account_id,
+    counterAccountId: fields.counterAccountId !== undefined ? fields.counterAccountId : cur.counter_account_id,
+    frequency: fields.frequency ?? cur.frequency,
+    dueDay: fields.dueDay !== undefined ? fields.dueDay : cur.due_day,
+    dueMonth: fields.dueMonth !== undefined ? fields.dueMonth : cur.due_month,
+    isShared: fields.isShared ?? !!cur.is_shared,
+    isActive: fields.isActive ?? !!cur.is_active,
+  };
+  const t = nowIso();
+  await exec(SQL.updateRule, [
+    bcSanitizeCell(f.name), f.type, f.amountCents, f.categoryId ?? "", f.accountId, f.counterAccountId ?? "",
+    f.frequency, f.dueDay, f.dueMonth, f.isShared ? 1 : 0, f.isActive ? 1 : 0, t, id,
+  ]);
+}
+
+export const softDeleteRule = (id) => exec(SQL.softDeleteRule, [nowIso(), id]);
+
 export async function dumpAllTables() {
   const out = {};
   for (const t of TABLES) out[t] = await query(SQL.dumpTable(t));

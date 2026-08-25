@@ -93,5 +93,17 @@ export const SQL = {
   insertBudget: `INSERT INTO budgets (id,period_id,category_id,amount_cents,created_at,updated_at,deleted)
     VALUES (?,?,?,?,?,?,0)`,
   budgetsOfPeriod: `SELECT b.id, b.category_id, b.amount_cents FROM budgets b WHERE b.period_id=? AND b.deleted=0`,
+
+  // Reglas recurrentes (Task 10). Activas primero, luego alfabético — mismo criterio que la
+  // lista de Recurrentes (las inactivas se apilan al final con su badge gris).
+  listRules: `SELECT * FROM recurring_rules WHERE deleted=0 ORDER BY is_active DESC, name`,
+  getRule: `SELECT * FROM recurring_rules WHERE id=? AND deleted=0`,
+  insertRule: `INSERT INTO recurring_rules (id,name,type,amount_cents,category_id,account_id,counter_account_id,
+    frequency,due_day,due_month,is_shared,is_active,created_at,updated_at,deleted)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
+  updateRule: `UPDATE recurring_rules SET name=?, type=?, amount_cents=?, category_id=?, account_id=?,
+    counter_account_id=?, frequency=?, due_day=?, due_month=?, is_shared=?, is_active=?, updated_at=?
+    WHERE id=?`,
+  softDeleteRule: `UPDATE recurring_rules SET deleted=1, updated_at=? WHERE id=?`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"];

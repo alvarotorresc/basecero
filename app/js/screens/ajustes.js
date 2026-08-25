@@ -2,6 +2,7 @@ import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod } from "../repo
 import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
 import { hoyISO, fmtDiaCorto } from "../format.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
+import { renderRecurrentes } from "./recurrentes.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
@@ -90,6 +91,10 @@ export async function renderAjustes(container) {
 
       ${periodoCardHtml(openPeriod)}
 
+      <div class="card" style="margin-bottom:12px">
+        <button type="button" id="btn-recurrentes" style="${BTN_SECONDARY}">Gastos e ingresos recurrentes</button>
+      </div>
+
       <div class="card">
         <p style="font-weight:600;margin-bottom:4px">Copia de emergencia</p>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
@@ -114,6 +119,10 @@ export async function renderAjustes(container) {
 
     container.querySelector("#btn-xlsx-import").onclick = () => {
       container.querySelector("#xlsx-file-input").click();
+    };
+
+    container.querySelector("#btn-recurrentes").onclick = () => {
+      renderRecurrentes(container, () => renderAjustes(container));
     };
 
     const cerrarBtn = container.querySelector("#btn-cerrar-periodo");
