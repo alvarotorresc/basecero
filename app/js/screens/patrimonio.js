@@ -551,9 +551,15 @@ export async function renderPatrimonio(container) {
         <input type="text" id="goal-name" value="${escAttr(f.name)}" placeholder="p. ej. ${escAttr(GOAL_TYPE_LABEL[f.type])}">
       </label>
 
+      ${editing ? `
+      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
+        <span class="field-label">Tipo</span>
+        <div style="padding:14px 16px;font-size:15px;font-weight:600;background:#1b1e21;border-radius:var(--radius-sm);">${escHtml(GOAL_TYPE_LABEL[f.type])}</div>
+        <div style="font-size:11px;color:var(--text-3);">El tipo no se puede cambiar una vez creado el objetivo. Para cambiarlo, bórralo y crea uno nuevo.</div>
+      </div>` : `
       <div class="segmented" style="margin-bottom:18px;">
         ${GOAL_TYPES.map((t) => `<button type="button" data-goal-tipo="${t.id}" class="${f.type === t.id ? "active" : ""}">${t.label}</button>`).join("")}
-      </div>
+      </div>`}
 
       ${renderGoalConditionalFields(f)}
 

@@ -453,11 +453,13 @@ export const getGoal = async (id) => (await query(SQL.getGoal, [id]))[0] ?? null
 const HUCHA_GOAL_TYPES = new Set(["emergency_fund", "savings_target", "provision"]);
 
 /** Crea un goal. fields camelCase: {name, type, targetAmountCents, targetMonths, targetPct,
- *  targetDate, accountId, categoryId}. Para los tipos con hucha propia (emergency_fund/
+ *  targetDate, accountId, categoryId, isActive}. Para los tipos con hucha propia (emergency_fund/
  *  savings_target/provision) sin accountId: crea la cuenta savings "Hucha · {name}" y el goal
  *  EN EL MISMO execMany (atómico: o quedan las dos filas o ninguna) — el id de la hucha se
  *  genera aquí para poder referenciarlo en el INSERT del goal sin depender de un autogenerado
- *  por SQLite. spending_cap/savings_rate no llevan hucha: accountId se queda a "". */
+ *  por SQLite. spending_cap/savings_rate no llevan hucha: accountId se queda a "". isActive
+ *  respeta lo recibido (por defecto 1 si no se indica) — antes se hardcodeaba a 1, ignorando el
+ *  toggle "Activo" del formulario si el usuario lo apagaba al crear (ver fix report). */
 export async function createGoal(fields) {
   const t = nowIso();
   const goalId = bcUlid();
@@ -470,12 +472,13 @@ export async function createGoal(fields) {
       bind: [accountId, bcSanitizeCell(`Hucha · ${fields.name}`), "savings", 0, t, t],
     });
   }
+  const isActive = fields.isActive !== undefined ? (fields.isActive ? 1 : 0) : 1;
   stmts.push({
     sql: SQL.insertGoal,
     bind: [
       goalId, bcSanitizeCell(fields.name), fields.type,
       fields.targetAmountCents ?? null, fields.targetMonths ?? null, fields.targetPct ?? null,
-      fields.targetDate ?? "", accountId, fields.categoryId ?? "", 1, t, t,
+      fields.targetDate ?? "", accountId, fields.categoryId ?? "", isActive, t, t,
     ],
   });
   await execMany(stmts);

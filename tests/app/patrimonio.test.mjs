@@ -283,7 +283,10 @@ const HUCHA_GOAL_TYPES = new Set(["emergency_fund", "savings_target", "provision
 
 /** Reproduce EXACTAMENTE la secuencia de repo.createGoal: si el tipo lleva hucha propia y no se
  *  pasa accountId, crea la cuenta savings "Hucha · {name}" y el goal EN EL MISMO execMany —
- *  el id de la hucha se genera en JS (bcUlid en repo real) para poder referenciarlo en el goal. */
+ *  el id de la hucha se genera en JS (bcUlid en repo real) para poder referenciarlo en el goal.
+ *  isActive respeta `fields.isActive` si se indica (por defecto 1) — antes del fix (ver
+ *  task-14-report.md) se hardcodeaba a 1 sin mirar el campo, ignorando el toggle "Activo" del
+ *  formulario al crear. */
 function createGoalReproduced(db, fields, now = T) {
   const goalId = "goal-" + Math.floor(Math.random() * 1e9);
   const stmts = [];
@@ -292,12 +295,13 @@ function createGoalReproduced(db, fields, now = T) {
     accountId = "acc-hucha-" + Math.floor(Math.random() * 1e9);
     stmts.push({ sql: SQL.insertAccount, bind: [accountId, `Hucha · ${fields.name}`, "savings", 0, now, now] });
   }
+  const isActive = fields.isActive !== undefined ? (fields.isActive ? 1 : 0) : 1;
   stmts.push({
     sql: SQL.insertGoal,
     bind: [
       goalId, fields.name, fields.type,
       fields.targetAmountCents ?? null, fields.targetMonths ?? null, fields.targetPct ?? null,
-      fields.targetDate ?? "", accountId, fields.categoryId ?? "", 1, now, now,
+      fields.targetDate ?? "", accountId, fields.categoryId ?? "", isActive, now, now,
     ],
   });
   execManyRaw(db, stmts);
@@ -470,6 +474,19 @@ test("createGoal: dos goals con hucha nunca comparten cuenta (cada create crea l
   assert.notEqual(goal1.account_id, "");
   assert.notEqual(goal2.account_id, "");
   assert.notEqual(goal1.account_id, goal2.account_id, "cada goal tiene su propia hucha, nunca comparten");
+});
+
+test("createGoal con isActive:false: el goal se crea YA desactivado (is_active=0), no se ignora el toggle 'Activo' del formulario", () => {
+  const db = openDb();
+  seedMinimal(db);
+
+  const goalId = createGoalReproduced(db, {
+    name: "Objetivo apagado", type: "spending_cap", targetAmountCents: 10000, categoryId: "cat-casa", isActive: false,
+  });
+
+  const goal = db.prepare("SELECT * FROM goals WHERE id=?").get(goalId);
+  assert.equal(goal.is_active, 0, "isActive:false en create debe persistir como is_active=0, no quedar hardcodeado a 1");
+  assert.deepEqual(db.prepare(SQL.listGoals).all().map((r) => r.id), [], "listGoals (is_active=1) no lo lista");
 });
 
 test("execMany: si el insert del goal falla tras crear su hucha, hace rollback completo (no queda ni la cuenta huérfana)", () => {
