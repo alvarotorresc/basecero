@@ -89,15 +89,19 @@ function previsionRowHtml(item, byId) {
   const badge = paid
     ? `<span style="font-size:9px;font-weight:700;letter-spacing:0.04em;color:var(--green);background:#16291d;border-radius:6px;padding:3px 6px;flex-shrink:0;">✅ pagado</span>`
     : `<span style="font-size:9px;font-weight:700;letter-spacing:0.04em;color:var(--amber);background:#2f2712;border-radius:6px;padding:3px 6px;flex-shrink:0;">⏳ pendiente</span>`;
-  return `
-    <div class="tx-row"${paid ? "" : ` data-prevision-rule="${escAttr(rule.id)}" style="cursor:pointer;-webkit-tap-highlight-color:transparent;"`}>
+  const inner = `
       <div class="tx-icon" style="--cat:${color};">${icon}</div>
       <div class="tx-body">
         <div class="tx-title">${escHtml(rule.name)}</div>
       </div>
       <div class="num" style="font-size:14px;font-weight:600;flex-shrink:0;">${fmtEUR(myCents)}</div>
-      ${badge}
-    </div>`;
+      ${badge}`;
+  // Pagada: fila estática (nada que hacer). Pendiente: <button> real (no un <div> con onclick),
+  // igual criterio que recurrentes.js ruleRowHtml — accesible por teclado/lector de pantalla.
+  return paid
+    ? `<div class="tx-row">${inner}</div>`
+    : `<button type="button" class="tx-row" data-prevision-rule="${escAttr(rule.id)}"
+        style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">${inner}</button>`;
 }
 
 /** Bloque "Previsión": reglas recurrentes que aplican este mes (pagadas o pendientes), con

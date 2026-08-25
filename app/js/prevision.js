@@ -25,7 +25,7 @@ export function periodMonth(startDateIso) {
 export function ruleApplies(rule, month) {
   if (!rule.is_active) return false;
   if (rule.frequency === "monthly" || rule.frequency === "weekly") return true;
-  if (rule.due_month == null) return false;
+  if (rule.due_month == null || rule.due_month === "") return false;
   if (rule.frequency === "yearly") return rule.due_month === month;
   if (rule.frequency === "quarterly") return (((month - rule.due_month) % 12) + 12) % 3 === 0;
   return false;

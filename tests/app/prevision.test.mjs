@@ -65,8 +65,11 @@ test("ruleApplies: matriz de reglas de negocio", () => {
   // inactiva: nunca aplica, sea cual sea la frecuencia
   assert.equal(ruleApplies({ is_active: 0, frequency: "monthly" }, 8), false);
 
-  // quarterly/yearly sin due_month: nunca aplica
+  // quarterly/yearly sin due_month: nunca aplica (null O "" — la hoja usa IF(J="","no",...),
+  // que es el guard fiel: "" no debe colar como 0 y aplicar por casualidad de módulo)
   assert.equal(ruleApplies({ ...base, frequency: "quarterly", due_month: null }, 8), false);
+  assert.equal(ruleApplies({ ...base, frequency: "quarterly", due_month: "" }, 9), false,
+    "'' no debe colar como due_month=0 (9-0=9, %3=0 daría 'sí' si no se guardase)");
 });
 
 test("myAmountOfRule: prorratea si is_shared, si no el importe íntegro", () => {
