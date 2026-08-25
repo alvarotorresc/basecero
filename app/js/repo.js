@@ -63,6 +63,39 @@ export const pendingSharedTotalCents = async () => (await query(SQL.pendingShare
 export const spentByRootCategory = (pid) => query(SQL.spentByRootCategory, [pid]);
 export const budgetsOfPeriod = (pid) => query(SQL.budgetsOfPeriod, [pid]);
 
+/** Completa los huecos de SQL.spentByDay (que solo trae los días CON movimiento) con 0, para
+ *  los 7 días naturales que terminan en `todayIso` (inclusive). Pura — sin I/O — para que
+ *  spentLast7Days (que sí hace la query) sea testable sin duplicar la lógica de relleno (ver
+ *  tests/app/charts.test.mjs, que reproduce el mismo query+fill a mano). */
+export function fillLast7Days(rows, todayIso) {
+  const byDate = Object.fromEntries(rows.map((r) => [r.date, r.cents]));
+  const end = new Date(todayIso + "T12:00:00");
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(end);
+    d.setDate(d.getDate() - i);
+    const iso = d.toLocaleDateString("sv-SE");
+    days.push({ date: iso, cents: byDate[iso] ?? 0 });
+  }
+  return days;
+}
+
+/** Tarjeta "Flujo de gasto" de Inicio (Task 12): gasto por día de los últimos 7 días naturales
+ *  (hoy incluido), con los días sin movimiento a 0.
+ *  LIMITACIÓN CONOCIDA: la query está acotada a `pid` (mismo criterio que el resto de Inicio,
+ *  literal del brief: "un rango date BETWEEN ? AND ? del periodo"), así que en los primeros días
+ *  de un periodo recién abierto la ventana de 7 días "se corta" en la fecha de inicio — los días
+ *  que caen en el periodo ANTERIOR muestran 0 aunque hubiera gasto real ese día. No se resuelve
+ *  aquí (quitar el filtro de periodo rompería la consistencia con el resto de números de Inicio,
+ *  todos periodo-scoped); documentado para quien la use en la UI. */
+export async function spentLast7Days(pid) {
+  const today = hoyISO();
+  const start = new Date(today + "T12:00:00");
+  start.setDate(start.getDate() - 6);
+  const rows = await query(SQL.spentByDay, [pid, start.toLocaleDateString("sv-SE"), today]);
+  return fillLast7Days(rows, today);
+}
+
 /** Liquida un gasto compartido pendiente: crea el refund de la parte de Sara (categoría/comercio
  *  del gasto original, hoy, cuenta de destino elegida) enlazado por refId. Reutiliza sara_amount_cents
  *  de pendingShared (ya calculado con el pct EFECTIVO del propio periodo del gasto, no el abierto)

@@ -1,9 +1,12 @@
 import {
   getOpenPeriod, spentOfPeriod, incomeOfPeriod, listByDay, allCategoriesById,
   pendingShared, pendingSharedTotalCents, budgetsOfPeriod, previsionOfPeriod,
+  spentByRootCategory, spentLast7Days,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtEUR, fmtDiaLargo, fmtDiaCorto, hoyISO } from "../format.js";
+import { fmtEUR, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO } from "../format.js";
+import { budgetStatus } from "./presupuesto.js";
+import { barChartSvg, donutSvg } from "../charts.js";
 import { renderLiquidar } from "./liquidar.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 import { renderPresupuesto } from "./presupuesto.js";
@@ -13,6 +16,13 @@ import { renderRegistro } from "./registro.js";
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const pctFmt = new Intl.NumberFormat("es-ES", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const fmtNumEs = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const centsToStr = (cents) => fmtNumEs.format((cents ?? 0) / 100);
+
+// Cuántas categorías raíz se listan individualmente en el donut antes de agrupar el resto en
+// "Otras N" — mismo criterio visual que design/Resumen.dc.html:139-213 (6 + "Otras 3").
+const DONUT_TOP_N = 6;
+const DONUT_OTHERS_COLOR = "#5c646d";
 
 /** Agrupa las filas de listByDay (ya vienen ordenadas por date DESC) en bloques por día,
  *  preservando el orden de llegada. */
@@ -135,18 +145,128 @@ function previsionHtml(prevision, byId) {
     </div>`;
 }
 
+/** Tarjeta "Flujo de gasto": barChartSvg de los últimos 7 días naturales (hoy incluido y
+ *  marcado como activo) — réplica de design/Resumen.dc.html:67-107. days7 viene de
+ *  repo.spentLast7Days: 7 entradas {date, cents} ya rellenas con 0 en los días sin movimiento. */
+function flujoDeGastoHtml(days7) {
+  const hoy = hoyISO();
+  const total7 = days7.reduce((s, d) => s + d.cents, 0);
+  const days = days7.map((d) => ({ label: fmtDiaIni(d.date), cents: d.cents, active: d.date === hoy }));
+  return `
+    <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
+        <div style="font-size:15px;font-weight:700;">Flujo de gasto</div>
+        <div style="font-size:11px;color:var(--text-3);">Últimos 7 días · ${fmtEUR(total7)}</div>
+      </div>
+      ${barChartSvg(days)}
+    </div>`;
+}
+
+/** Color de la barra de estado de una fila del donut: igual criterio que
+ *  presupuesto.js#statusColor (ok -> color propio de la categoría, warn/over -> ámbar/rojo). No
+ *  se reutiliza directamente porque presupuesto.js no la exporta (es de detalle interno de esa
+ *  pantalla) — aquí además el texto NO se colorea en warn (solo la barra), a diferencia de
+ *  Presupuesto: ver design/Resumen.dc.html:146 (Casa, warn, texto blanco) vs :189 (Transporte,
+ *  over, texto rojo). */
+function donutBarColor(level, catColor) {
+  if (level === "warn") return "var(--amber)";
+  if (level === "over") return "var(--red)";
+  return catColor;
+}
+
+/** Una fila de la lista de categorías del donut: punto de color + nombre + "X € de Y €" con
+ *  mini-barra (categorías CON límite este periodo) o "X € sin límite" sin barra (el resto y el
+ *  grupo "Otras N") — réplica de design/Resumen.dc.html:140-213. */
+function categoriaDonutRowHtml(name, color, spentCents, limitCents) {
+  if (limitCents > 0) {
+    const st = budgetStatus(spentCents, limitCents);
+    const barColor = donutBarColor(st.level, color);
+    const numColor = st.level === "over" ? "var(--red)" : "var(--text)";
+    const barPct = Math.min(100, Math.max(0, st.pct));
+    return `
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="width:8px;height:8px;border-radius:3px;background:${color};"></div>
+            <div style="font-size:13px;color:var(--text-2);">${escHtml(name)}</div>
+          </div>
+          <div class="num" style="font-size:13px;font-weight:600;color:${numColor};white-space:nowrap;">${fmtEUR(spentCents)} <span style="font-weight:500;color:var(--text-3);">de ${fmtEUR(limitCents)}</span></div>
+        </div>
+        <div style="height:5px;background:#1e2225;border-radius:999px;overflow:hidden;">
+          <div style="width:${barPct}%;height:5px;background:${barColor};border-radius:999px;"></div>
+        </div>
+      </div>`;
+  }
+  return `
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:8px;height:8px;border-radius:3px;background:${color};"></div>
+        <div style="font-size:13px;color:var(--text-2);">${escHtml(name)}</div>
+      </div>
+      <div class="num" style="font-size:13px;font-weight:600;white-space:nowrap;">${fmtEUR(spentCents)} <span style="font-weight:500;color:var(--text-3);">sin límite</span></div>
+    </div>`;
+}
+
+/** Tarjeta "Gasto por categoría": donut + lista de categorías raíz con gasto, agrupando las que
+ *  sobran más allá de DONUT_TOP_N en "Otras N" — réplica de design/Resumen.dc.html:109-215. Se
+ *  oculta entera si el periodo no tiene ningún gasto categorizado todavía (mismo criterio que
+ *  conSaraHtml/previsionHtml: nada que mostrar).
+ *
+ *  El centro del donut muestra la SUMA DE LAS RAÍCES (= suma de los arcos), NO spentOfPeriod():
+ *  un movimiento sin categorizar (category_id='') no cae bajo ninguna raíz (spentByRootCategory
+ *  no lo agrupa) y por tanto no aparece en el anillo — si el centro mostrara el total del
+ *  periodo, podría ser mayor que la suma de los arcos dibujados, dando la falsa impresión de que
+ *  "falta" un trozo. Mostrando la suma de lo categorizado, el número del centro SIEMPRE coincide
+ *  con el 100% del anillo. */
+function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupuesto) {
+  const withSpend = rootRows.filter((r) => r.spent_cents > 0);
+  if (withSpend.length === 0) return "";
+
+  const top = withSpend.slice(0, DONUT_TOP_N);
+  const rest = withSpend.slice(DONUT_TOP_N);
+  const restTotal = rest.reduce((s, r) => s + r.spent_cents, 0);
+  const categorizedTotal = withSpend.reduce((s, r) => s + r.spent_cents, 0);
+
+  const slices = top.map((r) => ({ color: colorForCategory(r.root_id, byId), cents: r.spent_cents }));
+  if (rest.length > 0) slices.push({ color: DONUT_OTHERS_COLOR, cents: restTotal });
+
+  const rowsHtml = top
+    .map((r) => categoriaDonutRowHtml(r.name, colorForCategory(r.root_id, byId), r.spent_cents, budgetByCategory[r.root_id] ?? 0))
+    .join("");
+  const otrasRowHtml = rest.length > 0 ? categoriaDonutRowHtml(`Otras ${rest.length}`, DONUT_OTHERS_COLOR, restTotal, 0) : "";
+
+  return `
+    <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+        <div style="display:flex;flex-direction:column;gap:3px;">
+          <div style="font-size:15px;font-weight:700;">Gasto por categoría</div>
+          <div style="font-size:11px;color:var(--text-3);">Solo tu parte de lo compartido</div>
+        </div>
+        ${showVerPresupuesto ? `<button type="button" id="inicio-ver-presupuesto" style="all:unset;cursor:pointer;
+          font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;
+          -webkit-tap-highlight-color:transparent;">Ver presupuesto →</button>` : ""}
+      </div>
+      <div style="display:flex;justify-content:center;">
+        ${donutSvg(slices, centsToStr(categorizedTotal), "EUR gastados")}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        ${rowsHtml}${otrasRowHtml}
+      </div>
+    </div>`;
+}
+
 /** Pantalla Inicio: cabecera del periodo abierto (gastado, ingresos, ahorrado, tasa),
- *  bloque "Con Sara" (pendiente/liquidar), bloque "Previsión" (reglas recurrentes del mes)
- *  y sus movimientos agrupados por día. */
+ *  tarjetas "Flujo de gasto" y "Gasto por categoría", bloque "Con Sara" (pendiente/liquidar),
+ *  bloque "Previsión" (reglas recurrentes del mes) y sus movimientos agrupados por día. */
 export async function renderInicio(container) {
-  let period, spent, income, rows, byId, sharedRows, sharedTotal, budgets, prevision;
+  let period, spent, income, rows, byId, sharedRows, sharedTotal, budgets, prevision, rootRows, days7;
   try {
     period = await getOpenPeriod();
     if (!period) {
       container.innerHTML = `<div class="banner-aviso red">No hay ningún periodo abierto.</div>`;
       return;
     }
-    [spent, income, rows, byId, sharedRows, sharedTotal, budgets, prevision] = await Promise.all([
+    [spent, income, rows, byId, sharedRows, sharedTotal, budgets, prevision, rootRows, days7] = await Promise.all([
       spentOfPeriod(period.id),
       incomeOfPeriod(period.id),
       listByDay(period.id),
@@ -155,11 +275,15 @@ export async function renderInicio(container) {
       pendingSharedTotalCents(),
       budgetsOfPeriod(period.id),
       previsionOfPeriod(period),
+      spentByRootCategory(period.id),
+      spentLast7Days(period.id),
     ]);
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">No se pudo cargar Inicio: ${escHtml(e.message)}</div>`;
     return;
   }
+
+  const budgetByCategory = Object.fromEntries(budgets.map((b) => [b.category_id, b.amount_cents]));
 
   const ahorrado = income - spent;
   const tasa = income > 0 ? pctFmt.format(ahorrado / income) : "—";
@@ -186,12 +310,7 @@ export async function renderInicio(container) {
       </button>
 
       <div style="display:flex;flex-direction:column;gap:6px;">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
-          <div class="section-title">Gastado</div>
-          ${budgets.length > 0 ? `<button type="button" id="inicio-ver-presupuesto" style="all:unset;cursor:pointer;
-            font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;
-            -webkit-tap-highlight-color:transparent;">Ver presupuesto →</button>` : ""}
-        </div>
+        <div class="section-title">Gastado</div>
         <div class="num" style="font-size:38px;font-weight:600;letter-spacing:-0.02em;">${fmtEUR(spent)}</div>
       </div>
 
@@ -212,6 +331,10 @@ export async function renderInicio(container) {
         </div>
       </div>
     </div>
+
+    ${flujoDeGastoHtml(days7)}
+
+    ${gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, budgets.length > 0)}
 
     ${conSaraHtml(period, sharedRows, sharedTotal)}
 

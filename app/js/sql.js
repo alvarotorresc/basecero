@@ -94,6 +94,17 @@ export const SQL = {
     VALUES (?,?,?,?,?,?,0)`,
   budgetsOfPeriod: `SELECT b.id, b.category_id, b.amount_cents FROM budgets b WHERE b.period_id=? AND b.deleted=0`,
 
+  // Gasto por día en un rango (Task 12, tarjeta "Flujo de gasto" de Inicio). Mismo criterio que
+  // spentOfPeriod (MY_AMOUNT de expenses, refunds sueltos restan prorrateados), agrupado por
+  // fecha. Solo trae los días con movimiento — repo.spentLast7Days rellena los que faltan con 0
+  // en JS (fillLast7Days). Bind: [periodId, startDateIso, endDateIso].
+  spentByDay: `SELECT t.date AS date,
+    COALESCE(SUM(CASE WHEN t.type='expense' THEN ${MY_AMOUNT}
+                 WHEN t.type='refund' AND t.ref_id='' THEN -${MY_AMOUNT} ELSE 0 END),0) AS cents
+  FROM transactions t JOIN periods p ON p.id=t.period_id
+  WHERE t.period_id=? AND t.deleted=0 AND t.date BETWEEN ? AND ?
+  GROUP BY t.date`,
+
   // Reglas recurrentes (Task 10). Activas primero, luego alfabético — mismo criterio que la
   // lista de Recurrentes (las inactivas se apilan al final con su badge gris).
   listRules: `SELECT * FROM recurring_rules WHERE deleted=0 ORDER BY is_active DESC, name`,

@@ -10,6 +10,11 @@ export const fmtDiaLargo = (iso) =>
 export const fmtDiaCorto = (iso) =>
   new Date(iso + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" });
 
+// Inicial del día de la semana en español (L M X J V S D) — tarjeta "Flujo de gasto" de Inicio
+// (Task 12). getDay(): 0=domingo..6=sábado, de ahí el array empezando en D.
+const WEEKDAY_INITIALS = ["D", "L", "M", "X", "J", "V", "S"];
+export const fmtDiaIni = (iso) => WEEKDAY_INITIALS[new Date(iso + "T12:00:00").getDay()];
+
 // Día anterior a un ISO (YYYY-MM-DD), cruzando mes/año si hace falta. T12:00:00 evita líos de DST.
 export function prevDayIso(iso) {
   const d = new Date(iso + "T12:00:00");
