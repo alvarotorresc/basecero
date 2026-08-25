@@ -181,7 +181,7 @@ export async function renderRegistro(container, onDone, prefill) {
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
         <div class="section-title">Hacia</div>
         <div class="chips">
-          ${accounts.filter((a) => a.id !== state.accountId).map((a) => `<button type="button" class="chip${state.counterAccountId === a.id ? " active" : ""}" data-counter-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
+          ${accountsAll.filter((a) => a.id !== state.accountId).map((a) => `<button type="button" class="chip${state.counterAccountId === a.id ? " active" : ""}" data-counter-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
         </div>
       </div>`;
     }

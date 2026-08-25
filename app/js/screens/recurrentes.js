@@ -135,7 +135,7 @@ export async function renderRecurrentes(container, onBack) {
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
         <div class="section-title">Hacia</div>
         <div class="chips">
-          ${accounts.filter((a) => a.id !== f.accountId).map((a) => `<button type="button" class="chip${f.counterAccountId === a.id ? " active" : ""}" data-counter-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
+          ${accountsAll.filter((a) => a.id !== f.accountId).map((a) => `<button type="button" class="chip${f.counterAccountId === a.id ? " active" : ""}" data-counter-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
         </div>
       </div>`;
     }

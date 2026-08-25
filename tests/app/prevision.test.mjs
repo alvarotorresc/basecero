@@ -103,6 +103,18 @@ test("SQL.accountBalance: expense resta, income suma, transfer resta origen y su
   assert.equal(n26Corte, 100000 - 2000 + 1500);
 });
 
+test("SQL.accountBalance: la letra del préstamo como transfer hacia el pasivo acerca su saldo a cero", () => {
+  const db = openDb();
+  seedMinimal(db);
+  // Letra de 200 €: sale de N26 y amortiza el préstamo (−6000 → −5800).
+  ins(db, { id: "letra", date: "2026-08-27", type: "transfer", cents: 20000, account: "acc-n26", counterAccount: "acc-prestamo", category: "" });
+
+  const prestamo = db.prepare(SQL.accountBalance).get("2026-12-31", "acc-prestamo").balance_cents;
+  assert.equal(prestamo, -600000 + 20000);
+  const n26 = db.prepare(SQL.accountBalance).get("2026-12-31", "acc-n26").balance_cents;
+  assert.equal(n26, 100000 - 20000);
+});
+
 test("previsión del periodo (composición SQL + prevision.js): pagado por rule_id, pagado por fallback categoría+importe, disponible = saldo - comprometido + Sara", () => {
   const db = openDb();
   seedMinimal(db); // per-1: start_date 2026-07-27 (periodMonth=8), my_share_pct=60; acc-n26 opening 100000
