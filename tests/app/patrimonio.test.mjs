@@ -5,6 +5,7 @@ import { netWorthOfBalances, shortMonthLabel, goalProgress } from "../../app/js/
 import { openDb, seedMinimal } from "./helpers.mjs";
 
 const T = "2026-08-24T18:00:00Z";
+const T2 = "2026-08-24T19:00:00Z";
 
 /** Inserta una transacción usando la firma de SQL.insertTransaction (mismo helper que
  *  tests/app/prevision.test.mjs y tests/app/periodos.test.mjs). */
@@ -260,4 +261,232 @@ test("goalsWithProgress (reproducida): ctx armado desde SQL real (accountBalance
   const tasa = goalProgress({ type: "savings_rate", target_pct: 50 }, ctx);
   assert.equal(tasa.currentCents, 70);
   assert.equal(tasa.level, "ok", "70% de ahorro supera el objetivo de 50%");
+});
+
+// ---- Formularios de cuentas y objetivos (Task 14) --------------------------
+
+/** Reproduce EXACTAMENTE el op "execMany" del Worker (BEGIN/ejecuta/COMMIT, ROLLBACK si falla) —
+ *  mismo helper que tests/app/periodos.test.mjs para repo.openNextPeriod: no hay Worker en Node
+ *  para probar repo.createGoal (execMany) tal cual. */
+function execManyRaw(db, stmts) {
+  db.exec("BEGIN");
+  try {
+    for (const s of stmts) db.prepare(s.sql).run(...(s.bind ?? []));
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+}
+
+const HUCHA_GOAL_TYPES = new Set(["emergency_fund", "savings_target", "provision"]);
+
+/** Reproduce EXACTAMENTE la secuencia de repo.createGoal: si el tipo lleva hucha propia y no se
+ *  pasa accountId, crea la cuenta savings "Hucha · {name}" y el goal EN EL MISMO execMany —
+ *  el id de la hucha se genera en JS (bcUlid en repo real) para poder referenciarlo en el goal. */
+function createGoalReproduced(db, fields, now = T) {
+  const goalId = "goal-" + Math.floor(Math.random() * 1e9);
+  const stmts = [];
+  let accountId = fields.accountId || "";
+  if (HUCHA_GOAL_TYPES.has(fields.type) && !accountId) {
+    accountId = "acc-hucha-" + Math.floor(Math.random() * 1e9);
+    stmts.push({ sql: SQL.insertAccount, bind: [accountId, `Hucha · ${fields.name}`, "savings", 0, now, now] });
+  }
+  stmts.push({
+    sql: SQL.insertGoal,
+    bind: [
+      goalId, fields.name, fields.type,
+      fields.targetAmountCents ?? null, fields.targetMonths ?? null, fields.targetPct ?? null,
+      fields.targetDate ?? "", accountId, fields.categoryId ?? "", 1, now, now,
+    ],
+  });
+  execManyRaw(db, stmts);
+  return goalId;
+}
+
+/** Reproduce repo.updateAccount: acc-n26 ignora el name recibido (conserva el actual), el resto
+ *  de campos ausentes también conservan el valor actual (mismo criterio que updateRule). */
+function updateAccountReproduced(db, id, fields, now = T2) {
+  const cur = db.prepare(SQL.getAccount).get(id);
+  const name = id === "acc-n26" ? cur.name : (fields.name ?? cur.name);
+  const type = fields.type ?? cur.type;
+  const openingBalanceCents = fields.openingBalanceCents ?? cur.opening_balance_cents;
+  db.prepare(SQL.updateAccount).run(name, type, openingBalanceCents, now, id);
+}
+
+test("SQL.insertAccount: crea la cuenta con display_order = MAX+1 y admite opening_balance negativo (pasivo)", () => {
+  const db = openDb();
+  seedMinimal(db); // 3 cuentas semilla, display_order 1/2/4
+  db.prepare(SQL.insertAccount).run("acc-nueva", "Cuenta nueva", "checking", -12345, T, T);
+
+  const row = db.prepare("SELECT * FROM accounts WHERE id='acc-nueva'").get();
+  assert.equal(row.name, "Cuenta nueva");
+  assert.equal(row.type, "checking");
+  assert.equal(row.opening_balance_cents, -12345);
+  assert.equal(row.display_order, 5, "MAX(display_order) de las 3 semilla (1,2,4) + 1");
+  assert.equal(row.is_archived, 0);
+  assert.equal(row.deleted, 0);
+});
+
+test("SQL.insertAccount: en una base sin ninguna cuenta todavía, display_order empieza en 1 (COALESCE cubre el MAX de una tabla vacía)", () => {
+  const db = openDb(); // sin seedMinimal: 0 filas en accounts
+  db.prepare(SQL.insertAccount).run("acc-primera", "Primera cuenta", "checking", 0, T, T);
+  const row = db.prepare("SELECT * FROM accounts WHERE id='acc-primera'").get();
+  assert.equal(row.display_order, 1);
+});
+
+test("SQL.updateAccount: cambia nombre/tipo/saldo inicial y updated_at, nunca created_at", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const before = db.prepare("SELECT * FROM accounts WHERE id='acc-revolut'").get();
+
+  db.prepare(SQL.updateAccount).run("Revolut renombrada", "savings", 99999, T2, "acc-revolut");
+
+  const after = db.prepare("SELECT * FROM accounts WHERE id='acc-revolut'").get();
+  assert.equal(after.name, "Revolut renombrada");
+  assert.equal(after.opening_balance_cents, 99999);
+  assert.equal(after.updated_at, T2);
+  assert.equal(after.created_at, before.created_at);
+});
+
+test("updateAccount (reproducido) de acc-n26: ignora el nombre recibido y conserva 'N26', pero SÍ cambia opening_balance", () => {
+  const db = openDb();
+  seedMinimal(db); // acc-n26 checking 100000
+
+  updateAccountReproduced(db, "acc-n26", { name: "Cuenta corriente", openingBalanceCents: 250000 });
+
+  const row = db.prepare("SELECT * FROM accounts WHERE id='acc-n26'").get();
+  assert.equal(row.name, "N26", "el name recibido se ignora: acc-n26 no es renombrable");
+  assert.equal(row.opening_balance_cents, 250000, "opening_balance SÍ es editable en acc-n26");
+});
+
+test("CHECK de type inválido en accounts lanza (insertAccount)", () => {
+  const db = openDb();
+  seedMinimal(db);
+  assert.throws(() => db.prepare(SQL.insertAccount).run("acc-x", "X", "wallet", 0, T, T), /CHECK constraint failed/);
+});
+
+test("SQL.insertGoal + SQL.getGoal: crea un goal con sus datos completos", () => {
+  const db = openDb();
+  seedMinimal(db);
+  db.prepare(SQL.insertGoal).run(
+    "goal-1", "Fondo de emergencia", "emergency_fund", null, 3, null, "", "acc-revolut", "", 1, T, T,
+  );
+  const row = db.prepare(SQL.getGoal).get("goal-1");
+  assert.equal(row.name, "Fondo de emergencia");
+  assert.equal(row.type, "emergency_fund");
+  assert.equal(row.target_months, 3);
+  assert.equal(row.target_amount_cents, null);
+  assert.equal(row.account_id, "acc-revolut");
+  assert.equal(row.is_active, 1);
+});
+
+test("SQL.updateGoal: cambia los campos editables (incluido is_active, el toggle de desactivar) y updated_at, nunca created_at", () => {
+  const db = openDb();
+  seedMinimal(db);
+  db.prepare(SQL.insertGoal).run("goal-1", "Original", "savings_target", 100000, null, null, "", "acc-revolut", "", 1, T, T);
+  const before = db.prepare(SQL.getGoal).get("goal-1");
+
+  db.prepare(SQL.updateGoal).run(
+    "Renombrado", "savings_target", 200000, null, null, "2027-01-01", "acc-revolut", "", 0, T2, "goal-1",
+  );
+
+  const after = db.prepare(SQL.getGoal).get("goal-1");
+  assert.equal(after.name, "Renombrado");
+  assert.equal(after.target_amount_cents, 200000);
+  assert.equal(after.target_date, "2027-01-01");
+  assert.equal(after.is_active, 0, "desactivado (toggle is_active)");
+  assert.equal(after.updated_at, T2);
+  assert.equal(after.created_at, before.created_at);
+});
+
+test("SQL.softDeleteGoal: marca deleted+updated_at y desaparece de listGoals", () => {
+  const db = openDb();
+  seedMinimal(db);
+  db.prepare(SQL.insertGoal).run("goal-1", "Permanece", "savings_target", 100000, null, null, "", "acc-revolut", "", 1, T, T);
+  db.prepare(SQL.insertGoal).run("goal-2", "Borrar", "savings_target", 100000, null, null, "", "acc-revolut", "", 1, T, T);
+
+  db.prepare(SQL.softDeleteGoal).run(T2, "goal-2");
+
+  const row = db.prepare("SELECT deleted, updated_at FROM goals WHERE id='goal-2'").get();
+  assert.equal(row.deleted, 1);
+  assert.equal(row.updated_at, T2);
+  const rows = db.prepare(SQL.listGoals).all();
+  assert.deepEqual(rows.map((r) => r.id), ["goal-1"]);
+});
+
+test("SQL.listExpenseRootCategories: solo raíces de gasto (parent_id=''), nunca hijas ni de ingreso", () => {
+  const db = openDb();
+  seedMinimal(db); // cat-casa (raíz gasto), cat-casa-alquiler (hija), cat-nomina (raíz ingreso)
+  const rows = db.prepare(SQL.listExpenseRootCategories).all();
+  assert.deepEqual(rows.map((r) => r.id), ["cat-casa"]);
+});
+
+// ---- createGoal (reproducido): hucha automática atómica --------------------
+
+test("createGoal savings_target sin accountId: crea UNA hucha savings vinculada, atómicamente", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const before = db.prepare("SELECT COUNT(*) c FROM accounts").get().c;
+
+  const goalId = createGoalReproduced(db, { name: "Viaje a Japón", type: "savings_target", targetAmountCents: 300000 });
+
+  const after = db.prepare("SELECT COUNT(*) c FROM accounts").get().c;
+  assert.equal(after, before + 1, "exactamente una cuenta nueva");
+
+  const goal = db.prepare(SQL.getGoal).get(goalId);
+  assert.notEqual(goal.account_id, "", "el goal queda vinculado a una cuenta");
+  const hucha = db.prepare("SELECT * FROM accounts WHERE id=?").get(goal.account_id);
+  assert.equal(hucha.type, "savings");
+  assert.equal(hucha.name, "Hucha · Viaje a Japón");
+});
+
+test("createGoal spending_cap: NO crea ninguna hucha (el tipo no lleva cuenta)", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const before = db.prepare("SELECT COUNT(*) c FROM accounts").get().c;
+
+  const goalId = createGoalReproduced(db, {
+    name: "Techo de Restauración", type: "spending_cap", targetAmountCents: 20000, categoryId: "cat-casa",
+  });
+
+  const after = db.prepare("SELECT COUNT(*) c FROM accounts").get().c;
+  assert.equal(after, before, "spending_cap no crea ninguna cuenta");
+
+  const goal = db.prepare(SQL.getGoal).get(goalId);
+  assert.equal(goal.account_id, "", "spending_cap no lleva hucha");
+  assert.equal(goal.category_id, "cat-casa");
+});
+
+test("createGoal: dos goals con hucha nunca comparten cuenta (cada create crea la suya)", () => {
+  const db = openDb();
+  seedMinimal(db);
+
+  const g1 = createGoalReproduced(db, { name: "Fondo de emergencia", type: "emergency_fund", targetMonths: 3 });
+  const g2 = createGoalReproduced(db, { name: "Provisión seguro coche", type: "provision", targetAmountCents: 36000 });
+
+  const goal1 = db.prepare(SQL.getGoal).get(g1);
+  const goal2 = db.prepare(SQL.getGoal).get(g2);
+  assert.notEqual(goal1.account_id, "");
+  assert.notEqual(goal2.account_id, "");
+  assert.notEqual(goal1.account_id, goal2.account_id, "cada goal tiene su propia hucha, nunca comparten");
+});
+
+test("execMany: si el insert del goal falla tras crear su hucha, hace rollback completo (no queda ni la cuenta huérfana)", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const before = db.prepare("SELECT COUNT(*) c FROM accounts").get().c;
+
+  const accountId = "acc-hucha-x";
+  const stmts = [
+    { sql: SQL.insertAccount, bind: [accountId, "Hucha · X", "savings", 0, T, T] },
+    // type inválido: viola el CHECK de goals.type a propósito, DESPUÉS de crear la hucha
+    { sql: SQL.insertGoal, bind: ["goal-x", "X", "bad_type", null, 3, null, "", accountId, "", 1, T, T] },
+  ];
+
+  assert.throws(() => execManyRaw(db, stmts), /CHECK constraint failed/);
+
+  const after = db.prepare("SELECT COUNT(*) c FROM accounts").get().c;
+  assert.equal(after, before, "rollback: la hucha creada en el mismo lote también desaparece");
+  assert.equal(db.prepare("SELECT * FROM goals WHERE id='goal-x'").get(), undefined);
 });

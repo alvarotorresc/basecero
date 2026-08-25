@@ -140,5 +140,27 @@ export const SQL = {
   listAllAccounts: `SELECT id, name, type FROM accounts WHERE deleted=0 AND is_archived=0 ORDER BY display_order`,
   listClosedPeriods: `SELECT * FROM periods WHERE status='closed' AND deleted=0 ORDER BY start_date`,
   listGoals: `SELECT * FROM goals WHERE is_active=1 AND deleted=0 ORDER BY created_at`,
+
+  // Formularios de cuentas y objetivos (Task 14).
+  // Selector de categoría de spending_cap: SOLO raíces de gasto (parent_id=''), nunca hijas —
+  // ver handoff de goalProgress (repo.js): una hija ahí no hace match con spentByRootCategory
+  // y se queda silenciosamente en 0%.
+  listExpenseRootCategories: `SELECT id, name FROM categories c
+    WHERE c.flow='expense' AND c.parent_id='' AND c.deleted=0 AND c.is_archived=0 ORDER BY c.display_order`,
+  getAccount: `SELECT * FROM accounts WHERE id=? AND deleted=0`,
+  // display_order = MAX actual + 1 en la MISMA sentencia (SELECT en vez de VALUES): así una
+  // cuenta nueva (manual o hucha automática de un goal) siempre se coloca al final de la lista
+  // sin que repo.js tenga que hacer una query aparte para calcularlo.
+  insertAccount: `INSERT INTO accounts (id,name,type,opening_balance_cents,display_order,is_archived,created_at,updated_at,deleted)
+    SELECT ?,?,?,?, COALESCE(MAX(display_order),0)+1, 0, ?,?,0 FROM accounts WHERE deleted=0`,
+  // acc-n26 no es renombrable (lo aplica repo.updateAccount, ignorando el name recibido): esta
+  // SQL sí acepta name porque el resto de cuentas SÍ pueden renombrarse.
+  updateAccount: `UPDATE accounts SET name=?, type=?, opening_balance_cents=?, updated_at=? WHERE id=?`,
+  getGoal: `SELECT * FROM goals WHERE id=? AND deleted=0`,
+  insertGoal: `INSERT INTO goals (id,name,type,target_amount_cents,target_months,target_pct,target_date,account_id,category_id,is_active,created_at,updated_at,deleted)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0)`,
+  updateGoal: `UPDATE goals SET name=?, type=?, target_amount_cents=?, target_months=?, target_pct=?,
+    target_date=?, account_id=?, category_id=?, is_active=?, updated_at=? WHERE id=?`,
+  softDeleteGoal: `UPDATE goals SET deleted=1, updated_at=? WHERE id=?`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"];

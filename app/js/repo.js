@@ -416,6 +416,102 @@ export async function goalsWithProgress() {
   return goals.map((g) => goalProgress(g, ctx));
 }
 
+// ---- Formularios de cuentas y objetivos (Task 14) --------------------------
+
+export const listExpenseRootCategories = () => query(SQL.listExpenseRootCategories);
+export const getAccount = async (id) => (await query(SQL.getAccount, [id]))[0] ?? null;
+
+/** Crea una cuenta. Devuelve el id nuevo (generado aquí, no lo asigna la BD): lo necesita
+ *  createGoal para poder referenciar la hucha recién creada en el INSERT del goal, dentro del
+ *  MISMO execMany. */
+export async function createAccount({ name, type, openingBalanceCents }) {
+  const id = bcUlid();
+  const t = nowIso();
+  await exec(SQL.insertAccount, [id, bcSanitizeCell(name), type, openingBalanceCents, t, t]);
+  return id;
+}
+
+/** Actualiza una cuenta (mismas claves camelCase que createAccount). acc-n26 —la que usa el
+ *  import de N26 para localizarla por id fijo— NO admite cambiar de nombre: el `name` recibido
+ *  se ignora en silencio y se conserva "N26", pero opening_balance_cents SÍ es editable (saldo
+ *  inicial real de la cuenta, no lo toca el import). Los demás campos ausentes conservan el
+ *  valor actual — mismo criterio merge-on-current que repo.updateRule. */
+export async function updateAccount(id, fields) {
+  const cur = await getAccount(id);
+  if (!cur) throw new Error("Cuenta no encontrada");
+  const name = id === "acc-n26" ? cur.name : (fields.name ?? cur.name);
+  const type = fields.type ?? cur.type;
+  const openingBalanceCents = fields.openingBalanceCents ?? cur.opening_balance_cents;
+  const t = nowIso();
+  await exec(SQL.updateAccount, [bcSanitizeCell(name), type, openingBalanceCents, t, id]);
+}
+
+export const getGoal = async (id) => (await query(SQL.getGoal, [id]))[0] ?? null;
+
+// Tipos de goal con hucha propia (contrato §7.2): si se crean sin accountId, cada uno se lleva
+// su cuenta savings dedicada — dos goals nunca comparten hucha entre sí.
+const HUCHA_GOAL_TYPES = new Set(["emergency_fund", "savings_target", "provision"]);
+
+/** Crea un goal. fields camelCase: {name, type, targetAmountCents, targetMonths, targetPct,
+ *  targetDate, accountId, categoryId}. Para los tipos con hucha propia (emergency_fund/
+ *  savings_target/provision) sin accountId: crea la cuenta savings "Hucha · {name}" y el goal
+ *  EN EL MISMO execMany (atómico: o quedan las dos filas o ninguna) — el id de la hucha se
+ *  genera aquí para poder referenciarlo en el INSERT del goal sin depender de un autogenerado
+ *  por SQLite. spending_cap/savings_rate no llevan hucha: accountId se queda a "". */
+export async function createGoal(fields) {
+  const t = nowIso();
+  const goalId = bcUlid();
+  const stmts = [];
+  let accountId = fields.accountId || "";
+  if (HUCHA_GOAL_TYPES.has(fields.type) && !accountId) {
+    accountId = bcUlid();
+    stmts.push({
+      sql: SQL.insertAccount,
+      bind: [accountId, bcSanitizeCell(`Hucha · ${fields.name}`), "savings", 0, t, t],
+    });
+  }
+  stmts.push({
+    sql: SQL.insertGoal,
+    bind: [
+      goalId, bcSanitizeCell(fields.name), fields.type,
+      fields.targetAmountCents ?? null, fields.targetMonths ?? null, fields.targetPct ?? null,
+      fields.targetDate ?? "", accountId, fields.categoryId ?? "", 1, t, t,
+    ],
+  });
+  await execMany(stmts);
+  return goalId;
+}
+
+/** Actualiza un goal (mismas claves camelCase que createGoal, + isActive para el toggle de
+ *  desactivar). Los campos ausentes conservan el valor actual — mismo criterio merge-on-current
+ *  que updateRule. Los NULLABLE_NUM (target_amount_cents/target_months/target_pct) usan
+ *  `!== undefined` en vez de `??`: así se puede guardar explícitamente `null` (p.ej. al cambiar
+ *  de tipo a uno que no usa ese campo) sin que `?? cur.x` lo resucite con el valor anterior. No
+ *  crea ninguna hucha nueva (a diferencia de createGoal): editar el tipo de un goal existente no
+ *  está en el alcance de esta task. */
+export async function updateGoal(id, fields) {
+  const cur = await getGoal(id);
+  if (!cur) throw new Error("Objetivo no encontrado");
+  const f = {
+    name: fields.name ?? cur.name,
+    type: fields.type ?? cur.type,
+    targetAmountCents: fields.targetAmountCents !== undefined ? fields.targetAmountCents : cur.target_amount_cents,
+    targetMonths: fields.targetMonths !== undefined ? fields.targetMonths : cur.target_months,
+    targetPct: fields.targetPct !== undefined ? fields.targetPct : cur.target_pct,
+    targetDate: fields.targetDate ?? cur.target_date,
+    accountId: fields.accountId ?? cur.account_id,
+    categoryId: fields.categoryId !== undefined ? fields.categoryId : cur.category_id,
+    isActive: fields.isActive ?? !!cur.is_active,
+  };
+  const t = nowIso();
+  await exec(SQL.updateGoal, [
+    bcSanitizeCell(f.name), f.type, f.targetAmountCents, f.targetMonths, f.targetPct,
+    f.targetDate ?? "", f.accountId ?? "", f.categoryId ?? "", f.isActive ? 1 : 0, t, id,
+  ]);
+}
+
+export const softDeleteGoal = (id) => exec(SQL.softDeleteGoal, [nowIso(), id]);
+
 export async function dumpAllTables() {
   const out = {};
   for (const t of TABLES) out[t] = await query(SQL.dumpTable(t));
