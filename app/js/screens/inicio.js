@@ -1,11 +1,12 @@
 import {
   getOpenPeriod, spentOfPeriod, incomeOfPeriod, listByDay, allCategoriesById,
-  pendingShared, pendingSharedTotalCents,
+  pendingShared, pendingSharedTotalCents, budgetsOfPeriod,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtEUR, fmtDiaLargo, fmtDiaCorto, hoyISO } from "../format.js";
 import { renderLiquidar } from "./liquidar.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
+import { renderPresupuesto } from "./presupuesto.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const pctFmt = new Intl.NumberFormat("es-ES", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -81,20 +82,21 @@ function conSaraHtml(period, sharedRows, sharedTotal) {
 /** Pantalla Inicio: cabecera del periodo abierto (gastado, ingresos, ahorrado, tasa),
  *  bloque "Con Sara" (pendiente/liquidar) y sus movimientos agrupados por día. */
 export async function renderInicio(container) {
-  let period, spent, income, rows, byId, sharedRows, sharedTotal;
+  let period, spent, income, rows, byId, sharedRows, sharedTotal, budgets;
   try {
     period = await getOpenPeriod();
     if (!period) {
       container.innerHTML = `<div class="banner-aviso red">No hay ningún periodo abierto.</div>`;
       return;
     }
-    [spent, income, rows, byId, sharedRows, sharedTotal] = await Promise.all([
+    [spent, income, rows, byId, sharedRows, sharedTotal, budgets] = await Promise.all([
       spentOfPeriod(period.id),
       incomeOfPeriod(period.id),
       listByDay(period.id),
       allCategoriesById(),
       pendingShared(),
       pendingSharedTotalCents(),
+      budgetsOfPeriod(period.id),
     ]);
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">No se pudo cargar Inicio: ${escHtml(e.message)}</div>`;
@@ -126,7 +128,12 @@ export async function renderInicio(container) {
       </button>
 
       <div style="display:flex;flex-direction:column;gap:6px;">
-        <div class="section-title">Gastado</div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
+          <div class="section-title">Gastado</div>
+          ${budgets.length > 0 ? `<button type="button" id="inicio-ver-presupuesto" style="all:unset;cursor:pointer;
+            font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;
+            -webkit-tap-highlight-color:transparent;">Ver presupuesto →</button>` : ""}
+        </div>
         <div class="num" style="font-size:38px;font-weight:600;letter-spacing:-0.02em;">${fmtEUR(spent)}</div>
       </div>
 
@@ -155,6 +162,9 @@ export async function renderInicio(container) {
 
   const liquidarBtn = container.querySelector("#con-sara-liquidar");
   if (liquidarBtn) liquidarBtn.onclick = () => renderLiquidar(container, () => renderInicio(container));
+
+  const presuBtn = container.querySelector("#inicio-ver-presupuesto");
+  if (presuBtn) presuBtn.onclick = () => renderPresupuesto(container, () => renderInicio(container));
 
   container.querySelector("#inicio-periodo-header").onclick = () => {
     document.body.classList.add("onboarding");
