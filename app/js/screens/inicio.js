@@ -208,19 +208,46 @@ function categoriaDonutRowHtml(name, color, spentCents, limitCents) {
 }
 
 /** Tarjeta "Gasto por categoría": donut + lista de categorías raíz con gasto, agrupando las que
- *  sobran más allá de DONUT_TOP_N en "Otras N" — réplica de design/Resumen.dc.html:109-215. Se
- *  oculta entera si el periodo no tiene ningún gasto categorizado todavía (mismo criterio que
- *  conSaraHtml/previsionHtml: nada que mostrar).
+ *  sobran más allá de DONUT_TOP_N en "Otras N" — réplica de design/Resumen.dc.html:109-215.
  *
  *  El centro del donut muestra la SUMA DE LAS RAÍCES (= suma de los arcos), NO spentOfPeriod():
  *  un movimiento sin categorizar (category_id='') no cae bajo ninguna raíz (spentByRootCategory
  *  no lo agrupa) y por tanto no aparece en el anillo — si el centro mostrara el total del
  *  periodo, podría ser mayor que la suma de los arcos dibujados, dando la falsa impresión de que
  *  "falta" un trozo. Mostrando la suma de lo categorizado, el número del centro SIEMPRE coincide
- *  con el 100% del anillo. */
+ *  con el 100% del anillo.
+ *
+ *  "Ver presupuesto →" es el ÚNICO punto de entrada a la pantalla Presupuesto (ver
+ *  task-12-report.md, fix tras revisión): NO puede depender de que haya algo que dibujar en el
+ *  donut. Si no hay gasto categorizado todavía (periodo recién abierto, todo sin categorizar,
+ *  refunds que dejan las raíces a 0/negativo...) pero el periodo SÍ tiene presupuestos, se
+ *  muestra una tarjeta reducida con solo la cabecera + el enlace, sin donut ni lista — mismo
+ *  `id`/handler que la variante completa. Solo si tampoco hay presupuestos la tarjeta entera se
+ *  oculta (nada que mostrar Y nada a lo que entrar, igual criterio que conSaraHtml/previsionHtml). */
 function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupuesto) {
+  const verPresupuestoBtn = showVerPresupuesto
+    ? `<button type="button" id="inicio-ver-presupuesto" style="all:unset;cursor:pointer;
+        font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;
+        -webkit-tap-highlight-color:transparent;">Ver presupuesto →</button>`
+    : "";
+  const headerHtml = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        <div style="font-size:15px;font-weight:700;">Gasto por categoría</div>
+        <div style="font-size:11px;color:var(--text-3);">Solo tu parte de lo compartido</div>
+      </div>
+      ${verPresupuestoBtn}
+    </div>`;
+
   const withSpend = rootRows.filter((r) => r.spent_cents > 0);
-  if (withSpend.length === 0) return "";
+  if (withSpend.length === 0) {
+    if (!showVerPresupuesto) return "";
+    return `
+      <div class="card" style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">
+        ${headerHtml}
+        <div style="font-size:12px;color:var(--text-3);">Aún no hay gasto categorizado este periodo.</div>
+      </div>`;
+  }
 
   const top = withSpend.slice(0, DONUT_TOP_N);
   const rest = withSpend.slice(DONUT_TOP_N);
@@ -237,15 +264,7 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupue
 
   return `
     <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
-        <div style="display:flex;flex-direction:column;gap:3px;">
-          <div style="font-size:15px;font-weight:700;">Gasto por categoría</div>
-          <div style="font-size:11px;color:var(--text-3);">Solo tu parte de lo compartido</div>
-        </div>
-        ${showVerPresupuesto ? `<button type="button" id="inicio-ver-presupuesto" style="all:unset;cursor:pointer;
-          font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;
-          -webkit-tap-highlight-color:transparent;">Ver presupuesto →</button>` : ""}
-      </div>
+      ${headerHtml}
       <div style="display:flex;justify-content:center;">
         ${donutSvg(slices, centsToStr(categorizedTotal), "EUR gastados")}
       </div>
