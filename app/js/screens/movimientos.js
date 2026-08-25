@@ -295,11 +295,11 @@ export async function renderMovimientos(container) {
         <div style="display:flex; gap:8px; padding:0 0 14px;">
           <div style="flex:1; background:#1b1e21; border-radius:14px; padding:10px 11px;">
             <div style="font-size:10px; color:var(--text-3);">Tu parte · ${pct}%</div>
-            <div class="num" style="font-size:15px; font-weight:600;">${fmtEUR(myCents)}</div>
+            <div class="num" id="mov-split-mine" style="font-size:15px; font-weight:600;">${fmtEUR(myCents)}</div>
           </div>
           <div style="flex:1; background:#1b1e21; border-radius:14px; padding:10px 11px;">
             <div style="font-size:10px; color:var(--text-3);">Sara · ${100 - pct}%</div>
-            <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtEUR(saraCents)}</div>
+            <div class="num" id="mov-split-sara" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtEUR(saraCents)}</div>
           </div>
         </div>` : ""}
       </div>` : ""}
@@ -347,6 +347,18 @@ export async function renderMovimientos(container) {
       d.cents = Math.round(parseFloat((d.raw || "0").replace(",", ".")) * 100) || 0;
       errorMsg = "";
       state.deleteConfirm = false;
+      // No se llama a render() aquí (perdería el foco/cursor del input mientras se escribe), pero
+      // el preview "Tu parte / Sara" de un gasto compartido se queda con el importe viejo si no se
+      // actualiza a mano — parche puntual de los dos nodos en vez de un re-render completo.
+      const mineEl = container.querySelector("#mov-split-mine");
+      const saraEl = container.querySelector("#mov-split-sara");
+      if (d.isShared && mineEl && saraEl) {
+        const period = periods.find((p) => p.id === state.periodId);
+        const pct = period?.my_share_pct ?? 100;
+        const myCents = Math.round((d.cents * pct) / 100);
+        mineEl.textContent = fmtEUR(myCents);
+        saraEl.textContent = fmtEUR(d.cents - myCents);
+      }
     };
     container.querySelector("#mov-merchant").oninput = (e) => { d.merchant = e.target.value; state.deleteConfirm = false; };
     container.querySelector("#mov-note").oninput = (e) => { d.note = e.target.value; state.deleteConfirm = false; };
