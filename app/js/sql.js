@@ -105,5 +105,22 @@ export const SQL = {
     counter_account_id=?, frequency=?, due_day=?, due_month=?, is_shared=?, is_active=?, updated_at=?
     WHERE id=?`,
   softDeleteRule: `UPDATE recurring_rules SET deleted=1, updated_at=? WHERE id=?`,
+
+  // Previsión (Task 11). Una regla se da por pagada este periodo si hay una transacción
+  // ligada por rule_id, O (fallback del dashboard, para movimientos metidos a mano sin
+  // enlazar la regla) una con la MISMA categoría y el MISMO importe (sin prorratear).
+  paidRuleIds: `SELECT DISTINCT rule_id FROM transactions WHERE period_id=? AND deleted=0 AND rule_id<>''`,
+  paidByCatAmount: `SELECT DISTINCT category_id || '|' || amount_cents AS k FROM transactions WHERE period_id=? AND deleted=0`,
+  // Saldo de una cuenta a una fecha dada: opening_balance_cents + movimientos hasta esa fecha
+  // (inclusive). SQL VERBATIM del brief de Task 11 — la reutilizan Tasks 13/14, no tocar sin
+  // revisar esas tareas. Bind: [atDateIso, accountId].
+  accountBalance: `SELECT a.opening_balance_cents + COALESCE((SELECT SUM(CASE
+      WHEN t.type IN ('expense','transfer') AND t.account_id=a.id THEN -t.amount_cents
+      WHEN t.type='transfer' AND t.counter_account_id=a.id THEN t.amount_cents
+      WHEN t.type IN ('income','refund') AND t.account_id=a.id THEN t.amount_cents
+      WHEN t.type='adjustment' AND t.account_id=a.id THEN t.amount_cents
+      ELSE 0 END) FROM transactions t
+    WHERE t.deleted=0 AND (t.account_id=a.id OR t.counter_account_id=a.id) AND t.date<=?),0) AS balance_cents
+  FROM accounts a WHERE a.id=?`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"];

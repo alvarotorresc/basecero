@@ -2,6 +2,7 @@ import { SQL, TABLES } from "./sql.js";
 import { query, exec, execMany } from "./db.js";
 import { nowIso, hoyISO, prevDayIso } from "./format.js";
 import { CONTRACT, insertSql } from "./contract.js";
+import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -171,6 +172,48 @@ export async function updateRule(id, fields) {
 }
 
 export const softDeleteRule = (id) => exec(SQL.softDeleteRule, [nowIso(), id]);
+
+export const accountBalanceCents = async (accountId, atDateIso) =>
+  (await query(SQL.accountBalance, [atDateIso, accountId]))[0].balance_cents;
+
+/** Previsión del periodo (Task 11): reglas recurrentes que aplican este mes, con su estado
+ *  pagado/pendiente (por rule_id o, si se registró a mano, por el fallback categoría+importe)
+ *  y el "disponible real" — mismo criterio que la hoja "Previsión" (dashboards.py:103-134).
+ *  comprometidoCents excluye type='income' (una regla de ingreso pendiente no "compromete"
+ *  nada, solo lo hacen los gastos/transferencias sin pagar). saldoN26Cents es el saldo de
+ *  'acc-n26' A HOY (no a la fecha del periodo: es el disponible AHORA). */
+export async function previsionOfPeriod(period) {
+  const month = periodMonth(period.start_date);
+  const [rules, paidByRule, paidByCat, saldoN26Cents, pendienteSaraCents] = await Promise.all([
+    listRules(),
+    query(SQL.paidRuleIds, [period.id]),
+    query(SQL.paidByCatAmount, [period.id]),
+    accountBalanceCents("acc-n26", hoyISO()),
+    pendingSharedTotalCents(),
+  ]);
+  const paidRuleIdSet = new Set(paidByRule.map((r) => r.rule_id));
+  const paidCatAmountSet = new Set(paidByCat.map((r) => r.k));
+
+  const items = rules
+    .filter((rule) => ruleApplies(rule, month))
+    .map((rule) => {
+      const myCents = myAmountOfRule(rule, period.my_share_pct);
+      const paid = paidRuleIdSet.has(rule.id) || paidCatAmountSet.has(`${rule.category_id}|${rule.amount_cents}`);
+      return { rule, myCents, paid };
+    });
+
+  const comprometidoCents = items
+    .filter((it) => !it.paid && it.rule.type !== "income")
+    .reduce((sum, it) => sum + it.myCents, 0);
+
+  return {
+    items,
+    comprometidoCents,
+    saldoN26Cents,
+    pendienteSaraCents,
+    disponibleCents: saldoN26Cents - comprometidoCents + pendienteSaraCents,
+  };
+}
 
 export async function dumpAllTables() {
   const out = {};

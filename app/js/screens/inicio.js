@@ -1,14 +1,17 @@
 import {
   getOpenPeriod, spentOfPeriod, incomeOfPeriod, listByDay, allCategoriesById,
-  pendingShared, pendingSharedTotalCents, budgetsOfPeriod,
+  pendingShared, pendingSharedTotalCents, budgetsOfPeriod, previsionOfPeriod,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtEUR, fmtDiaLargo, fmtDiaCorto, hoyISO } from "../format.js";
 import { renderLiquidar } from "./liquidar.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 import { renderPresupuesto } from "./presupuesto.js";
+import { renderRecurrentes } from "./recurrentes.js";
+import { renderRegistro } from "./registro.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const pctFmt = new Intl.NumberFormat("es-ES", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 /** Agrupa las filas de listByDay (ya vienen ordenadas por date DESC) en bloques por día,
@@ -79,17 +82,67 @@ function conSaraHtml(period, sharedRows, sharedTotal) {
     </div>`;
 }
 
+function previsionRowHtml(item, byId) {
+  const { rule, myCents, paid } = item;
+  const color = rule.type === "transfer" ? "#5c646d" : colorForCategory(rule.category_id, byId);
+  const icon = rule.type === "transfer" ? "⇄" : iconForCategory(rule.category_id, byId);
+  const badge = paid
+    ? `<span style="font-size:9px;font-weight:700;letter-spacing:0.04em;color:var(--green);background:#16291d;border-radius:6px;padding:3px 6px;flex-shrink:0;">✅ pagado</span>`
+    : `<span style="font-size:9px;font-weight:700;letter-spacing:0.04em;color:var(--amber);background:#2f2712;border-radius:6px;padding:3px 6px;flex-shrink:0;">⏳ pendiente</span>`;
+  return `
+    <div class="tx-row"${paid ? "" : ` data-prevision-rule="${escAttr(rule.id)}" style="cursor:pointer;-webkit-tap-highlight-color:transparent;"`}>
+      <div class="tx-icon" style="--cat:${color};">${icon}</div>
+      <div class="tx-body">
+        <div class="tx-title">${escHtml(rule.name)}</div>
+      </div>
+      <div class="num" style="font-size:14px;font-weight:600;flex-shrink:0;">${fmtEUR(myCents)}</div>
+      ${badge}
+    </div>`;
+}
+
+/** Bloque "Previsión": reglas recurrentes que aplican este mes (pagadas o pendientes), con
+ *  el "comprometido restante" y el "disponible real" destacado. Se oculta entero si no hay
+ *  ninguna regla aplicable este mes (aunque estén todas ya pagadas, el bloque se muestra). */
+function previsionHtml(prevision, byId) {
+  if (prevision.items.length === 0) return "";
+  return `
+    <div class="card" style="display:flex;flex-direction:column;gap:14px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div class="section-title">Previsión</div>
+        <button type="button" id="prevision-gestionar" style="all:unset;cursor:pointer;
+          font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;
+          -webkit-tap-highlight-color:transparent;">Gestionar recurrentes →</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        ${prevision.items.map((it) => previsionRowHtml(it, byId)).join("")}
+      </div>
+      <hr class="divider">
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
+          <div style="font-size:12px;color:var(--text-2);">Comprometido restante</div>
+          <div class="num" style="font-size:14px;font-weight:600;">${fmtEUR(prevision.comprometidoCents)}</div>
+        </div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
+          <div style="font-size:13px;font-weight:700;">Disponible real</div>
+          <div class="num ${prevision.disponibleCents >= 0 ? "text-green" : "text-red"}"
+            style="font-size:20px;font-weight:700;letter-spacing:-0.02em;">${fmtEUR(prevision.disponibleCents)}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
 /** Pantalla Inicio: cabecera del periodo abierto (gastado, ingresos, ahorrado, tasa),
- *  bloque "Con Sara" (pendiente/liquidar) y sus movimientos agrupados por día. */
+ *  bloque "Con Sara" (pendiente/liquidar), bloque "Previsión" (reglas recurrentes del mes)
+ *  y sus movimientos agrupados por día. */
 export async function renderInicio(container) {
-  let period, spent, income, rows, byId, sharedRows, sharedTotal, budgets;
+  let period, spent, income, rows, byId, sharedRows, sharedTotal, budgets, prevision;
   try {
     period = await getOpenPeriod();
     if (!period) {
       container.innerHTML = `<div class="banner-aviso red">No hay ningún periodo abierto.</div>`;
       return;
     }
-    [spent, income, rows, byId, sharedRows, sharedTotal, budgets] = await Promise.all([
+    [spent, income, rows, byId, sharedRows, sharedTotal, budgets, prevision] = await Promise.all([
       spentOfPeriod(period.id),
       incomeOfPeriod(period.id),
       listByDay(period.id),
@@ -97,6 +150,7 @@ export async function renderInicio(container) {
       pendingShared(),
       pendingSharedTotalCents(),
       budgetsOfPeriod(period.id),
+      previsionOfPeriod(period),
     ]);
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">No se pudo cargar Inicio: ${escHtml(e.message)}</div>`;
@@ -157,6 +211,8 @@ export async function renderInicio(container) {
 
     ${conSaraHtml(period, sharedRows, sharedTotal)}
 
+    ${previsionHtml(prevision, byId)}
+
     ${movimientosHtml}
   `;
 
@@ -165,6 +221,26 @@ export async function renderInicio(container) {
 
   const presuBtn = container.querySelector("#inicio-ver-presupuesto");
   if (presuBtn) presuBtn.onclick = () => renderPresupuesto(container, () => renderInicio(container));
+
+  const gestionarBtn = container.querySelector("#prevision-gestionar");
+  if (gestionarBtn) gestionarBtn.onclick = () => renderRecurrentes(container, () => renderInicio(container));
+
+  container.querySelectorAll("[data-prevision-rule]").forEach((el) => {
+    el.onclick = () => {
+      const item = prevision.items.find((it) => it.rule.id === el.dataset.previsionRule);
+      if (!item) return;
+      const { rule } = item;
+      renderRegistro(container, () => renderInicio(container), {
+        type: rule.type,
+        amountCents: rule.amount_cents,
+        categoryId: rule.category_id,
+        accountId: rule.account_id,
+        merchant: rule.name,
+        ruleId: rule.id,
+        isShared: !!rule.is_shared,
+      });
+    };
+  });
 
   container.querySelector("#inicio-periodo-header").onclick = () => {
     document.body.classList.add("onboarding");
