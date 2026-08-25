@@ -43,6 +43,44 @@ test("import: falta una pestaña del contrato → error", () => {
   assert.match(errors[0], /budgets/);
 });
 
+// Regresión (hallazgo crítico de la review final): la hoja del GENERADOR real añade a la
+// derecha de "meta" (a partir de la columna D, con una C en blanco de por medio) una columna
+// por cada enum con sus valores permitidos, para alimentar los desplegables — MÁS filas de
+// valores (aquí 5, goal_types) que filas key/value reales (aquí 3). Antes del fix, el filtro de
+// "fila vacía" miraba TODAS las columnas de la fila cruda, así que las filas 5 y 6 (sin key/value
+// pero con un valor de enum en columna D/E) colaban como {key:"",value:""} duplicadas → replaceAll
+// reventaba con "UNIQUE constraint failed: meta.key" al importar cualquier hoja del generador.
+test("import: meta con columnas de enums del generador (más filas de enum que de key/value) no duplica PKs vacías", () => {
+  const wb = wbFromSeed();
+  wb.Sheets.meta = X.utils.aoa_to_sheet([
+    ["key", "value", "", "account_types", "goal_types"],
+    ["schema_version", "1", "", "checking", "emergency_fund"],
+    ["currency", "EUR", "", "savings", "savings_target"],
+    ["created_with", "basecero-pwa", "", "liability", "spending_cap"],
+    ["", "", "", "", "savings_rate"],
+    ["", "", "", "", "provision"],
+  ]);
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  assert.equal(data.meta.length, 3, "solo las 3 filas key/value reales, las 2 de solo-enum se descartan");
+  assert.deepEqual(validateImport(data), []);
+});
+
+// Misma familia de bug, pero en una pestaña de DATOS (no meta): una fila totalmente vacía (p.ej.
+// una fila de plantilla sobrante) no debe colarse como registro real ni chocar con las columnas
+// booleanas (que "" mapea a 0, no a vacío — ver comentario en xlsx.js#workbookToRows).
+test("import: fila totalmente vacía en una pestaña de datos (no meta) se descarta y valida limpio", () => {
+  const wb = wbFromSeed();
+  const existingRows = X.utils.sheet_to_json(wb.Sheets.accounts, { defval: "" });
+  const header = Object.keys(existingRows[0]);
+  const aoa = [header, ...existingRows.map((r) => header.map((h) => r[h])), header.map(() => "")];
+  wb.Sheets.accounts = X.utils.aoa_to_sheet(aoa);
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  assert.equal(data.accounts.length, existingRows.length, "la fila totalmente vacía se descarta");
+  assert.deepEqual(validateImport(data), []);
+});
+
 const parse = (mutate) => workbookToRows(X, wbFromSeed(mutate)).data;
 
 test("validate: base semilla válida", () => { assert.deepEqual(validateImport(parse()), []); });

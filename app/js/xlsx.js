@@ -31,8 +31,14 @@ export function workbookToRows(X, wb) {
     const cols = CONTRACT[table].cols, bools = new Set(BOOL_COLS[table] ?? []);
     const byHeader = Object.fromEntries(cols.map((c) => [xlsxHeader(c), c]));
     const raw = X.utils.sheet_to_json(ws, { defval: "" });
+    // Filas totalmente vacías fuera — pero solo cuentan las columnas DEL CONTRATO (byHeader).
+    // La hoja del generador añade a la derecha de "meta" columnas sin cabecera de contrato con
+    // las listas de los desplegables (enum_*), con más filas de valores que filas key/value
+    // reales: si se mirara Object.values(r) entero, esas columnas "colaban" como fila no-vacía
+    // y sobrevivían como {key:"",value:""} — dos PKs '' duplicadas que revientan el replaceAll
+    // con "UNIQUE constraint failed: meta.key" al importar la hoja real del generador.
     data[table] = raw
-      .filter((r) => Object.values(r).some((v) => v !== ""))   // filas totalmente vacías fuera
+      .filter((r) => Object.entries(r).some(([h, v]) => byHeader[h] && v !== ""))
       .map((r) => {
         const row = {};
         for (const [h, v] of Object.entries(r)) {
