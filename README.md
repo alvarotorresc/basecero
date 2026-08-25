@@ -1,7 +1,34 @@
 # BaseCero
 
-BaseCero es una app de finanzas personales, en desarrollo, pensada para ser
-**open source y totalmente offline**. Antes de escribir la app, este
+BaseCero es una app de finanzas personales, **open source y totalmente
+offline**.
+
+## La app (PWA)
+
+**https://alvarotorresc.github.io/basecero/** — instalable desde el navegador
+(en Android: Chrome → menú → «Añadir a pantalla de inicio»; en escritorio:
+icono de instalación en la barra de direcciones).
+
+- **Tus datos no salen del dispositivo.** Todo vive en una base SQLite local
+  (OPFS); no hay servidor, ni cuentas, ni telemetría. Funciona sin conexión.
+- **El dato canónico es una hoja de cálculo**: desde Ajustes puedes exportar
+  un `.xlsx` (una pestaña por tabla), editarlo en Google Sheets o LibreOffice
+  y volver a importarlo; el import valida el contrato completo y reemplaza la
+  base (descargando antes una copia de seguridad).
+- Incluye: registro rápido de gastos/ingresos/transferencias/devoluciones/
+  ajustes, gastos compartidos con liquidación, periodos manuales con
+  presupuestos por categoría, recurrentes con previsión y «disponible real»,
+  patrimonio con objetivos, gráficas, e import del CSV de N26 con
+  deduplicación y conciliación.
+- El código de la app está en [`app/`](app/) (vanilla JS, sin build step);
+  se sirve tal cual desde GitHub Pages.
+
+## El contrato de datos (hoja de cálculo)
+
+Antes de la app, este repositorio construyó su **contrato de datos**: una
+hoja de cálculo de Google Sheets cuya estructura (pestañas, columnas, tipos y
+relaciones) es la que la app importa y exporta sin pérdida de datos ni de
+relaciones. Antes de escribir la app, este
 repositorio construye su **contrato de datos**: una hoja de cálculo de Google
 Sheets cuya estructura (pestañas, columnas, tipos y relaciones) es la que la
 futura app deberá importar y exportar sin pérdida de datos ni de relaciones.
