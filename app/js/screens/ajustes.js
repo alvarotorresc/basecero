@@ -154,7 +154,7 @@ export async function renderAjustes(container) {
         const res = await importN26Csv(await file.text());
         state.n26Result = `Nuevas: ${res.created} · Conciliadas: ${res.reconciled} · `
           + `Duplicadas (saltadas): ${res.skipped}. Revisa la bandeja «sin categorizar» en `
-          + `Movimientos y reclasifica a devolución los Bizum de Sara.`;
+          + `Movimientos. Los Bizum de Sara se concilian solos si usas «Liquidar» en Inicio antes de importar.`;
       } catch (err) {
         state.n26Error = err.message;
       } finally {
