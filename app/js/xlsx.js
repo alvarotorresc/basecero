@@ -64,6 +64,21 @@ export function validateImport(data) {
   if (!["basecero-sheets-mvp", "basecero-pwa"].includes(meta.created_with))
     errs.push(`meta: created_with no reconocido («${meta.created_with}»)`);
 
+  // PK vacía o duplicada dentro de la propia pestaña (meta usa "key", el resto "id"): sin este
+  // check, una fila con PK vacía se cuela en el Set de ids de abajo indistinguible de "sin FK", y
+  // una PK duplicada sobrescribe en silencio la fila anterior al hacer replaceAll — el bug real
+  // que motivó este hallazgo era justo eso (dos {key:"",value:""}).
+  for (const table of Object.keys(CONTRACT)) {
+    const pkCol = table === "meta" ? "key" : "id";
+    const seen = new Set();
+    (data[table] ?? []).forEach((row, i) => {
+      const pk = row[pkCol];
+      if (pk === "" || pk == null) { errs.push(`pestaña «${table}» fila ${i + 2}: id vacío`); return; }
+      if (seen.has(pk)) errs.push(`pestaña «${table}» fila ${i + 2}: id duplicado («${pk}»)`);
+      else seen.add(pk);
+    });
+  }
+
   const ids = {};   // tabla → Set de ids (para FKs)
   for (const t of Object.keys(CONTRACT))
     ids[t] = new Set((data[t] ?? []).map((r) => r.id ?? r.key));
