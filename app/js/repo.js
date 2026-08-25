@@ -12,8 +12,17 @@ export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[
  *  dejaría un periodo cerrado sin sucesor abierto, violando la invariante de que siempre hay
  *  como mucho un periodo open). budgets: [{categoryId, amountCents}]. La usa tanto el
  *  asistente de cierre normal como el onboarding (modo 'first', sin periodo previo). */
+/** ¿startDate cae on/antes del start_date del periodo open que se va a cerrar? Si es así,
+ *  end_date (día anterior a startDate) quedaría ANTES de start_date del periodo que se cierra —
+ *  un rango invertido. PURA y sin DB (mismo patrón que sharedFieldsLocked/fillLast7Days: así se
+ *  testea sin Worker) para que openNextPeriod pueda lanzar el error ANTES de construir el
+ *  execMany. Sin periodo abierto (modo 'first') no hay nada que comparar: siempre false. */
+export const periodStartTooEarly = (open, startDate) => !!open && startDate <= open.start_date;
+
 export async function openNextPeriod({ name, startDate, sharePct, budgets = [] }) {
   const current = await getOpenPeriod();
+  if (periodStartTooEarly(current, startDate))
+    throw new Error("La fecha debe ser posterior al inicio del periodo actual");
   const t = nowIso();
   const newId = bcUlid();
   const stmts = [];

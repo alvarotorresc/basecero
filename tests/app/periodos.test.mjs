@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SQL } from "../../app/js/sql.js";
 import { prevDayIso } from "../../app/js/format.js";
+import { periodStartTooEarly } from "../../app/js/repo.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
 const T = "2026-08-24T18:00:00Z";
@@ -105,6 +106,14 @@ test("openNextPeriod en modo 'first' (sin periodo abierto previo): solo crea el 
   assert.equal(rows[0].id, newId);
   assert.equal(rows[0].status, "open");
   assert.equal(rows[0].my_share_pct, 50);
+});
+
+test("periodStartTooEarly (repo.openNextPeriod): guarda contra un rango invertido (end_date < start_date)", () => {
+  const open = { start_date: "2026-08-01" };
+  assert.equal(periodStartTooEarly(open, "2026-07-31"), true, "startDate ANTES del periodo abierto");
+  assert.equal(periodStartTooEarly(open, "2026-08-01"), true, "startDate IGUAL al periodo abierto (end_date quedaría antes de start_date)");
+  assert.equal(periodStartTooEarly(open, "2026-08-02"), false, "startDate posterior: caso normal");
+  assert.equal(periodStartTooEarly(null, "2026-01-01"), false, "modo 'first' sin periodo abierto: nada que comparar");
 });
 
 test("spentByRootCategory: agrega el subárbol, resta refunds sin ref prorrateados, excluye otros periodos/income y ordena por gasto desc", () => {
