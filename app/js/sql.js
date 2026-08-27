@@ -177,5 +177,6 @@ export const SQL = {
     WHERE account_id='acc-n26' AND deleted=0`,
   reconcileTx: `UPDATE transactions SET external_id=?, status='reconciled', updated_at=? WHERE id=?`,
   upsertMeta: `INSERT INTO meta (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`,
+  allMeta: `SELECT key, value FROM meta`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"];

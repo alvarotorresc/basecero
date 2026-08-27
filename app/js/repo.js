@@ -65,6 +65,16 @@ export const listAccounts = () => query(SQL.listAccounts);
 export const allCategoriesById = async () =>
   Object.fromEntries((await query(SQL.allCategories)).map((c) => [c.id, c]));
 
+/** Config de la app como objeto {clave: valor}. Las semillas de schema.sql garantizan
+ *  como mínimo schema_version, currency, created_with y locale. */
+export async function getMetaAll() {
+  const rows = await query(SQL.allMeta);
+  return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+}
+export async function setMeta(key, value) {
+  await exec(SQL.upsertMeta, [key, value]);
+}
+
 export const listPeriods = () => query(SQL.listPeriods);
 export const listAllByDay = (pid) => query(SQL.listAllByDay, [pid]);
 export const getTransaction = async (id) => (await query(SQL.getTransaction, [id]))[0] ?? null;
