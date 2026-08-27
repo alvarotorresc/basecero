@@ -1,9 +1,10 @@
 import {
   addTransaction, getOpenPeriod, listExpenseLeafCategories, listIncomeCategories,
-  listAccounts, allCategoriesById, recentForRefund,
+  listAccounts, allCategoriesById, recentForRefund, getMetaAll,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, hoyISO, currencySymbol } from "../format.js";
+import { resolveAccountId } from "../account-defaults.js";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "back"];
 const ICON_BACK = `<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 5.5H9.2L3.5 12l5.7 6.5H20a1 1 0 001-1v-11a1 1 0 00-1-1z"></path><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"></path></svg>`;
@@ -29,14 +30,15 @@ const centsToRaw = (cents) => (cents ? (Math.abs(cents) / 100).toFixed(2).replac
  *  onDone() se llama tanto al cerrar (✕) como tras guardar con éxito.
  *  prefill opcional (Task 11): {type, amountCents, categoryId, accountId, merchant, ruleId, isShared}. */
 export async function renderRegistro(container, onDone, prefill) {
-  let period, expenseCats, incomeCats, accountsAll, byId;
+  let period, expenseCats, incomeCats, accountsAll, byId, meta;
   try {
-    [period, expenseCats, incomeCats, accountsAll, byId] = await Promise.all([
+    [period, expenseCats, incomeCats, accountsAll, byId, meta] = await Promise.all([
       getOpenPeriod(),
       listExpenseLeafCategories(),
       listIncomeCategories(),
       listAccounts(),
       allCategoriesById(),
+      getMetaAll(),
     ]);
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">No se pudo cargar la pantalla de registro: ${escHtml(e.message)}</div>`;
@@ -56,7 +58,7 @@ export async function renderRegistro(container, onDone, prefill) {
     raw: centsToRaw(prefill?.amountCents),
     cents: prefill?.amountCents ?? 0,
     categoryId: prefill?.categoryId ?? null,
-    accountId: prefill?.accountId ?? "acc-n26",
+    accountId: prefill?.accountId ?? resolveAccountId(meta.default_account_id, accounts) ?? "",
     counterAccountId: "",
     isShared: prefill?.isShared ?? false,
     fecha: hoyISO(),

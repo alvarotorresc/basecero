@@ -1,6 +1,7 @@
-import { pendingShared, listAccounts, allCategoriesById, settleShared } from "../repo.js";
+import { pendingShared, listAccounts, allCategoriesById, settleShared, getMetaAll } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtDiaCorto } from "../format.js";
+import { resolveAccountId } from "../account-defaults.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
@@ -38,9 +39,11 @@ function rowHtml(r, byId, confirmId) {
  *  selector de cuenta de destino arriba y confirmación en dos toques por fila. onBack vuelve
  *  a Inicio (que se re-renderiza entero, igual que renderRegistro/onDone en main.js). */
 export async function renderLiquidar(container, onBack) {
-  let rows, accountsAll, byId;
+  let rows, accountsAll, byId, meta;
   try {
-    [rows, accountsAll, byId] = await Promise.all([pendingShared(), listAccounts(), allCategoriesById()]);
+    [rows, accountsAll, byId, meta] = await Promise.all([
+      pendingShared(), listAccounts(), allCategoriesById(), getMetaAll(),
+    ]);
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">No se pudo cargar Liquidar: ${escHtml(e.message)}</div>`;
     return;
@@ -49,7 +52,7 @@ export async function renderLiquidar(container, onBack) {
 
   const state = {
     rows,
-    accountId: accounts.find((a) => a.id === "acc-n26")?.id ?? accounts[0]?.id ?? "",
+    accountId: resolveAccountId(meta.default_account_id, accounts) ?? "",
     confirmId: null,
     busy: false,
   };
