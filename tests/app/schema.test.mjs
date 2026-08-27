@@ -58,3 +58,13 @@ test("meta: semillas incluyen locale es-ES y currency EUR", () => {
   assert.equal(meta.locale, "es-ES");
   assert.equal(meta.currency, "EUR");
 });
+
+test("meta: las claves de cuenta entran vacías con INSERT OR IGNORE", () => {
+  const db = freshDb();
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='import_account_id'").get().value, "");
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='default_account_id'").get().value, "");
+  // re-ejecutar el esquema NO pisa un valor ya configurado
+  db.prepare("UPDATE meta SET value='acc-x' WHERE key='import_account_id'").run();
+  db.exec(schema);
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='import_account_id'").get().value, "acc-x");
+});
