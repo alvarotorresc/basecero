@@ -14,7 +14,10 @@ icono de instalación en la barra de direcciones).
 - **El dato canónico es una hoja de cálculo**: desde Ajustes puedes exportar
   un `.xlsx` (una pestaña por tabla), editarlo en Google Sheets o LibreOffice
   y volver a importarlo; el import valida el contrato completo y reemplaza la
-  base (descargando antes una copia de seguridad).
+  base (descargando antes una copia de seguridad). También puedes exportar una
+  **copia cifrada** (`.bce`, AES-256-GCM con contraseña) desde el mismo sitio:
+  se descifra solo desde BaseCero al importarla, y si olvidas la contraseña
+  no hay forma de recuperarla — no se guarda en ningún sitio.
 - Incluye: registro rápido de gastos/ingresos/transferencias/devoluciones/
   ajustes, gastos compartidos con liquidación, periodos manuales con
   presupuestos por categoría, recurrentes con previsión y «disponible real»,
