@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
-import { seedStatements, SEED_ACCOUNTS, SEED_CATEGORIES } from "../../app/js/seeds.js";
+import { seedStatements, SEED_CATEGORIES } from "../../app/js/seeds.js";
 import { SQL } from "../../app/js/sql.js";
 
 const schema = readFileSync(new URL("../../app/js/schema.sql", import.meta.url), "utf8");
@@ -22,12 +22,11 @@ test("esquema aplica y las 8 tablas existen", () => {
   assert.equal(db.prepare("SELECT value FROM meta WHERE key='schema_version'").get().value, "1");
 });
 
-test("semillas: 4 cuentas y 41 categorías con integridad", () => {
+test("semillas: 0 cuentas (las crea el usuario) y 41 categorías con integridad", () => {
   const db = freshDb();
-  assert.equal(db.prepare("SELECT COUNT(*) c FROM accounts").get().c, 4);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM accounts").get().c, 0);
   assert.equal(db.prepare("SELECT COUNT(*) c FROM categories").get().c, 41);
   assert.equal(db.prepare("SELECT COUNT(*) c FROM categories WHERE parent_id<>'' AND parent_id NOT IN (SELECT id FROM categories)").get().c, 0);
-  assert.equal(db.prepare("SELECT name FROM accounts WHERE id='acc-n26'").get().name, "N26");
 });
 
 test("CHECKs de enums y de importes positivos", () => {

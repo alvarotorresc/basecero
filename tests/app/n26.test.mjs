@@ -27,6 +27,8 @@ function db() {
   const d = new DatabaseSync(":memory:");
   d.exec(readFileSync(new URL("../../app/js/schema.sql", import.meta.url), "utf8"));
   for (const { sql, rows } of seedStatements(T)) for (const r of rows) d.prepare(sql).run(...r);
+  d.prepare(`INSERT INTO accounts (id,name,type,opening_balance_cents,display_order,is_archived,created_at,updated_at,deleted)
+             VALUES ('acc-n26','N26','checking',0,1,0,?,?,0)`).run(T, T);
   d.prepare(SQL.insertPeriod).run("p1", "Agosto 2026", "2026-07-27", 60, T, T);
   return d;
 }
