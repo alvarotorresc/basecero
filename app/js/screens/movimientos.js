@@ -3,7 +3,7 @@ import {
   listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById, hasActiveLinkedRefund,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtDiaLargo, hoyISO } from "../format.js";
+import { fmtMoney, fmtDiaLargo, hoyISO, currencySymbol } from "../format.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -248,7 +248,7 @@ export async function renderMovimientos(container) {
           ${d.type === "adjustment" ? `<button type="button" class="icon-btn" id="mov-sign" aria-label="Cambiar signo" style="font-size:18px; font-weight:700;" ${locked ? "disabled" : ""}>${d.sign}</button>` : ""}
           <input type="text" inputmode="decimal" id="mov-raw" value="${escAttr(d.raw)}" placeholder="0" ${locked ? "disabled" : ""}
             style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;${locked ? "opacity:.5;" : ""}">
-          <span class="amount-currency">€</span>
+          <span class="amount-currency">${currencySymbol()}</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
       </div>

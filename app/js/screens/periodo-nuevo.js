@@ -3,7 +3,7 @@ import {
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { eurToCents } from "../contract.js";
-import { fmtMoney, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct } from "../format.js";
+import { fmtMoney, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol } from "../format.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -196,7 +196,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
         <input type="number" min="0" step="1" inputmode="decimal" placeholder="Sin límite"
           data-budget="${r.root_id}" value="${escAttr(raw)}" class="budget-input${empty ? " is-empty" : ""}">
         <span class="budget-eur" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:12px;
-          color:var(--text-3); pointer-events:none; display:${empty ? "none" : ""};">€</span>
+          color:var(--text-3); pointer-events:none; display:${empty ? "none" : ""};">${currencySymbol()}</span>
       </div>
     </div>`;
   }

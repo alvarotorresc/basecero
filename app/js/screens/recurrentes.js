@@ -3,7 +3,7 @@ import {
   createRule, updateRule, softDeleteRule,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney } from "../format.js";
+import { fmtMoney, currencySymbol } from "../format.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -208,7 +208,7 @@ export async function renderRecurrentes(container, onBack) {
         <div class="amount-display" style="align-items:center;">
           <input type="text" inputmode="decimal" id="rec-raw" value="${escAttr(f.raw)}" placeholder="0"
             style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
-          <span class="amount-currency">€</span>
+          <span class="amount-currency">${currencySymbol()}</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
       </div>

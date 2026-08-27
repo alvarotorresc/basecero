@@ -4,7 +4,7 @@ import {
   spentByRootCategory, spentLast7Days,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtNum2, fmtPct } from "../format.js";
+import { fmtMoney, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtNum2, fmtPct, currencyCode } from "../format.js";
 import { budgetStatus } from "./presupuesto.js";
 import { barChartSvg, donutSvg } from "../charts.js";
 import { renderLiquidar } from "./liquidar.js";
@@ -264,7 +264,7 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupue
     <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
       ${headerHtml}
       <div style="display:flex;justify-content:center;">
-        ${donutSvg(slices, centsToStr(categorizedTotal), "EUR gastados")}
+        ${donutSvg(slices, centsToStr(categorizedTotal), `${currencyCode()} gastados`)}
       </div>
       <div style="display:flex;flex-direction:column;gap:12px;">
         ${rowsHtml}${otrasRowHtml}

@@ -4,7 +4,7 @@ import {
   createGoal, updateGoal, softDeleteGoal,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, hoyISO, fmtDec1 } from "../format.js";
+import { fmtMoney, hoyISO, fmtDec1, currencySymbol, currencyCode } from "../format.js";
 import { sparklineSvg } from "../charts.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -116,7 +116,7 @@ function cuentasCardHtml(accounts) {
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <div style="font-size:15px;font-weight:700;">Cuentas</div>
       <div style="display:flex;align-items:center;gap:10px;">
-        <div style="font-size:11px;color:var(--text-3);">${n} activa${n === 1 ? "" : "s"} · solo EUR</div>
+        <div style="font-size:11px;color:var(--text-3);">${n} activa${n === 1 ? "" : "s"} · solo ${currencyCode()}</div>
         <button type="button" class="icon-btn" id="btn-nueva-cuenta" aria-label="Nueva cuenta" style="width:28px;height:28px;border-radius:9px;font-size:16px;">+</button>
       </div>
     </div>`;
@@ -331,7 +331,7 @@ export async function renderPatrimonio(container) {
           <button type="button" class="icon-btn" id="acc-sign" aria-label="Cambiar signo" style="font-size:18px; font-weight:700;">${f.sign}</button>
           <input type="text" inputmode="decimal" id="acc-raw" value="${escAttr(f.raw)}" placeholder="0"
             style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
-          <span class="amount-currency">€</span>
+          <span class="amount-currency">${currencySymbol()}</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
       </div>
@@ -498,7 +498,7 @@ export async function renderPatrimonio(container) {
         <div class="amount-display" style="align-items:center;">
           <input type="text" inputmode="decimal" id="goal-raw" value="${escAttr(f.raw)}" placeholder="0"
             style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
-          <span class="amount-currency">€</span>
+          <span class="amount-currency">${currencySymbol()}</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
       </div>`;
