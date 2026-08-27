@@ -7,12 +7,32 @@
  *  por semana". Así lo hace la propia fórmula de la hoja (linea 118-123 de dashboards.py,
  *  declarada autoritativa), que solo distingue monthly/weekly del resto agrupándolos juntos. */
 
-/** Mes (1-12) del periodo: mes de start_date + 15 días (celda C1/D1 de la hoja "Previsión").
- *  T12:00:00 evita líos de cambio de hora al sumar días (mismo patrón que format.js prevDayIso). */
-export function periodMonth(startDateIso) {
+/** Mes (1-12) al que se atribuye un periodo: el mes que contiene la MAYOR PARTE del rango
+ *  [start_date, end_date]. Periodo abierto (end_date vacío): se asume un mes natural menos un
+ *  día — la convención "de nómina a nómina". Empate: gana el mes más tardío (mismo criterio
+ *  que la heurística anterior). T12:00:00 evita líos de cambio de hora (como format.js#prevDayIso). */
+export function periodMonth(startDateIso, endDateIso = "") {
   const d = new Date(startDateIso + "T12:00:00");
-  d.setDate(d.getDate() + 15);
-  return d.getMonth() + 1;
+  const startMonth = d.getMonth() + 1;
+  let end;
+  if (endDateIso) {
+    end = new Date(endDateIso + "T12:00:00");
+  } else {
+    end = new Date(d);
+    end.setMonth(end.getMonth() + 1);
+    end.setDate(end.getDate() - 1);
+  }
+  const counts = []; // [{month, n}] en orden de aparición dentro del rango
+  for (; d <= end; d.setDate(d.getDate() + 1)) {
+    const m = d.getMonth() + 1;
+    const last = counts[counts.length - 1];
+    if (last && last.month === m) last.n += 1;
+    else counts.push({ month: m, n: 1 });
+  }
+  if (!counts.length) return startMonth; // rango vacío o fechas incoherentes: mes de inicio
+  let best = counts[0];
+  for (const c of counts) if (c.n >= best.n) best = c; // >= : el empate lo gana el mes más tardío
+  return best.month;
 }
 
 /** ¿Aplica `rule` en el mes `month` (1-12) del periodo? Mismo orden de comprobación que la

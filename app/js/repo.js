@@ -262,7 +262,7 @@ export const accountBalanceCents = async (accountId, atDateIso) =>
  *  nada, solo lo hacen los gastos/transferencias sin pagar). saldoN26Cents es el saldo de
  *  'acc-n26' A HOY (no a la fecha del periodo: es el disponible AHORA). */
 export async function previsionOfPeriod(period) {
-  const month = periodMonth(period.start_date);
+  const month = periodMonth(period.start_date, period.end_date);
   const [rules, paidByRule, paidByCat, saldoN26Cents, pendienteSaraCents] = await Promise.all([
     listRules(),
     query(SQL.paidRuleIds, [period.id]),
