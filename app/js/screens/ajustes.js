@@ -280,6 +280,12 @@ export async function renderAjustes(container) {
     if (decConfirm) decConfirm.onclick = async () => {
       const pass = container.querySelector("#dec-pass").value;
       const errBox = container.querySelector("#dec-error");
+      if (!pass) {
+        const box = container.querySelector("#dec-error");
+        box.textContent = "Escribe la contraseña de la copia.";
+        box.style.display = "block";
+        return;
+      }
       state.busy = true; render();
       try {
         const plain = await decryptBackup(state.encImport.buf, pass);
