@@ -9,6 +9,37 @@ import { X } from "./helpers.mjs";
 const FAST = { iterations: 1000 };
 const sample = () => crypto.getRandomValues(new Uint8Array(256));
 
+// Vector de referencia (known-answer test): contenedor real generado UNA VEZ con
+// encryptBackup(new TextEncoder().encode("BaseCero golden vector v1"), "contraseña dorada nº1", { iterations: 1000 }).
+// NUNCA regenerar este hex: existe justo para que un refactor futuro (cambiar el hash,
+// la codificación de la passphrase o la normalización) no pueda quedar en verde sin más
+// que romper la lectura de las copias ya exportadas por usuarios reales. Si este test
+// falla, el bug está en el código nuevo, no en el vector.
+const GOLDEN_HEX =
+  "42434531011301a43f42f4ab8954cb878d73fbe245000003e8d17f4197d20669f72e54fc0c866469e392439afec59d2c3d8277cb50109babd6fef21731329f6b7d96d74ccd0a6fff3a0bbeb57589";
+const GOLDEN_PASS = "contraseña dorada nº1";
+const GOLDEN_PLAIN = new TextEncoder().encode("BaseCero golden vector v1");
+const hexToBytes = (hex) => new Uint8Array(Buffer.from(hex, "hex"));
+
+test("golden vector: un contenedor v1 exportado ayer se sigue descifrando hoy", async () => {
+  const vector = hexToBytes(GOLDEN_HEX);
+  const dec = await decryptBackup(vector, GOLDEN_PASS);
+  assert.deepEqual(dec, GOLDEN_PLAIN);
+});
+
+test("golden vector: contraseña equivocada sobre el mismo contenedor → WrongPassphraseError", async () => {
+  const vector = hexToBytes(GOLDEN_HEX);
+  await assert.rejects(() => decryptBackup(vector, "otra distinta x"), WrongPassphraseError);
+});
+
+test("plaintext vacío: round-trip a un Uint8Array de longitud 0", async () => {
+  const enc = await encryptBackup(new Uint8Array(0), "contraseña larga", FAST);
+  assert.equal(enc.length, 37 + 16); // cabecera + tag GCM, sin plaintext
+  assert.equal(isEncryptedBackup(enc), true);
+  const dec = await decryptBackup(enc, "contraseña larga");
+  assert.deepEqual(dec, new Uint8Array(0));
+});
+
 test("constantes de producción", () => {
   assert.equal(PBKDF2_ITERATIONS, 600000);
   assert.equal(MIN_PASSPHRASE, 10);
