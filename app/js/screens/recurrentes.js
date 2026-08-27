@@ -3,7 +3,7 @@ import {
   createRule, updateRule, softDeleteRule,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtEUR } from "../format.js";
+import { fmtMoney } from "../format.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -52,7 +52,7 @@ export async function renderRecurrentes(container, onBack) {
   function ruleRowHtml(r) {
     const { color, icon } = ruleIconColor(r);
     const freqLabel = FREQ_LABEL[r.frequency] ?? r.frequency;
-    let subtitle = `${fmtEUR(r.amount_cents)} · ${freqLabel} · día ${r.due_day}`;
+    let subtitle = `${fmtMoney(r.amount_cents)} · ${freqLabel} · día ${r.due_day}`;
     if (r.due_month) subtitle += ` · mes ${r.due_month}`;
     return `
     <div class="card" style="padding:14px;">

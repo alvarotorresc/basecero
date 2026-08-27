@@ -4,7 +4,7 @@ import {
   spentByRootCategory, spentLast7Days,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtEUR, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO } from "../format.js";
+import { fmtMoney, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO } from "../format.js";
 import { budgetStatus } from "./presupuesto.js";
 import { barChartSvg, donutSvg } from "../charts.js";
 import { renderLiquidar } from "./liquidar.js";
@@ -45,7 +45,7 @@ function txRowHtml(r, byId) {
   const color = colorForCategory(r.category_id, byId);
   const icon = iconForCategory(r.category_id, byId);
   const title = r.merchant || catName;
-  const sub = catName + (r.is_shared ? ` · tu parte ${fmtEUR(r.my_amount_cents)}` : "");
+  const sub = catName + (r.is_shared ? ` · tu parte ${fmtMoney(r.my_amount_cents)}` : "");
   const isExpense = r.type === "expense";
   const amountClass = isExpense ? "negative" : "positive";
   const sign = isExpense ? "-" : "+";
@@ -57,7 +57,7 @@ function txRowHtml(r, byId) {
         <div class="tx-title">${escHtml(title)}</div>
         <div class="tx-sub">${escHtml(sub)}</div>
       </div>
-      <div class="tx-amount num ${amountClass}">${sign}${fmtEUR(r.amount_cents)}</div>
+      <div class="tx-amount num ${amountClass}">${sign}${fmtMoney(r.amount_cents)}</div>
     </div>`;
 }
 
@@ -80,7 +80,7 @@ function conSaraHtml(period, sharedRows, sharedTotal) {
       <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;">
         <div style="display:flex;flex-direction:column;gap:5px;">
           <div style="font-size:11px;color:var(--text-3);">Pendiente de que te devuelva</div>
-          <div class="num text-red" style="font-size:30px;font-weight:600;letter-spacing:-0.02em;">${fmtEUR(sharedTotal)}</div>
+          <div class="num text-red" style="font-size:30px;font-weight:600;letter-spacing:-0.02em;">${fmtMoney(sharedTotal)}</div>
         </div>
         <button type="button" id="con-sara-liquidar" style="height:40px;padding:0 14px;border-radius:14px;
           background:#1b1e21;color:var(--text-2);border:0;font-size:13px;font-weight:600;cursor:pointer;
@@ -104,7 +104,7 @@ function previsionRowHtml(item, byId) {
       <div class="tx-body">
         <div class="tx-title">${escHtml(rule.name)}</div>
       </div>
-      <div class="num" style="font-size:14px;font-weight:600;flex-shrink:0;">${fmtEUR(myCents)}</div>
+      <div class="num" style="font-size:14px;font-weight:600;flex-shrink:0;">${fmtMoney(myCents)}</div>
       ${badge}`;
   // Pagada: fila estática (nada que hacer). Pendiente: <button> real (no un <div> con onclick),
   // igual criterio que recurrentes.js ruleRowHtml — accesible por teclado/lector de pantalla.
@@ -134,12 +134,12 @@ function previsionHtml(prevision, byId) {
       <div style="display:flex;flex-direction:column;gap:8px;">
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
           <div style="font-size:12px;color:var(--text-2);">Comprometido restante</div>
-          <div class="num" style="font-size:14px;font-weight:600;">${fmtEUR(prevision.comprometidoCents)}</div>
+          <div class="num" style="font-size:14px;font-weight:600;">${fmtMoney(prevision.comprometidoCents)}</div>
         </div>
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
           <div style="font-size:13px;font-weight:700;">Disponible real</div>
           <div class="num ${prevision.disponibleCents >= 0 ? "text-green" : "text-red"}"
-            style="font-size:20px;font-weight:700;letter-spacing:-0.02em;">${fmtEUR(prevision.disponibleCents)}</div>
+            style="font-size:20px;font-weight:700;letter-spacing:-0.02em;">${fmtMoney(prevision.disponibleCents)}</div>
         </div>
       </div>
     </div>`;
@@ -156,7 +156,7 @@ function flujoDeGastoHtml(days7) {
     <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
         <div style="font-size:15px;font-weight:700;">Flujo de gasto</div>
-        <div style="font-size:11px;color:var(--text-3);">Últimos 7 días · ${fmtEUR(total7)}</div>
+        <div style="font-size:11px;color:var(--text-3);">Últimos 7 días · ${fmtMoney(total7)}</div>
       </div>
       ${barChartSvg(days)}
     </div>`;
@@ -190,7 +190,7 @@ function categoriaDonutRowHtml(name, color, spentCents, limitCents) {
             <div style="width:8px;height:8px;border-radius:3px;background:${color};"></div>
             <div style="font-size:13px;color:var(--text-2);">${escHtml(name)}</div>
           </div>
-          <div class="num" style="font-size:13px;font-weight:600;color:${numColor};white-space:nowrap;">${fmtEUR(spentCents)} <span style="font-weight:500;color:var(--text-3);">de ${fmtEUR(limitCents)}</span></div>
+          <div class="num" style="font-size:13px;font-weight:600;color:${numColor};white-space:nowrap;">${fmtMoney(spentCents)} <span style="font-weight:500;color:var(--text-3);">de ${fmtMoney(limitCents)}</span></div>
         </div>
         <div style="height:5px;background:#1e2225;border-radius:999px;overflow:hidden;">
           <div style="width:${barPct}%;height:5px;background:${barColor};border-radius:999px;"></div>
@@ -203,7 +203,7 @@ function categoriaDonutRowHtml(name, color, spentCents, limitCents) {
         <div style="width:8px;height:8px;border-radius:3px;background:${color};"></div>
         <div style="font-size:13px;color:var(--text-2);">${escHtml(name)}</div>
       </div>
-      <div class="num" style="font-size:13px;font-weight:600;white-space:nowrap;">${fmtEUR(spentCents)} <span style="font-weight:500;color:var(--text-3);">sin límite</span></div>
+      <div class="num" style="font-size:13px;font-weight:600;white-space:nowrap;">${fmtMoney(spentCents)} <span style="font-weight:500;color:var(--text-3);">sin límite</span></div>
     </div>`;
 }
 
@@ -330,7 +330,7 @@ export async function renderInicio(container) {
 
       <div style="display:flex;flex-direction:column;gap:6px;">
         <div class="section-title">Gastado</div>
-        <div class="num" style="font-size:38px;font-weight:600;letter-spacing:-0.02em;">${fmtEUR(spent)}</div>
+        <div class="num" style="font-size:38px;font-weight:600;letter-spacing:-0.02em;">${fmtMoney(spent)}</div>
       </div>
 
       <hr class="divider">
@@ -338,11 +338,11 @@ export async function renderInicio(container) {
       <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;">
         <div style="display:flex;flex-direction:column;gap:5px;">
           <div style="font-size:11px;color:var(--text-3);">Ingresos</div>
-          <div class="num text-green" style="font-size:15px;font-weight:600;">${fmtEUR(income)}</div>
+          <div class="num text-green" style="font-size:15px;font-weight:600;">${fmtMoney(income)}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px;">
           <div style="font-size:11px;color:var(--text-3);">Ahorrado</div>
-          <div class="num ${ahorrado >= 0 ? "text-green" : "text-red"}" style="font-size:15px;font-weight:600;">${fmtEUR(ahorrado)}</div>
+          <div class="num ${ahorrado >= 0 ? "text-green" : "text-red"}" style="font-size:15px;font-weight:600;">${fmtMoney(ahorrado)}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px;">
           <div style="font-size:11px;color:var(--text-3);">Tasa</div>

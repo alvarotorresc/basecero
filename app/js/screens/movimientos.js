@@ -3,7 +3,7 @@ import {
   listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById, hasActiveLinkedRefund,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtEUR, fmtDiaLargo, hoyISO } from "../format.js";
+import { fmtMoney, fmtDiaLargo, hoyISO } from "../format.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -40,7 +40,7 @@ function movRowHtml(r, byId, accById) {
         <div class="tx-title">${escHtml(from)} → ${escHtml(to)}</div>
         <div class="tx-sub">${escHtml(r.merchant || r.note || "Transferencia")}</div>
       </div>
-      <div class="tx-amount num">${fmtEUR(r.amount_cents)}</div>
+      <div class="tx-amount num">${fmtMoney(r.amount_cents)}</div>
     </button>`;
   }
   if (r.type === "adjustment") {
@@ -52,7 +52,7 @@ function movRowHtml(r, byId, accById) {
         <div class="tx-title">Ajuste</div>
         <div class="tx-sub">${escHtml(r.merchant || r.note || "")}</div>
       </div>
-      <div class="tx-amount num ${isNeg ? "negative" : "positive"}">${isNeg ? "-" : "+"}${fmtEUR(Math.abs(r.amount_cents))}</div>
+      <div class="tx-amount num ${isNeg ? "negative" : "positive"}">${isNeg ? "-" : "+"}${fmtMoney(Math.abs(r.amount_cents))}</div>
     </button>`;
   }
   const cat = byId[r.category_id];
@@ -60,7 +60,7 @@ function movRowHtml(r, byId, accById) {
   const color = colorForCategory(r.category_id, byId);
   const icon = iconForCategory(r.category_id, byId);
   const title = r.merchant || catName || "Sin categorizar";
-  const sub = (catName || "Sin categorizar") + (r.is_shared ? ` · tu parte ${fmtEUR(r.my_amount_cents)}` : "");
+  const sub = (catName || "Sin categorizar") + (r.is_shared ? ` · tu parte ${fmtMoney(r.my_amount_cents)}` : "");
   const isExpense = r.type === "expense";
   const amountClass = isExpense ? "negative" : "positive";
   const sign = isExpense ? "-" : "+";
@@ -71,7 +71,7 @@ function movRowHtml(r, byId, accById) {
       <div class="tx-title">${escHtml(title)}</div>
       <div class="tx-sub">${escHtml(sub)}</div>
     </div>
-    <div class="tx-amount num ${amountClass}">${sign}${fmtEUR(r.amount_cents)}</div>
+    <div class="tx-amount num ${amountClass}">${sign}${fmtMoney(r.amount_cents)}</div>
   </button>`;
 }
 
@@ -274,7 +274,7 @@ export async function renderMovimientos(container) {
       <div class="card" style="padding:12px 14px; margin-bottom:18px;">
         <div style="font-size:10px; color:var(--text-3);">Vinculado a</div>
         <div style="font-size:14px; font-weight:600;">
-          ${escHtml(state.linkedRefund.merchant || byId[state.linkedRefund.category_id]?.name || "Gasto")} · ${fmtEUR(state.linkedRefund.amount_cents)}
+          ${escHtml(state.linkedRefund.merchant || byId[state.linkedRefund.category_id]?.name || "Gasto")} · ${fmtMoney(state.linkedRefund.amount_cents)}
         </div>
       </div>` : ""}
 
@@ -306,11 +306,11 @@ export async function renderMovimientos(container) {
         <div style="display:flex; gap:8px; padding:0 0 14px;">
           <div style="flex:1; background:#1b1e21; border-radius:14px; padding:10px 11px;">
             <div style="font-size:10px; color:var(--text-3);">Tu parte · ${pct}%</div>
-            <div class="num" id="mov-split-mine" style="font-size:15px; font-weight:600;">${fmtEUR(myCents)}</div>
+            <div class="num" id="mov-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
           </div>
           <div style="flex:1; background:#1b1e21; border-radius:14px; padding:10px 11px;">
             <div style="font-size:10px; color:var(--text-3);">Sara · ${100 - pct}%</div>
-            <div class="num" id="mov-split-sara" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtEUR(saraCents)}</div>
+            <div class="num" id="mov-split-sara" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(saraCents)}</div>
           </div>
         </div>` : ""}
       </div>` : ""}
@@ -367,8 +367,8 @@ export async function renderMovimientos(container) {
         const period = periods.find((p) => p.id === state.periodId);
         const pct = period?.my_share_pct ?? 100;
         const myCents = Math.round((d.cents * pct) / 100);
-        mineEl.textContent = fmtEUR(myCents);
-        saraEl.textContent = fmtEUR(d.cents - myCents);
+        mineEl.textContent = fmtMoney(myCents);
+        saraEl.textContent = fmtMoney(d.cents - myCents);
       }
     };
     container.querySelector("#mov-merchant").oninput = (e) => { d.merchant = e.target.value; state.deleteConfirm = false; };

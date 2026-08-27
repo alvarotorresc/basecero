@@ -1,6 +1,6 @@
 import { pendingShared, listAccounts, allCategoriesById, settleShared } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtEUR, fmtDiaCorto } from "../format.js";
+import { fmtMoney, fmtDiaCorto } from "../format.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
@@ -26,7 +26,7 @@ function rowHtml(r, byId, confirmId) {
         <div class="tx-sub">${escHtml(catName)} · ${fmtDiaCorto(r.date)}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">
-        <div class="num" style="font-size:14px;font-weight:600;">${fmtEUR(r.sara_amount_cents)}</div>
+        <div class="num" style="font-size:14px;font-weight:600;">${fmtMoney(r.sara_amount_cents)}</div>
         <button type="button" data-settle="${r.id}" style="${confirming ? BTN_SETTLE_CONFIRM : BTN_SETTLE}">
           ${confirming ? "Sí, liquidar" : "Liquidar"}
         </button>
@@ -82,7 +82,7 @@ export async function renderLiquidar(container, onBack) {
           </div>
           <div style="display:flex; align-items:baseline; justify-content:space-between; padding:0 4px;">
             <div class="section-title">Total pendiente</div>
-            <div class="num text-red" style="font-size:15px; font-weight:600;">${fmtEUR(total)}</div>
+            <div class="num text-red" style="font-size:15px; font-weight:600;">${fmtMoney(total)}</div>
           </div>`}
     `;
     wire();

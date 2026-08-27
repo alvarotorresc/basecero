@@ -1,6 +1,6 @@
 import { SQL, TABLES } from "./sql.js";
 import { query, exec, execMany } from "./db.js";
-import { nowIso, hoyISO, prevDayIso, fmtEUR } from "./format.js";
+import { nowIso, hoyISO, prevDayIso, fmtMoney } from "./format.js";
 import { CONTRACT, insertSql } from "./contract.js";
 import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
 
@@ -406,7 +406,7 @@ export function goalProgress(goal, ctx) {
     const targetCents = goal.target_amount_cents ?? 0;
     const pct = safeDiv(currentCents, targetCents);
     const monthlyCents = Math.round(targetCents / 12);
-    return { goal, currentCents, targetCents, pct, level: "ok", subtitle: `Provisión · ${fmtEUR(monthlyCents)} al mes` };
+    return { goal, currentCents, targetCents, pct, level: "ok", subtitle: `Provisión · ${fmtMoney(monthlyCents)} al mes` };
   }
 
   if (goal.type === "spending_cap") {
@@ -420,8 +420,8 @@ export function goalProgress(goal, ctx) {
     const level = pct > 100 ? "over" : pct >= 85 ? "warn" : "ok";
     const remaining = targetCents - currentCents;
     const subtitle = level === "over"
-      ? `Superado por ${fmtEUR(-remaining)}`
-      : `Te quedan ${fmtEUR(remaining)} para el cierre del periodo`;
+      ? `Superado por ${fmtMoney(-remaining)}`
+      : `Te quedan ${fmtMoney(remaining)} para el cierre del periodo`;
     return { goal, currentCents, targetCents, pct, level, subtitle };
   }
 

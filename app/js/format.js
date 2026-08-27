@@ -1,7 +1,30 @@
+// Moneda y locale de presentación de TODA la app. Por defecto es-ES/EUR; main.js llama a
+// initFormat(meta) en el boot (la app espera al worker antes de pintar, no hay carrera).
 // useGrouping:"always" — el "auto" por defecto usa la estrategia CLDR "min2" y NO agrupa
 // miles en importes de 4 cifras (p.ej. 1800 -> "1800,00 €" en vez de "1.800,00 €").
-const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", useGrouping: "always" });
-export const fmtEUR = (cents) => eur.format((cents ?? 0) / 100);
+// OJO: los "sv-SE" de más abajo NO son locale de presentación (truco YYYY-MM-DD): no dependen de esto.
+let locale = "es-ES";
+let currency = "EUR";
+let money = buildMoney();
+function buildMoney() {
+  return new Intl.NumberFormat(locale, { style: "currency", currency, useGrouping: "always" });
+}
+export function initFormat(meta) {
+  const prev = { locale, currency };
+  locale = meta?.locale || "es-ES";
+  currency = meta?.currency || "EUR";
+  try {
+    money = buildMoney();
+  } catch {
+    // currency/locale corruptos en meta: la app arranca igual, con los valores anteriores
+    ({ locale, currency } = prev);
+    money = buildMoney();
+  }
+}
+export const fmtMoney = (cents) => money.format((cents ?? 0) / 100);
+export const currencySymbol = () => money.formatToParts(0).find((p) => p.type === "currency").value;
+export const currencyCode = () => currency;
+export const appLocale = () => locale;
 export const hoyISO = () => new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD en hora local
 export const nowIso = () => new Date().toISOString().slice(0, 19) + "Z";
 export const fmtDiaLargo = (iso) =>

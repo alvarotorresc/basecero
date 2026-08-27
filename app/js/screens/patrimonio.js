@@ -4,7 +4,7 @@ import {
   createGoal, updateGoal, softDeleteGoal,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtEUR, hoyISO } from "../format.js";
+import { fmtMoney, hoyISO } from "../format.js";
 import { sparklineSvg } from "../charts.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -48,7 +48,7 @@ function netWorthCardHtml(netWorthCents, series) {
   const badgeHtml = variation === null ? "" : `
     <div style="display:flex;align-items:center;gap:5px;background:${up ? "#14261d" : "#2a1c1c"};border-radius:10px;padding:6px 9px;flex-shrink:0;">
       ${ICON_ARROW(up)}
-      <div style="font-size:11px;font-weight:700;color:${up ? "var(--green)" : "var(--red)"};">${fmtEUR(Math.abs(variation))}</div>
+      <div style="font-size:11px;font-weight:700;color:${up ? "var(--green)" : "var(--red)"};">${fmtMoney(Math.abs(variation))}</div>
     </div>`;
 
   return `
@@ -56,7 +56,7 @@ function netWorthCardHtml(netWorthCents, series) {
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
         <div style="display:flex;flex-direction:column;gap:6px;">
           <div style="font-size:12px;font-weight:600;color:var(--text-2);">Patrimonio neto</div>
-          <div class="num" style="font-size:38px;font-weight:600;line-height:1;letter-spacing:-0.02em;">${fmtEUR(netWorthCents)}</div>
+          <div class="num" style="font-size:38px;font-weight:600;line-height:1;letter-spacing:-0.02em;">${fmtMoney(netWorthCents)}</div>
         </div>
         ${badgeHtml}
       </div>
@@ -104,7 +104,7 @@ function cuentaRowHtml(a, isDefault) {
         <div class="list-row-title">${escHtml(a.name)}</div>
         <div class="list-row-sub">${accountSubtitle(a.type, isDefault)}</div>
       </div>
-      <div class="num" style="font-size:15px;font-weight:600;${isLiability ? "color:var(--red);" : ""}">${fmtEUR(a.balance_cents)}</div>
+      <div class="num" style="font-size:15px;font-weight:600;${isLiability ? "color:var(--red);" : ""}">${fmtMoney(a.balance_cents)}</div>
     </button>`;
 }
 
@@ -161,9 +161,9 @@ const GOAL_TYPE_LABEL = Object.fromEntries(GOAL_TYPES.map((t) => [t.id, t.label]
 const HUCHA_GOAL_TYPES = new Set(["emergency_fund", "savings_target", "provision"]);
 
 /** savings_rate guarda puntos porcentuales en currentCents/targetCents (ver repo.goalProgress):
- *  se muestran como "%", el resto de tipos como € (fmtEUR). */
+ *  se muestran como "%", el resto de tipos como € (fmtMoney). */
 function fmtGoalAmount(goal, cents) {
-  return goal.type === "savings_rate" ? `${fmtPct1.format(cents)} %` : fmtEUR(cents);
+  return goal.type === "savings_rate" ? `${fmtPct1.format(cents)} %` : fmtMoney(cents);
 }
 
 /** Fila de un goal: título + "actual / objetivo", barra de 8px, subtítulo contextual a la

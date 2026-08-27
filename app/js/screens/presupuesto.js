@@ -1,6 +1,6 @@
 import { getOpenPeriod, spentByRootCategory, budgetsOfPeriod, allCategoriesById } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtEUR, fmtDiaCorto, hoyISO } from "../format.js";
+import { fmtMoney, fmtDiaCorto, hoyISO } from "../format.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
@@ -57,20 +57,20 @@ function categoryCardHtml(row, budgetCents, byId) {
       <div style="display:flex;">
         <div style="display:flex;align-items:center;gap:7px;background:color-mix(in srgb, var(--red) 14%, var(--card));border-radius:10px;padding:7px 11px;">
           ${ICON_TRIANGLE("var(--red)")}
-          <div style="font-size:12px;font-weight:600;color:var(--red);">Superado por ${fmtEUR(-remaining)}</div>
+          <div style="font-size:12px;font-weight:600;color:var(--red);">Superado por ${fmtMoney(-remaining)}</div>
         </div>
       </div>`;
   } else if (st.level === "warn") {
     statusLineHtml = `
       <div style="display:flex;align-items:center;gap:7px;">
         ${ICON_TRIANGLE("var(--amber)")}
-        <div style="font-size:12px;color:var(--amber);">Casi al límite · te quedan ${fmtEUR(remaining)}</div>
+        <div style="font-size:12px;color:var(--amber);">Casi al límite · te quedan ${fmtMoney(remaining)}</div>
       </div>`;
   } else {
     statusLineHtml = `
       <div style="display:flex;align-items:center;gap:7px;">
         ${ICON_CHECK("var(--green)")}
-        <div style="font-size:12px;color:var(--text-2);">Te quedan ${fmtEUR(remaining)}</div>
+        <div style="font-size:12px;color:var(--text-2);">Te quedan ${fmtMoney(remaining)}</div>
       </div>`;
   }
 
@@ -80,7 +80,7 @@ function categoryCardHtml(row, budgetCents, byId) {
         <div class="tx-icon" style="--cat:${color};width:44px;height:44px;border-radius:15px;font-size:21px;">${icon}</div>
         <div style="display:flex;flex-direction:column;gap:3px;flex-grow:1;min-width:0;">
           <div style="font-size:15px;font-weight:600;">${escHtml(row.name)}</div>
-          <div class="num" style="font-size:12px;color:var(--text-3);">${fmtEUR(row.spent_cents)} de ${fmtEUR(budgetCents)}</div>
+          <div class="num" style="font-size:12px;color:var(--text-3);">${fmtMoney(row.spent_cents)} de ${fmtMoney(budgetCents)}</div>
         </div>
         <div class="num" style="font-size:22px;font-weight:700;color:${numColor};flex-shrink:0;">${fmtPct(st.pct)}</div>
       </div>
@@ -99,7 +99,7 @@ function sinLimiteHtml(rows) {
     <div style="display:flex;align-items:center;gap:10px;background:#131517;border:1px dashed #2a2f34;border-radius:18px;padding:14px 16px;">
       <div style="display:flex;flex-direction:column;gap:3px;flex-grow:1;">
         <div style="font-size:13px;font-weight:600;color:var(--text-2);">Sin límite este periodo</div>
-        <div style="font-size:11px;color:var(--text-3);">${escHtml(nombres)} · ${fmtEUR(total)} gastados</div>
+        <div style="font-size:11px;color:var(--text-3);">${escHtml(nombres)} · ${fmtMoney(total)} gastados</div>
       </div>
       ${ICON_CHEVRON}
     </div>`;
@@ -168,8 +168,8 @@ export async function renderPresupuesto(container, onBack) {
         <div style="display:flex;flex-direction:column;gap:6px;">
           <div style="font-size:12px;font-weight:600;color:var(--text-2);">Gastado de lo presupuestado</div>
           <div style="display:flex;align-items:baseline;gap:7px;">
-            <div class="num" style="font-size:30px;font-weight:600;line-height:1;letter-spacing:-0.02em;">${fmtEUR(totalSpent)}</div>
-            <div class="num" style="font-size:13px;color:var(--text-3);">de ${fmtEUR(totalLimit)}</div>
+            <div class="num" style="font-size:30px;font-weight:600;line-height:1;letter-spacing:-0.02em;">${fmtMoney(totalSpent)}</div>
+            <div class="num" style="font-size:13px;color:var(--text-3);">de ${fmtMoney(totalLimit)}</div>
           </div>
         </div>
         <div class="num" style="font-size:24px;font-weight:700;line-height:1;color:var(--accent);">${fmtPct(totalSt.pct)}</div>
@@ -179,8 +179,8 @@ export async function renderPresupuesto(container, onBack) {
       </div>
       <div style="font-size:11px;color:var(--text-3);">
         ${totalRemaining >= 0
-          ? `Te quedan <span style="color:var(--green);font-weight:700;">${fmtEUR(totalRemaining)}</span> en las ${n} categoría${n === 1 ? "" : "s"} con límite`
-          : `Te has pasado <span style="color:var(--red);font-weight:700;">${fmtEUR(-totalRemaining)}</span> en las ${n} categoría${n === 1 ? "" : "s"} con límite`}
+          ? `Te quedan <span style="color:var(--green);font-weight:700;">${fmtMoney(totalRemaining)}</span> en las ${n} categoría${n === 1 ? "" : "s"} con límite`
+          : `Te has pasado <span style="color:var(--red);font-weight:700;">${fmtMoney(-totalRemaining)}</span> en las ${n} categoría${n === 1 ? "" : "s"} con límite`}
       </div>
     </div>
 
