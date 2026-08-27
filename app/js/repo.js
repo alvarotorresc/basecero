@@ -3,6 +3,7 @@ import { query, exec, execMany } from "./db.js";
 import { nowIso, hoyISO, prevDayIso, fmtMoney, fmtDec1, appLocale } from "./format.js";
 import { CONTRACT, insertSql } from "./contract.js";
 import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
+import { resolveAccountId } from "./account-defaults.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -73,6 +74,17 @@ export async function getMetaAll() {
 }
 export async function setMeta(key, value) {
   await exec(SQL.upsertMeta, [key, value]);
+}
+
+/** Cuenta destino del import CSV / cuenta por defecto de formularios, resueltas desde meta
+ *  (vacío ⇒ primera checking activa; null ⇒ no hay cuentas). */
+export async function importAccountId() {
+  const [meta, accounts] = await Promise.all([getMetaAll(), listAccounts()]);
+  return resolveAccountId(meta.import_account_id, accounts);
+}
+export async function defaultAccountId() {
+  const [meta, accounts] = await Promise.all([getMetaAll(), listAccounts()]);
+  return resolveAccountId(meta.default_account_id, accounts);
 }
 
 export const listPeriods = () => query(SQL.listPeriods);
@@ -562,9 +574,10 @@ export const softDeleteGoal = (id) => exec(SQL.softDeleteGoal, [nowIso(), id]);
 
 // ---- Import CSV N26 (Task 15) -----------------------------------------------
 
-// Lo consume n26.js para re-firmar en memoria las transacciones existentes de acc-n26 antes de
-// decidir cada fila del CSV (bcDecideImportAction) — un único query, no uno por fila.
-export const n26Existing = () => query(SQL.n26Existing);
+// Lo consume n26.js para re-firmar en memoria las transacciones existentes de la cuenta de
+// import antes de decidir cada fila del CSV (bcDecideImportAction) — un único query, no uno
+// por fila.
+export const n26Existing = (accountId) => query(SQL.n26Existing, [accountId]);
 
 export async function dumpAllTables() {
   const out = {};

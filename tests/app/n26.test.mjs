@@ -49,7 +49,7 @@ const CSV_2ROWS = [CSV_HEADER, csvRow(), csvRow({ date: "2026-08-21", partner: "
  *  pure.bcParseN26Csv/bcDecideImportAction (apps_script/pure.js, idéntico a vendor/pure.js) y el
  *  externalIdFor REAL de n26.js (adaptador de captura incluido). */
 async function runImport(d, text, hashFn = sha256hex) {
-  const existing = d.prepare(SQL.n26Existing).all().map((t) => ({
+  const existing = d.prepare(SQL.n26Existing).all("acc-n26").map((t) => ({
     id: t.id, dateIso: t.date, type: t.type,
     amountCents: Math.abs(t.amount_cents) * (t.type === "expense" ? -1 : 1),
     externalId: t.external_id, status: t.status,
