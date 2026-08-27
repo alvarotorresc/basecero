@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { openDb, seedMinimal, dumpAll, X } from "./helpers.mjs";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../../app/js/xlsx.js";
 import { insertSql, CONTRACT } from "../../app/js/contract.js";
+import { replaceAllStmts } from "../../app/js/repo.js";
+import { SQL } from "../../app/js/sql.js";
 
 test("export: pestaña por tabla, euros, bools y cabeceras sin _cents", () => {
   const db = openDb(); seedMinimal(db);
@@ -181,10 +183,28 @@ test("ROUND-TRIP: export → import → mismos datos", () => {
   assert.deepEqual(errors, []);
   assert.deepEqual(validateImport(data), []);
 
-  const db2 = openDb();   // aplicar el import como lo hará replaceAll
-  for (const t of Object.keys(CONTRACT)) {
-    db2.prepare(`DELETE FROM ${t}`).run();
-    for (const row of data[t]) db2.prepare(insertSql(t)).run(...CONTRACT[t].cols.map((c) => row[c]));
-  }
+  const db2 = openDb(); // aplicar el import con la MISMA lógica que replaceAll (fusión de meta incluida)
+  for (const s of replaceAllStmts(data)) db2.prepare(s.sql).run(...(s.bind ?? []));
   assert.deepEqual(dumpAll(db2), original);
+});
+
+test("import: replaceAll fusiona meta — conserva claves que la hoja no trae", () => {
+  const db = openDb(); seedMinimal(db);
+  // config del usuario que una hoja antigua no conoce (upsert: vale antes y después de que existan como semilla)
+  db.prepare(SQL.upsertMeta).run("locale", "en-GB");
+  db.prepare(SQL.upsertMeta).run("csv_profile", "{}");
+  const data = {
+    meta: [
+      { key: "schema_version", value: "1" },
+      { key: "currency", value: "USD" },
+      { key: "created_with", value: "basecero-pwa" },
+    ],
+    accounts: [], categories: [], periods: [], transactions: [], recurring_rules: [], goals: [], budgets: [],
+  };
+  for (const s of replaceAllStmts(data)) db.prepare(s.sql).run(...(s.bind ?? []));
+  const meta = Object.fromEntries(db.prepare("SELECT key, value FROM meta").all().map((r) => [r.key, r.value]));
+  assert.equal(meta.locale, "en-GB", "clave ausente de la hoja: sobrevive");
+  assert.equal(meta.csv_profile, "{}", "clave ausente de la hoja: sobrevive");
+  assert.equal(meta.currency, "USD", "clave presente en la hoja: se actualiza");
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM accounts").get().c, 0, "las demás tablas SÍ se reemplazan");
 });

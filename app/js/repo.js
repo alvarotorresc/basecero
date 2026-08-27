@@ -565,9 +565,17 @@ export async function dumpAllTables() {
 
 export const exportAllJson = () => dumpAllTables();
 
-export async function replaceAll(data) {
-  const stmts = [...TABLES].reverse().map((t) => ({ sql: `DELETE FROM ${t}` }));
-  for (const t of TABLES)
+/** Import de hoja completa. Todas las tablas se REEMPLAZAN salvo `meta`, que se FUSIONA
+ *  (upsert de las claves que trae la hoja, conservando las que no vienen): una hoja exportada
+ *  antes de que existiera una clave de config no debe borrarla en silencio. */
+export function replaceAllStmts(data) {
+  const tables = TABLES.filter((t) => t !== "meta");
+  const stmts = [...tables].reverse().map((t) => ({ sql: `DELETE FROM ${t}` }));
+  for (const row of data.meta) stmts.push({ sql: SQL.upsertMeta, bind: [row.key, row.value] });
+  for (const t of tables)
     for (const row of data[t]) stmts.push({ sql: insertSql(t), bind: CONTRACT[t].cols.map((c) => row[c]) });
-  await execMany(stmts);
+  return stmts;
+}
+export async function replaceAll(data) {
+  await execMany(replaceAllStmts(data));
 }
