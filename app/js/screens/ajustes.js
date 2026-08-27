@@ -15,7 +15,7 @@ const BTN_SECONDARY = "background:transparent;color:var(--text);border:1px solid
 const INPUT_STYLE = "background:transparent;color:var(--text);border:1px solid var(--border);"
   + "border-radius:var(--radius-sm);padding:12px;width:100%;font:400 15px var(--font-ui);";
 
-const CURRENCIES = ["EUR", "USD", "GBP", "CHF", "MXN", "ARS", "CLP", "COP", "PEN", "UYU", "BRL", "DOP"];
+const CURRENCIES = ["EUR", "USD", "GBP", "CHF", "MXN", "ARS", "COP", "PEN", "UYU", "BRL", "DOP"];
 const LOCALES = [
   ["es-ES", "Español (España)"], ["es-MX", "Español (México)"], ["es-AR", "Español (Argentina)"],
   ["en-US", "English (US)"], ["en-GB", "English (UK)"], ["de-DE", "Deutsch"],
@@ -357,9 +357,20 @@ export async function renderAjustes(container) {
     }
 
     container.querySelector("#btn-prefs-save").onclick = async () => {
-      await setMeta("currency", container.querySelector("#pref-currency").value);
-      await setMeta("locale", container.querySelector("#pref-locale").value);
-      location.reload();
+      // Leer los selects ANTES de render(): reconstruye el DOM desde metaCfg (el valor
+      // guardado), así que leerlos después devolvería el valor antiguo, no el elegido.
+      const currency = container.querySelector("#pref-currency").value;
+      const locale = container.querySelector("#pref-locale").value;
+      state.busy = true; render();
+      try {
+        await setMeta("currency", currency);
+        await setMeta("locale", locale);
+        location.reload();
+      } catch (err) {
+        state.busy = false;
+        state.errors = [`No se pudieron guardar las preferencias: ${err.message}`];
+        render();
+      }
     };
 
     container.querySelector("#btn-json-export").onclick = async () => {
