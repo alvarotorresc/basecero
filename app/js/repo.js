@@ -271,15 +271,16 @@ export const accountBalanceCents = async (accountId, atDateIso) =>
  *  pagado/pendiente (por rule_id o, si se registró a mano, por el fallback categoría+importe)
  *  y el "disponible real" — mismo criterio que la hoja "Previsión" (dashboards.py:103-134).
  *  comprometidoCents excluye type='income' (una regla de ingreso pendiente no "compromete"
- *  nada, solo lo hacen los gastos/transferencias sin pagar). saldoN26Cents es el saldo de
- *  'acc-n26' A HOY (no a la fecha del periodo: es el disponible AHORA). */
+ *  nada, solo lo hacen los gastos/transferencias sin pagar). saldoCuentaCents es el saldo de
+ *  la cuenta por defecto A HOY (no a la fecha del periodo: es el disponible AHORA). */
 export async function previsionOfPeriod(period) {
   const month = periodMonth(period.start_date, period.end_date);
-  const [rules, paidByRule, paidByCat, saldoN26Cents, pendienteSaraCents] = await Promise.all([
+  const mainAccountId = await defaultAccountId();
+  const [rules, paidByRule, paidByCat, saldoCuentaCents, pendienteSaraCents] = await Promise.all([
     listRules(),
     query(SQL.paidRuleIds, [period.id]),
     query(SQL.paidByCatAmount, [period.id]),
-    accountBalanceCents("acc-n26", hoyISO()),
+    mainAccountId ? accountBalanceCents(mainAccountId, hoyISO()) : Promise.resolve(0),
     pendingSharedTotalCents(),
   ]);
   const paidRuleIdSet = new Set(paidByRule.map((r) => r.rule_id));
@@ -300,9 +301,9 @@ export async function previsionOfPeriod(period) {
   return {
     items,
     comprometidoCents,
-    saldoN26Cents,
+    saldoCuentaCents,
     pendienteSaraCents,
-    disponibleCents: saldoN26Cents - comprometidoCents + pendienteSaraCents,
+    disponibleCents: saldoCuentaCents - comprometidoCents + pendienteSaraCents,
   };
 }
 

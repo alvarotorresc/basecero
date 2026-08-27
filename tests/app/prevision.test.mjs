@@ -183,12 +183,12 @@ test("previsión del periodo (composición SQL + prevision.js): pagado por rule_
     .reduce((sum, it) => sum + it.myCents, 0);
   assert.equal(comprometidoCents, 1500, "solo F: pendiente y no es income (D pendiente pero es income, se excluye)");
 
-  const saldoN26Cents = db.prepare(SQL.accountBalance).get("2026-08-24", "acc-n26").balance_cents;
-  assert.equal(saldoN26Cents, 100000 - 90000 - 12000 - 5000, "opening menos los 3 gastos del periodo");
+  const saldoCuentaCents = db.prepare(SQL.accountBalance).get("2026-08-24", "acc-n26").balance_cents;
+  assert.equal(saldoCuentaCents, 100000 - 90000 - 12000 - 5000, "opening menos los 3 gastos del periodo");
 
   const pendienteSaraCents = db.prepare(SQL.pendingSharedTotal).get().total_cents;
   assert.equal(pendienteSaraCents, 5000 - 3000, "gastoSara: 5000 - 60% de mi parte = 2000 de Sara");
 
-  const disponibleCents = saldoN26Cents - comprometidoCents + pendienteSaraCents;
+  const disponibleCents = saldoCuentaCents - comprometidoCents + pendienteSaraCents;
   assert.equal(disponibleCents, -7000 - 1500 + 2000);
 });
