@@ -124,6 +124,7 @@ export async function renderRegistro(container, onDone, prefill) {
   }
 
   function validationError() {
+    if (!state.accountId) return "Crea primero una cuenta en Patrimonio.";
     if (state.tipo === "transfer") {
       if (state.cents <= 0) return "Introduce un importe.";
       if (!state.counterAccountId || state.counterAccountId === state.accountId)

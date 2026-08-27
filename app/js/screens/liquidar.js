@@ -101,6 +101,12 @@ export async function renderLiquidar(container, onBack) {
     container.querySelectorAll("[data-settle]").forEach((b) => {
       b.onclick = async () => {
         const id = b.dataset.settle;
+        if (!state.accountId) {
+          errorMsg = "Crea primero una cuenta en Patrimonio.";
+          state.confirmId = null;
+          render();
+          return;
+        }
         if (state.confirmId !== id) {
           state.confirmId = id;
           errorMsg = "";
