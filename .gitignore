@@ -3,6 +3,7 @@ generator/.venv/
 __pycache__/
 *.pyc
 
-# Backlog y config de sesión: material de trabajo, local
+# Backlog, config de sesión y docs: material de trabajo, local
 /BACKLOG.md
 /CLAUDE.md
+/docs/
