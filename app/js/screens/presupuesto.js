@@ -21,7 +21,7 @@ const ICON_TRIANGLE = (color) =>
   `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5L21.2 19.5H2.8z"></path><path d="M12 10.2v4M12 17.2h.01"></path></svg>`;
 const ICON_CHEVRON = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#656c74" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5l7 7-7 7"></path></svg>`;
 
-const fmtPct = (pct) => `${Math.round(pct)} %`;
+const fmtPctInt = (pct) => `${Math.round(pct)} %`;
 
 /** Une nombres para el recuadro "Sin límite este periodo": hasta `max` nombres tal cual,
  *  y si sobran se corta con "y N más" (sin "y" antes del último del grupo visible, igual
@@ -82,7 +82,7 @@ function categoryCardHtml(row, budgetCents, byId) {
           <div style="font-size:15px;font-weight:600;">${escHtml(row.name)}</div>
           <div class="num" style="font-size:12px;color:var(--text-3);">${fmtMoney(row.spent_cents)} de ${fmtMoney(budgetCents)}</div>
         </div>
-        <div class="num" style="font-size:22px;font-weight:700;color:${numColor};flex-shrink:0;">${fmtPct(st.pct)}</div>
+        <div class="num" style="font-size:22px;font-weight:700;color:${numColor};flex-shrink:0;">${fmtPctInt(st.pct)}</div>
       </div>
       <div style="height:10px;background:#1e2225;border-radius:999px;overflow:hidden;">
         <div style="width:${barPct}%;height:10px;background:${numColor};border-radius:999px;"></div>
@@ -172,7 +172,7 @@ export async function renderPresupuesto(container, onBack) {
             <div class="num" style="font-size:13px;color:var(--text-3);">de ${fmtMoney(totalLimit)}</div>
           </div>
         </div>
-        <div class="num" style="font-size:24px;font-weight:700;line-height:1;color:var(--accent);">${fmtPct(totalSt.pct)}</div>
+        <div class="num" style="font-size:24px;font-weight:700;line-height:1;color:var(--accent);">${fmtPctInt(totalSt.pct)}</div>
       </div>
       <div style="height:10px;background:#1e2225;border-radius:999px;overflow:hidden;">
         <div style="width:${totalBarPct}%;height:10px;background:var(--accent);border-radius:999px;"></div>
