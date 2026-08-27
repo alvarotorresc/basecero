@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { seedStatements, SEED_ACCOUNTS, SEED_CATEGORIES } from "../../app/js/seeds.js";
+import { SQL } from "../../app/js/sql.js";
 
 const schema = readFileSync(new URL("../../app/js/schema.sql", import.meta.url), "utf8");
 function freshDb() {
@@ -49,4 +50,11 @@ test("colores: hoja hereda de la raíz", async () => {
   const byId = Object.fromEntries(SEED_CATEGORIES.map((c) => [c[0], { id: c[0], parent_id: c[2] }]));
   assert.equal(colorForCategory("cat-casa-luz", byId), colorForCategory("cat-casa", byId));
   assert.match(colorForCategory("cat-casa", byId), /^#[0-9a-f]{6}$/i);
+});
+
+test("meta: semillas incluyen locale es-ES y currency EUR", () => {
+  const db = freshDb();
+  const meta = Object.fromEntries(db.prepare(SQL.allMeta).all().map((r) => [r.key, r.value]));
+  assert.equal(meta.locale, "es-ES");
+  assert.equal(meta.currency, "EUR");
 });

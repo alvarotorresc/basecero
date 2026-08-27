@@ -3,11 +3,10 @@ import {
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { eurToCents } from "../contract.js";
-import { fmtEUR, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto } from "../format.js";
+import { fmtMoney, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol } from "../format.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-const pctFmt = new Intl.NumberFormat("es-ES", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const BTN_SECONDARY = "background:transparent;color:var(--text);border:1px solid var(--border);"
   + "border-radius:var(--radius-sm);padding:16px;flex:1;font:600 16px var(--font-ui);cursor:pointer;";
 
@@ -84,8 +83,8 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
 
   function notaSinAsignarHtml(sinAsignar) {
     return sinAsignar >= 0
-      ? `Quedan <span style="color:var(--green); font-weight:700;">${fmtEUR(sinAsignar)}</span> sin asignar: de ahí salen la cuota del coche, las provisiones y lo que ahorres.`
-      : `Te pasas por <span style="color:var(--red); font-weight:700;">${fmtEUR(-sinAsignar)}</span> de los ingresos previstos.`;
+      ? `Quedan <span style="color:var(--green); font-weight:700;">${fmtMoney(sinAsignar)}</span> sin asignar: de ahí salen la cuota del coche, las provisiones y lo que ahorres.`
+      : `Te pasas por <span style="color:var(--red); font-weight:700;">${fmtMoney(-sinAsignar)}</span> de los ingresos previstos.`;
   }
 
   /** Actualiza SOLO el total/barra/nota tras editar un importe, sin re-renderizar toda la
@@ -94,7 +93,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
   function patchTotal() {
     const presupuestado = totalPresupuestadoCents();
     const presupEl = container.querySelector("#pn-presupuestado");
-    if (presupEl) presupEl.textContent = fmtEUR(presupuestado);
+    if (presupEl) presupEl.textContent = fmtMoney(presupuestado);
     if (mode === "next") {
       const pctBarra = closingIncome > 0 ? Math.min(100, Math.round((presupuestado / closingIncome) * 100)) : 0;
       const sinAsignar = closingIncome - presupuestado;
@@ -119,7 +118,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
   function bloqueCierre() {
     if (mode !== "next") return "";
     const ahorrado = closingIncome - closingSpent;
-    const tasa = closingIncome > 0 ? pctFmt.format(ahorrado / closingIncome) : "—";
+    const tasa = closingIncome > 0 ? fmtPct(ahorrado / closingIncome) : "—";
     const rangeEnd = prevDayIso(state.startDate || hoyISO());
     return `
     <div class="card" style="display:flex; flex-direction:column; gap:14px; margin-bottom:16px;">
@@ -133,11 +132,11 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
       <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px;">
         <div style="display:flex; flex-direction:column; gap:5px;">
           <div style="font-size:11px; color:var(--text-3);">Gastado</div>
-          <div class="num" style="font-size:15px; font-weight:600;">${fmtEUR(closingSpent)}</div>
+          <div class="num" style="font-size:15px; font-weight:600;">${fmtMoney(closingSpent)}</div>
         </div>
         <div style="display:flex; flex-direction:column; gap:5px;">
           <div style="font-size:11px; color:var(--text-3);">Ahorrado</div>
-          <div class="num ${ahorrado >= 0 ? "text-green" : "text-red"}" style="font-size:15px; font-weight:600;">${fmtEUR(ahorrado)}</div>
+          <div class="num ${ahorrado >= 0 ? "text-green" : "text-red"}" style="font-size:15px; font-weight:600;">${fmtMoney(ahorrado)}</div>
         </div>
         <div style="display:flex; flex-direction:column; gap:5px;">
           <div style="font-size:11px; color:var(--text-3);">Tasa de ahorro</div>
@@ -191,13 +190,13 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
       <div class="tx-icon" style="--cat:${color};">${icon}</div>
       <div style="display:flex; flex-direction:column; gap:3px; flex-grow:1; min-width:0;">
         <div style="font-size:14px; font-weight:600;">${escHtml(r.name)}</div>
-        ${mode === "next" ? `<div style="font-size:11px; color:var(--text-3);">Mes pasado: ${fmtEUR(r.spent_cents)}</div>` : ""}
+        ${mode === "next" ? `<div style="font-size:11px; color:var(--text-3);">Mes pasado: ${fmtMoney(r.spent_cents)}</div>` : ""}
       </div>
       <div style="position:relative; flex-shrink:0;">
         <input type="number" min="0" step="1" inputmode="decimal" placeholder="Sin límite"
           data-budget="${r.root_id}" value="${escAttr(raw)}" class="budget-input${empty ? " is-empty" : ""}">
         <span class="budget-eur" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:12px;
-          color:var(--text-3); pointer-events:none; display:${empty ? "none" : ""};">€</span>
+          color:var(--text-3); pointer-events:none; display:${empty ? "none" : ""};">${currencySymbol()}</span>
       </div>
     </div>`;
   }
@@ -256,12 +255,12 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
       <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
         <div style="display:flex; flex-direction:column; gap:5px;">
           <div style="font-size:12px; font-weight:600; color:var(--text-2);">Presupuestado</div>
-          <div class="num" id="pn-presupuestado" style="font-size:28px; font-weight:600; letter-spacing:-0.02em;">${fmtEUR(presupuestado)}</div>
+          <div class="num" id="pn-presupuestado" style="font-size:28px; font-weight:600; letter-spacing:-0.02em;">${fmtMoney(presupuestado)}</div>
         </div>
         ${ingresos != null ? `
         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;">
           <div style="font-size:11px; color:var(--text-3);">Ingresos previstos</div>
-          <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtEUR(ingresos)}</div>
+          <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(ingresos)}</div>
         </div>` : ""}
       </div>
       ${ingresos != null ? `

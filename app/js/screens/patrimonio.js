@@ -4,13 +4,12 @@ import {
   createGoal, updateGoal, softDeleteGoal,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtEUR, hoyISO } from "../format.js";
+import { fmtMoney, hoyISO, fmtDec1, currencySymbol, currencyCode } from "../format.js";
 import { sparklineSvg } from "../charts.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const centsToRaw = (cents) => (cents ? (Math.abs(cents) / 100).toFixed(2).replace(".", ",") : "");
-const fmtPct1 = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 // ---- tarjeta "Patrimonio neto" --------------------------------------------
 
@@ -48,7 +47,7 @@ function netWorthCardHtml(netWorthCents, series) {
   const badgeHtml = variation === null ? "" : `
     <div style="display:flex;align-items:center;gap:5px;background:${up ? "#14261d" : "#2a1c1c"};border-radius:10px;padding:6px 9px;flex-shrink:0;">
       ${ICON_ARROW(up)}
-      <div style="font-size:11px;font-weight:700;color:${up ? "var(--green)" : "var(--red)"};">${fmtEUR(Math.abs(variation))}</div>
+      <div style="font-size:11px;font-weight:700;color:${up ? "var(--green)" : "var(--red)"};">${fmtMoney(Math.abs(variation))}</div>
     </div>`;
 
   return `
@@ -56,7 +55,7 @@ function netWorthCardHtml(netWorthCents, series) {
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
         <div style="display:flex;flex-direction:column;gap:6px;">
           <div style="font-size:12px;font-weight:600;color:var(--text-2);">Patrimonio neto</div>
-          <div class="num" style="font-size:38px;font-weight:600;line-height:1;letter-spacing:-0.02em;">${fmtEUR(netWorthCents)}</div>
+          <div class="num" style="font-size:38px;font-weight:600;line-height:1;letter-spacing:-0.02em;">${fmtMoney(netWorthCents)}</div>
         </div>
         ${badgeHtml}
       </div>
@@ -104,7 +103,7 @@ function cuentaRowHtml(a, isDefault) {
         <div class="list-row-title">${escHtml(a.name)}</div>
         <div class="list-row-sub">${accountSubtitle(a.type, isDefault)}</div>
       </div>
-      <div class="num" style="font-size:15px;font-weight:600;${isLiability ? "color:var(--red);" : ""}">${fmtEUR(a.balance_cents)}</div>
+      <div class="num" style="font-size:15px;font-weight:600;${isLiability ? "color:var(--red);" : ""}">${fmtMoney(a.balance_cents)}</div>
     </button>`;
 }
 
@@ -117,7 +116,7 @@ function cuentasCardHtml(accounts) {
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <div style="font-size:15px;font-weight:700;">Cuentas</div>
       <div style="display:flex;align-items:center;gap:10px;">
-        <div style="font-size:11px;color:var(--text-3);">${n} activa${n === 1 ? "" : "s"} · solo EUR</div>
+        <div style="font-size:11px;color:var(--text-3);">${n} activa${n === 1 ? "" : "s"} · solo ${currencyCode()}</div>
         <button type="button" class="icon-btn" id="btn-nueva-cuenta" aria-label="Nueva cuenta" style="width:28px;height:28px;border-radius:9px;font-size:16px;">+</button>
       </div>
     </div>`;
@@ -161,9 +160,9 @@ const GOAL_TYPE_LABEL = Object.fromEntries(GOAL_TYPES.map((t) => [t.id, t.label]
 const HUCHA_GOAL_TYPES = new Set(["emergency_fund", "savings_target", "provision"]);
 
 /** savings_rate guarda puntos porcentuales en currentCents/targetCents (ver repo.goalProgress):
- *  se muestran como "%", el resto de tipos como € (fmtEUR). */
+ *  se muestran como "%", el resto de tipos como € (fmtMoney). */
 function fmtGoalAmount(goal, cents) {
-  return goal.type === "savings_rate" ? `${fmtPct1.format(cents)} %` : fmtEUR(cents);
+  return goal.type === "savings_rate" ? `${fmtDec1(cents)} %` : fmtMoney(cents);
 }
 
 /** Fila de un goal: título + "actual / objetivo", barra de 8px, subtítulo contextual a la
@@ -332,7 +331,7 @@ export async function renderPatrimonio(container) {
           <button type="button" class="icon-btn" id="acc-sign" aria-label="Cambiar signo" style="font-size:18px; font-weight:700;">${f.sign}</button>
           <input type="text" inputmode="decimal" id="acc-raw" value="${escAttr(f.raw)}" placeholder="0"
             style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
-          <span class="amount-currency">€</span>
+          <span class="amount-currency">${currencySymbol()}</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
       </div>
@@ -499,7 +498,7 @@ export async function renderPatrimonio(container) {
         <div class="amount-display" style="align-items:center;">
           <input type="text" inputmode="decimal" id="goal-raw" value="${escAttr(f.raw)}" placeholder="0"
             style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
-          <span class="amount-currency">€</span>
+          <span class="amount-currency">${currencySymbol()}</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
       </div>`;

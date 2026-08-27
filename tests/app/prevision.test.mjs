@@ -43,8 +43,15 @@ function insRule(db, over = {}) {
   return v.id;
 }
 
-test("periodMonth: mes de start_date + 15 días", () => {
+test("periodMonth: mayor parte del rango", () => {
+  // paridad Álvaro (abierto, día 27): el resultado NO cambia con la implementación nueva
   assert.equal(periodMonth("2026-07-27"), 8);
+  assert.equal(periodMonth("2026-07-27", "2026-08-26"), 8); // cerrado, mismo rango
+  assert.equal(periodMonth("2026-08-01"), 8);               // quien cobra el día 1
+  assert.equal(periodMonth("2026-06-25", "2026-07-02"), 6); // periodo corto: manda junio (6 días vs 2)
+  assert.equal(periodMonth("2026-02-14", "2026-03-13"), 2); // febrero: la heurística +15 decía marzo (mal)
+  assert.equal(periodMonth("2026-02-15", "2026-03-14"), 3); // empate 14/14: gana el mes más tardío
+  assert.equal(periodMonth("2026-03-10", "2026-03-01"), 3); // rango incoherente: cae al mes de inicio, sin lanzar
 });
 
 test("ruleApplies: matriz de reglas de negocio", () => {

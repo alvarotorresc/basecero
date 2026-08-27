@@ -1,9 +1,12 @@
 // Módulo PURO (sin DOM ni imports de db/repo): construye y devuelve strings SVG/HTML para las
 // gráficas de Inicio (Task 12) y del detalle de cuenta (sparklineSvg, Task 13). Esto permite que
 // los tests de node importen el módulo directamente, sin worker ni DOM (ver tests/app/charts.test.mjs).
+// Importa fmtNum2 de format.js para el formateo de números — format.js también es puro (sin DOM
+// ni imports de db/repo), así que esta independencia se mantiene.
 
-const fmtNumEs = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const centsToStr = (cents) => fmtNumEs.format((cents ?? 0) / 100);
+import { fmtNum2 } from "./format.js";
+
+const centsToStr = (cents) => fmtNum2((cents ?? 0) / 100);
 
 // ---- barChartSvg ----------------------------------------------------------
 
@@ -57,7 +60,7 @@ const DONUT_CIRC = 2 * Math.PI * DONUT_R;
  *  stroke-dasharray/stroke-dashoffset rotados −90° (empiezan arriba, avanzan en sentido horario)
  *  — réplica de design/Resumen.dc.html:119-137. slices: [{color, cents}], ya en el orden en que
  *  deben pintarse. centerTitle/centerSub: texto ya formateado por quien llama (p.ej. "1.762,40"
- *  / "EUR gastados") — este módulo no conoce fmtEUR ni ninguna moneda. */
+ *  / "EUR gastados") — este módulo no conoce fmtMoney ni ninguna moneda. */
 export function donutSvg(slices, centerTitle, centerSub) {
   const total = slices.reduce((s, sl) => s + Math.max(0, sl.cents ?? 0), 0);
 

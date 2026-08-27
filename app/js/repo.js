@@ -1,6 +1,6 @@
 import { SQL, TABLES } from "./sql.js";
 import { query, exec, execMany } from "./db.js";
-import { nowIso, hoyISO, prevDayIso, fmtEUR } from "./format.js";
+import { nowIso, hoyISO, prevDayIso, fmtMoney, fmtDec1, appLocale } from "./format.js";
 import { CONTRACT, insertSql } from "./contract.js";
 import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
 
@@ -64,6 +64,16 @@ export const listIncomeCategories = () => query(SQL.listIncomeCategories);
 export const listAccounts = () => query(SQL.listAccounts);
 export const allCategoriesById = async () =>
   Object.fromEntries((await query(SQL.allCategories)).map((c) => [c.id, c]));
+
+/** Config de la app como objeto {clave: valor}. Las semillas de schema.sql garantizan
+ *  como mínimo schema_version, currency, created_with y locale. */
+export async function getMetaAll() {
+  const rows = await query(SQL.allMeta);
+  return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+}
+export async function setMeta(key, value) {
+  await exec(SQL.upsertMeta, [key, value]);
+}
 
 export const listPeriods = () => query(SQL.listPeriods);
 export const listAllByDay = (pid) => query(SQL.listAllByDay, [pid]);
@@ -252,7 +262,7 @@ export const accountBalanceCents = async (accountId, atDateIso) =>
  *  nada, solo lo hacen los gastos/transferencias sin pagar). saldoN26Cents es el saldo de
  *  'acc-n26' A HOY (no a la fecha del periodo: es el disponible AHORA). */
 export async function previsionOfPeriod(period) {
-  const month = periodMonth(period.start_date);
+  const month = periodMonth(period.start_date, period.end_date);
   const [rules, paidByRule, paidByCat, saldoN26Cents, pendienteSaraCents] = await Promise.all([
     listRules(),
     query(SQL.paidRuleIds, [period.id]),
@@ -342,7 +352,6 @@ export async function avgSpentOfClosedPeriods() {
   return Math.round(spents.reduce((s, c) => s + c, 0) / spents.length);
 }
 
-const fmtDecimal1 = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 // den<=0 -> 0 en vez de NaN/Infinity: mismo criterio que budgetStatus (presupuesto.js), pero sin
 // importarla desde repo.js (capa de datos no depende de una pantalla) — 3 líneas, se duplica aquí.
 const safeDiv = (num, den) => (den > 0 ? (num / den) * 100 : 0);
@@ -350,7 +359,7 @@ const safeDiv = (num, den) => (den > 0 ? (num / den) * 100 : 0);
 // "antes de mayo 2027" (mes en minúscula, mitad de frase) — a diferencia de
 // format.js#nombrePorDefecto (que capitaliza para usarlo como NOMBRE de periodo), aquí no aplica.
 const fmtMesAnio = (iso) =>
-  new Date(iso + "T12:00:00").toLocaleDateString("es-ES", { month: "long", year: "numeric" }).replace(" de ", " ");
+  new Date(iso + "T12:00:00").toLocaleDateString(appLocale(), { month: "long", year: "numeric" }).replace(" de ", " ");
 
 /** Progreso de UN goal activo según su tipo (contrato §7.2) — función PURA: toda la información
  *  ya viene resuelta en `ctx` (repo.goalsWithProgress hace las queries UNA vez y arma ctx antes
@@ -377,7 +386,7 @@ export function goalProgress(goal, ctx) {
     const pct = safeDiv(currentCents, targetCents);
     const accName = accountNameById[goal.account_id] ?? "";
     const subtitle = avgSpentCents > 0
-      ? `Hucha en ${accName} · cubre ${fmtDecimal1.format(currentCents / avgSpentCents)} meses de gasto`
+      ? `Hucha en ${accName} · cubre ${fmtDec1(currentCents / avgSpentCents)} meses de gasto`
       : `Hucha en ${accName} · todavía sin periodos cerrados para calcular el gasto medio`;
     return { goal, currentCents, targetCents, pct, level: "ok", subtitle };
   }
@@ -396,7 +405,7 @@ export function goalProgress(goal, ctx) {
     const targetCents = goal.target_amount_cents ?? 0;
     const pct = safeDiv(currentCents, targetCents);
     const monthlyCents = Math.round(targetCents / 12);
-    return { goal, currentCents, targetCents, pct, level: "ok", subtitle: `Provisión · ${fmtEUR(monthlyCents)} al mes` };
+    return { goal, currentCents, targetCents, pct, level: "ok", subtitle: `Provisión · ${fmtMoney(monthlyCents)} al mes` };
   }
 
   if (goal.type === "spending_cap") {
@@ -410,8 +419,8 @@ export function goalProgress(goal, ctx) {
     const level = pct > 100 ? "over" : pct >= 85 ? "warn" : "ok";
     const remaining = targetCents - currentCents;
     const subtitle = level === "over"
-      ? `Superado por ${fmtEUR(-remaining)}`
-      : `Te quedan ${fmtEUR(remaining)} para el cierre del periodo`;
+      ? `Superado por ${fmtMoney(-remaining)}`
+      : `Te quedan ${fmtMoney(remaining)} para el cierre del periodo`;
     return { goal, currentCents, targetCents, pct, level, subtitle };
   }
 
@@ -565,9 +574,17 @@ export async function dumpAllTables() {
 
 export const exportAllJson = () => dumpAllTables();
 
-export async function replaceAll(data) {
-  const stmts = [...TABLES].reverse().map((t) => ({ sql: `DELETE FROM ${t}` }));
-  for (const t of TABLES)
+/** Import de hoja completa. Todas las tablas se REEMPLAZAN salvo `meta`, que se FUSIONA
+ *  (upsert de las claves que trae la hoja, conservando las que no vienen): una hoja exportada
+ *  antes de que existiera una clave de config no debe borrarla en silencio. */
+export function replaceAllStmts(data) {
+  const tables = TABLES.filter((t) => t !== "meta");
+  const stmts = [...tables].reverse().map((t) => ({ sql: `DELETE FROM ${t}` }));
+  for (const row of data.meta) stmts.push({ sql: SQL.upsertMeta, bind: [row.key, row.value] });
+  for (const t of tables)
     for (const row of data[t]) stmts.push({ sql: insertSql(t), bind: CONTRACT[t].cols.map((c) => row[c]) });
-  await execMany(stmts);
+  return stmts;
+}
+export async function replaceAll(data) {
+  await execMany(replaceAllStmts(data));
 }

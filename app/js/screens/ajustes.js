@@ -1,4 +1,4 @@
-import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod } from "../repo.js";
+import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta } from "../repo.js";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
 import { hoyISO, fmtDiaCorto } from "../format.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
@@ -7,12 +7,28 @@ import { importN26Csv } from "../n26.js";
 import { encryptBackup, decryptBackup, isEncryptedBackup, WrongPassphraseError, MIN_PASSPHRASE } from "../backup-crypto.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
 const BTN_SECONDARY = "background:transparent;color:var(--text);border:1px solid var(--border);"
   + "border-radius:var(--radius-sm);padding:16px;width:100%;font:600 16px var(--font-ui);cursor:pointer;";
 
 const INPUT_STYLE = "background:transparent;color:var(--text);border:1px solid var(--border);"
   + "border-radius:var(--radius-sm);padding:12px;width:100%;font:400 15px var(--font-ui);";
+
+const CURRENCIES = ["EUR", "USD", "GBP", "CHF", "MXN", "ARS", "COP", "PEN", "UYU", "BRL", "DOP"];
+const LOCALES = [
+  ["es-ES", "Español (España)"], ["es-MX", "Español (México)"], ["es-AR", "Español (Argentina)"],
+  ["en-US", "English (US)"], ["en-GB", "English (UK)"], ["de-DE", "Deutsch"],
+  ["fr-FR", "Français"], ["it-IT", "Italiano"], ["pt-BR", "Português (Brasil)"],
+];
+
+const currencyOptionsHtml = (cur) =>
+  [...new Set([cur, ...CURRENCIES])]
+    .map((c) => `<option value="${escAttr(c)}" ${c === cur ? "selected" : ""}>${escHtml(c)}</option>`).join("");
+const localeOptionsHtml = (loc) => {
+  const known = LOCALES.some(([v]) => v === loc) ? LOCALES : [[loc, loc], ...LOCALES];
+  return known.map(([v, label]) => `<option value="${escAttr(v)}" ${v === loc ? "selected" : ""}>${escHtml(label)}</option>`).join("");
+};
 
 function download(blob, filename) {
   const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: filename });
@@ -62,6 +78,9 @@ function periodoCardHtml(period) {
 export async function renderAjustes(container) {
   let openPeriod = null;
   try { openPeriod = await getOpenPeriod(); } catch { openPeriod = null; }
+
+  let metaCfg = { currency: "EUR", locale: "es-ES" };
+  try { metaCfg = { ...metaCfg, ...(await getMetaAll()) }; } catch {}
 
   const state = {
     errors: null, pending: null, busy: false, n26Result: null, n26Error: null,
@@ -156,6 +175,17 @@ export async function renderAjustes(container) {
         <div class="banner-aviso" style="margin-top:12px;display:block"><p>${escHtml(state.n26Result)}</p></div>` : ""}
         ${state.n26Error ? `
         <div class="banner-aviso red" style="margin-top:12px;display:block"><p>${escHtml(state.n26Error)}</p></div>` : ""}
+      </div>
+
+      <div class="card" style="margin-bottom:12px">
+        <p style="font-weight:600;margin-bottom:4px">Moneda y formato</p>
+        <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
+          Divisa de los importes y formato de números y fechas. Se aplican al guardar (recarga la app).</p>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <select id="pref-currency" style="${INPUT_STYLE}">${currencyOptionsHtml(metaCfg.currency)}</select>
+          <select id="pref-locale" style="${INPUT_STYLE}">${localeOptionsHtml(metaCfg.locale)}</select>
+        </div>
+        <button type="button" id="btn-prefs-save" style="${BTN_SECONDARY}" ${state.busy ? "disabled" : ""}>Guardar preferencias</button>
       </div>
 
       <div class="card" style="margin-bottom:12px">
@@ -325,6 +355,23 @@ export async function renderAjustes(container) {
         }
       };
     }
+
+    container.querySelector("#btn-prefs-save").onclick = async () => {
+      // Leer los selects ANTES de render(): reconstruye el DOM desde metaCfg (el valor
+      // guardado), así que leerlos después devolvería el valor antiguo, no el elegido.
+      const currency = container.querySelector("#pref-currency").value;
+      const locale = container.querySelector("#pref-locale").value;
+      state.busy = true; render();
+      try {
+        await setMeta("currency", currency);
+        await setMeta("locale", locale);
+        location.reload();
+      } catch (err) {
+        state.busy = false;
+        state.errors = [`No se pudieron guardar las preferencias: ${err.message}`];
+        render();
+      }
+    };
 
     container.querySelector("#btn-json-export").onclick = async () => {
       const data = await exportAllJson();

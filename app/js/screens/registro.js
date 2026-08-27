@@ -3,7 +3,7 @@ import {
   listAccounts, allCategoriesById, recentForRefund,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtEUR, hoyISO } from "../format.js";
+import { fmtMoney, hoyISO, currencySymbol } from "../format.js";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "back"];
 const ICON_BACK = `<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 5.5H9.2L3.5 12l5.7 6.5H20a1 1 0 001-1v-11a1 1 0 00-1-1z"></path><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"></path></svg>`;
@@ -145,7 +145,7 @@ export async function renderRegistro(container, onDone, prefill) {
         <div style="min-width:0;">
           <div style="font-size:10px; color:var(--text-3);">Vinculado a</div>
           <div style="font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-            ${escHtml(label)} · ${fmtEUR(linked.amount_cents)}
+            ${escHtml(label)} · ${fmtMoney(linked.amount_cents)}
           </div>
         </div>
         <button type="button" id="reg-refund-unlink" class="icon-btn" aria-label="Quitar vínculo">✕</button>
@@ -163,7 +163,7 @@ export async function renderRegistro(container, onDone, prefill) {
               <span style="flex:1; min-width:0; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                 ${escHtml(r.merchant || byId[r.category_id]?.name || "Gasto")}${r.is_shared ? " · compartido" : ""}
               </span>
-              <span class="num">${fmtEUR(r.amount_cents)}</span>
+              <span class="num">${fmtMoney(r.amount_cents)}</span>
             </button>`).join("")}
       </div>` : ""}
     </div>`;
@@ -216,7 +216,7 @@ export async function renderRegistro(container, onDone, prefill) {
         <div class="amount-display" style="align-items:center;">
           ${state.tipo === "adjustment" ? `<button type="button" class="icon-btn" id="reg-sign" aria-label="Cambiar signo" style="font-size:18px; font-weight:700;">${state.adjustmentSign}</button>` : ""}
           <span class="num">${state.tipo === "adjustment" && state.adjustmentSign === "-" ? "−" : ""}${escHtml(state.raw || "0")}</span>
-          <span class="amount-currency">€</span>
+          <span class="amount-currency">${currencySymbol()}</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
       </div>
@@ -268,11 +268,11 @@ export async function renderRegistro(container, onDone, prefill) {
         <div style="display:flex; gap:8px; padding:0 0 14px;">
           <div style="flex:1; background:#1b1e21; border-radius:14px; padding:10px 11px;">
             <div style="font-size:10px; color:var(--text-3);">Tu parte · ${pct}%</div>
-            <div class="num" style="font-size:15px; font-weight:600;">${fmtEUR(myCents)}</div>
+            <div class="num" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
           </div>
           <div style="flex:1; background:#1b1e21; border-radius:14px; padding:10px 11px;">
             <div style="font-size:10px; color:var(--text-3);">Sara · ${100 - pct}%</div>
-            <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtEUR(saraCents)}</div>
+            <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(saraCents)}</div>
           </div>
         </div>` : ""}
       </div>` : ""}
