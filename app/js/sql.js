@@ -158,8 +158,6 @@ export const SQL = {
   // sin que repo.js tenga que hacer una query aparte para calcularlo.
   insertAccount: `INSERT INTO accounts (id,name,type,opening_balance_cents,display_order,is_archived,created_at,updated_at,deleted)
     SELECT ?,?,?,?, COALESCE(MAX(display_order),0)+1, 0, ?,?,0 FROM accounts WHERE deleted=0`,
-  // acc-n26 no es renombrable (lo aplica repo.updateAccount, ignorando el name recibido): esta
-  // SQL sí acepta name porque el resto de cuentas SÍ pueden renombrarse.
   updateAccount: `UPDATE accounts SET name=?, type=?, opening_balance_cents=?, updated_at=? WHERE id=?`,
   getGoal: `SELECT * FROM goals WHERE id=? AND deleted=0`,
   insertGoal: `INSERT INTO goals (id,name,type,target_amount_cents,target_months,target_pct,target_date,account_id,category_id,is_active,created_at,updated_at,deleted)

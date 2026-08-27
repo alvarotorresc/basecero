@@ -488,15 +488,14 @@ export async function createAccount({ name, type, openingBalanceCents }) {
   return id;
 }
 
-/** Actualiza una cuenta (mismas claves camelCase que createAccount). acc-n26 —la que usa el
- *  import de N26 para localizarla por id fijo— NO admite cambiar de nombre: el `name` recibido
- *  se ignora en silencio y se conserva "N26", pero opening_balance_cents SÍ es editable (saldo
- *  inicial real de la cuenta, no lo toca el import). Los demás campos ausentes conservan el
- *  valor actual — mismo criterio merge-on-current que repo.updateRule. */
+/** Actualiza una cuenta (mismas claves camelCase que createAccount). Toda cuenta es renombrable,
+ *  incluida la que usa el import de N26 (localiza la cuenta por `meta.import_account_id`, no por
+ *  nombre). Los campos ausentes conservan el valor actual — mismo criterio merge-on-current que
+ *  repo.updateRule. */
 export async function updateAccount(id, fields) {
   const cur = await getAccount(id);
   if (!cur) throw new Error("Cuenta no encontrada");
-  const name = id === "acc-n26" ? cur.name : (fields.name ?? cur.name);
+  const name = fields.name ?? cur.name;
   const type = fields.type ?? cur.type;
   const openingBalanceCents = fields.openingBalanceCents ?? cur.opening_balance_cents;
   const t = nowIso();

@@ -81,9 +81,9 @@ const ACCOUNT_TYPES = [
 ];
 
 /** Subtítulo por tipo — "Cuenta corriente · por defecto" es el único texto literal que pide el
- *  brief (para N26); el resto ("Ahorro"/"Pasivo") queda deliberadamente genérico: no hay en el
- *  contrato ningún campo del que derivar "2 huchas con objetivo" o "cuota 189 €/mes" del mockup
- *  sin inventar datos, así que no se replican aquí. */
+ *  brief; el resto ("Ahorro"/"Pasivo") queda deliberadamente genérico: no hay en el contrato
+ *  ningún campo del que derivar "2 huchas con objetivo" o "cuota 189 €/mes" del mockup sin
+ *  inventar datos, así que no se replican aquí. */
 function accountSubtitle(type, isDefault) {
   if (type === "checking") return `Cuenta corriente${isDefault ? " · por defecto" : ""}`;
   if (type === "savings") return "Ahorro";
@@ -301,7 +301,6 @@ export async function renderPatrimonio(container) {
   function renderAccountForm() {
     const f = state.accountForm;
     const editing = !!state.editingAccountId;
-    const isN26 = state.editingAccountId === "acc-n26";
 
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
@@ -310,16 +309,10 @@ export async function renderPatrimonio(container) {
         <span style="width:36px;"></span>
       </div>
 
-      ${isN26 ? `
-      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
-        <span class="field-label">Nombre</span>
-        <div style="padding:14px 16px;font-size:15px;font-weight:600;background:#1b1e21;border-radius:var(--radius-sm);">N26</div>
-        <div style="font-size:11px;color:var(--text-3);">No renombrable: la usa el import de N26.</div>
-      </div>` : `
       <label class="field field-stack" style="margin-bottom:18px;">
         <span class="field-label">Nombre</span>
         <input type="text" id="acc-name" value="${escAttr(f.name)}" placeholder="p. ej. Revolut">
-      </label>`}
+      </label>
 
       <div class="segmented" style="margin-bottom:18px;">
         ${ACCOUNT_TYPES.map((t) => `<button type="button" data-acc-tipo="${t.id}" class="${f.type === t.id ? "active" : ""}">${t.label}</button>`).join("")}
@@ -351,11 +344,9 @@ export async function renderPatrimonio(container) {
 
   function wireAccountForm() {
     const f = state.accountForm;
-    const isN26 = state.editingAccountId === "acc-n26";
     container.querySelector("#acc-back").onclick = () => backToMain();
 
-    const nameInput = container.querySelector("#acc-name");
-    if (nameInput) nameInput.oninput = (e) => { f.name = e.target.value; };
+    container.querySelector("#acc-name").oninput = (e) => { f.name = e.target.value; };
 
     container.querySelectorAll("[data-acc-tipo]").forEach((b) => {
       b.onclick = () => {
@@ -377,7 +368,7 @@ export async function renderPatrimonio(container) {
 
     container.querySelector("#acc-save").onclick = async () => {
       const btn = container.querySelector("#acc-save");
-      if (!isN26 && !f.name.trim()) {
+      if (!f.name.trim()) {
         errorMsg = "Ponle un nombre a la cuenta.";
         render();
         const savedBtn = container.querySelector("#acc-save");
