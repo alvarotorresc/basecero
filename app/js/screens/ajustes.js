@@ -4,11 +4,15 @@ import { hoyISO, fmtDiaCorto } from "../format.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 import { renderRecurrentes } from "./recurrentes.js";
 import { importN26Csv } from "../n26.js";
+import { encryptBackup, decryptBackup, isEncryptedBackup, WrongPassphraseError, MIN_PASSPHRASE } from "../backup-crypto.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
 const BTN_SECONDARY = "background:transparent;color:var(--text);border:1px solid var(--border);"
   + "border-radius:var(--radius-sm);padding:16px;width:100%;font:600 16px var(--font-ui);cursor:pointer;";
+
+const INPUT_STYLE = "background:transparent;color:var(--text);border:1px solid var(--border);"
+  + "border-radius:var(--radius-sm);padding:12px;width:100%;font:400 15px var(--font-ui);";
 
 function download(blob, filename) {
   const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: filename });
@@ -59,7 +63,28 @@ export async function renderAjustes(container) {
   let openPeriod = null;
   try { openPeriod = await getOpenPeriod(); } catch { openPeriod = null; }
 
-  const state = { errors: null, pending: null, busy: false, n26Result: null, n26Error: null };
+  const state = {
+    errors: null, pending: null, busy: false, n26Result: null, n26Error: null,
+    encExport: false, encImport: null,
+  };
+
+  async function processImportBuffer(buf) {
+    // buf: ArrayBuffer|Uint8Array con un .xlsx EN CLARO (ya descifrado si venía cifrado)
+    const wb = window.XLSX.read(buf, { type: "array" });
+    const { data, errors: parseErrors } = workbookToRows(window.XLSX, wb);
+    const errors = [...parseErrors, ...validateImport(data)];
+    if (errors.length) {
+      state.errors = errors; state.pending = null;
+      return;
+    }
+    const currentDump = await dumpAllTables();
+    state.errors = null;
+    // dumpAllTables trae TODAS las filas (incluidas las soft-deleted, necesario para el
+    // backup JSON completo) — el aviso de "movimientos actuales" antes de un reemplazo
+    // destructivo debe contar solo las visibles, si no infla la cifra con lo ya borrado.
+    const activeCount = currentDump.transactions.filter((t) => !t.deleted).length;
+    state.pending = { data, currentDump, currentCount: activeCount };
+  }
 
   function render() {
     container.innerHTML = `
@@ -69,15 +94,41 @@ export async function renderAjustes(container) {
         <p style="font-weight:600;margin-bottom:4px">Tu hoja de cálculo</p>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
           Exporta todos tus datos a un .xlsx editable en LibreOffice/Sheets, o importa una hoja para sustituir
-          los datos actuales.</p>
+          los datos actuales. La copia cifrada (.bce) también se importa desde aquí.</p>
         <button type="button" class="btn-primary" id="btn-xlsx-export" ${state.busy ? "disabled" : ""}>Exportar hoja (.xlsx)</button>
         <button type="button" id="btn-xlsx-import" style="${BTN_SECONDARY}margin-top:10px" ${state.busy ? "disabled" : ""}>Importar hoja (.xlsx)</button>
-        <input type="file" id="xlsx-file-input" accept=".xlsx" style="display:none">
+        <input type="file" id="xlsx-file-input" accept=".xlsx,.bce" style="display:none">
+
+        ${state.encExport ? `
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px">
+          <p style="color:var(--text-2);font-size:13px">
+            La copia cifrada (.bce) solo se abre desde BaseCero con esta contraseña.
+            <strong>Si la olvidas, la copia es irrecuperable</strong> — no se guarda en ningún sitio.</p>
+          <input type="password" id="enc-pass-1" style="${INPUT_STYLE}" placeholder="Contraseña (mín. ${MIN_PASSPHRASE} caracteres)">
+          <input type="password" id="enc-pass-2" style="${INPUT_STYLE}" placeholder="Repite la contraseña">
+          <div id="enc-error" class="banner-aviso red" style="display:none"></div>
+          <div style="display:flex;gap:8px">
+            <button type="button" id="btn-enc-cancel" style="${BTN_SECONDARY}flex:1" ${state.busy ? "disabled" : ""}>Cancelar</button>
+            <button type="button" class="btn-primary" id="btn-enc-confirm" style="flex:1" ${state.busy ? "disabled" : ""}>Exportar cifrada</button>
+          </div>
+        </div>` : `
+        <button type="button" id="btn-enc-export" style="${BTN_SECONDARY}margin-top:10px" ${state.busy ? "disabled" : ""}>Exportar copia cifrada (.bce)</button>`}
 
         ${state.errors ? `
         <div class="banner-aviso red" style="margin-top:12px;max-height:200px;overflow-y:auto;display:block">
           ${state.errors.slice(0, 10).map((e) => `<p>${escHtml(e)}</p>`).join("")}
           ${state.errors.length > 10 ? `<p>y ${state.errors.length - 10} más</p>` : ""}
+        </div>` : ""}
+
+        ${state.encImport ? `
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+          <p style="color:var(--text-2);font-size:13px">Esta copia está cifrada. Escribe su contraseña para continuar.</p>
+          <input type="password" id="dec-pass" style="${INPUT_STYLE}" placeholder="Contraseña de la copia">
+          <div id="dec-error" class="banner-aviso red" style="display:none"></div>
+          <div style="display:flex;gap:8px">
+            <button type="button" id="btn-dec-cancel" style="${BTN_SECONDARY}flex:1" ${state.busy ? "disabled" : ""}>Cancelar</button>
+            <button type="button" class="btn-primary" id="btn-dec-confirm" style="flex:1" ${state.busy ? "disabled" : ""}>Descifrar</button>
+          </div>
         </div>` : ""}
 
         ${state.pending ? `
@@ -162,6 +213,34 @@ export async function renderAjustes(container) {
       }
     };
 
+    const encBtn = container.querySelector("#btn-enc-export");
+    if (encBtn) encBtn.onclick = () => { state.encExport = true; render(); };
+
+    const encCancel = container.querySelector("#btn-enc-cancel");
+    if (encCancel) encCancel.onclick = () => { state.encExport = false; render(); };
+
+    const encConfirm = container.querySelector("#btn-enc-confirm");
+    if (encConfirm) encConfirm.onclick = async () => {
+      const p1 = container.querySelector("#enc-pass-1").value;
+      const p2 = container.querySelector("#enc-pass-2").value;
+      const errBox = container.querySelector("#enc-error");
+      const fail = (msg) => { errBox.textContent = msg; errBox.style.display = "block"; };
+      if (p1.length < MIN_PASSPHRASE) return fail(`Mínimo ${MIN_PASSPHRASE} caracteres.`);
+      if (p1 !== p2) return fail("Las contraseñas no coinciden.");
+      state.busy = true; render();
+      try {
+        const wb = rowsToWorkbook(window.XLSX, await dumpAllTables());
+        const arr = window.XLSX.write(wb, { type: "array", bookType: "xlsx" });
+        const enc = await encryptBackup(arr, p1);
+        download(new Blob([enc], { type: "application/octet-stream" }), `basecero-cifrado-${hoyISO()}.bce`);
+        state.encExport = false;
+      } catch (e) {
+        state.errors = [`No se pudo exportar: ${e.message}`];
+      } finally {
+        state.busy = false; render();
+      }
+    };
+
     const cerrarBtn = container.querySelector("#btn-cerrar-periodo");
     if (cerrarBtn) cerrarBtn.onclick = () => {
       document.body.classList.add("onboarding");
@@ -181,24 +260,51 @@ export async function renderAjustes(container) {
       state.busy = true; render();
       try {
         const buf = await file.arrayBuffer();
-        const wb = window.XLSX.read(buf, { type: "array" });
-        const { data, errors: parseErrors } = workbookToRows(window.XLSX, wb);
-        const errors = [...parseErrors, ...validateImport(data)];
-        if (errors.length) {
-          state.errors = errors; state.pending = null;
-          return;
+        if (isEncryptedBackup(buf)) {
+          state.errors = null; state.pending = null; state.encImport = { buf };
+        } else {
+          state.encImport = null;
+          await processImportBuffer(buf);
         }
-        const currentDump = await dumpAllTables();
-        state.errors = null;
-        // dumpAllTables trae TODAS las filas (incluidas las soft-deleted, necesario para el
-        // backup JSON completo) — el aviso de "movimientos actuales" antes de un reemplazo
-        // destructivo debe contar solo las visibles, si no infla la cifra con lo ya borrado.
-        const activeCount = currentDump.transactions.filter((t) => !t.deleted).length;
-        state.pending = { data, currentDump, currentCount: activeCount };
       } catch (err) {
         state.errors = [`No se pudo leer el archivo: ${err.message}`]; state.pending = null;
       } finally {
         state.busy = false; render();
+      }
+    };
+
+    const decCancel = container.querySelector("#btn-dec-cancel");
+    if (decCancel) decCancel.onclick = () => { state.encImport = null; render(); };
+
+    const decConfirm = container.querySelector("#btn-dec-confirm");
+    if (decConfirm) decConfirm.onclick = async () => {
+      const pass = container.querySelector("#dec-pass").value;
+      const errBox = container.querySelector("#dec-error");
+      if (!pass) {
+        const box = container.querySelector("#dec-error");
+        box.textContent = "Escribe la contraseña de la copia.";
+        box.style.display = "block";
+        return;
+      }
+      state.busy = true; render();
+      try {
+        const plain = await decryptBackup(state.encImport.buf, pass);
+        state.encImport = null;
+        await processImportBuffer(plain);
+      } catch (err) {
+        if (err instanceof WrongPassphraseError) {
+          // El formulario sigue abierto para reintentar; el error va inline, sin re-render
+          // (un render() vaciaría el input).
+          state.busy = false; render();
+          const box = container.querySelector("#dec-error");
+          box.textContent = "Contraseña incorrecta o archivo dañado.";
+          box.style.display = "block";
+          return;
+        }
+        // Error estructural (BackupFormatError) u otro: se cierra el formulario y va al banner normal.
+        state.errors = [err.message]; state.encImport = null;
+      } finally {
+        if (state.busy) { state.busy = false; render(); }
       }
     };
 

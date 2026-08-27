@@ -2,3 +2,8 @@ dist/
 generator/.venv/
 __pycache__/
 *.pyc
+
+# Backlog, config de sesión y docs: material de trabajo, local
+/BACKLOG.md
+/CLAUDE.md
+/docs/
