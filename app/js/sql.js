@@ -158,8 +158,6 @@ export const SQL = {
   // sin que repo.js tenga que hacer una query aparte para calcularlo.
   insertAccount: `INSERT INTO accounts (id,name,type,opening_balance_cents,display_order,is_archived,created_at,updated_at,deleted)
     SELECT ?,?,?,?, COALESCE(MAX(display_order),0)+1, 0, ?,?,0 FROM accounts WHERE deleted=0`,
-  // acc-n26 no es renombrable (lo aplica repo.updateAccount, ignorando el name recibido): esta
-  // SQL sí acepta name porque el resto de cuentas SÍ pueden renombrarse.
   updateAccount: `UPDATE accounts SET name=?, type=?, opening_balance_cents=?, updated_at=? WHERE id=?`,
   getGoal: `SELECT * FROM goals WHERE id=? AND deleted=0`,
   insertGoal: `INSERT INTO goals (id,name,type,target_amount_cents,target_months,target_pct,target_date,account_id,category_id,is_active,created_at,updated_at,deleted)
@@ -168,13 +166,14 @@ export const SQL = {
     target_date=?, account_id=?, category_id=?, is_active=?, updated_at=? WHERE id=?`,
   softDeleteGoal: `UPDATE goals SET deleted=1, updated_at=? WHERE id=?`,
 
-  // Import CSV N26 (Task 15). n26Existing trae las transacciones NO borradas de la cuenta N26
-  // para que n26.js las re-firme en memoria (bcDecideImportAction espera amountCents CON signo,
+  // Import CSV (Task 15, generalizada en PR B): trae las transacciones NO borradas de la
+  // cuenta de import (meta.import_account_id resuelta por repo.importAccountId) para que
+  // n26.js las re-firme en memoria (bcDecideImportAction espera amountCents CON signo,
   // aquí siempre viene positivo por el CHECK de la tabla) sin una query por fila del CSV.
   // reconcileTx SOLO toca external_id/status/updated_at — nunca amount/date/category/merchant,
   // así una fila manual conciliada conserva su categoría y comercio tal cual los metió el usuario.
   n26Existing: `SELECT id, date, type, amount_cents, external_id, status FROM transactions
-    WHERE account_id='acc-n26' AND deleted=0`,
+    WHERE account_id=? AND deleted=0`,
   reconcileTx: `UPDATE transactions SET external_id=?, status='reconciled', updated_at=? WHERE id=?`,
   upsertMeta: `INSERT INTO meta (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`,
   allMeta: `SELECT key, value FROM meta`,

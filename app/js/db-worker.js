@@ -17,7 +17,7 @@ async function init() {
   }
   const schema = await (await fetch(new URL("./schema.sql", import.meta.url))).text();
   db.exec(schema);
-  const seeded = db.selectValue("SELECT COUNT(*) FROM accounts");
+  const seeded = db.selectValue("SELECT COUNT(*) FROM categories");
   if (seeded === 0) {
     const now = new Date().toISOString().slice(0, 19) + "Z";
     db.exec("BEGIN");

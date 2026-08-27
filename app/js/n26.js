@@ -6,7 +6,7 @@
 import { SQL } from "./sql.js";
 import { execMany } from "./db.js";
 import { nowIso } from "./format.js";
-import { getOpenPeriod, n26Existing } from "./repo.js";
+import { getOpenPeriod, n26Existing, importAccountId } from "./repo.js";
 
 /** SHA-256 hex vía Web Crypto (crypto.subtle), asíncrona — sustituye a gasSha256Hex (Apps
  *  Script usa Utilities.computeDigest, síncrona; el navegador no ofrece un SHA-256 síncrono). */
@@ -33,11 +33,14 @@ export async function externalIdFor(row, hashFn = sha256Hex) {
 export async function importN26Csv(text) {
   const period = await getOpenPeriod();
   if (!period) throw new Error("No hay ningún periodo abierto");
+  const accountId = await importAccountId();
+  if (!accountId) throw new Error("No hay ninguna cuenta donde importar: crea una en Patrimonio");
 
   // Re-firma en memoria (puerto literal del brief: |amount_cents| × signo por type). El CHECK de
-  // la tabla exige amount_cents>0 SOLO para type<>'adjustment' — acc-n26 podría en teoría tener
-  // algún adjustment con signo negativo, de ahí el Math.abs explícito en vez de asumir positivo.
-  const existing = (await n26Existing()).map((t) => ({
+  // la tabla exige amount_cents>0 SOLO para type<>'adjustment' — la cuenta de import podría en
+  // teoría tener algún adjustment con signo negativo, de ahí el Math.abs explícito en vez de
+  // asumir positivo.
+  const existing = (await n26Existing(accountId)).map((t) => ({
     id: t.id,
     dateIso: t.date,
     type: t.type,
@@ -67,7 +70,7 @@ export async function importN26Csv(text) {
       const type = r.amountCents < 0 ? "expense" : "income";
       stmts.push({
         sql: SQL.insertTransaction,
-        bind: [id, r.bookingDate, period.id, type, Math.abs(r.amountCents), "acc-n26", "",
+        bind: [id, r.bookingDate, period.id, type, Math.abs(r.amountCents), accountId, "",
           "", bcSanitizeCell(r.partnerName), bcSanitizeCell(r.paymentReference),
           0, null, 0, "", "", r.externalId, "reconciled", now, now],
       });

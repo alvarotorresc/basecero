@@ -1,9 +1,4 @@
-export const SEED_ACCOUNTS = [
-  ["acc-n26", "N26", "checking", 0, 1],
-  ["acc-revolut", "Revolut", "savings", 0, 2],
-  ["acc-traderepublic", "Trade Republic", "savings", 0, 3],
-  ["acc-prestamo-coche", "Préstamo coche", "liability", 0, 4],
-];
+// Las cuentas ya no se siembran: las crea el usuario (Patrimonio hoy, onboarding en PR F).
 export const SEED_CATEGORIES = [
   ["cat-casa", "Casa", "", "expense", "need", 10],
   ["cat-casa-alquiler", "Alquiler/Hipoteca", "cat-casa", "expense", "need", 11],
@@ -49,7 +44,6 @@ export const SEED_CATEGORIES = [
 ];
 export function seedStatements(now) {
   return [
-    { sql: "INSERT INTO accounts (id,name,type,opening_balance_cents,display_order,is_archived,created_at,updated_at,deleted) VALUES (?,?,?,?,?,0,'" + now + "','" + now + "',0)", rows: SEED_ACCOUNTS },
     { sql: "INSERT INTO categories (id,name,parent_id,flow,need_type,display_order,is_archived,created_at,updated_at,deleted) VALUES (?,?,?,?,?,?,0,'" + now + "','" + now + "',0)", rows: SEED_CATEGORIES },
   ];
 }

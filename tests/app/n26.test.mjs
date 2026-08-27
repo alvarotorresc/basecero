@@ -27,6 +27,8 @@ function db() {
   const d = new DatabaseSync(":memory:");
   d.exec(readFileSync(new URL("../../app/js/schema.sql", import.meta.url), "utf8"));
   for (const { sql, rows } of seedStatements(T)) for (const r of rows) d.prepare(sql).run(...r);
+  d.prepare(`INSERT INTO accounts (id,name,type,opening_balance_cents,display_order,is_archived,created_at,updated_at,deleted)
+             VALUES ('acc-n26','N26','checking',0,1,0,?,?,0)`).run(T, T);
   d.prepare(SQL.insertPeriod).run("p1", "Agosto 2026", "2026-07-27", 60, T, T);
   return d;
 }
@@ -49,7 +51,7 @@ const CSV_2ROWS = [CSV_HEADER, csvRow(), csvRow({ date: "2026-08-21", partner: "
  *  pure.bcParseN26Csv/bcDecideImportAction (apps_script/pure.js, idéntico a vendor/pure.js) y el
  *  externalIdFor REAL de n26.js (adaptador de captura incluido). */
 async function runImport(d, text, hashFn = sha256hex) {
-  const existing = d.prepare(SQL.n26Existing).all().map((t) => ({
+  const existing = d.prepare(SQL.n26Existing).all("acc-n26").map((t) => ({
     id: t.id, dateIso: t.date, type: t.type,
     amountCents: Math.abs(t.amount_cents) * (t.type === "expense" ? -1 : 1),
     externalId: t.external_id, status: t.status,

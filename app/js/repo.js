@@ -3,6 +3,7 @@ import { query, exec, execMany } from "./db.js";
 import { nowIso, hoyISO, prevDayIso, fmtMoney, fmtDec1, appLocale } from "./format.js";
 import { CONTRACT, insertSql } from "./contract.js";
 import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
+import { resolveAccountId } from "./account-defaults.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -73,6 +74,17 @@ export async function getMetaAll() {
 }
 export async function setMeta(key, value) {
   await exec(SQL.upsertMeta, [key, value]);
+}
+
+/** Cuenta destino del import CSV / cuenta por defecto de formularios, resueltas desde meta
+ *  (vacío ⇒ primera checking activa; null ⇒ no hay cuentas). */
+export async function importAccountId() {
+  const [meta, accounts] = await Promise.all([getMetaAll(), listAccounts()]);
+  return resolveAccountId(meta.import_account_id, accounts);
+}
+export async function defaultAccountId() {
+  const [meta, accounts] = await Promise.all([getMetaAll(), listAccounts()]);
+  return resolveAccountId(meta.default_account_id, accounts);
 }
 
 export const listPeriods = () => query(SQL.listPeriods);
@@ -259,15 +271,16 @@ export const accountBalanceCents = async (accountId, atDateIso) =>
  *  pagado/pendiente (por rule_id o, si se registró a mano, por el fallback categoría+importe)
  *  y el "disponible real" — mismo criterio que la hoja "Previsión" (dashboards.py:103-134).
  *  comprometidoCents excluye type='income' (una regla de ingreso pendiente no "compromete"
- *  nada, solo lo hacen los gastos/transferencias sin pagar). saldoN26Cents es el saldo de
- *  'acc-n26' A HOY (no a la fecha del periodo: es el disponible AHORA). */
+ *  nada, solo lo hacen los gastos/transferencias sin pagar). saldoCuentaCents es el saldo de
+ *  la cuenta por defecto A HOY (no a la fecha del periodo: es el disponible AHORA). */
 export async function previsionOfPeriod(period) {
   const month = periodMonth(period.start_date, period.end_date);
-  const [rules, paidByRule, paidByCat, saldoN26Cents, pendienteSaraCents] = await Promise.all([
+  const mainAccountId = await defaultAccountId();
+  const [rules, paidByRule, paidByCat, saldoCuentaCents, pendienteSaraCents] = await Promise.all([
     listRules(),
     query(SQL.paidRuleIds, [period.id]),
     query(SQL.paidByCatAmount, [period.id]),
-    accountBalanceCents("acc-n26", hoyISO()),
+    mainAccountId ? accountBalanceCents(mainAccountId, hoyISO()) : Promise.resolve(0),
     pendingSharedTotalCents(),
   ]);
   const paidRuleIdSet = new Set(paidByRule.map((r) => r.rule_id));
@@ -288,9 +301,9 @@ export async function previsionOfPeriod(period) {
   return {
     items,
     comprometidoCents,
-    saldoN26Cents,
+    saldoCuentaCents,
     pendienteSaraCents,
-    disponibleCents: saldoN26Cents - comprometidoCents + pendienteSaraCents,
+    disponibleCents: saldoCuentaCents - comprometidoCents + pendienteSaraCents,
   };
 }
 
@@ -476,15 +489,14 @@ export async function createAccount({ name, type, openingBalanceCents }) {
   return id;
 }
 
-/** Actualiza una cuenta (mismas claves camelCase que createAccount). acc-n26 —la que usa el
- *  import de N26 para localizarla por id fijo— NO admite cambiar de nombre: el `name` recibido
- *  se ignora en silencio y se conserva "N26", pero opening_balance_cents SÍ es editable (saldo
- *  inicial real de la cuenta, no lo toca el import). Los demás campos ausentes conservan el
- *  valor actual — mismo criterio merge-on-current que repo.updateRule. */
+/** Actualiza una cuenta (mismas claves camelCase que createAccount). Toda cuenta es renombrable,
+ *  incluida la que usa el import de N26 (localiza la cuenta por `meta.import_account_id`, no por
+ *  nombre). Los campos ausentes conservan el valor actual — mismo criterio merge-on-current que
+ *  repo.updateRule. */
 export async function updateAccount(id, fields) {
   const cur = await getAccount(id);
   if (!cur) throw new Error("Cuenta no encontrada");
-  const name = id === "acc-n26" ? cur.name : (fields.name ?? cur.name);
+  const name = fields.name ?? cur.name;
   const type = fields.type ?? cur.type;
   const openingBalanceCents = fields.openingBalanceCents ?? cur.opening_balance_cents;
   const t = nowIso();
@@ -562,9 +574,10 @@ export const softDeleteGoal = (id) => exec(SQL.softDeleteGoal, [nowIso(), id]);
 
 // ---- Import CSV N26 (Task 15) -----------------------------------------------
 
-// Lo consume n26.js para re-firmar en memoria las transacciones existentes de acc-n26 antes de
-// decidir cada fila del CSV (bcDecideImportAction) — un único query, no uno por fila.
-export const n26Existing = () => query(SQL.n26Existing);
+// Lo consume n26.js para re-firmar en memoria las transacciones existentes de la cuenta de
+// import antes de decidir cada fila del CSV (bcDecideImportAction) — un único query, no uno
+// por fila.
+export const n26Existing = (accountId) => query(SQL.n26Existing, [accountId]);
 
 export async function dumpAllTables() {
   const out = {};

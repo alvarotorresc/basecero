@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
-import { seedStatements, SEED_ACCOUNTS, SEED_CATEGORIES } from "../../app/js/seeds.js";
+import { seedStatements, SEED_CATEGORIES } from "../../app/js/seeds.js";
 import { SQL } from "../../app/js/sql.js";
 
 const schema = readFileSync(new URL("../../app/js/schema.sql", import.meta.url), "utf8");
@@ -22,12 +22,11 @@ test("esquema aplica y las 8 tablas existen", () => {
   assert.equal(db.prepare("SELECT value FROM meta WHERE key='schema_version'").get().value, "1");
 });
 
-test("semillas: 4 cuentas y 41 categorías con integridad", () => {
+test("semillas: 0 cuentas (las crea el usuario) y 41 categorías con integridad", () => {
   const db = freshDb();
-  assert.equal(db.prepare("SELECT COUNT(*) c FROM accounts").get().c, 4);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM accounts").get().c, 0);
   assert.equal(db.prepare("SELECT COUNT(*) c FROM categories").get().c, 41);
   assert.equal(db.prepare("SELECT COUNT(*) c FROM categories WHERE parent_id<>'' AND parent_id NOT IN (SELECT id FROM categories)").get().c, 0);
-  assert.equal(db.prepare("SELECT name FROM accounts WHERE id='acc-n26'").get().name, "N26");
 });
 
 test("CHECKs de enums y de importes positivos", () => {
@@ -57,4 +56,14 @@ test("meta: semillas incluyen locale es-ES y currency EUR", () => {
   const meta = Object.fromEntries(db.prepare(SQL.allMeta).all().map((r) => [r.key, r.value]));
   assert.equal(meta.locale, "es-ES");
   assert.equal(meta.currency, "EUR");
+});
+
+test("meta: las claves de cuenta entran vacías con INSERT OR IGNORE", () => {
+  const db = freshDb();
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='import_account_id'").get().value, "");
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='default_account_id'").get().value, "");
+  // re-ejecutar el esquema NO pisa un valor ya configurado
+  db.prepare("UPDATE meta SET value='acc-x' WHERE key='import_account_id'").run();
+  db.exec(schema);
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='import_account_id'").get().value, "acc-x");
 });

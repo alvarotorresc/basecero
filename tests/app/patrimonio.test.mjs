@@ -308,11 +308,11 @@ function createGoalReproduced(db, fields, now = T) {
   return goalId;
 }
 
-/** Reproduce repo.updateAccount: acc-n26 ignora el name recibido (conserva el actual), el resto
- *  de campos ausentes también conservan el valor actual (mismo criterio que updateRule). */
+/** Reproduce repo.updateAccount: campos ausentes conservan el valor actual (mismo criterio que
+ *  updateRule). Toda cuenta, incluida acc-n26, es renombrable. */
 function updateAccountReproduced(db, id, fields, now = T2) {
   const cur = db.prepare(SQL.getAccount).get(id);
-  const name = id === "acc-n26" ? cur.name : (fields.name ?? cur.name);
+  const name = fields.name ?? cur.name;
   const type = fields.type ?? cur.type;
   const openingBalanceCents = fields.openingBalanceCents ?? cur.opening_balance_cents;
   db.prepare(SQL.updateAccount).run(name, type, openingBalanceCents, now, id);
@@ -353,15 +353,13 @@ test("SQL.updateAccount: cambia nombre/tipo/saldo inicial y updated_at, nunca cr
   assert.equal(after.created_at, before.created_at);
 });
 
-test("updateAccount (reproducido) de acc-n26: ignora el nombre recibido y conserva 'N26', pero SÍ cambia opening_balance", () => {
+test("updateAccount (reproducido): acc-n26 se renombra como cualquier otra cuenta", () => {
   const db = openDb();
   seedMinimal(db); // acc-n26 checking 100000
-
   updateAccountReproduced(db, "acc-n26", { name: "Cuenta corriente", openingBalanceCents: 250000 });
-
   const row = db.prepare("SELECT * FROM accounts WHERE id='acc-n26'").get();
-  assert.equal(row.name, "N26", "el name recibido se ignora: acc-n26 no es renombrable");
-  assert.equal(row.opening_balance_cents, 250000, "opening_balance SÍ es editable en acc-n26");
+  assert.equal(row.name, "Cuenta corriente");
+  assert.equal(row.opening_balance_cents, 250000);
 });
 
 test("CHECK de type inválido en accounts lanza (insertAccount)", () => {
