@@ -4,13 +4,12 @@ import {
   createGoal, updateGoal, softDeleteGoal,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, hoyISO } from "../format.js";
+import { fmtMoney, hoyISO, fmtDec1 } from "../format.js";
 import { sparklineSvg } from "../charts.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const centsToRaw = (cents) => (cents ? (Math.abs(cents) / 100).toFixed(2).replace(".", ",") : "");
-const fmtPct1 = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 // ---- tarjeta "Patrimonio neto" --------------------------------------------
 
@@ -163,7 +162,7 @@ const HUCHA_GOAL_TYPES = new Set(["emergency_fund", "savings_target", "provision
 /** savings_rate guarda puntos porcentuales en currentCents/targetCents (ver repo.goalProgress):
  *  se muestran como "%", el resto de tipos como € (fmtMoney). */
 function fmtGoalAmount(goal, cents) {
-  return goal.type === "savings_rate" ? `${fmtPct1.format(cents)} %` : fmtMoney(cents);
+  return goal.type === "savings_rate" ? `${fmtDec1(cents)} %` : fmtMoney(cents);
 }
 
 /** Fila de un goal: título + "actual / objetivo", barra de 8px, subtítulo contextual a la

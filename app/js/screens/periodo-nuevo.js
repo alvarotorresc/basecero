@@ -3,11 +3,10 @@ import {
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { eurToCents } from "../contract.js";
-import { fmtMoney, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto } from "../format.js";
+import { fmtMoney, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct } from "../format.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-const pctFmt = new Intl.NumberFormat("es-ES", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const BTN_SECONDARY = "background:transparent;color:var(--text);border:1px solid var(--border);"
   + "border-radius:var(--radius-sm);padding:16px;flex:1;font:600 16px var(--font-ui);cursor:pointer;";
 
@@ -119,7 +118,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
   function bloqueCierre() {
     if (mode !== "next") return "";
     const ahorrado = closingIncome - closingSpent;
-    const tasa = closingIncome > 0 ? pctFmt.format(ahorrado / closingIncome) : "—";
+    const tasa = closingIncome > 0 ? fmtPct(ahorrado / closingIncome) : "—";
     const rangeEnd = prevDayIso(state.startDate || hoyISO());
     return `
     <div class="card" style="display:flex; flex-direction:column; gap:14px; margin-bottom:16px;">

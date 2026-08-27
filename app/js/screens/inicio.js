@@ -4,7 +4,7 @@ import {
   spentByRootCategory, spentLast7Days,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO } from "../format.js";
+import { fmtMoney, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtNum2, fmtPct } from "../format.js";
 import { budgetStatus } from "./presupuesto.js";
 import { barChartSvg, donutSvg } from "../charts.js";
 import { renderLiquidar } from "./liquidar.js";
@@ -15,9 +15,7 @@ import { renderRegistro } from "./registro.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-const pctFmt = new Intl.NumberFormat("es-ES", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
-const fmtNumEs = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const centsToStr = (cents) => fmtNumEs.format((cents ?? 0) / 100);
+const centsToStr = (cents) => fmtNum2((cents ?? 0) / 100);
 
 // Cuántas categorías raíz se listan individualmente en el donut antes de agrupar el resto en
 // "Otras N" — mismo criterio visual que design/Resumen.dc.html:139-213 (6 + "Otras 3").
@@ -305,7 +303,7 @@ export async function renderInicio(container) {
   const budgetByCategory = Object.fromEntries(budgets.map((b) => [b.category_id, b.amount_cents]));
 
   const ahorrado = income - spent;
-  const tasa = income > 0 ? pctFmt.format(ahorrado / income) : "—";
+  const tasa = income > 0 ? fmtPct(ahorrado / income) : "—";
   const hoy = hoyISO();
 
   const movimientosHtml = rows.length === 0

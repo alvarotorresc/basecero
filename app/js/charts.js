@@ -1,9 +1,12 @@
 // Módulo PURO (sin DOM ni imports de db/repo): construye y devuelve strings SVG/HTML para las
 // gráficas de Inicio (Task 12) y del detalle de cuenta (sparklineSvg, Task 13). Esto permite que
 // los tests de node importen el módulo directamente, sin worker ni DOM (ver tests/app/charts.test.mjs).
+// Importa fmtNum2 de format.js para el formateo de números — format.js también es puro (sin DOM
+// ni imports de db/repo), así que esta independencia se mantiene.
 
-const fmtNumEs = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const centsToStr = (cents) => fmtNumEs.format((cents ?? 0) / 100);
+import { fmtNum2 } from "./format.js";
+
+const centsToStr = (cents) => fmtNum2((cents ?? 0) / 100);
 
 // ---- barChartSvg ----------------------------------------------------------
 

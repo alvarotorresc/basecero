@@ -1,6 +1,6 @@
 import { SQL, TABLES } from "./sql.js";
 import { query, exec, execMany } from "./db.js";
-import { nowIso, hoyISO, prevDayIso, fmtMoney } from "./format.js";
+import { nowIso, hoyISO, prevDayIso, fmtMoney, fmtDec1, appLocale } from "./format.js";
 import { CONTRACT, insertSql } from "./contract.js";
 import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
 
@@ -352,7 +352,6 @@ export async function avgSpentOfClosedPeriods() {
   return Math.round(spents.reduce((s, c) => s + c, 0) / spents.length);
 }
 
-const fmtDecimal1 = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 // den<=0 -> 0 en vez de NaN/Infinity: mismo criterio que budgetStatus (presupuesto.js), pero sin
 // importarla desde repo.js (capa de datos no depende de una pantalla) — 3 líneas, se duplica aquí.
 const safeDiv = (num, den) => (den > 0 ? (num / den) * 100 : 0);
@@ -360,7 +359,7 @@ const safeDiv = (num, den) => (den > 0 ? (num / den) * 100 : 0);
 // "antes de mayo 2027" (mes en minúscula, mitad de frase) — a diferencia de
 // format.js#nombrePorDefecto (que capitaliza para usarlo como NOMBRE de periodo), aquí no aplica.
 const fmtMesAnio = (iso) =>
-  new Date(iso + "T12:00:00").toLocaleDateString("es-ES", { month: "long", year: "numeric" }).replace(" de ", " ");
+  new Date(iso + "T12:00:00").toLocaleDateString(appLocale(), { month: "long", year: "numeric" }).replace(" de ", " ");
 
 /** Progreso de UN goal activo según su tipo (contrato §7.2) — función PURA: toda la información
  *  ya viene resuelta en `ctx` (repo.goalsWithProgress hace las queries UNA vez y arma ctx antes
@@ -387,7 +386,7 @@ export function goalProgress(goal, ctx) {
     const pct = safeDiv(currentCents, targetCents);
     const accName = accountNameById[goal.account_id] ?? "";
     const subtitle = avgSpentCents > 0
-      ? `Hucha en ${accName} · cubre ${fmtDecimal1.format(currentCents / avgSpentCents)} meses de gasto`
+      ? `Hucha en ${accName} · cubre ${fmtDec1(currentCents / avgSpentCents)} meses de gasto`
       : `Hucha en ${accName} · todavía sin periodos cerrados para calcular el gasto medio`;
     return { goal, currentCents, targetCents, pct, level: "ok", subtitle };
   }
