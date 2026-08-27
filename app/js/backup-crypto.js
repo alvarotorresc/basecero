@@ -33,7 +33,7 @@ export function isEncryptedBackup(data) {
 
 async function deriveKey(passphrase, salt, iterations) {
   const material = await crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+    "raw", new TextEncoder().encode(passphrase.normalize("NFC")), "PBKDF2", false, ["deriveKey"]);
   return crypto.subtle.deriveKey(
     { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
     material,

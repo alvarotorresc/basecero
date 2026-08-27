@@ -84,6 +84,15 @@ test("un fichero no cifrado no se confunde con uno cifrado", async () => {
   await assert.rejects(() => decryptBackup(zip, "contraseña larga"), BackupFormatError);
 });
 
+test("la passphrase se normaliza a NFC (NFD y NFC son la misma contraseña)", async () => {
+  const nfd = "café con leche"; // 'e' + acento combinante (NFD)
+  const nfc = "café con leche";  // 'é' precompuesto (NFC)
+  const plain = sample();
+  const enc = await encryptBackup(plain, nfd, FAST);
+  const dec = await decryptBackup(enc, nfc);
+  assert.deepEqual(dec, plain);
+});
+
 test("round-trip con un .xlsx real de SheetJS", async () => {
   const wb = X.utils.book_new();
   X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([["k", "v"], ["a", 1]]), "Hoja");
