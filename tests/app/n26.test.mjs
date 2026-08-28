@@ -41,7 +41,7 @@ function csvRow({ date = "2026-08-20", partner = "MERCADONA", iban = "", type = 
   return `"${date}","${date}","${partner}","${iban}","${type}","${ref}","${account}","${amount}","","",""`;
 }
 
-const CSV_2ROWS = [CSV_HEADER, csvRow(), csvRow({ date: "2026-08-21", partner: "Sara",
+const CSV_2ROWS = [CSV_HEADER, csvRow(), csvRow({ date: "2026-08-21", partner: "MARTA G.",
   iban: "ES9121000000000000000000", type: "MoneyBeam", ref: "Bizum alquiler", amount: "360.00" })].join("\n");
 
 /** Reproduce el flujo de n26.importN26Csv (app/js/n26.js) contra node:sqlite: no hay Worker
@@ -101,7 +101,7 @@ test("import CSV de 2 filas sobre base vacía: 2 creadas reconciled sin categor�
   assert.equal(gasto.period_id, "p1");
   assert.match(gasto.external_id, /^[0-9a-f]{16}$/);
 
-  const ingreso = rows.find((r) => r.merchant === "Sara");
+  const ingreso = rows.find((r) => r.merchant === "MARTA G.");
   assert.equal(ingreso.type, "income");
   assert.equal(ingreso.amount_cents, 36000);
   assert.equal(ingreso.category_id, "");
@@ -125,7 +125,7 @@ test("fila que casa con un pending manual ≤3 días: reconciled, conserva categ
 
   const res = await runImport(d, CSV_2ROWS);
   // Fila 1 (MERCADONA, -45.20, 2026-08-20) casa con manual1 (mismo importe, expense, 1 día de
-  // diferencia); fila 2 (Sara, +360.00) no tiene con qué casar -> create.
+  // diferencia); fila 2 (MARTA G., +360.00) no tiene con qué casar -> create.
   assert.deepEqual(res, { created: 1, reconciled: 1, skipped: 0 });
   assert.equal(n26Rows(d).length, 2);
 

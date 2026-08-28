@@ -1,4 +1,4 @@
-import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta } from "../repo.js";
+import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMetaMany } from "../repo.js";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
 import { hoyISO, fmtDiaCorto } from "../format.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
@@ -41,7 +41,7 @@ function downloadXlsx(dump, filename) {
   download(new Blob([arr], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
 }
 
-function periodoCardHtml(period) {
+function periodoCardHtml(period, partnerName) {
   if (!period) return "";
   // start_date puede quedar en el futuro (se puede abrir el periodo unos días antes de que
   // empiece): en ese caso no hay "días transcurridos" que mostrar, así que se omite ese tramo
@@ -66,7 +66,9 @@ function periodoCardHtml(period) {
       </div>
       <button type="button" class="btn-primary" id="btn-cerrar-periodo">Cerrar periodo y abrir el siguiente</button>
       <div style="font-size:11px;color:var(--text-3);line-height:1.5">
-        Al cerrar fijarás la fecha final y elegirás el reparto con Sara del periodo nuevo. Ábrelo el día que entre la nómina.
+        ${partnerName
+          ? `Al cerrar fijarás la fecha final y elegirás el reparto con ${escHtml(partnerName)} del periodo nuevo. Ábrelo el día que entre la nómina.`
+          : "Al cerrar fijarás la fecha final. Ábrelo el día que entre la nómina."}
       </div>
     </div>
   </div>`;
@@ -81,6 +83,7 @@ export async function renderAjustes(container) {
 
   let metaCfg = { currency: "EUR", locale: "es-ES" };
   try { metaCfg = { ...metaCfg, ...(await getMetaAll()) }; } catch {}
+  const partnerName = (metaCfg.partner_name || "").trim();
 
   const state = {
     errors: null, pending: null, busy: false, n26Result: null, n26Error: null,
@@ -161,7 +164,7 @@ export async function renderAjustes(container) {
         </div>` : ""}
       </div>
 
-      ${periodoCardHtml(openPeriod)}
+      ${periodoCardHtml(openPeriod, partnerName)}
 
       <div class="card" style="margin-bottom:12px">
         <p style="font-weight:600;margin-bottom:4px">Banco</p>
@@ -185,7 +188,12 @@ export async function renderAjustes(container) {
           <select id="pref-currency" style="${INPUT_STYLE}">${currencyOptionsHtml(metaCfg.currency)}</select>
           <select id="pref-locale" style="${INPUT_STYLE}">${localeOptionsHtml(metaCfg.locale)}</select>
         </div>
-        <button type="button" id="btn-prefs-save" style="${BTN_SECONDARY}" ${state.busy ? "disabled" : ""}>Guardar preferencias</button>
+        <label class="field field-stack" style="margin-top:12px;">
+          <span class="field-label">Compartes gastos con</span>
+          <input type="text" id="cfg-partner" value="${escAttr(metaCfg.partner_name || "")}" placeholder="Nadie — déjalo vacío si llevas tus cuentas solo">
+        </label>
+        <div style="font-size:11px;color:var(--text-3);">Con nombre, aparecen el reparto y «Liquidar». Vacío, la app es solo tuya.</div>
+        <button type="button" id="btn-prefs-save" style="${BTN_SECONDARY}margin-top:12px" ${state.busy ? "disabled" : ""}>Guardar preferencias</button>
       </div>
 
       <div class="card" style="margin-bottom:12px">
@@ -234,8 +242,12 @@ export async function renderAjustes(container) {
       try {
         const res = await importN26Csv(await file.text());
         state.n26Result = `Nuevas: ${res.created} · Conciliadas: ${res.reconciled} · `
-          + `Duplicadas (saltadas): ${res.skipped}. Revisa la bandeja «sin categorizar» en `
-          + `Movimientos. Los Bizum de Sara se concilian solos si usas «Liquidar» en Inicio antes de importar.`;
+          + `Duplicadas (saltadas): ${res.skipped}. Revisa la bandeja «sin categorizar» en Movimientos.`
+          // texto plano: se escapa una única vez al pintarlo (escHtml en el render de más abajo),
+          // así que partnerName va SIN escapar aquí para no escaparlo dos veces.
+          + (partnerName
+            ? ` Los Bizum de ${partnerName} se concilian solos si usas «Liquidar» en Inicio antes de importar.`
+            : "");
       } catch (err) {
         state.n26Error = err.message;
       } finally {
@@ -357,14 +369,18 @@ export async function renderAjustes(container) {
     }
 
     container.querySelector("#btn-prefs-save").onclick = async () => {
-      // Leer los selects ANTES de render(): reconstruye el DOM desde metaCfg (el valor
+      // Leer los inputs ANTES de render(): reconstruye el DOM desde metaCfg (el valor
       // guardado), así que leerlos después devolvería el valor antiguo, no el elegido.
       const currency = container.querySelector("#pref-currency").value;
       const locale = container.querySelector("#pref-locale").value;
+      const partner = container.querySelector("#cfg-partner").value.trim();
       state.busy = true; render();
       try {
-        await setMeta("currency", currency);
-        await setMeta("locale", locale);
+        // Los tres campos de la tarjeta en UN execMany (vía setMetaMany): o quedan las tres
+        // claves guardadas o ninguna, así currency/locale/partner_name nunca quedan a medias.
+        // partner_name va sin bcSanitizeCell a propósito: SheetJS exporta la celda como string (sin riesgo
+        // de fórmula) y sanitizar ensuciaría el nombre en toda la UI («+Ana» → «'+Ana»).
+        await setMetaMany([["currency", currency], ["locale", locale], ["partner_name", partner]]);
         location.reload();
       } catch (err) {
         state.busy = false;

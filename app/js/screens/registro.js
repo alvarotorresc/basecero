@@ -52,6 +52,7 @@ export async function renderRegistro(container, onDone, prefill) {
 
   const accounts = accountsAll.filter((a) => a.type !== "liability");
   const pct = period?.my_share_pct ?? 100;
+  const partnerName = (meta.partner_name || "").trim();
 
   const state = {
     tipo: prefill?.type ?? "expense",
@@ -60,7 +61,7 @@ export async function renderRegistro(container, onDone, prefill) {
     categoryId: prefill?.categoryId ?? null,
     accountId: prefill?.accountId ?? resolveAccountId(meta.default_account_id, accounts) ?? "",
     counterAccountId: "",
-    isShared: prefill?.isShared ?? false,
+    isShared: partnerName ? (prefill?.isShared ?? false) : false,
     fecha: hoyISO(),
     merchant: prefill?.merchant ?? "",
     note: "",
@@ -101,17 +102,17 @@ export async function renderRegistro(container, onDone, prefill) {
     state.refId = row.id;
     state.categoryId = row.category_id;
     if (row.is_shared) {
-      // Solo precarga categoría + importe de la parte de Sara; el refund de
+      // Solo precarga categoría + importe de la parte de la contraparte; el refund de
       // liquidación en sí NO se marca compartido (mismo criterio que Task 7
-      // settleShared: is_shared=0, ya es el 100% de lo que Sara debe).
+      // settleShared: is_shared=0, ya es el 100% de lo que la contraparte debe).
       // Usa el pct EFECTIVO del gasto enlazado (su propio override, o el pct
       // de SU periodo), no el del periodo abierto: el gasto puede venir de un
       // periodo cerrado con reparto distinto o llevar su propio override.
       const rowPct = row.share_pct_override ?? row.period_pct ?? 100;
       const myPart = Math.round((row.amount_cents * rowPct) / 100);
-      const saraPart = row.amount_cents - myPart;
-      state.raw = centsToRaw(saraPart);
-      state.cents = saraPart;
+      const partnerPart = row.amount_cents - myPart;
+      state.raw = centsToRaw(partnerPart);
+      state.cents = partnerPart;
     }
     state.refundPickerOpen = false;
     errorMsg = "";
@@ -200,7 +201,7 @@ export async function renderRegistro(container, onDone, prefill) {
   function render() {
     const cats = categoriesFor();
     const myCents = state.isShared ? Math.round((state.cents * pct) / 100) : state.cents;
-    const saraCents = state.isShared ? state.cents - myCents : 0;
+    const partnerCents = state.isShared ? state.cents - myCents : 0;
 
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
 
@@ -258,10 +259,10 @@ export async function renderRegistro(container, onDone, prefill) {
         <input type="text" id="reg-note" value="${escAttr(state.note)}" placeholder="Opcional">
       </label>
 
-      ${needsCategory(state.tipo) ? `
+      ${needsCategory(state.tipo) && partnerName ? `
       <div class="card" style="padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
-          <span style="font-size:15px; font-weight:600;">Compartido con Sara</span>
+          <span style="font-size:15px; font-weight:600;">Compartido con ${escHtml(partnerName)}</span>
           <span class="toggle">
             <input type="checkbox" id="reg-shared" ${state.isShared ? "checked" : ""}>
             <span class="toggle-track"><span class="toggle-knob"></span></span>
@@ -274,8 +275,8 @@ export async function renderRegistro(container, onDone, prefill) {
             <div class="num" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
           </div>
           <div style="flex:1; background:#1b1e21; border-radius:14px; padding:10px 11px;">
-            <div style="font-size:10px; color:var(--text-3);">Sara · ${100 - pct}%</div>
-            <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(saraCents)}</div>
+            <div style="font-size:10px; color:var(--text-3);">${escHtml(partnerName)} · ${100 - pct}%</div>
+            <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerCents)}</div>
           </div>
         </div>` : ""}
       </div>` : ""}

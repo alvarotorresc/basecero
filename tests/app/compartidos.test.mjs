@@ -28,7 +28,7 @@ function ins(db, over = {}) {
 
 /** Reproduce EXACTAMENTE la secuencia que hace repo.settleShared (que a su vez delega en
  *  repo.addTransaction({refId})): busca la fila en pendingShared (misma fuente de verdad para
- *  el importe/categoría de Sara, sin duplicar el cálculo del pct), inserta el refund de
+ *  el importe/categoría de la contraparte, sin duplicar el cálculo del pct), inserta el refund de
  *  liquidación en el periodo abierto y marca settled=1 en el gasto original — el mismo
  *  execMany([insertStmt, updateSettled]) de repo.addTransaction. */
 function settleShared(db, origId, accountId, now, openPeriodId = "per-1") {
@@ -36,24 +36,24 @@ function settleShared(db, origId, accountId, now, openPeriodId = "per-1") {
   if (!row) throw new Error("Gasto compartido no encontrado o ya liquidado");
   const refundId = "refund-" + origId;
   db.prepare(SQL.insertTransaction).run(
-    refundId, "2026-08-24", openPeriodId, "refund", row.sara_amount_cents, accountId, "",
+    refundId, "2026-08-24", openPeriodId, "refund", row.partner_amount_cents, accountId, "",
     row.category_id, row.merchant, "Liquidación", 0, null, 0, origId, "", "", "pending", now, now,
   );
   db.prepare("UPDATE transactions SET settled=1, updated_at=? WHERE id=?").run(now, origId);
   return refundId;
 }
 
-test("pendingShared: calcula sara_amount_cents con el pct del PROPIO periodo de cada gasto y con override", () => {
+test("pendingShared: calcula partner_amount_cents con el pct del PROPIO periodo de cada gasto y con override", () => {
   const db = openDb();
   seedMinimal(db);
   db.prepare(`INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
     VALUES ('per-2','Julio 2026','2026-06-27','2026-07-27','closed',50,'',?,?,0)`).run(T, T);
 
-  // per-1 (60/40): sin override → sara = 4000
+  // per-1 (60/40): sin override → contraparte = 4000
   const a = ins(db, { id: "a", date: "2026-08-10", period: "per-1", cents: 10000, shared: 1 });
-  // per-2 (50/50, periodo YA CERRADO): sin override → sara = 5000, con SU pct propio, no el de per-1
+  // per-2 (50/50, periodo YA CERRADO): sin override → contraparte = 5000, con SU pct propio, no el de per-1
   const b = ins(db, { id: "b", date: "2026-08-05", period: "per-2", cents: 10000, shared: 1 });
-  // per-1 con override=90 → el override manda sobre el pct del periodo: sara = 1000
+  // per-1 con override=90 → el override manda sobre el pct del periodo: contraparte = 1000
   const c = ins(db, { id: "c", date: "2026-08-15", period: "per-1", cents: 10000, shared: 1, override: 90 });
 
   // no deben aparecer:
@@ -66,23 +66,23 @@ test("pendingShared: calcula sara_amount_cents con el pct del PROPIO periodo de 
   const rows = db.prepare(SQL.pendingShared).all();
 
   assert.deepEqual(rows.map((r) => r.id), [b, a, c], "orden por date ASC");
-  assert.equal(rows.find((r) => r.id === a).sara_amount_cents, 4000);
-  assert.equal(rows.find((r) => r.id === b).sara_amount_cents, 5000);
-  assert.equal(rows.find((r) => r.id === c).sara_amount_cents, 1000);
+  assert.equal(rows.find((r) => r.id === a).partner_amount_cents, 4000);
+  assert.equal(rows.find((r) => r.id === b).partner_amount_cents, 5000);
+  assert.equal(rows.find((r) => r.id === c).partner_amount_cents, 1000);
 
   const total = db.prepare(SQL.pendingSharedTotal).get().total_cents;
   assert.equal(total, 4000 + 5000 + 1000, "el income compartido NO debe sumar al total pendiente");
 });
 
-test("pendingShared: un reparto 100/0 (pct del periodo o override) da sara_amount_cents=0 y se excluye", () => {
+test("pendingShared: un reparto 100/0 (pct del periodo o override) da partner_amount_cents=0 y se excluye", () => {
   const db = openDb();
   seedMinimal(db);
   db.prepare(`INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
     VALUES ('per-100','Periodo 100/0','2026-05-27','2026-06-27','closed',100,'',?,?,0)`).run(T, T);
 
-  // periodo con my_share_pct=100 (permitido en el onboarding): sara = 0 → no debe aparecer
+  // periodo con my_share_pct=100 (permitido en el onboarding): contraparte = 0 → no debe aparecer
   const soloYo = ins(db, { id: "solo-yo", period: "per-100", cents: 10000, shared: 1 });
-  // per-1 (60/40) pero con override=100: el override manda, sara = 0 → tampoco debe aparecer
+  // per-1 (60/40) pero con override=100: el override manda, contraparte = 0 → tampoco debe aparecer
   const overrideCien = ins(db, { id: "override-cien", period: "per-1", cents: 10000, shared: 1, override: 100 });
   // control: un compartido normal SÍ debe aparecer
   const normal = ins(db, { id: "normal", period: "per-1", cents: 10000, shared: 1 });
@@ -96,7 +96,7 @@ test("pendingShared: un reparto 100/0 (pct del periodo o override) da sara_amoun
   assert.equal(total, 4000, "solo 'normal' (60/40 de 10000) debe sumar; los 100/0 no aportan nada");
 });
 
-test("settleShared: crea el refund con importe/categoría/comercio de la parte de Sara y el original queda settled", () => {
+test("settleShared: crea el refund con importe/categoría/comercio de la parte de la contraparte y el original queda settled", () => {
   const db = openDb();
   seedMinimal(db);
   const gastoId = ins(db, {
@@ -108,13 +108,13 @@ test("settleShared: crea el refund con importe/categoría/comercio de la parte d
 
   const refund = db.prepare("SELECT * FROM transactions WHERE id=?").get(refundId);
   assert.equal(refund.type, "refund");
-  assert.equal(refund.amount_cents, 3200, "8000 - 60% = 3200 (parte de Sara)");
+  assert.equal(refund.amount_cents, 3200, "8000 - 60% = 3200 (parte de la contraparte)");
   assert.equal(refund.category_id, "cat-casa-alquiler");
   assert.equal(refund.merchant, "IKEA");
   assert.equal(refund.note, "Liquidación");
   assert.equal(refund.account_id, "acc-n26");
   assert.equal(refund.ref_id, gastoId);
-  assert.equal(refund.is_shared, 0, "el refund de liquidación en sí no se marca compartido (ya es el 100% de Sara)");
+  assert.equal(refund.is_shared, 0, "el refund de liquidación en sí no se marca compartido (ya es el 100% de la contraparte)");
 
   const gasto = db.prepare("SELECT settled FROM transactions WHERE id=?").get(gastoId);
   assert.equal(gasto.settled, 1);
@@ -167,6 +167,30 @@ test("SQL.hasActiveLinkedRefund: true solo con un refund ACTIVO que apunte por r
     "un refund BORRADO no cuenta como enlace activo (mismo criterio que unsettleIfNoActiveRefunds)");
 });
 
+// ---- Task 5 (PR C, contraparte): banner de migración de Inicio ------------------------
+
+test("hasShared: detecta transacciones y reglas compartidas activas (borradas no cuentan)", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const has = () => !!(db.prepare(SQL.hasSharedTx).get() || db.prepare(SQL.hasSharedRule).get());
+  assert.equal(has(), false);
+
+  const txId = ins(db, { id: "tx-shared", shared: 1 });
+  assert.equal(has(), true, "una transacción compartida activa cuenta");
+
+  db.prepare("UPDATE transactions SET deleted=1 WHERE id=?").run(txId);
+  assert.equal(has(), false, "transacción compartida borrada no cuenta");
+
+  db.prepare(SQL.insertRule).run(
+    "rule-shared", "Netflix", "expense", 1500, "cat-casa-alquiler", "acc-n26", "",
+    "monthly", 1, null, 1, 1, T, T,
+  );
+  assert.equal(has(), true, "una regla recurrente compartida activa también cuenta");
+
+  db.prepare("UPDATE recurring_rules SET deleted=1 WHERE id=?").run("rule-shared");
+  assert.equal(has(), false, "regla compartida borrada no cuenta");
+});
+
 test("sharedFieldsLocked: pura, sin DB — replica exactamente lo que updateTransaction debe bloquear", () => {
   const settledExpense = { type: "expense", settled: 1, amount_cents: 4550, is_shared: 1, share_pct_override: null };
 
@@ -194,7 +218,7 @@ test("sharedFieldsLocked: pura, sin DB — replica exactamente lo que updateTran
     { amountCents: 6000, isShared: true, sharePctOverride: null },
   ), true, "cambiar el importe de un gasto liquidado debe bloquearse");
 
-  // settled + expense + is_shared distinto (desmarcar "Compartido con Sara") → bloquea
+  // settled + expense + is_shared distinto (desmarcar "Compartido con la contraparte") → bloquea
   assert.equal(sharedFieldsLocked(
     settledExpense,
     { amountCents: 4550, isShared: false, sharePctOverride: null },

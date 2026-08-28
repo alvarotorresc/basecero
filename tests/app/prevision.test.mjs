@@ -7,7 +7,7 @@ import { openDb, seedMinimal } from "./helpers.mjs";
 const T = "2026-08-24T18:00:00Z";
 
 /** Inserta una transacción usando la firma de SQL.insertTransaction (mismo helper que
- *  tests/app/sara.test.mjs). */
+ *  tests/app/compartidos.test.mjs). */
 function ins(db, over = {}) {
   const v = {
     id: "t" + Math.floor(Math.random() * 1e9),
@@ -122,7 +122,7 @@ test("SQL.accountBalance: la letra del préstamo como transfer hacia el pasivo a
   assert.equal(n26, 100000 - 20000);
 });
 
-test("previsión del periodo (composición SQL + prevision.js): pagado por rule_id, pagado por fallback categoría+importe, disponible = saldo - comprometido + Sara", () => {
+test("previsión del periodo (composición SQL + prevision.js): pagado por rule_id, pagado por fallback categoría+importe, disponible = saldo - comprometido + contraparte", () => {
   const db = openDb();
   seedMinimal(db); // per-1: start_date 2026-07-27 (periodMonth=8), my_share_pct=60; acc-n26 opening 100000
 
@@ -149,7 +149,7 @@ test("previsión del periodo (composición SQL + prevision.js): pagado por rule_
   // Movimientos del periodo:
   ins(db, { id: "pagoA", cents: 90000, rule: ruleA });                                  // paga A por rule_id
   ins(db, { id: "pagoB", cents: 12000, category: "cat-casa-alquiler" });                // paga B por fallback (mismo cat+importe SIN rule_id)
-  ins(db, { id: "gastoSara", cents: 5000, shared: 1 });                                 // pendiente con Sara, no ligado a ninguna regla
+  ins(db, { id: "gastoContraparte", cents: 5000, shared: 1 });                          // pendiente con la contraparte, no ligado a ninguna regla
 
   const rules = db.prepare(SQL.listRules).all();
   const paidByRuleSet = new Set(db.prepare(SQL.paidRuleIds).all(period.id).map((r) => r.rule_id));
@@ -186,9 +186,9 @@ test("previsión del periodo (composición SQL + prevision.js): pagado por rule_
   const saldoCuentaCents = db.prepare(SQL.accountBalance).get("2026-08-24", "acc-n26").balance_cents;
   assert.equal(saldoCuentaCents, 100000 - 90000 - 12000 - 5000, "opening menos los 3 gastos del periodo");
 
-  const pendienteSaraCents = db.prepare(SQL.pendingSharedTotal).get().total_cents;
-  assert.equal(pendienteSaraCents, 5000 - 3000, "gastoSara: 5000 - 60% de mi parte = 2000 de Sara");
+  const pendientePartnerCents = db.prepare(SQL.pendingSharedTotal).get().total_cents;
+  assert.equal(pendientePartnerCents, 5000 - 3000, "gastoContraparte: 5000 - 60% de mi parte = 2000 de la contraparte");
 
-  const disponibleCents = saldoCuentaCents - comprometidoCents + pendienteSaraCents;
+  const disponibleCents = saldoCuentaCents - comprometidoCents + pendientePartnerCents;
   assert.equal(disponibleCents, -7000 - 1500 + 2000);
 });

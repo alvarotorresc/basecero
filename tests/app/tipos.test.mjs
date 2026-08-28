@@ -67,9 +67,9 @@ test("recentForRefund: expone period_pct y share_pct_override del gasto enlazado
   db.prepare(`INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
     VALUES ('per-closed','Julio 2026','2026-06-27','2026-07-27','closed',70,'',?,?,0)`).run(T, T);
 
-  // compartido sin override, en el periodo cerrado (70%) -> parte de Sara = 30%
+  // compartido sin override, en el periodo cerrado (70%) -> parte de la contraparte = 30%
   const closedId = ins(db, { period: "per-closed", type: "expense", cents: 10000, shared: 1 });
-  // compartido con override 50%, en el periodo abierto per-1 (60%) -> el override manda -> parte de Sara = 50%
+  // compartido con override 50%, en el periodo abierto per-1 (60%) -> el override manda -> parte de la contraparte = 50%
   const overrideId = ins(db, { period: "per-1", type: "expense", cents: 8000, shared: 1, override: 50 });
 
   const rows = db.prepare(SQL.recentForRefund).all("per-1");

@@ -75,6 +75,21 @@ export async function getMetaAll() {
 export async function setMeta(key, value) {
   await exec(SQL.upsertMeta, [key, value]);
 }
+/** Guarda varias claves de meta EN EL MISMO execMany: o quedan todas escritas o ninguna (una
+ *  tarjeta de Ajustes con varios campos —p.ej. moneda, locale y contraparte— no debe poder
+ *  quedar a medio guardar si algo falla entre un setMeta y el siguiente). pairs: [[key, value]]. */
+export async function setMetaMany(pairs) {
+  await execMany(pairs.map(([key, value]) => ({ sql: SQL.upsertMeta, bind: [key, value] })));
+}
+
+/** PR C (contraparte), Task 5: ¿hay algún gasto o regla compartidos activos (sin importar
+ *  meta.partner_name)? La usa Inicio para el banner de migración de una sola vez cuando una BD
+ *  trae compartidos de antes de que la contraparte fuera configurable (partner_name vacío pero
+ *  ya hay is_shared=1 en la BD). */
+export async function hasSharedData() {
+  const [t, r] = await Promise.all([query(SQL.hasSharedTx), query(SQL.hasSharedRule)]);
+  return t.length > 0 || r.length > 0;
+}
 
 /** Cuenta destino del import CSV / cuenta por defecto de formularios, resueltas desde meta
  *  (vacío ⇒ primera checking activa; null ⇒ no hay cuentas). */
@@ -146,8 +161,8 @@ export async function spentLast7Days(pid) {
   return fillLast7Days(rows, today);
 }
 
-/** Liquida un gasto compartido pendiente: crea el refund de la parte de Sara (categoría/comercio
- *  del gasto original, hoy, cuenta de destino elegida) enlazado por refId. Reutiliza sara_amount_cents
+/** Liquida un gasto compartido pendiente: crea el refund de la parte de la contraparte (categoría/comercio
+ *  del gasto original, hoy, cuenta de destino elegida) enlazado por refId. Reutiliza partner_amount_cents
  *  de pendingShared (ya calculado con el pct EFECTIVO del propio periodo del gasto, no el abierto)
  *  en vez de recalcular el pct aquí. El settled=1 del original lo pone addTransaction({refId}) solo. */
 export async function settleShared(txId, accountId) {
@@ -155,7 +170,7 @@ export async function settleShared(txId, accountId) {
   if (!row) throw new Error("Gasto compartido no encontrado o ya liquidado");
   await addTransaction({
     type: "refund",
-    amountCents: row.sara_amount_cents,
+    amountCents: row.partner_amount_cents,
     date: hoyISO(),
     categoryId: row.category_id,
     accountId,
@@ -189,11 +204,11 @@ export async function updateTransaction(id, fields) {
   };
   // Task 17 ronda 2 (controller ruling, finding A): un gasto ya liquidado (settled=1) con un
   // refund activo enlazado no puede cambiar de importe/compartido/reparto — si no, el refund
-  // se queda congelado con el importe viejo y la deuda con Sara se pierde en silencio. Guarda
+  // se queda congelado con el importe viejo y la deuda con la contraparte se pierde en silencio. Guarda
   // server-side (no solo UI, que ya bloquea los campos): un save que NO toca esos campos
   // (solo categoría/fecha/nota/comercio) sigue funcionando con normalidad.
   if (sharedFieldsLocked(cur, f) && (await hasActiveLinkedRefund(id))) {
-    throw new Error("Movimiento liquidado con Sara: borra su liquidación en Movimientos antes de cambiar el importe o el reparto.");
+    throw new Error("Gasto ya liquidado: borra su liquidación en Movimientos antes de cambiar el importe o el reparto.");
   }
   const t = nowIso();
   await exec(SQL.updateTransaction, [
@@ -276,7 +291,7 @@ export const accountBalanceCents = async (accountId, atDateIso) =>
 export async function previsionOfPeriod(period) {
   const month = periodMonth(period.start_date, period.end_date);
   const mainAccountId = await defaultAccountId();
-  const [rules, paidByRule, paidByCat, saldoCuentaCents, pendienteSaraCents] = await Promise.all([
+  const [rules, paidByRule, paidByCat, saldoCuentaCents, pendientePartnerCents] = await Promise.all([
     listRules(),
     query(SQL.paidRuleIds, [period.id]),
     query(SQL.paidByCatAmount, [period.id]),
@@ -302,8 +317,8 @@ export async function previsionOfPeriod(period) {
     items,
     comprometidoCents,
     saldoCuentaCents,
-    pendienteSaraCents,
-    disponibleCents: saldoCuentaCents - comprometidoCents + pendienteSaraCents,
+    pendientePartnerCents,
+    disponibleCents: saldoCuentaCents - comprometidoCents + pendientePartnerCents,
   };
 }
 
