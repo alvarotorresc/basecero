@@ -1,6 +1,6 @@
 import {
   listCategoriesAdmin, allCategoriesById, createCategory, updateCategory,
-  archiveCategory, unarchiveCategory, setCategoryStyle,
+  archiveCategory, unarchiveCategory, setCategoryStyle, reorderCategories, computeReorder,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, POOL, CURATED_ICONS, hashIndex } from "../category-colors.js";
 
@@ -532,19 +532,28 @@ export async function renderCategorias(container, onBack) {
   // colgar del dispatcher render()/state.view en vez de ser el único render)
   // ========================================================================
 
+  // Fila de hija: envuelta en un div (data-child-row, para medir/mover en el drag — Task 7) que
+  // NO es el botón que abre el formulario — el handle ≡ vive fuera de ese botón a propósito, así
+  // un tap/drag sobre el handle nunca puede disparar su click (ver wireDragHandle más abajo).
   function childRowHtml(child) {
     const color = dotColor(child);
     const icon = iconForCategory(child.id, byId);
     return `
-    <button type="button" class="cat-row" data-cat="${child.id}"
-      style="width:100%;display:flex;align-items:center;gap:12px;padding:9px 0;padding-left:44px;background:none;
-      border:0;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;${child.is_archived ? "opacity:0.5;" : ""}">
-      <div class="dotico" style="width:28px;height:28px;font-size:13px;--cat:${color};">${icon}</div>
-      <div class="tx-body" style="flex:1;min-width:0;">
-        <div class="tx-title">${escHtml(child.name)}</div>
-      </div>
-      ${child.is_archived ? `<span class="day-label" style="flex-shrink:0;">Archivada</span>` : ""}
-    </button>`;
+    <div data-child-row="${child.id}" style="display:flex;align-items:center;padding-left:44px;${child.is_archived ? "opacity:0.5;" : ""}">
+      <span class="cat-drag" data-drag="${child.id}" aria-hidden="true"
+        style="color:var(--text-3);font-size:14px;flex-shrink:0;opacity:0.6;letter-spacing:-1px;cursor:grab;
+        touch-action:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;
+        padding:10px 8px 10px 0;">≡</span>
+      <button type="button" class="cat-row" data-cat="${child.id}"
+        style="flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:9px 0;background:none;
+        border:0;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+        <div class="dotico" style="width:28px;height:28px;font-size:13px;--cat:${color};">${icon}</div>
+        <div class="tx-body" style="flex:1;min-width:0;">
+          <div class="tx-title">${escHtml(child.name)}</div>
+        </div>
+        ${child.is_archived ? `<span class="day-label" style="flex-shrink:0;">Archivada</span>` : ""}
+      </button>
+    </div>`;
   }
 
   // Grupo de hijas de una raíz expandida: ÚNICO contenedor .card de toda la pantalla (el resto de
@@ -579,8 +588,12 @@ export async function renderCategorias(container, onBack) {
     // el artboard, donde Casa (expandida) y Ocio (última visible) llevan border-bottom:0.
     const suppressBorder = isLast || expanded;
     return `
-    <div style="display:flex;align-items:center;${root.is_archived ? "opacity:0.5;" : ""}
+    <div data-root-row="${root.id}" style="display:flex;align-items:center;${root.is_archived ? "opacity:0.5;" : ""}
       ${suppressBorder ? "" : "border-bottom:1px solid var(--rule);"}">
+      <span class="cat-drag" data-drag="${root.id}" aria-hidden="true"
+        style="color:var(--text-3);font-size:14px;flex-shrink:0;opacity:0.6;letter-spacing:-1px;cursor:grab;
+        touch-action:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;
+        padding:14px 8px 14px 0;">≡</span>
       <button type="button" class="cat-row" data-cat="${root.id}"
         style="flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:13px 0;background:none;border:0;
         text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
@@ -631,7 +644,7 @@ export async function renderCategorias(container, onBack) {
       </div>
 
       <div style="font-size:11.5px;color:var(--text-3);margin-bottom:8px;">
-        Toca una categoría para editarla; el chevron abre sus subcategorías.
+        Mantén pulsado ≡ para reordenar. Toca una categoría para editarla; el chevron abre sus subcategorías.
       </div>
 
       <div style="display:flex;flex-direction:column;">
@@ -652,6 +665,136 @@ export async function renderCategorias(container, onBack) {
       </div>
     `;
     wireList();
+  }
+
+  // ========================================================================
+  // Task 7: reorden por arrastre (handle ≡). Grupos de reorden: raíces del
+  // flow activo entre sí (rootsOfFlow), o hijas de una misma raíz entre sí
+  // (childrenByParent.get(parentId)) — jamás se cruza de grupo, porque los
+  // rects que se miden y comparan durante el arrastre son SIEMPRE los del
+  // propio grupo (nunca se consulta nada de otro grupo).
+  //
+  // Indicador de drop (outline en la fila objetivo) en vez de desplazar los
+  // hermanos con transform: un grupo de raíces puede tener grupos de hijas
+  // expandidos intercalados entre dos de sus filas (groupHtml es HERMANO de
+  // la fila, no hijo — ver rootRowHtml), así que las filas de un mismo
+  // grupo no son necesariamente contiguas en pantalla. Desplazar hermanos
+  // asumiendo alturas/huecos uniformes se rompería en ese caso; el
+  // indicador no tiene ese problema porque no reposiciona nada más que la
+  // propia fila arrastrada (ghost vía transform).
+  //
+  // setPointerCapture en pointerdown (no tras el umbral): así todo el gesto
+  // — incluido el primer movimiento que decide si hay drag — llega SIEMPRE
+  // al handle, sin importar dónde ande el dedo/cursor. El umbral de 6px
+  // solo gobierna cuándo se activa el feedback visual (ghost + indicador),
+  // no si el evento llega: un tap simple en el handle no dispara nada (no
+  // tiene onclick propio) y, al vivir fuera del botón .cat-row, tampoco
+  // puede disparar accidentalmente su click — separar el target basta para
+  // no interferir con el tap-para-editar, sin depender del umbral para eso.
+  function wireDragHandle(handle) {
+    handle.addEventListener("pointerdown", (e) => {
+      if (e.isPrimary === false || (e.button !== undefined && e.button !== 0)) return;
+
+      const id = handle.dataset.drag;
+      const cat = rows.find((c) => c.id === id);
+      if (!cat) return;
+
+      const isRoot = cat.parent_id === "";
+      const groupIds = isRoot
+        ? rootsOfFlow(cat.flow).map((r) => r.id)
+        : (childrenByParent.get(cat.parent_id) ?? []).map((c) => c.id);
+      const startIndex = groupIds.indexOf(id);
+      if (startIndex === -1 || groupIds.length < 2) return; // nada que reordenar
+
+      const rowEls = groupIds.map((gid) =>
+        container.querySelector(isRoot ? `[data-root-row="${gid}"]` : `[data-child-row="${gid}"]`));
+      if (rowEls.some((el) => !el)) return; // DOM/estado desincronizados: no arriesgar el drag
+
+      const draggedEl = rowEls[startIndex];
+      // Rects medidos UNA VEZ al iniciar (antes de tocar ningún estilo) — el indicador de drop
+      // compara siempre contra este snapshot fijo, nunca remide en cada pointermove.
+      const rects = rowEls.map((el) => el.getBoundingClientRect());
+      const startY = e.clientY;
+      const pointerId = e.pointerId;
+
+      e.preventDefault();
+      try { handle.setPointerCapture(pointerId); } catch { return; }
+
+      let dragging = false;
+      let targetIndex = startIndex;
+
+      function setIndicator(idx) {
+        rowEls.forEach((el, i) => {
+          el.style.outline = (i === idx && i !== startIndex) ? "2px dashed var(--text-3)" : "";
+        });
+      }
+
+      function clearStyles() {
+        draggedEl.style.transform = "";
+        draggedEl.style.position = "";
+        draggedEl.style.zIndex = "";
+        draggedEl.style.boxShadow = "";
+        rowEls.forEach((el) => { el.style.outline = ""; });
+      }
+
+      function onMove(ev) {
+        if (ev.pointerId !== pointerId) return;
+        const dy = ev.clientY - startY;
+        if (!dragging) {
+          if (Math.abs(dy) < 6) return; // umbral: un tap con jitter mínimo no arranca el ghost
+          dragging = true;
+          draggedEl.style.position = "relative";
+          draggedEl.style.zIndex = "5";
+          draggedEl.style.boxShadow = "0 6px 16px rgba(0,0,0,0.28)";
+        }
+        draggedEl.style.transform = `translateY(${dy}px)`;
+
+        const center = rects[startIndex].top + rects[startIndex].height / 2 + dy;
+        let idx = rects.length - 1;
+        for (let i = 0; i < rects.length; i++) {
+          if (center < rects[i].bottom) { idx = i; break; }
+        }
+        if (idx !== targetIndex) {
+          targetIndex = idx;
+          setIndicator(targetIndex);
+        }
+      }
+
+      async function commitReorder(newOrder) {
+        try {
+          await reorderCategories(newOrder);
+          await loadData();
+        } catch {
+          // Reorden no persistido (p.ej. fallo del worker): se repinta con los datos ya cargados,
+          // que siguen siendo válidos — no hay nada que deshacer, nunca se mutó `rows` a mano.
+        }
+        render();
+      }
+
+      function finish(commit) {
+        handle.removeEventListener("pointermove", onMove);
+        handle.removeEventListener("pointerup", onUp);
+        handle.removeEventListener("pointercancel", onCancel);
+        try { handle.releasePointerCapture(pointerId); } catch { /* ya liberado por el navegador */ }
+
+        const wasDragging = dragging;
+        const finalTarget = targetIndex;
+        clearStyles();
+
+        if (!commit || !wasDragging || finalTarget === startIndex) {
+          if (wasDragging) render(); // deja el DOM limpio si hubo ghost visual sin persistir nada
+          return;
+        }
+        commitReorder(computeReorder(groupIds, startIndex, finalTarget));
+      }
+
+      function onUp(ev) { if (ev.pointerId === pointerId) finish(true); }
+      function onCancel(ev) { if (ev.pointerId === pointerId) finish(false); }
+
+      handle.addEventListener("pointermove", onMove);
+      handle.addEventListener("pointerup", onUp);
+      handle.addEventListener("pointercancel", onCancel);
+    });
   }
 
   function wireList() {
@@ -683,6 +826,8 @@ export async function renderCategorias(container, onBack) {
         if (root) openForm({ mode: "create", flow: root.flow, parentId: root.id });
       };
     });
+
+    container.querySelectorAll("[data-drag]").forEach((h) => wireDragHandle(h));
   }
 
   render();
