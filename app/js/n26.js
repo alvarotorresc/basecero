@@ -3,8 +3,8 @@
 // (processN26Csv) a la app: misma lógica de dedupe/conciliación, pero contra SQLite en vez de
 // la hoja de cálculo. bcParseN26Csv / bcParseCsvLine / bcBuildExternalId / bcDecideImportAction /
 // bcSanitizeCell / bcUlid son globales cargados por <script src="vendor/pure.js"> en index.html —
-// NO se importan ni se toca ese fichero (copia verbatim de app/vendor/pure.js, antes en
-// apps_script/; retirado del repo en la PR E).
+// NO se importan ni se toca ese fichero — la fuente única es app/vendor/pure.js (la copia que
+// existía en apps_script/ se retiró del repo en la PR E).
 import { SQL } from "./sql.js";
 import { execMany } from "./db.js";
 import { nowIso } from "./format.js";
