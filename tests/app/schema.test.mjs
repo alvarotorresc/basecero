@@ -67,7 +67,7 @@ test("meta: las claves de cuenta entran vacías con INSERT OR IGNORE", () => {
   db.prepare("UPDATE meta SET value='acc-x' WHERE key='import_account_id'").run();
   db.exec(schema);
   assert.equal(db.prepare("SELECT value FROM meta WHERE key='import_account_id'").get().value, "acc-x");
-  db.prepare("UPDATE meta SET value='Sara' WHERE key='partner_name'").run();
+  db.prepare("UPDATE meta SET value='MARTA G.' WHERE key='partner_name'").run();
   db.exec(schema);
-  assert.equal(db.prepare("SELECT value FROM meta WHERE key='partner_name'").get().value, "Sara");
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='partner_name'").get().value, "MARTA G.");
 });

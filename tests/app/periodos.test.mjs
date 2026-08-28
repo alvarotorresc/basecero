@@ -9,7 +9,7 @@ const T = "2026-08-24T18:00:00Z";
 const T2 = "2026-09-05T10:00:00Z";
 
 /** Inserta una transacción usando la firma de SQL.insertTransaction (mismo helper que
- *  tests/app/sara.test.mjs y tests/app/movimientos.test.mjs). */
+ *  tests/app/compartidos.test.mjs y tests/app/movimientos.test.mjs). */
 function ins(db, over = {}) {
   const v = {
     id: "t" + Math.floor(Math.random() * 1e9),
