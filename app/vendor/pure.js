@@ -1,4 +1,4 @@
-// Copia de apps_script/pure.js — NO editar aquí; fuente única en apps_script/. Regenerar: cp apps_script/pure.js app/vendor/pure.js (conservando esta cabecera)
+// Fuente única de la lógica pura de import (antes vivía en apps_script/, retirado del repo en la PR E).
 // Lógica pura de BaseCero, compartida entre Google Apps Script y Node (tests).
 // Sintaxis compatible GAS: var + function, sin import/export.
 

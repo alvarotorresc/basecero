@@ -4,10 +4,10 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
-const p = require("../pure.js");
+const p = require("../../app/vendor/pure.js");
 
 const sha256hex = (s) => createHash("sha256").update(s, "utf8").digest("hex");
-const csv = readFileSync(new URL("../fixtures/n26_sample.csv", import.meta.url), "utf8");
+const csv = readFileSync(new URL("./fixtures/n26_sample.csv", import.meta.url), "utf8");
 
 test("ulid: 26 chars Crockford y prefijo temporal estable", () => {
   const u = p.bcUlid(1756000000000, () => 128);

@@ -1,10 +1,11 @@
-import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMetaMany, allCategoriesById } from "../repo.js";
+import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta, setMetaMany, allCategoriesById } from "../repo.js";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
-import { hoyISO, fmtDiaCorto } from "../format.js";
+import { hoyISO, fmtDiaCorto, fmtMoney } from "../format.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 import { renderRecurrentes } from "./recurrentes.js";
 import { renderCategorias } from "./categorias.js";
-import { importN26Csv } from "../n26.js";
+import { importCsv, importWithProfile } from "../n26.js";
+import { buildProfile, applyProfile, detectDateFormat, detectDecimal, parseDateIso, parseAmountCents } from "../csv-generic.js";
 import { encryptBackup, decryptBackup, isEncryptedBackup, WrongPassphraseError, MIN_PASSPHRASE } from "../backup-crypto.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -46,6 +47,122 @@ function downloadXlsx(dump, filename) {
   download(new Blob([arr], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
 }
 
+// ======================================================================
+// Asistente de mapeo CSV genérico (Task 6, PR E): subvista de Ajustes que se abre cuando
+// importCsv() (router de n26.js, Task 5) devuelve needsMapping — banco sin soporte dedicado.
+// Spec visual de autoridad: docs/design/material-expresivo/ImportAsistente.dc.html (local,
+// git-ignored, no se commitea).
+// ======================================================================
+
+// Pastilla de asignación de cabecera: NO reutiliza .chip/.chips de app.css (esas asumen un
+// .chip-icon circular a la izquierda que este selector no lleva) — mismo criterio que el
+// chipStyle() local de categorias.js (Task 6 PR D); no hay módulo de UI compartido entre
+// pantallas para esta variante de pastilla de solo texto.
+function assistChipStyle(active) {
+  return `display:inline-flex;align-items:center;font-size:12px;font-weight:${active ? 700 : 600};
+    background:${active ? "var(--text)" : "var(--card)"};color:${active ? "var(--bg)" : "var(--text-2)"};
+    border:0;border-radius:999px;padding:8px 13px;white-space:nowrap;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;`;
+}
+
+// Fila de chips de asignación de un bloque. `options`: [{value,label}] — value=null representa
+// "sin columna" (solo Contraparte lo ofrece). Las cabeceras son texto del CSV del usuario, así
+// que value/label van SIEMPRE escapados (escAttr/escHtml), nunca confiar en su contenido.
+function chipsRowHtml(field, options, selected) {
+  return `<div style="display:flex;gap:7px;flex-wrap:wrap;">${options.map(({ value, label }) => {
+    const active = value === selected;
+    const valueAttr = value === null ? "" : escAttr(value);
+    const noneAttr = value === null ? ` data-assist-none="1"` : "";
+    return `<button type="button" data-assist-field="${field}" data-assist-value="${valueAttr}"${noneAttr}
+      style="${assistChipStyle(active)}">${escHtml(label)}</button>`;
+  }).join("")}</div>`;
+}
+
+// Nº de filas de datos del CSV completo (cabecera aparte, líneas en blanco fuera) — mismo
+// criterio de troceo que nonEmptyLines de csv-generic.js (no exportada de allí: ese módulo es
+// CERO-imports a propósito y esta cuenta es puramente de presentación de Ajustes).
+function csvDataRowCount(text) {
+  const lines = String(text ?? "").split(/\r?\n/).filter((l) => l.trim() !== "");
+  return Math.max(0, lines.length - 1);
+}
+
+function firstNonEmpty(values) {
+  return (values || []).find((v) => v !== null && v !== undefined && String(v).trim() !== "");
+}
+
+const DATE_FORMAT_LABELS = {
+  iso: "año-mes-día", "dmy-slash": "día/mes/año", "dmy-dot": "día/mes/año", "dmy-dash": "día/mes/año",
+};
+
+/** Nota bajo el bloque Fecha: verde con la conversión de ejemplo si TODA la muestra parsea con
+ *  algún formato ("12/09/2026 → 2026-09-12 · formato día/mes/año detectado", copy del artboard);
+ *  roja con el motivo si la columna no reconoce ningún formato; null (sin nota) si aún no hay
+ *  columna elegida. Recibe los valores YA extraídos de la muestra para esa columna, no el
+ *  profile completo: buildProfile agrega fecha+concepto+contraparte+importe en un único {error},
+ *  y esta nota tiene que poder mostrarse aunque otro bloque no esté resuelto todavía.
+ *  OJO orden: detectDateFormat ANTES de leer el ejemplo — con muestra vacía devuelve null y
+ *  firstNonEmpty también sería undefined, así que decidir primero evita un "undefined → …". */
+function dateNoteFor(values) {
+  if (values.length === 0) return null;
+  const fmt = detectDateFormat(values);
+  if (!fmt) return { ok: false, text: "No se reconoce el formato de fecha en esta columna." };
+  const raw = firstNonEmpty(values);
+  const iso = parseDateIso(raw, fmt);
+  return { ok: true, text: `✓ ${raw} → ${iso} · formato ${DATE_FORMAT_LABELS[fmt]} detectado` };
+}
+
+function amountNoteOk(raw, cents, decimal) {
+  const kind = cents < 0 ? "gasto" : "ingreso";
+  const decLabel = decimal === "," ? "coma" : "punto";
+  return { ok: true, text: `✓ ${raw} → ${kind} de ${fmtMoney(Math.abs(cents))} · decimal con ${decLabel} detectado` };
+}
+
+/** Nota bajo el bloque Importe: misma idea que dateNoteFor para importe+decimal.
+ *  spec = {kind:"single", values} | {kind:"split", debitValues, creditValues}. En modo cargo/
+ *  abono el signo NO se puede leer del propio valor (cargo/abono suelen venir SIN signo, p.ej.
+ *  "78,90" en la columna de cargo): lo decide la COLUMNA de origen, igual que applyProfile
+ *  (hasDebit ? -Math.abs(parsed) : Math.abs(parsed)) — de ahí el caso split aparte en vez de
+ *  reusar sin más la lógica de signo-desde-el-valor de single. */
+function amountNoteFor(spec) {
+  if (spec.kind === "single") {
+    const { values } = spec;
+    if (values.length === 0) return null;
+    const decimal = detectDecimal(values);
+    const raw = firstNonEmpty(values);
+    if (raw === undefined) return { ok: false, text: "La muestra no tiene ningún importe en esta columna." };
+    const cents = parseAmountCents(raw, decimal);
+    if (cents === null) return { ok: false, text: "No se reconoce el formato de importe en esta columna." };
+    return amountNoteOk(raw, cents, decimal);
+  }
+
+  const { debitValues, creditValues } = spec;
+  if (debitValues.length === 0 && creditValues.length === 0) return null;
+  const decimal = detectDecimal([...debitValues, ...creditValues]);
+  const debitRaw = firstNonEmpty(debitValues);
+  const isDebit = debitRaw !== undefined;
+  const raw = isDebit ? debitRaw : firstNonEmpty(creditValues);
+  if (raw === undefined) return { ok: false, text: "La muestra no tiene ningún importe de cargo o abono." };
+  const parsed = parseAmountCents(raw, decimal);
+  if (parsed === null) return { ok: false, text: "No se reconoce el formato de importe en esta columna." };
+  return amountNoteOk(raw, isDebit ? -Math.abs(parsed) : Math.abs(parsed), decimal);
+}
+
+/** Banner de resultado tras CUALQUIER import (directo por el router o vía el asistente): el
+ *  texto de siempre + «· N filas ilegibles omitidas» si applyProfile descartó alguna (omitted,
+ *  solo puede venir en via:"profile") + la frase de Bizum SOLO con contraparte configurada Y
+ *  via:"n26" — un CSV genérico no tiene forma de distinguir un Bizum de cualquier otro abono. */
+function importResultText(res, partnerName) {
+  let text = `Nuevas: ${res.created} · Conciliadas: ${res.reconciled} · Duplicadas (saltadas): ${res.skipped}`;
+  if (res.omitted) {
+    text += ` · ${res.omitted} fila${res.omitted === 1 ? "" : "s"} ilegible${res.omitted === 1 ? "" : "s"} omitida${res.omitted === 1 ? "" : "s"}`;
+  }
+  text += ". Revisa la bandeja «sin categorizar» en Movimientos.";
+  if (partnerName && res.via === "n26") {
+    text += ` Los Bizum de ${partnerName} se concilian solos si usas «Liquidar» en Inicio antes de importar.`;
+  }
+  return text;
+}
+
 function periodoCardHtml(period, partnerName) {
   if (!period) return "";
   // start_date puede quedar en el futuro (se puede abrir el periodo unos días antes de que
@@ -80,8 +197,10 @@ function periodoCardHtml(period, partnerName) {
 }
 
 /** Pantalla de Ajustes: export/import de la hoja .xlsx (motor de fase 2), cierre del periodo
- *  abierto (asistente unificado de Task 8), import de CSV de N26 (Task 15, tarjeta "Banco"),
- *  entradas-enlace a Recurrentes y Categorías (PR D, Task 5) y copia JSON de emergencia. */
+ *  abierto (asistente unificado de Task 8), import de CSV vía el router genérico (n26.js,
+ *  tarjeta "Banco") con su subvista de asistente de mapeo cuando el banco no se reconoce solo
+ *  (Task 6, PR E — antes solo N26, Task 15), entradas-enlace a Recurrentes y Categorías (PR D,
+ *  Task 5) y copia JSON de emergencia. */
 export async function renderAjustes(container) {
   let openPeriod = null;
   try { openPeriod = await getOpenPeriod(); } catch { openPeriod = null; }
@@ -100,6 +219,7 @@ export async function renderAjustes(container) {
   const state = {
     errors: null, pending: null, busy: false, n26Result: null, n26Error: null,
     encExport: false, encImport: null,
+    view: "main", assistant: null, // Task 6: subvista de asistente de mapeo (needsMapping)
   };
 
   async function processImportBuffer(buf) {
@@ -120,7 +240,15 @@ export async function renderAjustes(container) {
     state.pending = { data, currentDump, currentCount: activeCount };
   }
 
+  // Task 6: render() es el despachador de subvista (mismo patrón que categorias.js state.view /
+  // patrimonio.js) — renderMain() es el cuerpo de Ajustes de siempre (ni tocado ni reordenado,
+  // solo renombrado), renderAssistant() es la subvista nueva del asistente de mapeo.
   function render() {
+    if (state.view === "assistant") { renderAssistant(); return; }
+    renderMain();
+  }
+
+  function renderMain() {
     container.innerHTML = `
       <header class="screen-header"><h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">Ajustes</h1></header>
 
@@ -212,9 +340,11 @@ export async function renderAjustes(container) {
       <div class="card" style="margin-bottom:12px">
         <p style="font-weight:600;margin-bottom:4px">Banco</p>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
-          Importa el extracto CSV de N26: crea los movimientos que faltan y concilia los que ya
-          registraste a mano (mismo importe y sentido, ±3 días). Las duplicadas se saltan solas.</p>
-        <button type="button" class="btn-secondary" id="btn-n26-import" style="${BTN_FULL_WIDTH}" ${state.busy ? "disabled" : ""}>Importar CSV de N26</button>
+          Importa el extracto CSV de tu banco: crea los movimientos que faltan y concilia los que
+          ya registraste a mano (mismo importe y sentido, ±3 días). Las duplicadas se saltan
+          solas. Los CSV de N26 se reconocen solos; los de otros bancos te los pedimos configurar
+          una vez.</p>
+        <button type="button" class="btn-secondary" id="btn-n26-import" style="${BTN_FULL_WIDTH}" ${state.busy ? "disabled" : ""}>Importar CSV</button>
         <input type="file" id="n26-file-input" accept=".csv" style="display:none">
 
         ${state.n26Result ? `
@@ -252,10 +382,10 @@ export async function renderAjustes(container) {
         <button type="button" class="btn-secondary" id="btn-json-export" style="${BTN_FULL_WIDTH}">Exportar copia de seguridad (JSON)</button>
       </div>
     `;
-    wire();
+    wireMain();
   }
 
-  function wire() {
+  function wireMain() {
     container.querySelector("#btn-xlsx-export").onclick = async () => {
       state.busy = true; render();
       try {
@@ -289,14 +419,25 @@ export async function renderAjustes(container) {
       if (!file) return;
       state.busy = true; state.n26Result = null; state.n26Error = null; render();
       try {
-        const res = await importN26Csv(await file.text());
-        state.n26Result = `Nuevas: ${res.created} · Conciliadas: ${res.reconciled} · `
-          + `Duplicadas (saltadas): ${res.skipped}. Revisa la bandeja «sin categorizar» en Movimientos.`
+        const text = await file.text();
+        const res = await importCsv(text);
+        if (res.needsMapping) {
+          // Banco sin soporte dedicado y sin perfil guardado que case: abre el asistente en vez
+          // de tocar la base de datos. Nada se ha escrito todavía (importCsv con needsMapping no
+          // ejecuta ningún INSERT/UPDATE — ver n26.js).
+          state.view = "assistant";
+          state.assistant = {
+            fileName: file.name, text, headers: res.needsMapping.headers, sample: res.needsMapping.sample,
+            totalRows: csvDataRowCount(text),
+            date: null, concept: null, counterparty: null,
+            amountKind: "single", amountCol: null, debitCol: null, creditCol: null,
+            saveBusy: false, saveError: null,
+          };
+        } else {
           // texto plano: se escapa una única vez al pintarlo (escHtml en el render de más abajo),
-          // así que partnerName va SIN escapar aquí para no escaparlo dos veces.
-          + (partnerName
-            ? ` Los Bizum de ${partnerName} se concilian solos si usas «Liquidar» en Inicio antes de importar.`
-            : "");
+          // así que importResultText/partnerName van SIN escapar aquí para no escaparlos dos veces.
+          state.n26Result = importResultText(res, partnerName);
+        }
       } catch (err) {
         state.n26Error = err.message;
       } finally {
@@ -442,6 +583,211 @@ export async function renderAjustes(container) {
       const data = await exportAllJson();
       const blob = new Blob([JSON.stringify(data, null, 1)], { type: "application/json" });
       download(blob, `basecero-backup-${hoyISO()}.json`);
+    };
+  }
+
+  // Fondo de las 3 cajas "de tarjeta suelta" del asistente (fichero / preview / nota del pie):
+  // 16px/12-16, no la .card de app.css (22px/16 — pensada para las secciones de nivel de
+  // pantalla) — mismo criterio que la caja de vista previa de nombre en categorias.js:renderForm.
+  const ASSIST_BOX_STYLE = "background:var(--card);border-radius:16px;padding:12px 16px;";
+
+  /** Subvista "asistente de mapeo" (Task 6, PR E): se abre cuando importCsv() devuelve
+   *  needsMapping. Recalcula notas/preview/contador/CTA en cada render a partir de
+   *  state.assistant — no hay estado derivado guardado aparte, así que un solo render() tras
+   *  cualquier click de chip basta para que todo quede consistente. */
+  function renderAssistant() {
+    const a = state.assistant;
+    const colIdx = (h) => a.headers.indexOf(h);
+    const headerOptions = a.headers.map((h) => ({ value: h, label: h }));
+
+    const dateValues = a.date ? a.sample.map((r) => r[colIdx(a.date)]) : [];
+    const dateNote = dateNoteFor(dateValues);
+
+    const amountNote = a.amountKind === "single"
+      ? amountNoteFor({ kind: "single", values: a.amountCol ? a.sample.map((r) => r[colIdx(a.amountCol)]) : [] })
+      : (a.debitCol && a.creditCol
+        ? amountNoteFor({
+          kind: "split",
+          debitValues: a.sample.map((r) => r[colIdx(a.debitCol)]),
+          creditValues: a.sample.map((r) => r[colIdx(a.creditCol)]),
+        })
+        : null);
+
+    // Perfil completo: gate único del CTA (brief: "deshabilitado hasta que buildProfile
+    // devuelva perfil válido") y fuente de la preview/contador — NUNCA de los notas de
+    // fecha/importe de arriba, que tienen que poder mostrarse aunque otro bloque distinto
+    // (concepto/contraparte) siga sin resolver.
+    const profile = buildProfile({
+      headers: a.headers, date: a.date, concept: a.concept, counterparty: a.counterparty,
+      amountKind: a.amountKind, amountCol: a.amountCol, debitCol: a.debitCol, creditCol: a.creditCol,
+      sample: a.sample,
+    });
+    const profileValid = !profile.error;
+
+    let previewHtml = "";
+    let readableCount = 0;
+    if (profileValid) {
+      // Sobre el CSV COMPLETO (a.text), no solo la muestra de 5 filas: el contador "N de M" y el
+      // nº de filas de la card de arriba tienen que coincidir con lo que de verdad se va a
+      // importar al pulsar Guardar (mismo cálculo que hará importWithProfile).
+      const { rows, errors } = applyProfile(a.text, profile, bcParseCsvLine);
+      readableCount = rows.length;
+      const total = rows.length + errors.length;
+      const previewRows = rows.slice(0, 3);
+      const counterOk = errors.length === 0;
+      // Tres estados: verde = todo legible, rojo = nada legible (0 filas importarían), ámbar =
+      // parcial — el CTA de abajo ya bloquea el caso rojo, pero el color tiene que reflejarlo.
+      const counterColor = counterOk ? "var(--green)" : (rows.length === 0 ? "var(--red)" : "var(--amber)");
+      const counterText = counterOk
+        ? `✓ ${rows.length} de ${total} filas se leen bien`
+        : `⚠ ${rows.length} de ${total} filas se leen bien · fila ${errors[0].line}: ${errors[0].reason}`;
+
+      previewHtml = `
+      <div style="${ASSIST_BOX_STYLE}">
+        <div class="section-title" style="margin-bottom:6px;">Así se leerán tus movimientos</div>
+        ${previewRows.map((r, i) => {
+          // merchant||note, mismo criterio que movimientos.js (líneas 53/65/76): la contraparte
+          // manda como etiqueta reconocible; si no hay columna de contraparte asignada, cae al
+          // concepto — ningún campo mapeado queda sin sitio donde mostrarse.
+          const label = r.partnerName || r.paymentReference || "(sin concepto)";
+          const income = r.amountCents >= 0;
+          const rowStyle = `display:flex;align-items:center;gap:10px;padding:8px 0;`
+            + (i < previewRows.length - 1 ? "border-bottom:1px solid var(--rule);" : "");
+          return `
+          <div style="${rowStyle}">
+            <span style="color:var(--green);font-weight:700;flex-shrink:0;">✓</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(label)}</div>
+              <div class="num" style="font-size:10.5px;color:var(--text-3);">${escHtml(r.bookingDate)}</div>
+            </div>
+            <div class="num" style="font-size:13px;font-weight:700;${income ? "color:var(--green);" : ""}">${escHtml(fmtMoney(r.amountCents))}</div>
+          </div>`;
+        }).join("")}
+        <div class="num" style="font-size:11px;color:${counterColor};padding-top:8px;">${escHtml(counterText)}</div>
+      </div>`;
+    }
+
+    // 0 filas legibles (rows.length === 0 con profile válido) no debe dejar guardar un perfil que
+    // no importaría nada. Si !profileValid ni siquiera se ejecuta el bloque de arriba y
+    // readableCount se queda en 0, así que el OR es correcto sin condición extra.
+    const ctaDisabled = !profileValid || a.saveBusy || readableCount === 0;
+
+    container.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">Configura tu banco</div>
+        <button type="button" id="assist-close" aria-label="Cerrar" ${a.saveBusy ? "disabled" : ""}
+          style="width:44px;height:44px;border-radius:50%;background:var(--card2);border:0;color:var(--text);
+          display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M6 6l12 12M18 6L6 18"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px;">
+
+        <div style="${ASSIST_BOX_STYLE}display:flex;align-items:center;gap:12px;">
+          <div style="width:36px;height:36px;border-radius:12px;background:var(--card2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3H6.5A1.5 1.5 0 005 4.5v15A1.5 1.5 0 006.5 21h11a1.5 1.5 0 001.5-1.5V9z"></path><path d="M13 3v6h6M8.5 13h7M8.5 16.5h7"></path></svg>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(a.fileName)}</div>
+            <div style="font-size:11.5px;color:var(--text-2);">${a.totalRows} fila${a.totalRows === 1 ? "" : "s"} · formato no reconocido — dinos qué es cada columna, solo esta vez</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title" style="margin-bottom:7px;">Fecha</div>
+          ${chipsRowHtml("date", headerOptions, a.date)}
+          ${dateNote ? `<div class="num" style="font-size:11px;color:${dateNote.ok ? "var(--green)" : "var(--red)"};margin-top:5px;">${escHtml(dateNote.text)}</div>` : ""}
+        </div>
+
+        <div>
+          <div class="section-title" style="margin-bottom:7px;">Concepto</div>
+          ${chipsRowHtml("concept", headerOptions, a.concept)}
+        </div>
+
+        <div>
+          <div class="section-title" style="margin-bottom:7px;">Contraparte · opcional</div>
+          ${chipsRowHtml("counterparty", [...headerOptions, { value: null, label: "— sin columna" }], a.counterparty)}
+        </div>
+
+        <div>
+          <div class="section-title" style="margin-bottom:7px;">Importe</div>
+          <div class="segmented" style="border-radius:999px;margin-bottom:8px;">
+            <button type="button" data-assist-kind="single" class="${a.amountKind === "single" ? "active" : ""}"
+              style="border-radius:999px;${a.amountKind === "single" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">Una columna con signo</button>
+            <button type="button" data-assist-kind="split" class="${a.amountKind === "split" ? "active" : ""}"
+              style="border-radius:999px;${a.amountKind === "split" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">Cargo y abono</button>
+          </div>
+          ${a.amountKind === "single" ? chipsRowHtml("amountCol", headerOptions, a.amountCol) : `
+          <div class="section-title" style="margin:0 0 6px;">Cargo</div>
+          ${chipsRowHtml("debitCol", headerOptions, a.debitCol)}
+          <div class="section-title" style="margin:10px 0 6px;">Abono</div>
+          ${chipsRowHtml("creditCol", headerOptions, a.creditCol)}`}
+          ${amountNote ? `<div class="num" style="font-size:11px;color:${amountNote.ok ? "var(--green)" : "var(--red)"};margin-top:5px;">${escHtml(amountNote.text)}</div>` : ""}
+        </div>
+
+        ${previewHtml}
+
+        ${a.saveError ? `<div class="banner-aviso red" style="display:block"><p>${escHtml(a.saveError)}</p></div>` : ""}
+
+        <button type="button" class="btn-primary" id="assist-save" style="width:100%;${ctaDisabled ? "opacity:0.45;" : ""}" ${ctaDisabled ? "disabled" : ""}>Guardar perfil e importar</button>
+
+        <div style="${ASSIST_BOX_STYLE}display:flex;align-items:center;gap:10px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.01"></path></svg>
+          <div style="font-size:11.5px;color:var(--text-2);">El perfil se guarda en tu dispositivo: la próxima vez este banco se importa directo. Los CSV de N26 se reconocen solos, sin configurar nada.</div>
+        </div>
+      </div>
+    `;
+    wireAssistant(profile, profileValid);
+  }
+
+  function wireAssistant(profile, profileValid) {
+    const a = state.assistant;
+
+    container.querySelector("#assist-close").onclick = () => {
+      state.view = "main";
+      state.assistant = null;
+      render();
+    };
+
+    // Delegación uniforme para las 6 filas de chips (fecha/concepto/contraparte/importe-única/
+    // cargo/abono): el nombre del campo viaja en el propio data-attribute, así que un único
+    // handler basta — nada de repetir el mismo cableado 6 veces.
+    container.querySelectorAll("[data-assist-field]").forEach((b) => {
+      b.onclick = () => {
+        a[b.dataset.assistField] = b.dataset.assistNone === "1" ? null : b.dataset.assistValue;
+        render();
+      };
+    });
+
+    container.querySelectorAll("[data-assist-kind]").forEach((b) => {
+      b.onclick = () => {
+        a.amountKind = b.dataset.assistKind;
+        // Resetea la selección de importe al cambiar de modo (brief): una columna elegida en
+        // "una columna con signo" no tiene sentido como cargo o abono, y viceversa.
+        a.amountCol = null; a.debitCol = null; a.creditCol = null;
+        render();
+      };
+    });
+
+    container.querySelector("#assist-save").onclick = async () => {
+      if (!profileValid || a.saveBusy) return;
+      a.saveBusy = true; a.saveError = null; render();
+      try {
+        await setMeta("csv_profile", JSON.stringify(profile));
+        const res = await importWithProfile(a.text, profile);
+        state.view = "main";
+        state.assistant = null;
+        state.n26Result = importResultText({ ...res, via: "profile" }, partnerName);
+        state.n26Error = null;
+      } catch (err) {
+        a.saveBusy = false;
+        a.saveError = err.message;
+      } finally {
+        render();
+      }
     };
   }
 

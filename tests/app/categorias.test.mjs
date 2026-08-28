@@ -7,7 +7,7 @@ import { POOL, CURATED_ICONS, CATEGORY_ICONS, parseStyle, initCategoryStyle } fr
 import { openDb, seedMinimal } from "./helpers.mjs";
 
 const require = createRequire(import.meta.url);
-const pure = require("../../apps_script/pure.js");
+const pure = require("../../app/vendor/pure.js");
 
 const T = "2026-08-24T18:00:00Z";
 const T2 = "2026-08-24T19:00:00Z";
