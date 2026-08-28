@@ -1,5 +1,5 @@
 import {
-  getOpenPeriod, spentOfPeriod, incomeOfPeriod, listAllByDay, spentByRootCategory, openNextPeriod,
+  getOpenPeriod, spentOfPeriod, incomeOfPeriod, listAllByDay, spentByRootCategory, openNextPeriod, getMetaAll,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { eurToCents } from "../contract.js";
@@ -33,7 +33,7 @@ function renderAsistenteError(container, mode, onDone, message) {
  *  raíces con spent_cents=0 (mismo LEFT JOIN, sin fila cerrada de la que tirar "mes pasado").
  *  onDone() se llama tanto al abrir con éxito como al cancelar con la flecha atrás (modo 'next'). */
 export async function renderPeriodoNuevo(container, { mode, onDone }) {
-  let closingPeriod = null, closingSpent = 0, closingIncome = 0, closingCount = 0, rootRows = [];
+  let closingPeriod = null, closingSpent = 0, closingIncome = 0, closingCount = 0, rootRows = [], meta = {};
   try {
     if (mode === "next") {
       closingPeriod = await getOpenPeriod();
@@ -41,20 +41,22 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
         renderAsistenteError(container, mode, onDone, "No hay ningún periodo abierto que cerrar.");
         return;
       }
-      const [spent, income, all, roots] = await Promise.all([
+      const [spent, income, all, roots, metaAll] = await Promise.all([
         spentOfPeriod(closingPeriod.id),
         incomeOfPeriod(closingPeriod.id),
         listAllByDay(closingPeriod.id),
         spentByRootCategory(closingPeriod.id),
+        getMetaAll(),
       ]);
-      closingSpent = spent; closingIncome = income; closingCount = all.length; rootRows = roots;
+      closingSpent = spent; closingIncome = income; closingCount = all.length; rootRows = roots; meta = metaAll;
     } else {
-      rootRows = await spentByRootCategory("");
+      [rootRows, meta] = await Promise.all([spentByRootCategory(""), getMetaAll()]);
     }
   } catch (e) {
     renderAsistenteError(container, mode, onDone, "No se pudo cargar el asistente: " + e.message);
     return;
   }
+  const partnerName = (meta.partner_name || "").trim();
 
   // byId "de mentira" solo con lo que colorForCategory/iconForCategory necesitan (rootOf sube
   // por parent_id hasta encontrar la raíz): como root_id YA es una raíz, basta con parent_id=''.
@@ -162,11 +164,12 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
           style="height:42px; padding:0 13px; background:#1b1e21; border:0; border-radius:14px; color:var(--text);
           font:600 14px var(--font-ui); text-align:right; min-width:0;">
       </label>
+      ${partnerName ? `
       <hr class="divider">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 0;">
         <div style="display:flex; flex-direction:column; gap:3px;">
           <div style="font-size:14px; font-weight:600;">Pagas de lo compartido</div>
-          <div style="font-size:11px; color:var(--text-3);">Sara pagará el ${restante} % restante</div>
+          <div style="font-size:11px; color:var(--text-3);">${escHtml(partnerName)} pagará el ${restante} % restante</div>
         </div>
         <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
           <div class="num" style="font-size:15px; font-weight:600; min-width:44px; text-align:right;">${state.sharePct} %</div>
@@ -175,7 +178,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
             <button type="button" id="pn-pct-down" class="stepper-btn" aria-label="Bajar porcentaje">▼</button>
           </div>
         </div>
-      </div>
+      </div>` : ""}
     </div>`;
   }
 
@@ -294,8 +297,10 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
     };
     container.querySelector("#pn-nombre").oninput = (e) => { state.name = e.target.value; };
 
-    container.querySelector("#pn-pct-up").onclick = () => { state.sharePct = Math.min(100, state.sharePct + 5); render(); };
-    container.querySelector("#pn-pct-down").onclick = () => { state.sharePct = Math.max(0, state.sharePct - 5); render(); };
+    const pctUp = container.querySelector("#pn-pct-up");
+    if (pctUp) pctUp.onclick = () => { state.sharePct = Math.min(100, state.sharePct + 5); render(); };
+    const pctDown = container.querySelector("#pn-pct-down");
+    if (pctDown) pctDown.onclick = () => { state.sharePct = Math.max(0, state.sharePct - 5); render(); };
 
     container.querySelectorAll("[data-budget]").forEach((el) => {
       // oninput (no render()) para no perder el foco a media escritura ni "tragarse" el
@@ -338,7 +343,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
         await openNextPeriod({
           name: state.name.trim() || nombrePorDefecto(),
           startDate: state.startDate || hoyISO(),
-          sharePct: Math.min(100, Math.max(0, state.sharePct)),
+          sharePct: partnerName ? Math.min(100, Math.max(0, state.sharePct)) : 100,
           budgets,
         });
         onDone();

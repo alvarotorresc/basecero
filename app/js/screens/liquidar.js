@@ -49,6 +49,7 @@ export async function renderLiquidar(container, onBack) {
     return;
   }
   const accounts = accountsAll.filter((a) => a.type !== "liability");
+  const partnerName = (meta.partner_name || "").trim();
 
   const state = {
     rows,
@@ -64,7 +65,7 @@ export async function renderLiquidar(container, onBack) {
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
         <button type="button" class="icon-btn" id="liq-back" aria-label="Volver">←</button>
-        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">Liquidar con Sara</h1>
+        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${partnerName ? `Liquidar con ${escHtml(partnerName)}` : "Liquidar"}</h1>
         <span style="width:36px;"></span>
       </div>
 

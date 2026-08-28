@@ -41,7 +41,7 @@ function downloadXlsx(dump, filename) {
   download(new Blob([arr], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
 }
 
-function periodoCardHtml(period) {
+function periodoCardHtml(period, partnerName) {
   if (!period) return "";
   // start_date puede quedar en el futuro (se puede abrir el periodo unos días antes de que
   // empiece): en ese caso no hay "días transcurridos" que mostrar, así que se omite ese tramo
@@ -66,7 +66,9 @@ function periodoCardHtml(period) {
       </div>
       <button type="button" class="btn-primary" id="btn-cerrar-periodo">Cerrar periodo y abrir el siguiente</button>
       <div style="font-size:11px;color:var(--text-3);line-height:1.5">
-        Al cerrar fijarás la fecha final y elegirás el reparto con Sara del periodo nuevo. Ábrelo el día que entre la nómina.
+        ${partnerName
+          ? `Al cerrar fijarás la fecha final y elegirás el reparto con ${escHtml(partnerName)} del periodo nuevo. Ábrelo el día que entre la nómina.`
+          : "Al cerrar fijarás la fecha final. Ábrelo el día que entre la nómina."}
       </div>
     </div>
   </div>`;
@@ -81,6 +83,7 @@ export async function renderAjustes(container) {
 
   let metaCfg = { currency: "EUR", locale: "es-ES" };
   try { metaCfg = { ...metaCfg, ...(await getMetaAll()) }; } catch {}
+  const partnerName = (metaCfg.partner_name || "").trim();
 
   const state = {
     errors: null, pending: null, busy: false, n26Result: null, n26Error: null,
@@ -161,7 +164,7 @@ export async function renderAjustes(container) {
         </div>` : ""}
       </div>
 
-      ${periodoCardHtml(openPeriod)}
+      ${periodoCardHtml(openPeriod, partnerName)}
 
       <div class="card" style="margin-bottom:12px">
         <p style="font-weight:600;margin-bottom:4px">Banco</p>
@@ -234,8 +237,12 @@ export async function renderAjustes(container) {
       try {
         const res = await importN26Csv(await file.text());
         state.n26Result = `Nuevas: ${res.created} · Conciliadas: ${res.reconciled} · `
-          + `Duplicadas (saltadas): ${res.skipped}. Revisa la bandeja «sin categorizar» en `
-          + `Movimientos. Los Bizum de Sara se concilian solos si usas «Liquidar» en Inicio antes de importar.`;
+          + `Duplicadas (saltadas): ${res.skipped}. Revisa la bandeja «sin categorizar» en Movimientos.`
+          // texto plano: se escapa una única vez al pintarlo (escHtml en el render de más abajo),
+          // así que partnerName va SIN escapar aquí para no escaparlo dos veces.
+          + (partnerName
+            ? ` Los Bizum de ${partnerName} se concilian solos si usas «Liquidar» en Inicio antes de importar.`
+            : "");
       } catch (err) {
         state.n26Error = err.message;
       } finally {
