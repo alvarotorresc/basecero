@@ -1,6 +1,7 @@
 import {
   listPeriods, listAllByDay, getTransaction, updateTransaction, softDeleteTransaction, countUncategorized,
   listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById, hasActiveLinkedRefund,
+  getMetaAll,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtDiaLargo, hoyISO, currencySymbol } from "../format.js";
@@ -80,10 +81,11 @@ const isUncategorized = (r) => r.category_id === "" && (r.type === "expense" || 
 /** Pantalla Movimientos: selector de periodo, bandeja de sin-categorizar y lista agrupada por día
  *  (los 5 tipos), con subvista de detalle para editar/borrar cada movimiento. */
 export async function renderMovimientos(container) {
-  let periods, expenseCats, incomeCats, accountsAll, byId;
+  let periods, expenseCats, incomeCats, accountsAll, byId, meta;
   try {
-    [periods, expenseCats, incomeCats, accountsAll, byId] = await Promise.all([
+    [periods, expenseCats, incomeCats, accountsAll, byId, meta] = await Promise.all([
       listPeriods(), listExpenseLeafCategories(), listIncomeCategories(), listAccounts(), allCategoriesById(),
+      getMetaAll(),
     ]);
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">No se pudo cargar Movimientos: ${escHtml(e.message)}</div>`;
@@ -95,6 +97,7 @@ export async function renderMovimientos(container) {
     return;
   }
   const accById = Object.fromEntries(accountsAll.map((a) => [a.id, a]));
+  const partnerName = (meta.partner_name || "").trim();
 
   const state = {
     view: "list",
@@ -239,7 +242,7 @@ export async function renderMovimientos(container) {
 
       ${locked ? `
       <div class="banner-aviso" style="margin-bottom:18px;">
-        <p>Liquidado con Sara. Para editar el importe, borra antes su liquidación en Movimientos.</p>
+        <p>Liquidado. Para editar el importe, borra antes su liquidación en Movimientos.</p>
       </div>` : ""}
 
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
@@ -293,10 +296,10 @@ export async function renderMovimientos(container) {
         <input type="text" id="mov-note" value="${escAttr(d.note)}" placeholder="Opcional">
       </label>
 
-      ${needsCategory(d.type) ? `
+      ${needsCategory(d.type) && (d.isShared || partnerName) ? `
       <div class="card" style="padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:${locked ? "default" : "pointer"};${locked ? "opacity:.5;" : ""}">
-          <span style="font-size:15px; font-weight:600;">Compartido con Sara</span>
+          <span style="font-size:15px; font-weight:600;">Compartido con ${escHtml(partnerName) || "la contraparte"}</span>
           <span class="toggle">
             <input type="checkbox" id="mov-shared" ${d.isShared ? "checked" : ""} ${locked ? "disabled" : ""}>
             <span class="toggle-track"><span class="toggle-knob"></span></span>
@@ -309,7 +312,7 @@ export async function renderMovimientos(container) {
             <div class="num" id="mov-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
           </div>
           <div style="flex:1; background:#1b1e21; border-radius:14px; padding:10px 11px;">
-            <div style="font-size:10px; color:var(--text-3);">Sara · ${100 - pct}%</div>
+            <div style="font-size:10px; color:var(--text-3);">${escHtml(partnerName) || "Contraparte"} · ${100 - pct}%</div>
             <div class="num" id="mov-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerCents)}</div>
           </div>
         </div>` : ""}

@@ -52,6 +52,7 @@ export async function renderRegistro(container, onDone, prefill) {
 
   const accounts = accountsAll.filter((a) => a.type !== "liability");
   const pct = period?.my_share_pct ?? 100;
+  const partnerName = (meta.partner_name || "").trim();
 
   const state = {
     tipo: prefill?.type ?? "expense",
@@ -60,7 +61,7 @@ export async function renderRegistro(container, onDone, prefill) {
     categoryId: prefill?.categoryId ?? null,
     accountId: prefill?.accountId ?? resolveAccountId(meta.default_account_id, accounts) ?? "",
     counterAccountId: "",
-    isShared: prefill?.isShared ?? false,
+    isShared: partnerName ? (prefill?.isShared ?? false) : false,
     fecha: hoyISO(),
     merchant: prefill?.merchant ?? "",
     note: "",
@@ -258,10 +259,10 @@ export async function renderRegistro(container, onDone, prefill) {
         <input type="text" id="reg-note" value="${escAttr(state.note)}" placeholder="Opcional">
       </label>
 
-      ${needsCategory(state.tipo) ? `
+      ${needsCategory(state.tipo) && partnerName ? `
       <div class="card" style="padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
-          <span style="font-size:15px; font-weight:600;">Compartido con Sara</span>
+          <span style="font-size:15px; font-weight:600;">Compartido con ${escHtml(partnerName)}</span>
           <span class="toggle">
             <input type="checkbox" id="reg-shared" ${state.isShared ? "checked" : ""}>
             <span class="toggle-track"><span class="toggle-knob"></span></span>
@@ -274,7 +275,7 @@ export async function renderRegistro(container, onDone, prefill) {
             <div class="num" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
           </div>
           <div style="flex:1; background:#1b1e21; border-radius:14px; padding:10px 11px;">
-            <div style="font-size:10px; color:var(--text-3);">Sara · ${100 - pct}%</div>
+            <div style="font-size:10px; color:var(--text-3);">${escHtml(partnerName)} · ${100 - pct}%</div>
             <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerCents)}</div>
           </div>
         </div>` : ""}

@@ -1,6 +1,6 @@
 import {
   listRules, listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById,
-  createRule, updateRule, softDeleteRule,
+  createRule, updateRule, softDeleteRule, getMetaAll,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, currencySymbol } from "../format.js";
@@ -28,16 +28,18 @@ const needsMonth = (freq) => freq === "quarterly" || freq === "yearly";
  *  previsión) + formulario de alta/edición con borrado en dos toques (mismo patrón que
  *  movimientos.js openDetail/backToList). onBack vuelve a quien la haya abierto (Ajustes). */
 export async function renderRecurrentes(container, onBack) {
-  let rules, expenseCats, incomeCats, accountsAll, byId;
+  let rules, expenseCats, incomeCats, accountsAll, byId, meta;
   try {
-    [rules, expenseCats, incomeCats, accountsAll, byId] = await Promise.all([
+    [rules, expenseCats, incomeCats, accountsAll, byId, meta] = await Promise.all([
       listRules(), listExpenseLeafCategories(), listIncomeCategories(), listAccounts(), allCategoriesById(),
+      getMetaAll(),
     ]);
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">No se pudo cargar Recurrentes: ${escHtml(e.message)}</div>`;
     return;
   }
   const accounts = accountsAll.filter((a) => a.type !== "liability");
+  const partnerName = (meta.partner_name || "").trim();
 
   const state = { view: "list", rules, editId: null, form: null, deleteConfirm: false };
   let errorMsg = "";
@@ -249,10 +251,10 @@ export async function renderRecurrentes(container, onBack) {
         </label>` : ""}
       </div>
 
-      ${withCategory ? `
+      ${withCategory && (f.isShared || partnerName) ? `
       <div class="card" style="padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
-          <span style="font-size:15px; font-weight:600;">Compartida con Sara</span>
+          <span style="font-size:15px; font-weight:600;">Compartida con ${escHtml(partnerName) || "la contraparte"}</span>
           <span class="toggle">
             <input type="checkbox" id="rec-shared" ${f.isShared ? "checked" : ""}>
             <span class="toggle-track"><span class="toggle-knob"></span></span>
