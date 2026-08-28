@@ -42,6 +42,33 @@ export function initFormat(meta) {
   }
 }
 export const fmtMoney = (cents) => money.format((cents ?? 0) / 100);
+// Para el importe héroe (céntimos reducidos al 60%, ver DesignSystem.dc.html): parte el resultado
+// de money.formatToParts en tres trozos SIN reimplementar el locale. Split por POSICIÓN respecto a
+// la part "fraction", no por tipo: en monedas sin decimales (JPY) esa part no existe y el símbolo de
+// moneda puede ir de prefijo (ja-JP: "￥1.285") — filtrar por integer/group/decimal dejaría ese
+// prefijo fuera de main y rompería el orden al reconstruir main+cents+suffix.
+//   - main   = todas las parts anteriores a "fraction", concatenadas en orden (incluye separador
+//              decimal si lo hay, o el símbolo de moneda si va de prefijo)
+//   - cents  = el valor de la part "fraction" (si no existe, "")
+//   - suffix = todas las parts posteriores a "fraction" (si no existe "fraction", queda "")
+export const fmtMoneyParts = (cents) => {
+  const parts = money.formatToParts((cents ?? 0) / 100);
+  let main = "";
+  let centsOut = "";
+  let suffix = "";
+  let sawFraction = false;
+  for (const p of parts) {
+    if (p.type === "fraction") {
+      centsOut = p.value;
+      sawFraction = true;
+    } else if (!sawFraction) {
+      main += p.value;
+    } else {
+      suffix += p.value;
+    }
+  }
+  return { main, cents: centsOut, suffix };
+};
 export const fmtNum2 = (n) => num2.format(n);
 export const fmtPct = (v) => pct.format(v);
 export const fmtDec1 = (n) => dec1.format(n);

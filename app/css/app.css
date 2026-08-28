@@ -11,7 +11,7 @@ body {
   line-height: 1.4;
 }
 button { font: inherit; color: inherit; }
-::selection { background: var(--accent); color: #fff; }
+::selection { background: var(--text); color: var(--bg); }
 
 main#screen {
   display: block;
@@ -21,17 +21,44 @@ main#screen {
   padding: 20px 20px calc(84px + env(safe-area-inset-bottom, 0px) + 24px);
 }
 
+/* ===== componentes base (design/material-expresivo/DesignSystem.dc.html) =====
+   .card y .btn-primary viven también en tokens.css (PR A): app.css carga después,
+   misma especificidad → estas reglas ganan por cascada y sobrescriben el look viejo.
+   No se tocan las de tokens.css (limpieza prevista en la tarea 9). */
+.card {
+  border: 0; /* principio 4: cards sin borde, elevación tonal */
+}
+.btn-primary {
+  background: var(--text);
+  color: var(--bg);
+  border-radius: 999px;
+  height: 52px;
+  padding: 0 28px;
+  /* width:100% se hereda de tokens.css — la mayoría de usos son CTA a todo el ancho
+     al pie de un formulario; el ejemplo aislado del artboard no representa ese contexto. */
+}
+.btn-secondary {
+  background: var(--card2);
+  color: var(--text);
+  border: 0;
+  border-radius: 999px;
+  height: 52px;
+  padding: 0 28px;
+  font: 600 16px var(--font-ui);
+  cursor: pointer;
+}
+
 .section-title {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--text-3);
+  color: var(--text-2);
 }
 
 .divider {
   height: 1px;
-  background: var(--border);
+  background: var(--rule);
   border: 0;
 }
 
@@ -43,13 +70,13 @@ main#screen {
   margin-bottom: 16px;
 }
 .screen-header h1 {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
-  letter-spacing: -0.02em;
   line-height: 1.2;
 }
 .screen-header p {
   font-size: 12px;
+  font-weight: 500;
   color: var(--text-2);
 }
 
@@ -58,9 +85,9 @@ main#screen {
   width: 36px;
   height: 36px;
   flex-shrink: 0;
-  border-radius: 12px;
-  background: var(--card);
-  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card2);
+  border: 0;
   color: var(--text-2);
   font-size: 14px;
   display: flex;
@@ -76,7 +103,7 @@ main#screen {
   gap: 4px;
   padding: 4px;
   background: var(--card);
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-sm);
   overflow-x: auto;
   scrollbar-width: none;
@@ -97,8 +124,8 @@ main#screen {
   -webkit-tap-highlight-color: transparent;
 }
 .segmented button.active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--text);
+  color: var(--bg);
 }
 
 /* ===== selector "¿Devuelve un gasto?" (pantalla Registro, tipo devolución) ===== */
@@ -106,7 +133,7 @@ main#screen {
   width: 100%;
   height: 48px;
   background: var(--card);
-  border: 1px solid var(--border);
+  border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
   color: var(--text);
   font-size: 14px;
@@ -127,7 +154,7 @@ main#screen {
   height: 48px;
   background: none;
   border: 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--rule);
   color: var(--text);
   font-size: 13px;
   cursor: pointer;
@@ -144,12 +171,12 @@ main#screen {
 }
 .amount-display .num {
   font-size: 56px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 .amount-display .amount-currency {
   font-size: 26px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-3);
 }
 
@@ -166,8 +193,8 @@ main#screen {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #101214;
-  border-top: 1px solid #1d2124;
+  background: var(--bg);
+  border-top: 1px solid var(--rule);
   z-index: 20;
 }
 
@@ -196,7 +223,7 @@ main#screen {
   fill: none;
 }
 .tab.active {
-  color: var(--accent);
+  color: var(--text);
   font-weight: 700;
 }
 
@@ -205,8 +232,8 @@ main#screen {
   width: 56px;
   height: 56px;
   border-radius: 19px;
-  background: var(--accent);
-  color: #fff;
+  background: var(--text);
+  color: var(--bg);
   border: 0;
   display: flex;
   align-items: center;
@@ -216,8 +243,9 @@ main#screen {
   font-weight: 400;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
 }
-.fab:active { background: #2559d6; }
+.fab:active { background: color-mix(in srgb, var(--text) 88%, var(--bg)); }
 
 /* ===== chips de categoría ===== */
 .chips {
@@ -231,38 +259,37 @@ main#screen {
   align-items: center;
   gap: 9px;
   padding: 0 14px 0 8px;
-  border-radius: 15px;
-  background: var(--card);
-  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card2);
+  border: 0;
   color: var(--text-2);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 .chip-icon {
   width: 30px;
   height: 30px;
-  border-radius: 10px;
+  border-radius: 50%;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 16px;
   line-height: 1;
-  background: color-mix(in srgb, var(--cat, var(--accent)) 18%, transparent);
-  color: var(--cat, var(--accent));
+  background: color-mix(in srgb, var(--cat, var(--text-2)) 18%, transparent);
+  color: var(--cat, var(--text-2));
 }
 .chip-icon svg { width: 17px; height: 17px; }
 .chip.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  font-weight: 600;
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 700;
 }
 .chip.active .chip-icon {
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  background: color-mix(in srgb, var(--bg) 18%, transparent);
+  color: var(--bg);
 }
 
 /* chips de categoría en 2 filas con scroll horizontal (pantalla Registro) */
@@ -286,9 +313,9 @@ main#screen {
   align-items: center;
   gap: 6px;
   padding: 10px 4px;
-  border-radius: 15px;
-  background: var(--card);
-  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card2);
+  border: 0;
   color: var(--text-2);
   font-size: 11px;
   font-weight: 500;
@@ -304,9 +331,9 @@ main#screen {
   overflow: hidden;
 }
 .chip-v.active {
-  border-color: var(--accent);
-  color: var(--text);
-  font-weight: 600;
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 700;
 }
 
 /* ===== teclado numérico ===== */
@@ -318,7 +345,7 @@ main#screen {
 .key {
   height: 64px;
   background: var(--card);
-  border: 1px solid var(--border);
+  border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
@@ -330,7 +357,7 @@ main#screen {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.key:active { background: var(--border); }
+.key:active { background: var(--rule); }
 .key-comma { color: var(--text-2); }
 .key-back svg { width: 23px; height: 23px; stroke: var(--text-2); fill: none; }
 
@@ -389,8 +416,8 @@ main#screen {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: #7aa2ff;
-  background: #16233f;
+  color: var(--text-2);
+  background: var(--card2);
   border-radius: 6px;
   padding: 3px 6px;
   flex-shrink: 0;
@@ -398,11 +425,11 @@ main#screen {
 
 /* ===== cabecera de grupo por día (lista de movimientos de Inicio) ===== */
 .day-header {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--text-3);
+  color: var(--text-2);
 }
 
 /* ===== filas de lista genéricas (ajustes) ===== */
@@ -420,8 +447,8 @@ main#screen {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--cat, var(--accent)) 18%, transparent);
-  color: var(--cat, var(--accent));
+  background: color-mix(in srgb, var(--cat, var(--text-2)) 18%, transparent);
+  color: var(--cat, var(--text-2));
 }
 .list-row-icon svg { width: 20px; height: 20px; }
 .list-row-body { display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0; }
@@ -438,7 +465,7 @@ main#screen {
   height: 50px;
   padding: 0 16px;
   background: var(--card);
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-sm);
 }
 .field-label {
@@ -470,11 +497,11 @@ main#screen {
   gap: 6px;
 }
 .field.field-stack .field-label {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--text-3);
+  color: var(--text-2);
 }
 .field.field-stack input,
 .field.field-stack select {
@@ -504,7 +531,7 @@ main#screen {
 .toggle-track {
   position: absolute;
   inset: 0;
-  background: #2a2f34;
+  background: var(--card2);
   border-radius: 14px;
   transition: background 0.15s ease;
   pointer-events: none;
@@ -516,17 +543,18 @@ main#screen {
   width: 22px;
   height: 22px;
   border-radius: 11px;
-  background: #ffffff;
-  transition: transform 0.15s ease;
+  background: var(--text);
+  transition: transform 0.15s ease, background 0.15s ease;
 }
 .toggle input[type="checkbox"]:checked ~ .toggle-track {
-  background: var(--accent);
+  background: var(--text);
 }
 .toggle input[type="checkbox"]:checked ~ .toggle-track .toggle-knob {
+  background: var(--bg);
   transform: translateX(20px);
 }
 .toggle input[type="checkbox"]:focus-visible ~ .toggle-track {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--text);
   outline-offset: 2px;
 }
 
@@ -538,7 +566,7 @@ main#screen {
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--amber) 14%, var(--card));
-  border: 1px solid color-mix(in srgb, var(--amber) 35%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--amber) 35%, var(--rule));
   font-size: 12px;
   line-height: 1.5;
   color: var(--text-2);
@@ -552,7 +580,7 @@ main#screen {
 }
 .banner-aviso.red {
   background: color-mix(in srgb, var(--red) 14%, var(--card));
-  border-color: color-mix(in srgb, var(--red) 35%, var(--border));
+  border-color: color-mix(in srgb, var(--red) 35%, var(--rule));
 }
 .banner-aviso.red svg { color: var(--red); }
 
@@ -568,7 +596,7 @@ body > .banner-aviso {
   z-index: 30;
   border-radius: 0;
   background: color-mix(in srgb, var(--red) 14%, var(--card));
-  border: 1px solid color-mix(in srgb, var(--red) 35%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--red) 35%, var(--rule));
   border-top: 0;
 }
 body:has(> .banner-aviso) main#screen { margin-top: 46px; }
@@ -588,7 +616,7 @@ body:has(> .banner-aviso) main#screen { margin-top: 46px; }
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.stepper-btn:active { color: var(--accent); }
+.stepper-btn:active { color: var(--text); }
 
 /* input € de cada presupuesto por categoría: vacío = "Sin límite", estilo punteado */
 .budget-input {
@@ -596,7 +624,7 @@ body:has(> .banner-aviso) main#screen { margin-top: 46px; }
   width: 92px;
   flex-shrink: 0;
   padding: 0 24px 0 10px;
-  background: #1b1e21;
+  background: var(--card);
   border: 1px solid transparent;
   border-radius: 14px;
   color: var(--text);
@@ -605,8 +633,8 @@ body:has(> .banner-aviso) main#screen { margin-top: 46px; }
   outline: none;
 }
 .budget-input.is-empty {
-  background: #17191c;
-  border: 1px dashed var(--border);
+  background: var(--bg);
+  border: 1px dashed var(--rule);
   color: var(--text-3);
   font: 500 12px var(--font-ui);
   text-align: center;
@@ -619,6 +647,83 @@ body:has(> .banner-aviso) main#screen { margin-top: 46px; }
 /* chrome oculto durante el asistente de periodo (onboarding y cierre normal, ver main.js nav()) */
 body.onboarding .tabbar,
 body.onboarding .fab { display: none; }
+
+/* ===== componentes nuevos del sistema (consumidos por las tareas 5-8) ===== */
+
+/* icono redondo de categoría/comercio, color sólido + emoji encima (DesignSystem.dc.html) */
+.dotico {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  background: var(--cat, var(--text-2));
+}
+
+/* etiqueta versalitas 10.5/700/.09em — misma fórmula que .section-title/.day-header */
+.day-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+/* barra de progreso píldora de 8px; <i> es el relleno — el consumidor fija su ancho (width/%)
+   y opcionalmente --cat para el color (categoría o estado: bien/al límite/excedido) */
+.bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--card2);
+  overflow: hidden;
+}
+.bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--cat, var(--green));
+}
+
+/* anillo de progreso conic-gradient con hueco central; el consumidor fija --pct (0-100, número)
+   y opcionalmente --cat para el color; el contenido (icono/span) se centra sobre el hueco */
+.ring {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  position: relative;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--cat, var(--green)) calc(var(--pct, 0) * 1%), var(--card2) 0);
+}
+.ring::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: var(--card);
+}
+.ring > * {
+  position: relative;
+  font-size: 16px;
+}
+
+/* importe héroe: 34/700 tabular; los céntimos van en un <small> al 60% (principio 3, jerarquía invertida) */
+.amount-hero {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.amount-hero small {
+  font-size: 0.6em;
+  font-weight: 600;
+}
 
 /* ===== animación de aviso (importe/categoría inválidos al guardar) ===== */
 @keyframes bc-shake {
