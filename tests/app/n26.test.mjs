@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import { SQL } from "../../app/js/sql.js";
 import { seedStatements } from "../../app/js/seeds.js";
 import { sha256Hex, externalIdFor } from "../../app/js/n26.js";
+import { sniffCsv, isN26Headers, applyProfile, parseCsvProfile, profileMatches } from "../../app/js/csv-generic.js";
 
 const require = createRequire(import.meta.url);
 const pure = require("../../app/vendor/pure.js");
@@ -44,19 +45,19 @@ function csvRow({ date = "2026-08-20", partner = "MERCADONA", iban = "", type = 
 const CSV_2ROWS = [CSV_HEADER, csvRow(), csvRow({ date: "2026-08-21", partner: "MARTA G.",
   iban: "ES9121000000000000000000", type: "MoneyBeam", ref: "Bizum alquiler", amount: "360.00" })].join("\n");
 
-/** Reproduce el flujo de n26.importN26Csv (app/js/n26.js) contra node:sqlite: no hay Worker
- *  disponible en Node (db.js depende de él), así que — mismo patrón que el resto de
- *  tests/app/*.test.mjs (repo-sql, recurrentes...) — se compone la SQL a mano en vez de invocar
- *  repo.js/n26.js directamente. Usa las MISMAS funciones puras que la implementación real:
- *  pure.bcParseN26Csv/bcDecideImportAction (app/vendor/pure.js) y el
- *  externalIdFor REAL de n26.js (adaptador de captura incluido). */
-async function runImport(d, text, hashFn = sha256hex) {
+/** Reproduce runImportPipeline (app/js/n26.js, extraída en Task 5 PR E del cuerpo de
+ *  importN26Csv) contra node:sqlite: no hay Worker disponible en Node (db.js depende de él),
+ *  así que — mismo patrón que el resto de tests/app/*.test.mjs (repo-sql, recurrentes...) — se
+ *  compone la SQL a mano en vez de invocar repo.js/n26.js directamente. `rows` ya viene parseado
+ *  (misma forma que produce pure.bcParseN26Csv o csv-generic.applyProfile). Usa las MISMAS
+ *  funciones puras que la implementación real: pure.bcDecideImportAction (app/vendor/pure.js) y
+ *  el externalIdFor REAL de n26.js (adaptador de captura incluido). */
+async function runPipeline(d, rows, hashFn = sha256hex) {
   const existing = d.prepare(SQL.n26Existing).all("acc-n26").map((t) => ({
     id: t.id, dateIso: t.date, type: t.type,
     amountCents: Math.abs(t.amount_cents) * (t.type === "expense" ? -1 : 1),
     externalId: t.external_id, status: t.status,
   }));
-  const rows = pure.bcParseN26Csv(text);
   const res = { created: 0, reconciled: 0, skipped: 0 };
   for (const r of rows) {
     r.externalId = await externalIdFor(r, hashFn);
@@ -82,7 +83,38 @@ async function runImport(d, text, hashFn = sha256hex) {
   return res;
 }
 
+/** Reproduce el flujo de n26.importN26Csv: parsea con pure.bcParseN26Csv y entra al pipeline. */
+async function runImport(d, text, hashFn = sha256hex) {
+  return runPipeline(d, pure.bcParseN26Csv(text), hashFn);
+}
+
+const metaValue = (d, key) => d.prepare(`SELECT value FROM meta WHERE key=?`).get(key).value;
+const setMetaValue = (d, key, value) => d.prepare(`UPDATE meta SET value=? WHERE key=?`).run(value, key);
+
+/** Reproduce n26.importCsv (router de Task 5, PR E) contra node:sqlite, mismo patrón que
+ *  runImport/runPipeline: sniff con pure.bcParseCsvLine, N26 → runImport; si no, perfil guardado
+ *  en meta.csv_profile (leído a mano, sin repo.js) + profileMatches → applyProfile + runPipeline;
+ *  si no hay match → needsMapping SIN tocar la base de datos (ni siquiera se llega a leer meta si
+ *  ya hace falta la comprobación N26, pero tampoco se escribe nada en ningún camino). */
+async function runImportRouter(d, text, hashFn = sha256hex) {
+  const { headers, sample } = sniffCsv(text, pure.bcParseCsvLine);
+  if (isN26Headers(headers)) {
+    const res = await runImport(d, text, hashFn);
+    return { ...res, via: "n26" };
+  }
+
+  const profile = parseCsvProfile(metaValue(d, "csv_profile"));
+  if (profile && profileMatches(profile, headers)) {
+    const { rows, errors } = applyProfile(text, profile, pure.bcParseCsvLine);
+    const res = await runPipeline(d, rows, hashFn);
+    return { ...res, via: "profile", omitted: errors.length };
+  }
+
+  return { needsMapping: { headers, sample } };
+}
+
 const n26Rows = (d) => d.prepare(`SELECT * FROM transactions WHERE account_id='acc-n26' AND deleted=0`).all();
+const txCount = (d) => d.prepare(`SELECT COUNT(*) c FROM transactions`).get().c;
 
 test("import CSV de 2 filas sobre base vacía: 2 creadas reconciled sin categoría, signo/tipo correctos", async () => {
   const d = db();
@@ -154,4 +186,95 @@ test("sha256Hex: vector conocido sha256('abc')", async () => {
 
 test("parseN26Csv: cabecera no reconocida lanza error (propagado a importN26Csv)", () => {
   assert.throws(() => pure.bcParseN26Csv('"foo","bar"\n"1","2"'), /Cabecera CSV de N26 no reconocida/);
+});
+
+// -------------------------------------------------------------- router (importCsv, Task 5 PR E)
+
+const PROFILE = {
+  headers: ["Fecha", "Concepto", "Importe"],
+  date: "Fecha",
+  dateFormat: "iso",
+  concept: "Concepto",
+  counterparty: null,
+  amount: { kind: "single", col: "Importe", decimal: "," },
+};
+
+function genericRow({ date = "2026-08-20", concept = "Compra super", amount = "-45,20" } = {}) {
+  return `"${date}","${concept}","${amount}"`;
+}
+
+const GENERIC_HEADER = '"Fecha","Concepto","Importe"';
+const GENERIC_2ROWS = [GENERIC_HEADER, genericRow(),
+  genericRow({ date: "2026-08-21", concept: "Nomina", amount: "1500,00" })].join("\n");
+
+test("importCsv (router): cabeceras N26 -> mismo resultado que importN26Csv, via:'n26'", async () => {
+  const d = db();
+  const res = await runImportRouter(d, CSV_2ROWS);
+  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, via: "n26" });
+  assert.equal(n26Rows(d).length, 2);
+});
+
+test("importCsv (router): cabeceras desconocidas sin perfil -> needsMapping con headers+sample, cero inserciones", async () => {
+  const d = db();
+  assert.equal(metaValue(d, "csv_profile"), ""); // valor por defecto de schema.sql: sin perfil guardado
+  const res = await runImportRouter(d, GENERIC_2ROWS);
+  assert.deepEqual(res, {
+    needsMapping: {
+      headers: ["Fecha", "Concepto", "Importe"],
+      sample: [["2026-08-20", "Compra super", "-45,20"], ["2026-08-21", "Nomina", "1500,00"]],
+    },
+  });
+  assert.equal(txCount(d), 0);
+});
+
+test("importCsv (router): perfil guardado que NO matchea las cabeceras -> needsMapping", async () => {
+  const d = db();
+  setMetaValue(d, "csv_profile", JSON.stringify({ ...PROFILE, headers: ["Otra", "Cosa"] }));
+  const res = await runImportRouter(d, GENERIC_2ROWS);
+  assert.ok(res.needsMapping);
+  assert.deepEqual(res.needsMapping.headers, ["Fecha", "Concepto", "Importe"]);
+  assert.equal(txCount(d), 0);
+});
+
+test("importCsv (router): perfil que matchea -> crea y concilia por el pipeline compartido", async () => {
+  const d = db();
+  setMetaValue(d, "csv_profile", JSON.stringify(PROFILE));
+  const T2 = "2026-08-19T10:00:00Z";
+  d.prepare(SQL.insertTransaction).run(
+    "manual1", "2026-08-19", "p1", "expense", 4520, "acc-n26", "",
+    "cat-alimentacion-supermercado", "Compra en tienda", "", 0, null, 0, "", "", "", "pending", T2, T2);
+
+  const res = await runImportRouter(d, GENERIC_2ROWS);
+  // Fila 1 (Compra super, -45,20, 2026-08-20) casa con manual1 (mismo importe, expense, 1 día de
+  // diferencia); fila 2 (Nomina, +1500,00) no tiene con qué casar -> create.
+  assert.deepEqual(res, { created: 1, reconciled: 1, skipped: 0, via: "profile", omitted: 0 });
+  assert.equal(n26Rows(d).length, 2);
+
+  const manual = d.prepare(`SELECT * FROM transactions WHERE id='manual1'`).get();
+  assert.equal(manual.status, "reconciled");
+  assert.equal(manual.category_id, "cat-alimentacion-supermercado"); // conciliación conserva categoría/comercio
+  assert.match(manual.external_id, /^[0-9a-f]{16}$/);
+});
+
+test("importCsv (router): reimportar el MISMO texto -> dedupe por external_id, todo skipped", async () => {
+  const d = db();
+  setMetaValue(d, "csv_profile", JSON.stringify(PROFILE));
+  const first = await runImportRouter(d, GENERIC_2ROWS);
+  assert.deepEqual(first, { created: 2, reconciled: 0, skipped: 0, via: "profile", omitted: 0 });
+
+  const second = await runImportRouter(d, GENERIC_2ROWS);
+  assert.deepEqual(second, { created: 0, reconciled: 0, skipped: 2, via: "profile", omitted: 0 });
+  assert.equal(n26Rows(d).length, 2);
+});
+
+test("importCsv (router): filas con fecha/importe inválidos van a omitted, el resto se importa", async () => {
+  const d = db();
+  setMetaValue(d, "csv_profile", JSON.stringify(PROFILE));
+  const text = [GENERIC_HEADER, genericRow(), genericRow({ date: "no-es-fecha", concept: "Fila mala" }),
+    genericRow({ date: "2026-08-22", concept: "Importe malo", amount: "no-es-importe" }),
+    genericRow({ date: "2026-08-21", concept: "Nomina", amount: "1500,00" })].join("\n");
+
+  const res = await runImportRouter(d, text);
+  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, via: "profile", omitted: 2 });
+  assert.equal(n26Rows(d).length, 2);
 });
