@@ -101,17 +101,17 @@ export async function renderRegistro(container, onDone, prefill) {
     state.refId = row.id;
     state.categoryId = row.category_id;
     if (row.is_shared) {
-      // Solo precarga categoría + importe de la parte de Sara; el refund de
+      // Solo precarga categoría + importe de la parte de la contraparte; el refund de
       // liquidación en sí NO se marca compartido (mismo criterio que Task 7
-      // settleShared: is_shared=0, ya es el 100% de lo que Sara debe).
+      // settleShared: is_shared=0, ya es el 100% de lo que la contraparte debe).
       // Usa el pct EFECTIVO del gasto enlazado (su propio override, o el pct
       // de SU periodo), no el del periodo abierto: el gasto puede venir de un
       // periodo cerrado con reparto distinto o llevar su propio override.
       const rowPct = row.share_pct_override ?? row.period_pct ?? 100;
       const myPart = Math.round((row.amount_cents * rowPct) / 100);
-      const saraPart = row.amount_cents - myPart;
-      state.raw = centsToRaw(saraPart);
-      state.cents = saraPart;
+      const partnerPart = row.amount_cents - myPart;
+      state.raw = centsToRaw(partnerPart);
+      state.cents = partnerPart;
     }
     state.refundPickerOpen = false;
     errorMsg = "";
@@ -200,7 +200,7 @@ export async function renderRegistro(container, onDone, prefill) {
   function render() {
     const cats = categoriesFor();
     const myCents = state.isShared ? Math.round((state.cents * pct) / 100) : state.cents;
-    const saraCents = state.isShared ? state.cents - myCents : 0;
+    const partnerCents = state.isShared ? state.cents - myCents : 0;
 
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
 
@@ -275,7 +275,7 @@ export async function renderRegistro(container, onDone, prefill) {
           </div>
           <div style="flex:1; background:#1b1e21; border-radius:14px; padding:10px 11px;">
             <div style="font-size:10px; color:var(--text-3);">Sara · ${100 - pct}%</div>
-            <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(saraCents)}</div>
+            <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerCents)}</div>
           </div>
         </div>` : ""}
       </div>` : ""}

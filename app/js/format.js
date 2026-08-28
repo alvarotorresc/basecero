@@ -63,7 +63,7 @@ export function classifyStorageFailure(e) {
   if (name === "NoModificationAllowedError" || msg.includes("Access Handle")) return "locked";
   return "unsupported";
 }
-// Formato corto ("12 ago") — filas de Liquidar y el pie del bloque "Con Sara" en Inicio.
+// Formato corto ("12 ago") — filas de Liquidar y el pie del bloque de compartidos en Inicio.
 export const fmtDiaCorto = (iso) =>
   new Date(iso + "T12:00:00").toLocaleDateString(locale, { day: "numeric", month: "short" });
 

@@ -63,15 +63,15 @@ export const SQL = {
     WHERE r.ref_id=? AND r.type='refund' AND r.deleted=0 LIMIT 1`,
   countUncategorized: `SELECT COUNT(*) AS n FROM transactions
     WHERE period_id=? AND deleted=0 AND category_id='' AND type IN ('expense','income','refund')`,
-  // Gastos compartidos sin liquidar de TODOS los periodos (no solo el abierto): el bloque "Con
-  // Sara" y la pantalla Liquidar deben poder saldar algo pendiente de un periodo ya cerrado.
+  // Gastos compartidos sin liquidar de TODOS los periodos (no solo el abierto): el bloque de
+  // compartidos y la pantalla Liquidar deben poder saldar algo pendiente de un periodo ya cerrado.
   // type='expense' es necesario: is_shared/settled también existen en income/refund (ver
-  // registro.js needsCategory), y solo un gasto genera una deuda pendiente de que Sara devuelva.
-  // t.amount_cents - MY_AMOUNT > 0 excluye repartos 100/0 (pct o override): con sara_amount_cents=0
+  // registro.js needsCategory), y solo un gasto genera una deuda pendiente de que la contraparte devuelva.
+  // t.amount_cents - MY_AMOUNT > 0 excluye repartos 100/0 (pct o override): con partner_amount_cents=0
   // no hay nada que liquidar, y dejar la fila entrar rompería el CHECK amount_cents>0 del refund
-  // que settleShared crea con ese sara_amount_cents como su amount_cents.
+  // que settleShared crea con ese partner_amount_cents como su amount_cents.
   pendingShared: `SELECT t.id, t.date, t.amount_cents, t.merchant, t.category_id,
-      t.amount_cents - ${MY_AMOUNT} AS sara_amount_cents
+      t.amount_cents - ${MY_AMOUNT} AS partner_amount_cents
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.type='expense' AND t.is_shared=1 AND t.settled=0 AND t.deleted=0
       AND t.amount_cents - ${MY_AMOUNT} > 0

@@ -27,7 +27,7 @@ function rowHtml(r, byId, confirmId) {
         <div class="tx-sub">${escHtml(catName)} · ${fmtDiaCorto(r.date)}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">
-        <div class="num" style="font-size:14px;font-weight:600;">${fmtMoney(r.sara_amount_cents)}</div>
+        <div class="num" style="font-size:14px;font-weight:600;">${fmtMoney(r.partner_amount_cents)}</div>
         <button type="button" data-settle="${r.id}" style="${confirming ? BTN_SETTLE_CONFIRM : BTN_SETTLE}">
           ${confirming ? "Sí, liquidar" : "Liquidar"}
         </button>
@@ -59,7 +59,7 @@ export async function renderLiquidar(container, onBack) {
   let errorMsg = "";
 
   function render() {
-    const total = state.rows.reduce((s, r) => s + r.sara_amount_cents, 0);
+    const total = state.rows.reduce((s, r) => s + r.partner_amount_cents, 0);
 
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">

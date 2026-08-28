@@ -59,10 +59,10 @@ function txRowHtml(r, byId) {
     </div>`;
 }
 
-/** Bloque "Con Sara": pendiente de que devuelva, de TODOS los periodos (pendingShared/-Total
+/** Bloque de compartidos: pendiente de que devuelva, de TODOS los periodos (pendingShared/-Total
  *  cubren cualquier gasto compartido sin liquidar, no solo el del periodo abierto). Se oculta
  *  entero si no hay nada pendiente. */
-function conSaraHtml(period, sharedRows, sharedTotal) {
+function sharedBlockHtml(period, sharedRows, sharedTotal) {
   if (sharedRows.length === 0 && sharedTotal === 0) return "";
   const miPct = period.my_share_pct;
   const n = sharedRows.length;
@@ -80,7 +80,7 @@ function conSaraHtml(period, sharedRows, sharedTotal) {
           <div style="font-size:11px;color:var(--text-3);">Pendiente de que te devuelva</div>
           <div class="num text-red" style="font-size:30px;font-weight:600;letter-spacing:-0.02em;">${fmtMoney(sharedTotal)}</div>
         </div>
-        <button type="button" id="con-sara-liquidar" style="height:40px;padding:0 14px;border-radius:14px;
+        <button type="button" id="shared-liquidar" style="height:40px;padding:0 14px;border-radius:14px;
           background:#1b1e21;color:var(--text-2);border:0;font-size:13px;font-weight:600;cursor:pointer;
           -webkit-tap-highlight-color:transparent;">Liquidar</button>
       </div>
@@ -221,7 +221,7 @@ function categoriaDonutRowHtml(name, color, spentCents, limitCents) {
  *  periodo SÍ tiene presupuestos, se muestra una tarjeta reducida con solo la cabecera + el
  *  enlace, sin donut ni lista — mismo
  *  `id`/handler que la variante completa. Solo si tampoco hay presupuestos la tarjeta entera se
- *  oculta (nada que mostrar Y nada a lo que entrar, igual criterio que conSaraHtml/previsionHtml). */
+ *  oculta (nada que mostrar Y nada a lo que entrar, igual criterio que sharedBlockHtml/previsionHtml). */
 function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupuesto) {
   const verPresupuestoBtn = showVerPresupuesto
     ? `<button type="button" id="inicio-ver-presupuesto" style="all:unset;cursor:pointer;
@@ -273,7 +273,7 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupue
 }
 
 /** Pantalla Inicio: cabecera del periodo abierto (gastado, ingresos, ahorrado, tasa),
- *  tarjetas "Flujo de gasto" y "Gasto por categoría", bloque "Con Sara" (pendiente/liquidar),
+ *  tarjetas "Flujo de gasto" y "Gasto por categoría", bloque de compartidos (pendiente/liquidar),
  *  bloque "Previsión" (reglas recurrentes del mes) y sus movimientos agrupados por día. */
 export async function renderInicio(container) {
   let period, spent, income, rows, byId, sharedRows, sharedTotal, budgets, prevision, rootRows, days7;
@@ -353,14 +353,14 @@ export async function renderInicio(container) {
 
     ${gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, budgets.length > 0)}
 
-    ${conSaraHtml(period, sharedRows, sharedTotal)}
+    ${sharedBlockHtml(period, sharedRows, sharedTotal)}
 
     ${previsionHtml(prevision, byId)}
 
     ${movimientosHtml}
   `;
 
-  const liquidarBtn = container.querySelector("#con-sara-liquidar");
+  const liquidarBtn = container.querySelector("#shared-liquidar");
   if (liquidarBtn) liquidarBtn.onclick = () => renderLiquidar(container, () => renderInicio(container));
 
   const presuBtn = container.querySelector("#inicio-ver-presupuesto");

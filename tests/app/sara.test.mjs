@@ -36,14 +36,14 @@ function settleShared(db, origId, accountId, now, openPeriodId = "per-1") {
   if (!row) throw new Error("Gasto compartido no encontrado o ya liquidado");
   const refundId = "refund-" + origId;
   db.prepare(SQL.insertTransaction).run(
-    refundId, "2026-08-24", openPeriodId, "refund", row.sara_amount_cents, accountId, "",
+    refundId, "2026-08-24", openPeriodId, "refund", row.partner_amount_cents, accountId, "",
     row.category_id, row.merchant, "Liquidación", 0, null, 0, origId, "", "", "pending", now, now,
   );
   db.prepare("UPDATE transactions SET settled=1, updated_at=? WHERE id=?").run(now, origId);
   return refundId;
 }
 
-test("pendingShared: calcula sara_amount_cents con el pct del PROPIO periodo de cada gasto y con override", () => {
+test("pendingShared: calcula partner_amount_cents con el pct del PROPIO periodo de cada gasto y con override", () => {
   const db = openDb();
   seedMinimal(db);
   db.prepare(`INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
@@ -66,15 +66,15 @@ test("pendingShared: calcula sara_amount_cents con el pct del PROPIO periodo de 
   const rows = db.prepare(SQL.pendingShared).all();
 
   assert.deepEqual(rows.map((r) => r.id), [b, a, c], "orden por date ASC");
-  assert.equal(rows.find((r) => r.id === a).sara_amount_cents, 4000);
-  assert.equal(rows.find((r) => r.id === b).sara_amount_cents, 5000);
-  assert.equal(rows.find((r) => r.id === c).sara_amount_cents, 1000);
+  assert.equal(rows.find((r) => r.id === a).partner_amount_cents, 4000);
+  assert.equal(rows.find((r) => r.id === b).partner_amount_cents, 5000);
+  assert.equal(rows.find((r) => r.id === c).partner_amount_cents, 1000);
 
   const total = db.prepare(SQL.pendingSharedTotal).get().total_cents;
   assert.equal(total, 4000 + 5000 + 1000, "el income compartido NO debe sumar al total pendiente");
 });
 
-test("pendingShared: un reparto 100/0 (pct del periodo o override) da sara_amount_cents=0 y se excluye", () => {
+test("pendingShared: un reparto 100/0 (pct del periodo o override) da partner_amount_cents=0 y se excluye", () => {
   const db = openDb();
   seedMinimal(db);
   db.prepare(`INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)

@@ -161,9 +161,9 @@ export async function renderMovimientos(container) {
     if (row.type === "refund" && row.ref_id) {
       try { state.linkedRefund = await getTransaction(row.ref_id); } catch { state.linkedRefund = null; }
     }
-    // Task 17 ronda 2 (controller ruling, finding A): un gasto ya liquidado con Sara (settled=1
+    // Task 17 ronda 2 (controller ruling, finding A): un gasto ya liquidado con la contraparte (settled=1
     // Y con un refund activo enlazado) bloquea importe/compartido — editar el importe aquí sin
-    // tocar el refund deja la deuda con Sara mal calculada y sin nada pendiente que lo delate.
+    // tocar el refund deja la deuda con la contraparte mal calculada y sin nada pendiente que lo delate.
     state.detail.settledLocked = row.type === "expense" && !!row.settled
       && (await hasActiveLinkedRefund(id).catch(() => false));
     state.view = "detail";
@@ -225,7 +225,7 @@ export async function renderMovimientos(container) {
     const pct = period?.my_share_pct ?? 100;
     const cats = categoriesFor(d.type);
     const myCents = d.isShared ? Math.round((d.cents * pct) / 100) : d.cents;
-    const saraCents = d.isShared ? d.cents - myCents : 0;
+    const partnerCents = d.isShared ? d.cents - myCents : 0;
     const locked = !!d.settledLocked;
 
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
@@ -310,7 +310,7 @@ export async function renderMovimientos(container) {
           </div>
           <div style="flex:1; background:#1b1e21; border-radius:14px; padding:10px 11px;">
             <div style="font-size:10px; color:var(--text-3);">Sara · ${100 - pct}%</div>
-            <div class="num" id="mov-split-sara" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(saraCents)}</div>
+            <div class="num" id="mov-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerCents)}</div>
           </div>
         </div>` : ""}
       </div>` : ""}
@@ -359,16 +359,16 @@ export async function renderMovimientos(container) {
       errorMsg = "";
       state.deleteConfirm = false;
       // No se llama a render() aquí (perdería el foco/cursor del input mientras se escribe), pero
-      // el preview "Tu parte / Sara" de un gasto compartido se queda con el importe viejo si no se
+      // el preview "Tu parte / contraparte" de un gasto compartido se queda con el importe viejo si no se
       // actualiza a mano — parche puntual de los dos nodos en vez de un re-render completo.
       const mineEl = container.querySelector("#mov-split-mine");
-      const saraEl = container.querySelector("#mov-split-sara");
-      if (d.isShared && mineEl && saraEl) {
+      const partnerEl = container.querySelector("#mov-split-partner");
+      if (d.isShared && mineEl && partnerEl) {
         const period = periods.find((p) => p.id === state.periodId);
         const pct = period?.my_share_pct ?? 100;
         const myCents = Math.round((d.cents * pct) / 100);
         mineEl.textContent = fmtMoney(myCents);
-        saraEl.textContent = fmtMoney(d.cents - myCents);
+        partnerEl.textContent = fmtMoney(d.cents - myCents);
       }
     };
     container.querySelector("#mov-merchant").oninput = (e) => { d.merchant = e.target.value; state.deleteConfirm = false; };
