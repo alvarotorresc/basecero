@@ -625,14 +625,19 @@ export async function renderAjustes(container) {
     const profileValid = !profile.error;
 
     let previewHtml = "";
+    let readableCount = 0;
     if (profileValid) {
       // Sobre el CSV COMPLETO (a.text), no solo la muestra de 5 filas: el contador "N de M" y el
       // nº de filas de la card de arriba tienen que coincidir con lo que de verdad se va a
       // importar al pulsar Guardar (mismo cálculo que hará importWithProfile).
       const { rows, errors } = applyProfile(a.text, profile, bcParseCsvLine);
+      readableCount = rows.length;
       const total = rows.length + errors.length;
       const previewRows = rows.slice(0, 3);
       const counterOk = errors.length === 0;
+      // Tres estados: verde = todo legible, rojo = nada legible (0 filas importarían), ámbar =
+      // parcial — el CTA de abajo ya bloquea el caso rojo, pero el color tiene que reflejarlo.
+      const counterColor = counterOk ? "var(--green)" : (rows.length === 0 ? "var(--red)" : "var(--amber)");
       const counterText = counterOk
         ? `✓ ${rows.length} de ${total} filas se leen bien`
         : `⚠ ${rows.length} de ${total} filas se leen bien · fila ${errors[0].line}: ${errors[0].reason}`;
@@ -658,11 +663,14 @@ export async function renderAjustes(container) {
             <div class="num" style="font-size:13px;font-weight:700;${income ? "color:var(--green);" : ""}">${escHtml(fmtMoney(r.amountCents))}</div>
           </div>`;
         }).join("")}
-        <div class="num" style="font-size:11px;color:${counterOk ? "var(--green)" : "var(--amber)"};padding-top:8px;">${escHtml(counterText)}</div>
+        <div class="num" style="font-size:11px;color:${counterColor};padding-top:8px;">${escHtml(counterText)}</div>
       </div>`;
     }
 
-    const ctaDisabled = !profileValid || a.saveBusy;
+    // 0 filas legibles (rows.length === 0 con profile válido) no debe dejar guardar un perfil que
+    // no importaría nada. Si !profileValid ni siquiera se ejecuta el bloque de arriba y
+    // readableCount se queda en 0, así que el OR es correcto sin condición extra.
+    const ctaDisabled = !profileValid || a.saveBusy || readableCount === 0;
 
     container.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
