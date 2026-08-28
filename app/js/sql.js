@@ -32,12 +32,22 @@ export const SQL = {
   // para esta query y desaparecía del selector junto a ella. Con AND h.is_archived=0, una hija
   // archivada deja de contar: la raíz vuelve a ser hoja efectiva y reaparece (ver
   // tests/app/categorias.test.mjs, test de regresión).
+  // Item 5 (Important, review final): el ORDER BY ya no es solo c.display_order — ese es el
+  // display_order DENTRO del grupo (raíces entre sí, hijas de una misma raíz entre sí), así que
+  // tras reordenar hijas de una raíz, sus posiciones (1..n) podían intercalarse con las de OTRA
+  // raíz que casualmente compartiera los mismos números, descolocando el selector de Registro. El
+  // COALESCE ordena primero por el display_order de la RAÍZ de cada hoja (su propio display_order
+  // si ya es raíz, como en listIncomeCategories), agrupando las hojas por la posición de su árbol;
+  // c.parent_id de tiebreak dentro de esa raíz pone a la raíz ('' ordena antes que cualquier id)
+  // justo antes de sus hijas en listIncomeCategories (que no filtra por hoja, incluye raíces e
+  // hijas mezcladas); c.display_order final decide el orden dentro de ese mismo grupo.
   listExpenseLeafCategories: `SELECT c.id, c.name FROM categories c
     WHERE c.flow='expense' AND c.deleted=0 AND c.is_archived=0
       AND NOT EXISTS (SELECT 1 FROM categories h WHERE h.parent_id=c.id AND h.deleted=0 AND h.is_archived=0)
-    ORDER BY c.display_order`,
+    ORDER BY COALESCE((SELECT p.display_order FROM categories p WHERE p.id=c.parent_id AND p.deleted=0), c.display_order), c.parent_id, c.display_order`,
   listIncomeCategories: `SELECT c.id, c.name FROM categories c
-    WHERE c.flow='income' AND c.deleted=0 AND c.is_archived=0 ORDER BY c.display_order`,
+    WHERE c.flow='income' AND c.deleted=0 AND c.is_archived=0
+    ORDER BY COALESCE((SELECT p.display_order FROM categories p WHERE p.id=c.parent_id AND p.deleted=0), c.display_order), c.parent_id, c.display_order`,
   listAccounts: `SELECT id, name, type FROM accounts WHERE deleted=0 AND is_archived=0 ORDER BY display_order`,
   allCategories: `SELECT id, name, parent_id FROM categories WHERE deleted=0`,
   dumpTable: (t) => `SELECT * FROM ${t}`,   // solo para exportAllJson; t viene de la lista fija de tablas
@@ -223,9 +233,17 @@ export const SQL = {
   // Hijas ACTIVAS de una categoría: archiveCategory las recorre para archivarlas en cascada (una
   // SQL.setCategoryArchived por cada una, en el MISMO execMany que la de la propia raíz).
   childrenOf: `SELECT id FROM categories WHERE parent_id=? AND deleted=0 AND is_archived=0`,
-  // ¿Tiene `id` alguna hija ACTIVA? Guard "máx 2 niveles" de updateCategory (una raíz con hijas
-  // activas no puede convertirse en hija de otra) — mismo patrón que hasActiveLinkedRefund
-  // (SELECT 1 ... LIMIT 1, solo interesa la existencia).
+  // ¿Tiene `id` alguna hija ACTIVA? Ya NO la usa el guard de updateCategory (ver hasChildren) —
+  // se conserva porque el label de cascada de archivar SÍ es active-only a propósito (archiveCategory
+  // solo archiva en cascada las hijas activas, ver childrenOf) y porque tests/app/categorias.test.mjs
+  // la ejerce directamente. Mismo patrón que hasActiveLinkedRefund (SELECT 1 ... LIMIT 1, solo
+  // interesa la existencia).
   hasActiveChildren: `SELECT 1 FROM categories WHERE parent_id=? AND deleted=0 AND is_archived=0 LIMIT 1`,
+  // Item 3 (Important, review final): ¿tiene `id` alguna hija, ACTIVA o ARCHIVADA? Guard real de
+  // "máx 2 niveles" de updateCategory: hasActiveChildren (arriba) dejaba demotar una raíz cuya
+  // ÚNICA hija estaba archivada (activeChildren=0) — la hija archivada seguía apuntando, vía
+  // parent_id, a una categoría que dejaba de ser raíz, dejando un árbol de 3 niveles (huérfana en
+  // los hechos, aunque nunca se borra la fila). Sin filtro is_archived: cuenta cualquier hija.
+  hasChildren: `SELECT 1 FROM categories WHERE parent_id=? AND deleted=0 LIMIT 1`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"];

@@ -51,19 +51,44 @@ export function hashIndex(id) {
   return h % POOL.length;
 }
 
+// Defensa en profundidad (CRITICAL, review final): meta.category_style llega de un import xlsx sin
+// más validación que "es JSON válido" (parseStyle) — un color/icono corrupto (p.ej. un payload de
+// XSS) pasaría intacto a colorForCategory/iconForCategory y de ahí, SIN escapar, a los template
+// strings de categorias.js (style="--cat:${color}" / contenido ${icon}). sanitizeStyleMap descarta
+// en SILENCIO (sin throw: esto es la última línea de defensa para datos que ya pudieron entrar sin
+// pasar por setCategoryStyle, que sí lanza) cualquier entrada que no encaje en las listas cerradas.
+function sanitizeStyleMap(map) {
+  if (!map || typeof map !== "object" || Array.isArray(map)) return {};
+  const allowedIcons = new Set([...CURATED_ICONS, ...Object.values(CATEGORY_ICONS)]);
+  const out = {};
+  for (const [k, v] of Object.entries(map)) {
+    // JSON.parse crea "__proto__" como own property normal (no como el prototipo real) — pero
+    // out[k]= con k="__proto__" SÍ dispara el setter especial de Object.prototype y envenenaría el
+    // prototipo de `out`. Saltarla evita tocar out.__proto__ por completo.
+    if (k === "__proto__") continue;
+    if (!v || typeof v !== "object") continue;
+    const entry = {};
+    if (typeof v.color === "string" && POOL.includes(v.color)) entry.color = v.color;
+    if (typeof v.icon === "string" && allowedIcons.has(v.icon)) entry.icon = v.icon;
+    if (Object.keys(entry).length > 0) out[k] = entry;
+  }
+  return out;
+}
+
 // Overrides de usuario por categoría raíz: { [catId]: { color?, icon? } }. Se inicializan en el
 // boot desde meta.category_style (ver parseStyle) y los reutiliza la pantalla de edición.
 let style = {};
 export function initCategoryStyle(map) {
-  style = map && typeof map === "object" ? map : {};
+  style = sanitizeStyleMap(map);
 }
 
 // JSON.parse seguro para meta.category_style: cualquier fallo (valor ausente, corrupto, no-objeto)
-// vuelve a {} en vez de romper el boot.
+// vuelve a {} en vez de romper el boot. sanitizeStyleMap aplica el saneo de datos (Item 1) sobre
+// cualquier JSON que sí parsee pero traiga colores/iconos fuera de las listas cerradas.
 export function parseStyle(raw) {
   try {
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
+    return sanitizeStyleMap(parsed);
   } catch {
     return {};
   }

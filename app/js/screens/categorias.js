@@ -157,8 +157,14 @@ export async function renderCategorias(container, onBack) {
       parentId: mode === "edit" ? category.parent_id : (parentId || ""),
       isArchived: mode === "edit" ? !!category.is_archived : false,
       // Hijas ACTIVAS (campo `children` de listCategoriesAdmin, NO childrenByParent — ese cuenta
-      // también archivadas): gobierna el bloqueo de "Dentro de" y el aviso de cascada al archivar.
+      // también archivadas): gobierna SOLO el texto del aviso de cascada al archivar.
       activeChildrenCount: mode === "edit" ? (category.children || 0) : 0,
+      // Item 3 (review final): TOTAL de hijas (activas + archivadas), de childrenByParent — el
+      // árbol en cliente ve ambas. Gobierna lockedParent (ver renderForm): el guard real de
+      // repo.updateCategory (SQL.hasChildren) ya no distingue archivadas, así que la UI que lo
+      // refleja tampoco puede quedarse solo con las activas o dejaría "Dentro de" desbloqueado
+      // para un caso que el repo va a rechazar igualmente.
+      childrenCount: mode === "edit" ? (childrenByParent.get(category.id) ?? []).length : 0,
       wasRoot,
       colorTouched: wasRoot,
       color: initialColor,
@@ -198,7 +204,7 @@ export async function renderCategorias(container, onBack) {
     const form = state.form;
     const editing = form.mode === "edit";
     const isRoot = !form.parentId;
-    const lockedParent = editing && form.activeChildrenCount > 0;
+    const lockedParent = editing && form.childrenCount > 0;
     const preview = previewStyle(form);
     const parents = availableParents(form);
     const armed = state.deleteConfirm && !form.isArchived;
@@ -539,12 +545,12 @@ export async function renderCategorias(container, onBack) {
     const color = dotColor(child);
     const icon = iconForCategory(child.id, byId);
     return `
-    <div data-child-row="${child.id}" style="display:flex;align-items:center;padding-left:44px;${child.is_archived ? "opacity:0.5;" : ""}">
-      <span class="cat-drag" data-drag="${child.id}" aria-hidden="true"
+    <div data-child-row="${escAttr(child.id)}" style="display:flex;align-items:center;padding-left:44px;${child.is_archived ? "opacity:0.5;" : ""}">
+      <span class="cat-drag" data-drag="${escAttr(child.id)}" aria-hidden="true"
         style="color:var(--text-3);font-size:14px;flex-shrink:0;opacity:0.6;letter-spacing:-1px;cursor:grab;
         touch-action:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;
         padding:10px 8px 10px 0;">≡</span>
-      <button type="button" class="cat-row" data-cat="${child.id}"
+      <button type="button" class="cat-row" data-cat="${escAttr(child.id)}"
         style="flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:9px 0;background:none;
         border:0;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
         <div class="dotico" style="width:28px;height:28px;font-size:13px;--cat:${color};">${icon}</div>
@@ -562,14 +568,17 @@ export async function renderCategorias(container, onBack) {
   // borraría (el grupo dejaría de distinguirse de su entorno).
   function groupHtml(root) {
     const kids = childrenByParent.get(root.id) ?? [];
+    // Item 4 (review final): una raíz archivada no ofrece "+ Añadir subcategoría" — createCategory
+    // ya lo rechazaría en el repo (padre archivado), esto evita el viaje de ida y vuelta con error.
     return `
     <div class="card" style="border-radius:var(--radius-sm);padding:2px 12px 10px;margin-bottom:6px;">
       ${kids.map(childRowHtml).join("")}
+      ${root.is_archived ? "" : `
       <button type="button" data-add-sub="${root.id}"
         style="height:36px;padding:0 14px;margin:6px 0 0 44px;border-radius:999px;background:var(--card2);
         color:var(--text);border:0;font-size:12px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;">
         + Añadir subcategoría
-      </button>
+      </button>`}
     </div>`;
   }
 
@@ -588,13 +597,13 @@ export async function renderCategorias(container, onBack) {
     // el artboard, donde Casa (expandida) y Ocio (última visible) llevan border-bottom:0.
     const suppressBorder = isLast || expanded;
     return `
-    <div data-root-row="${root.id}" style="display:flex;align-items:center;${root.is_archived ? "opacity:0.5;" : ""}
+    <div data-root-row="${escAttr(root.id)}" style="display:flex;align-items:center;${root.is_archived ? "opacity:0.5;" : ""}
       ${suppressBorder ? "" : "border-bottom:1px solid var(--rule);"}">
-      <span class="cat-drag" data-drag="${root.id}" aria-hidden="true"
+      <span class="cat-drag" data-drag="${escAttr(root.id)}" aria-hidden="true"
         style="color:var(--text-3);font-size:14px;flex-shrink:0;opacity:0.6;letter-spacing:-1px;cursor:grab;
         touch-action:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;
         padding:14px 8px 14px 0;">≡</span>
-      <button type="button" class="cat-row" data-cat="${root.id}"
+      <button type="button" class="cat-row" data-cat="${escAttr(root.id)}"
         style="flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:13px 0;background:none;border:0;
         text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
         <div class="dotico" style="--cat:${color};">${icon}</div>

@@ -614,7 +614,16 @@ export async function createCategory({ name, flow, needType, parentId }) {
   const trimmed = String(name ?? "").trim();
   if (!trimmed) throw new Error("El nombre de la categoría no puede estar vacío");
   const pid = parentId || "";
-  if (pid) await assertValidParent(pid, flow);
+  if (pid) {
+    await assertValidParent(pid, flow);
+    // Item 4 (Important, review final): a propósito NO entra en assertValidParent (compartida con
+    // updateCategory) — save() en categorias.js manda parentId SIEMPRE en edición, incluso al
+    // renombrar una hija cuya raíz ya está archivada; si este check viviera ahí, ese rename (que
+    // hoy funciona y debe seguir funcionando) empezaría a lanzar. Solo alta bajo un padre archivado
+    // se bloquea aquí.
+    const parent = await getCategory(pid);
+    if (parent.is_archived) throw new Error("No se puede crear una subcategoría dentro de una categoría archivada");
+  }
   const id = bcUlid();
   const t = nowIso();
   await exec(SQL.insertCategory, [id, bcSanitizeCell(trimmed), pid, flow, needType ?? "", t, t, flow, pid]);
@@ -652,9 +661,13 @@ export async function updateCategory(id, fields) {
 
   if (parentId) {
     await assertValidParent(parentId, cur.flow);
-    const activeChildren = await query(SQL.hasActiveChildren, [id]);
-    if (activeChildren.length > 0) {
-      throw new Error("Esta categoría tiene subcategorías activas: solo se permiten dos niveles, no puede convertirse en subcategoría de otra");
+    // Item 3 (review final): hasChildren, NO hasActiveChildren — incluso con solo hijas
+    // ARCHIVADAS, demotarla dejaría un árbol de 3 niveles (la hija sigue apuntando, vía
+    // parent_id, a una categoría que deja de ser raíz). El mensaje ya no dice "activas": el guard
+    // es sobre CUALQUIER hija, se refleje o no como tal en la lista (que solo cuenta activas).
+    const children = await query(SQL.hasChildren, [id]);
+    if (children.length > 0) {
+      throw new Error("Esta categoría tiene subcategorías: solo se permiten dos niveles, no puede convertirse en subcategoría de otra");
     }
   }
 

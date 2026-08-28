@@ -198,6 +198,55 @@ test("Regresión: archivar una categoría income la saca de listIncomeCategories
   assert.deepEqual(db.prepare(SQL.listIncomeCategories).all(), []);
 });
 
+// Item 5 (Important, review final): display_order es por GRUPO (flow, parent_id) — dos raíces
+// distintas suelen tener hijas con los MISMOS números (1, 2, 3...). Ordenar listExpenseLeafCategories
+// solo por c.display_order (el de la propia hoja) intercalaba hojas de raíces distintas en vez de
+// agruparlas por su árbol. El fix ordena primero por el display_order de la RAÍZ de cada hoja.
+test("Regresión: listExpenseLeafCategories sigue agrupada por el orden de las RAÍCES tras reordenar un grupo de hijas", () => {
+  const db = openDb();
+  seedMinimal(db); // cat-casa (raíz, order 1) con cat-casa-alquiler (hija, order 1)
+  db.prepare(SQL.insertCategory).run("cat-casa-luz", "Luz", "cat-casa", "expense", "need", T, T, "expense", "cat-casa");
+  // cat-casa ahora tiene 2 hijas: alquiler(order1), luz(order2)
+
+  db.prepare(SQL.insertCategory).run("cat-ocio", "Ocio", "", "expense", "want", T, T, "expense", "");
+  // cat-ocio es la SEGUNDA raíz de gasto (display_order=2, MAX(1)+1)
+  db.prepare(SQL.insertCategory).run("cat-ocio-cine", "Cine", "cat-ocio", "expense", "want", T, T, "expense", "cat-ocio");
+  db.prepare(SQL.insertCategory).run("cat-ocio-restaurantes", "Restaurantes", "cat-ocio", "expense", "want", T, T, "expense", "cat-ocio");
+  // cat-ocio también tiene 2 hijas: cine(order1), restaurantes(order2) — MISMOS números que casa
+
+  // Reordena el grupo de hijas de cat-ocio a 1..n, invertido: restaurantes primero, cine después.
+  reorderCategoriesReproduced(db, ["cat-ocio-restaurantes", "cat-ocio-cine"]);
+  assert.equal(getCategoryRow(db, "cat-ocio-restaurantes").display_order, 1);
+  assert.equal(getCategoryRow(db, "cat-ocio-cine").display_order, 2);
+
+  const leafIds = db.prepare(SQL.listExpenseLeafCategories).all().map((r) => r.id);
+  assert.deepEqual(leafIds, ["cat-casa-alquiler", "cat-casa-luz", "cat-ocio-restaurantes", "cat-ocio-cine"],
+    "las hojas de cat-casa (raíz 1) preceden a las de cat-ocio (raíz 2), y dentro de cat-ocio respeta el nuevo orden — " +
+    "sin el fix, ordenar solo por c.display_order intercalaría alquiler/cine (ambas order=1) y luz/restaurantes (order=2)");
+});
+
+// Item 5, mitad de listIncomeCategories: a diferencia de la hoja de gasto, esta query NO filtra a
+// hojas — mezcla raíces e hijas en el mismo resultado, así que el tiebreak c.parent_id (''
+// ordena antes que cualquier id) importa de verdad: pone a cada raíz JUSTO ANTES de sus propias
+// hijas (mismo display_order que ellas, por el COALESCE), no después de una de ellas por azar de
+// rowid. cat-nomina (raíz, order=1) tiene 2 hijas (order=1,2, MISMOS números que cat-ahorro más
+// abajo); cat-ahorro es la SEGUNDA raíz de income (order=2) y también tiene 2 hijas (order=1,2).
+test("Regresión: listIncomeCategories agrupa cada raíz con sus propias hijas (mezcla raíces+hijas, no es una lista de hojas)", () => {
+  const db = openDb();
+  seedMinimal(db); // cat-nomina (raíz income, order 1), sin hijas todavía
+  db.prepare(SQL.insertCategory).run("cat-nomina-bonus", "Bonus", "cat-nomina", "income", "", T, T, "income", "cat-nomina");
+  db.prepare(SQL.insertCategory).run("cat-nomina-extra", "Extra", "cat-nomina", "income", "", T, T, "income", "cat-nomina");
+  db.prepare(SQL.insertCategory).run("cat-ahorro", "Ahorro", "", "income", "", T, T, "income", "");
+  db.prepare(SQL.insertCategory).run("cat-ahorro-hijo1", "H1", "cat-ahorro", "income", "", T, T, "income", "cat-ahorro");
+  db.prepare(SQL.insertCategory).run("cat-ahorro-hijo2", "H2", "cat-ahorro", "income", "", T, T, "income", "cat-ahorro");
+
+  const ids = db.prepare(SQL.listIncomeCategories).all().map((r) => r.id);
+  assert.deepEqual(ids, ["cat-nomina", "cat-nomina-bonus", "cat-nomina-extra", "cat-ahorro", "cat-ahorro-hijo1", "cat-ahorro-hijo2"],
+    "cat-nomina y sus 2 hijas primero, LUEGO cat-ahorro y las suyas — sin el fix, ordenar solo por c.display_order " +
+    "da [cat-nomina, cat-nomina-bonus, cat-ahorro-hijo1, cat-nomina-extra, cat-ahorro, cat-ahorro-hijo2]: " +
+    "cat-ahorro-hijo1 se cuela entre las hijas de nómina, y la propia raíz cat-ahorro aparece DESPUÉS de una de sus hijas");
+});
+
 // ---- Lógica de repo reproducida contra la BD --------------------------------
 // repo.js importa db.js, que usa el Worker del navegador — no hay Worker en Node. Igual que
 // tests/app/patrimonio.test.mjs (updateAccountReproduced) y tests/app/compartidos.test.mjs
@@ -228,12 +277,16 @@ function assertValidParentReproduced(db, parentId, flow) {
   }
 }
 
-/** Reproduce repo.createCategory. */
+/** Reproduce repo.createCategory (incluido el guard de padre archivado, Item 4). */
 function createCategoryReproduced(db, { name, flow, needType, parentId }, now = T) {
   const trimmed = String(name ?? "").trim();
   if (!trimmed) throw new Error("El nombre de la categoría no puede estar vacío");
   const pid = parentId || "";
-  if (pid) assertValidParentReproduced(db, pid, flow);
+  if (pid) {
+    assertValidParentReproduced(db, pid, flow);
+    const parent = getCategoryRow(db, pid);
+    if (parent.is_archived) throw new Error("No se puede crear una subcategoría dentro de una categoría archivada");
+  }
   const id = "cat-" + Math.floor(Math.random() * 1e9);
   db.prepare(SQL.insertCategory).run(id, pure.bcSanitizeCell(trimmed), pid, flow, needType ?? "", now, now, flow, pid);
   return id;
@@ -258,9 +311,10 @@ function updateCategoryReproduced(db, id, fields, now = T2) {
 
   if (parentId) {
     assertValidParentReproduced(db, parentId, cur.flow);
-    const activeChildren = db.prepare(SQL.hasActiveChildren).all(id);
-    if (activeChildren.length > 0) {
-      throw new Error("Esta categoría tiene subcategorías activas: solo se permiten dos niveles, no puede convertirse en subcategoría de otra");
+    // Item 3: hasChildren (activas + archivadas), no hasActiveChildren — mismo cambio que repo.js.
+    const children = db.prepare(SQL.hasChildren).all(id);
+    if (children.length > 0) {
+      throw new Error("Esta categoría tiene subcategorías: solo se permiten dos niveles, no puede convertirse en subcategoría de otra");
     }
   }
 
@@ -352,6 +406,19 @@ test("createCategory (reproducido): rechaza nombre vacío tras el recorte (trim)
   assert.throws(() => createCategoryReproduced(db, { name: "", flow: "expense" }), /nombre.*no puede estar vacío/);
 });
 
+// Item 4 (Important, review final), test (a): crear una subcategoría bajo una raíz ARCHIVADA se
+// rechaza en el repo — antes de este fix solo la UI lo escondía (groupHtml), nada lo impedía si
+// alguien se saltaba la pantalla (o la UI tenía un bug de refresco).
+test("createCategory (reproducido): rechaza crear una subcategoría bajo un padre archivado", () => {
+  const db = openDb();
+  seedMinimal(db);
+  db.prepare(SQL.setCategoryArchived).run(1, T2, "cat-casa");
+  assert.throws(
+    () => createCategoryReproduced(db, { name: "Comunidad", flow: "expense", needType: "need", parentId: "cat-casa" }),
+    /archivada/i,
+  );
+});
+
 test("updateCategory (reproducido): renombra con bcSanitizeCell aplicado y edita el needType", () => {
   const db = openDb();
   seedMinimal(db);
@@ -359,6 +426,19 @@ test("updateCategory (reproducido): renombra con bcSanitizeCell aplicado y edita
   const row = getCategoryRow(db, "cat-casa-alquiler");
   assert.equal(row.name, "'=HACK()", "bcSanitizeCell antepone ' a fórmulas peligrosas");
   assert.equal(row.need_type, "want");
+});
+
+// Item 4 (Important, review final), test (b) — REGRESIÓN PROHIBIDA: el guard de padre archivado
+// vive SOLO en createCategory, nunca en assertValidParent (compartida con updateCategory). save()
+// en categorias.js manda parentId SIEMPRE en edición (incluso sin tocar "Dentro de"), así que
+// renombrar una hija cuya raíz ya está archivada manda { name, parentId: <raíz archivada> } — si
+// el check hubiera entrado en assertValidParent, este caso (que hoy funciona) empezaría a lanzar.
+test("updateCategory (reproducido): renombrar una hija cuya raíz está archivada NO lanza (el guard de archivado es solo de alta)", () => {
+  const db = openDb();
+  seedMinimal(db); // cat-casa-alquiler es hija de cat-casa
+  db.prepare(SQL.setCategoryArchived).run(1, T2, "cat-casa");
+  updateCategoryReproduced(db, "cat-casa-alquiler", { name: "Nuevo nombre", parentId: "cat-casa" });
+  assert.equal(getCategoryRow(db, "cat-casa-alquiler").name, "Nuevo nombre");
 });
 
 test("updateCategory (reproducido): mueve una hija a otra raíz del MISMO flow (OK)", () => {
@@ -402,6 +482,21 @@ test("updateCategory (reproducido): una raíz SIN hijas activas SÍ puede recibi
   const raizB = createCategoryReproduced(db, { name: "B", flow: "expense", needType: "want", parentId: "" });
   updateCategoryReproduced(db, raizA, { parentId: raizB });
   assert.equal(getCategoryRow(db, raizA).parent_id, raizB);
+});
+
+// Item 3 (Important, review final): hasActiveChildren dejaba demotar una raíz cuya ÚNICA hija
+// estaba archivada (activeChildren=0) — la hija archivada quedaba huérfana en los hechos (su
+// parent_id sigue apuntando a una categoría que deja de ser raíz: árbol de 3 niveles). Con
+// hasChildren (sin filtro is_archived) el guard también cuenta hijas archivadas.
+test("updateCategory (reproducido): una raíz con SOLO hijas archivadas TAMPOCO puede recibir parentId (dejaría a la hija huérfana)", () => {
+  const db = openDb();
+  seedMinimal(db); // cat-casa tiene a cat-casa-alquiler como única hija
+  db.prepare(SQL.setCategoryArchived).run(1, T2, "cat-casa-alquiler"); // la archiva: 0 hijas ACTIVAS, pero sigue teniendo 1 hija
+  const otraRaizId = createCategoryReproduced(db, { name: "Ocio", flow: "expense", needType: "want", parentId: "" });
+  assert.throws(
+    () => updateCategoryReproduced(db, "cat-casa", { parentId: otraRaizId }),
+    /dos niveles/i,
+  );
 });
 
 test("updateCategory (reproducido): flow es inmutable — pasar la clave lanza, incluso con el mismo valor", () => {

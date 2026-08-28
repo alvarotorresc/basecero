@@ -145,11 +145,47 @@ test("category-colors: override de usuario tiene precedencia sobre seeds y aplic
   assert.equal(textColorForCategory("cat-casa-luz", byId), "#D97742", "cat-casa-luz debe heredar el tinte de texto del override de cat-casa");
 });
 
-test("category-colors: override con color corrupto (fuera del pool) cae a DEFAULT_COLOR en el texto", () => {
+// Item 1 (CRITICAL, review final): invertido — antes del saneo, un override con color corrupto
+// (fuera del pool, potencial payload de XSS) SOBREVIVÍA hasta colorForCategory y de ahí sin
+// escapar a los template strings de categorias.js. Ahora sanitizeStyleMap (interna) descarta la
+// entrada entera en initCategoryStyle: sin color válido y sin icono, la entrada queda vacía y ni
+// siquiera se guarda — cat-casa resuelve a su seed, como si nunca hubiera habido override.
+test("category-colors: override con color corrupto (fuera del pool) se descarta — resuelve al seed de la categoría", () => {
   initCategoryStyle({ "cat-casa": { color: "#123456" } });
   const byId = { "cat-casa": { id: "cat-casa", parent_id: "" } };
-  assert.equal(colorForCategory("cat-casa", byId), "#123456", "colorForCategory respeta el override aunque no esté en el pool");
-  assert.equal(textColorForCategory("cat-casa", byId), DEFAULT_COLOR, "textColorForCategory cae a DEFAULT_COLOR si el color no está en el pool");
+  assert.equal(colorForCategory("cat-casa", byId), "#4F94E9", "la entrada corrupta se descarta: cae al seed de cat-casa");
+  assert.equal(textColorForCategory("cat-casa", byId), "#6FA8F0", "ídem para el tinte de texto del seed");
+});
+
+test("category-colors: color fuera del pool se descarta, pero el icono válido de la MISMA entrada se conserva", () => {
+  const parsed = parseStyle(JSON.stringify({ "cat-casa": { color: "#123456", icon: CURATED_ICONS[0] } }));
+  assert.deepEqual(parsed, { "cat-casa": { icon: CURATED_ICONS[0] } });
+});
+
+test("category-colors: icono desconocido se descarta, pero el color válido de la MISMA entrada se conserva", () => {
+  const parsed = parseStyle(JSON.stringify({ "cat-casa": { color: POOL[0], icon: "🚫no-es-un-icono-permitido" } }));
+  assert.deepEqual(parsed, { "cat-casa": { color: POOL[0] } });
+});
+
+test("category-colors: un array en el nivel superior de meta.category_style se descarta entero → {}", () => {
+  assert.deepEqual(parseStyle(JSON.stringify([{ color: POOL[0] }])), {});
+  initCategoryStyle([{ color: POOL[0] }]);
+  const byId = { "cat-casa": { id: "cat-casa", parent_id: "" } };
+  assert.equal(colorForCategory("cat-casa", byId), "#4F94E9", "un array no aporta overrides: cat-casa sigue en su seed");
+});
+
+test("category-colors: una entrada válida (color del pool + icono permitido) queda intacta tras el saneo", () => {
+  const input = { "cat-casa": { color: POOL[3], icon: CURATED_ICONS[2] } };
+  assert.deepEqual(parseStyle(JSON.stringify(input)), input);
+});
+
+test("category-colors: la clave __proto__ del JSON se ignora sin contaminar Object.prototype ni pisar entradas legítimas vecinas", () => {
+  const malicious = JSON.parse(`{"__proto__":{"color":"${POOL[0]}","polluted":true},"cat-casa":{"color":"${POOL[1]}"}}`);
+  initCategoryStyle(malicious);
+  assert.equal(({}).polluted, undefined, "Object.prototype no debe contaminarse");
+  assert.equal(({}).color, undefined, "Object.prototype no debe contaminarse");
+  const byId = { "cat-casa": { id: "cat-casa", parent_id: "" } };
+  assert.equal(colorForCategory("cat-casa", byId), POOL[1], "la entrada legítima junto al __proto__ malicioso se conserva intacta");
 });
 
 test("category-colors: categoría nueva sin override (cat-mascotas) resuelve por hash — índice y color fijados, no recalculados", () => {
