@@ -2,6 +2,7 @@ dist/
 generator/.venv/
 __pycache__/
 *.pyc
+.playwright-mcp/
 
 # Backlog, config de sesión y docs: material de trabajo, local
 /BACKLOG.md
