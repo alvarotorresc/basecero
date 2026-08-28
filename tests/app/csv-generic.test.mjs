@@ -172,6 +172,17 @@ test("buildProfile: counterparty vacío o ausente se normaliza a null", () => {
   assert.equal(p2.counterparty, null);
 });
 
+test("buildProfile: cabecera vacía elegida como columna de fecha → error (si no, parseCsvProfile la rechazaría después en silencio)", () => {
+  const headers = ["", "Concepto", "Importe"];
+  const sample = [["12/09/2026", "Compra super", "-45,20"]];
+  const result = buildProfile({
+    headers, date: "", concept: "Concepto", counterparty: null,
+    amountKind: "single", amountCol: "Importe", sample,
+  });
+  assert.ok(result.error);
+  assert.equal(result.headers, undefined);
+});
+
 // ------------------------------------------------------------- applyProfile
 
 test("applyProfile: single — filas buenas + una fila con fecha inválida a errors", () => {
@@ -256,6 +267,20 @@ test("parseCsvProfile: __proto__ como clave se rechaza y no contamina Object.pro
     '"amount":{"kind":"single","col":"A","decimal":","},"__proto__":{"polluted":true}}';
   assert.equal(parseCsvProfile(raw), null);
   assert.equal({}.polluted, undefined);
+});
+
+test("parseCsvProfile: date no está en headers (perfil por lo demás válido) → null", () => {
+  assert.equal(parseCsvProfile(JSON.stringify({ ...VALID_PROFILE_SINGLE, date: "OtraFecha" })), null);
+});
+
+test("parseCsvProfile: amount.col === \"\" → null", () => {
+  assert.equal(parseCsvProfile(JSON.stringify({ ...VALID_PROFILE_SINGLE,
+    amount: { kind: "single", col: "", decimal: "," } })), null);
+});
+
+test("parseCsvProfile: amount.kind === \"split\" y debit no está en headers → null", () => {
+  assert.equal(parseCsvProfile(JSON.stringify({ ...VALID_PROFILE_SPLIT,
+    amount: { kind: "split", debit: "NoExiste", credit: "Abono", decimal: "." } })), null);
 });
 
 // ------------------------------------------------------------- profileMatches

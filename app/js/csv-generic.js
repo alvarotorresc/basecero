@@ -147,21 +147,21 @@ export function buildProfile({ headers, date, concept, counterparty, amountKind,
   const idx = (h) => headers.indexOf(h);
   const rows = Array.isArray(sample) ? sample : [];
 
-  if (idx(date) === -1) return { error: `columna de fecha inexistente: «${date}»` };
-  if (idx(concept) === -1) return { error: `columna de concepto inexistente: «${concept}»` };
+  if (date === "" || idx(date) === -1) return { error: `columna de fecha inexistente: «${date}»` };
+  if (concept === "" || idx(concept) === -1) return { error: `columna de concepto inexistente: «${concept}»` };
   const cp = normalizeCounterparty(counterparty);
-  if (cp !== null && idx(cp) === -1) return { error: `columna de contraparte inexistente: «${cp}»` };
+  if (cp !== null && (cp === "" || idx(cp) === -1)) return { error: `columna de contraparte inexistente: «${cp}»` };
 
   let amount;
   let amountSampleValues;
   if (amountKind === "single") {
-    if (idx(amountCol) === -1) return { error: `columna de importe inexistente: «${amountCol}»` };
+    if (amountCol === "" || idx(amountCol) === -1) return { error: `columna de importe inexistente: «${amountCol}»` };
     const ai = idx(amountCol);
     amountSampleValues = rows.map((r) => r[ai]);
     amount = { kind: "single", col: amountCol };
   } else if (amountKind === "split") {
-    if (idx(debitCol) === -1) return { error: `columna de cargo inexistente: «${debitCol}»` };
-    if (idx(creditCol) === -1) return { error: `columna de abono inexistente: «${creditCol}»` };
+    if (debitCol === "" || idx(debitCol) === -1) return { error: `columna de cargo inexistente: «${debitCol}»` };
+    if (creditCol === "" || idx(creditCol) === -1) return { error: `columna de abono inexistente: «${creditCol}»` };
     const di = idx(debitCol), ci = idx(creditCol);
     amountSampleValues = rows.flatMap((r) => [r[di], r[ci]]);
     amount = { kind: "split", debit: debitCol, credit: creditCol };
@@ -235,11 +235,12 @@ function validAmountShape(v) {
   const keys = Object.keys(v);
   if (v.kind === "single") {
     return keys.length === AMOUNT_KEYS_SINGLE.length && keys.every((k) => AMOUNT_KEYS_SINGLE.includes(k)) &&
-      typeof v.col === "string" && DECIMALS.has(v.decimal);
+      typeof v.col === "string" && v.col !== "" && DECIMALS.has(v.decimal);
   }
   if (v.kind === "split") {
     return keys.length === AMOUNT_KEYS_SPLIT.length && keys.every((k) => AMOUNT_KEYS_SPLIT.includes(k)) &&
-      typeof v.debit === "string" && typeof v.credit === "string" && DECIMALS.has(v.decimal);
+      typeof v.debit === "string" && v.debit !== "" && typeof v.credit === "string" && v.credit !== "" &&
+      DECIMALS.has(v.decimal);
   }
   return false;
 }
@@ -266,6 +267,18 @@ export function parseCsvProfile(json) {
   if (typeof parsed.concept !== "string" || parsed.concept === "") return null;
   if (!(parsed.counterparty === null || (typeof parsed.counterparty === "string" && parsed.counterparty !== ""))) return null;
   if (!validAmountShape(parsed.amount)) return null;
+
+  // Un perfil editado a mano puede tener cabeceras válidas por fuera (profileMatches solo compara
+  // ese array) pero columnas interiores que ya no existen en `headers` — hay que comprobarlas aquí
+  // o el import falla en silencio con "0 nuevas · N filas ilegibles".
+  if (!parsed.headers.includes(parsed.date)) return null;
+  if (!parsed.headers.includes(parsed.concept)) return null;
+  if (parsed.counterparty !== null && !parsed.headers.includes(parsed.counterparty)) return null;
+  if (parsed.amount.kind === "single") {
+    if (!parsed.headers.includes(parsed.amount.col)) return null;
+  } else {
+    if (!parsed.headers.includes(parsed.amount.debit) || !parsed.headers.includes(parsed.amount.credit)) return null;
+  }
 
   return {
     headers: [...parsed.headers],
