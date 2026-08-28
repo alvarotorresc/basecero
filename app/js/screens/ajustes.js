@@ -14,7 +14,7 @@ const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&qu
 // que antes), no el auto-width de la fila de píldoras del artboard.
 const BTN_FULL_WIDTH = "width:100%;";
 
-// Input plano sin borde (Limpia var(--border)): tile --card2, mismo criterio que los tiles de
+// Input plano sin borde: tile --card2, mismo criterio que los tiles de
 // fecha/nombre de periodo-nuevo.js.
 const INPUT_STYLE = "background:var(--card2);color:var(--text);border:0;"
   + "border-radius:var(--radius-sm);padding:12px 14px;width:100%;font:500 15px var(--font-ui);outline:none;";

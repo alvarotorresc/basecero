@@ -53,7 +53,7 @@ export async function renderRecurrentes(container, onBack) {
   const categoriesFor = (tipo) => (tipo === "income" ? incomeCats : tipo === "expense" ? expenseCats : []);
 
   function ruleIconColor(r) {
-    if (r.type === "transfer") return { color: "#5c646d", icon: "⇄" };
+    if (r.type === "transfer") return { color: "var(--text-2)", icon: "⇄" };
     return { color: colorForCategory(r.category_id, byId), icon: iconForCategory(r.category_id, byId) };
   }
 

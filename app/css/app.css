@@ -709,6 +709,7 @@ body.onboarding .fab { display: none; }
 }
 .ring > * {
   position: relative;
+  z-index: 1;
   font-size: 16px;
 }
 

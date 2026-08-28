@@ -80,10 +80,13 @@ function netWorthCardHtml(netWorthCents, series) {
 
 // Trazos de los iconos SVG de design/Patrimonio.dc.html:71-118 (uno por tipo de cuenta, no por
 // cuenta concreta: aquí solo hay 3 tipos). El color entra como --cat en .list-row-icon (mismo
-// mecanismo de tinte que .tx-icon con las categorías, ver app.css).
+// mecanismo de tinte que .tx-icon con las categorías, ver app.css). Paleta propia de tipo de
+// cuenta, independiente de category-colors.js (checking/liability no están en la lista de hex
+// viejos de categoría, así que se dejan tal cual; el morado de savings SÍ coincidía por accidente
+// con el hex viejo retirado de cat-suscripciones — migrado al mismo sucesor morado, tarea 9).
 const ACCOUNT_ICON = {
   checking: { color: "#7aa2ff", paths: '<rect x="3" y="5.5" width="18" height="13" rx="3.5"></rect><path d="M3 10.5h18"></path>' },
-  savings: { color: "#b08be8", paths: '<path d="M5 8.5h14a1.6 1.6 0 011.6 1.6v7.3A1.6 1.6 0 0119 19H5a1.6 1.6 0 01-1.6-1.6V6.6A1.6 1.6 0 015 5h10"></path><circle cx="16.5" cy="13.8" r="1.2"></circle>' },
+  savings: { color: "#9153AB", paths: '<path d="M5 8.5h14a1.6 1.6 0 011.6 1.6v7.3A1.6 1.6 0 0119 19H5a1.6 1.6 0 01-1.6-1.6V6.6A1.6 1.6 0 015 5h10"></path><circle cx="16.5" cy="13.8" r="1.2"></circle>' },
   liability: { color: "#f87171", paths: '<path d="M4.2 16.2h15.6v-3.8l-1.7-4.1a1.6 1.6 0 00-1.5-1H7.4a1.6 1.6 0 00-1.5 1l-1.7 4.1z"></path><path d="M6 16.2v2.4h2.6v-2.4M15.4 16.2v2.4H18v-2.4"></path>' },
 };
 
@@ -233,16 +236,7 @@ function goalBarRowHtml(g) {
  *  derecha (con el progreso en importes delante, mismo dato que goalBarRowHtml muestra en su fila
  *  de cabecera) — réplica de design/Patrimonio.dc.html:84-103. Color = paleta[i % 12] por el
  *  índice del goal en el orden de listado (determinista, sin persistir nada). Fila-botón, igual
- *  criterio que goalBarRowHtml.
- *
- *  DEFECTO DE app.css#.ring (fuera de alcance de este fichero, para la tarea 9): `.ring > *` no
- *  lleva z-index, así que el `::after` (el hueco central, generado el último en orden de árbol)
- *  pinta POR ENCIMA del contenido en vez de debajo — el "42%" queda oculto tras el círculo
- *  `var(--card)`, confirmado con una captura recortada al elemento. Este fichero es el primer
- *  consumidor real de `.ring` en la app (presupuesto.js no la usa todavía), por eso no se había
- *  visto antes. Parche local aquí (`z-index:1` inline en el `<span>`, dentro del alcance de
- *  `movimientos.js`/`patrimonio.js`); la solución de raíz es `.ring > * { z-index:1 }` en
- *  app.css, fuera del alcance de esta tarea. */
+ *  criterio que goalBarRowHtml. */
 function goalRingRowHtml(g, color) {
   const { goal, currentCents, targetCents, pct, subtitle } = g;
   const ringPct = Math.min(100, Math.max(0, pct));
@@ -251,7 +245,7 @@ function goalRingRowHtml(g, color) {
     <button type="button" data-goal="${goal.id}"
       style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;gap:14px;">
       <div class="ring" style="width:52px;height:52px;--pct:${ringPct};--cat:${color};">
-        <span class="num" style="position:relative;z-index:1;font-size:12px;font-weight:700;">${Math.round(pct)}%</span>
+        <span class="num" style="font-size:12px;font-weight:700;">${Math.round(pct)}%</span>
       </div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:13.5px;font-weight:600;">${escHtml(goal.name)}</div>
