@@ -163,6 +163,7 @@ export async function renderOnboarding(container, { onDone }) {
         </div>
         <div style="font-size:11.5px;color:var(--text-2);line-height:1.45;">Empiezas con un pack de 41 (Casa, Alimentación, Transporte…). Crea, renombra, recolorea o archiva las que quieras en Ajustes → Categorías.</div>
       </div>
+      ${state.errorMsg ? `<div style="font-size:11.5px;color:var(--red);">${escHtml(state.errorMsg)}</div>` : ""}
     </div>
     ${footHtml("Seguir", "onb-next-3")}`;
   }
@@ -252,6 +253,9 @@ export async function renderOnboarding(container, { onDone }) {
       };
     }
     if (state.step === 2) {
+      q("#onb-currency").onchange = (e) => { state.prefs.currency = e.target.value; };
+      q("#onb-locale").onchange = (e) => { state.prefs.locale = e.target.value; };
+      q("#onb-partner").oninput = (e) => { state.prefs.partner = e.target.value; state.errorMsg = ""; };
       q("#onb-next-3").onclick = async () => {
         if (state.busy) return;
         state.busy = true;
