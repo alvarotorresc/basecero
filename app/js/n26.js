@@ -1,8 +1,8 @@
-// Import de CSV de N26 (Task 15). Puerto directo de apps_script/main.js:106-164
+// Import de CSV de N26 (Task 15). Puerto directo de apps_script/main.js:106-164 (retirado del repo en la PR E; ver historial de git)
 // (processN26Csv) a la app: misma lógica de dedupe/conciliación, pero contra SQLite en vez de
 // la hoja de cálculo. bcParseN26Csv / bcBuildExternalId / bcDecideImportAction / bcSanitizeCell /
 // bcUlid son globales cargados por <script src="vendor/pure.js"> en index.html — NO se importan
-// ni se toca ese fichero (copia verbatim de apps_script/pure.js).
+// ni se toca ese fichero (copia verbatim de app/vendor/pure.js, antes en apps_script/; retirado del repo en la PR E).
 import { SQL } from "./sql.js";
 import { execMany } from "./db.js";
 import { nowIso } from "./format.js";
