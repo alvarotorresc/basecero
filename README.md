@@ -79,9 +79,11 @@ siguiente sección).
    y seleccionar `dist/BaseCero.xlsx`, eligiendo la opción
    **"Reemplazar hoja de cálculo"**.
 2. Abrir **Extensiones > Apps Script** y crear dos archivos de script:
-   `pure.gs` y `main.gs`, pegando en cada uno el contenido de
-   `app/vendor/pure.js` y `app/js/n26.js` (ver historial de git para `apps_script/`; retirado en la PR E)
-   respectivamente. Guardar el proyecto.
+   `pure.gs` y `main.gs`. En `pure.gs`, pegar el contenido de
+   `app/vendor/pure.js`; en `main.gs`, el antiguo `apps_script/main.js`,
+   retirado del repo en la PR de import genérico — se recupera del
+   historial con `git show 76bfdfb^:apps_script/main.js`. Guardar el
+   proyecto.
 3. Configurar el activador (icono del reloj ⏰ del editor de Apps Script):
    **Añadir activador** → función `onEditInstalable`, evento "De hoja de
    cálculo / Al editar". Al ser un trigger instalable (no el `onEdit` simple),
