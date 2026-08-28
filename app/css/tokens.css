@@ -12,7 +12,7 @@
 html { background: var(--bg); }
 body { font-family: var(--font-ui); color: var(--text); background: var(--bg); }
 .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
-.card { background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius); padding: 16px; }
+.card { background: var(--card); border-radius: var(--radius); padding: 16px; }
 .btn-primary { background: var(--accent); color: var(--bg); border: 0; border-radius: var(--radius-sm);
   padding: 16px; width: 100%; font: 600 16px var(--font-ui); cursor: pointer; }
 .text-red { color: var(--red); } .text-green { color: var(--green); }

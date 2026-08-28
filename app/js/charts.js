@@ -13,7 +13,7 @@ const centsToStr = (cents) => fmtNum2((cents ?? 0) / 100);
 const BAR_AREA_H = 124; // alto del área de barras, igual que design/Resumen.dc.html:73
 const BAR_MAX_H = 100;  // tope de la barra más alta — deja hueco arriba para la etiqueta de la activa
 const BAR_MIN_H = 3;    // alto mínimo visible para un día sin gasto (evita una barra invisible)
-const BAR_INACTIVE_COLOR = "#223252";
+const BAR_INACTIVE_COLOR = "var(--card2)";
 
 /** Tarjeta "Flujo de gasto": grid de N barras `align-items:end` + fila de iniciales de día
  *  debajo — réplica de design/Resumen.dc.html:73-106. Sin ejes.
@@ -42,7 +42,7 @@ export function barChartSvg(days) {
 
   const labelsHtml = days.map((d) => `
     <div class="flujo-day-label${d.active ? " flujo-day-label--active" : ""}"
-      style="font-size:11px;text-align:center;${d.active ? "font-weight:700;color:#e7e9ec;" : "color:#656c74;"}">${d.label}</div>`).join("");
+      style="font-size:11px;text-align:center;${d.active ? "font-weight:700;color:var(--text);" : "color:var(--text-3);"}">${d.label}</div>`).join("");
 
   return `
     <div style="display:grid;grid-template-columns:repeat(${days.length},minmax(0,1fr));gap:10px;height:${BAR_AREA_H}px;align-items:end;">${barsHtml}
@@ -89,7 +89,7 @@ export function donutSvg(slices, centerTitle, centerSub) {
       </svg>
       <div style="grid-area:1 / 1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;">
         <div class="num" style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;">${centerTitle}</div>
-        <div style="font-size:9px;color:#656c74;">${centerSub}</div>
+        <div style="font-size:9px;color:var(--text-3);">${centerSub}</div>
       </div>
     </div>`;
 }

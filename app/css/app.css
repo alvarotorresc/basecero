@@ -23,8 +23,7 @@ main#screen {
 
 /* ===== componentes base (design/material-expresivo/DesignSystem.dc.html) =====
    .card y .btn-primary viven también en tokens.css (PR A): app.css carga después,
-   misma especificidad → estas reglas ganan por cascada y sobrescriben el look viejo.
-   No se tocan las de tokens.css (limpieza prevista en la tarea 9). */
+   misma especificidad → estas reglas ganan por cascada y sobrescriben el look viejo. */
 .card {
   border: 0; /* principio 4: cards sin borde, elevación tonal */
 }
@@ -343,16 +342,16 @@ main#screen {
   gap: 6px;
 }
 .key {
-  height: 64px;
+  height: 52px;
   background: var(--card);
-  border: 1px solid var(--rule);
+  border: 0;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-num);
-  font-size: 22px;
-  font-weight: 500;
+  font-size: 19px;
+  font-weight: 600;
   color: var(--text);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;

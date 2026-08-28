@@ -299,8 +299,8 @@ export async function renderRegistro(container, onDone, prefill) {
 
       <div class="keypad" style="margin-bottom:18px;">
         ${KEYS.map((k) => k === "back"
-          ? `<button type="button" class="key key-back" data-key="back" aria-label="Borrar" style="height:52px;border:0;border-radius:16px;background:var(--card);">${ICON_BACK}</button>`
-          : `<button type="button" class="key${k === "," ? " key-comma" : ""}" data-key="${k}" style="height:52px;border:0;border-radius:16px;background:var(--card);font-size:19px;font-weight:600;">${k}</button>`
+          ? `<button type="button" class="key key-back" data-key="back" aria-label="Borrar">${ICON_BACK}</button>`
+          : `<button type="button" class="key${k === "," ? " key-comma" : ""}" data-key="${k}">${k}</button>`
         ).join("")}
       </div>
 

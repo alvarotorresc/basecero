@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { colorForCategory, textColorForCategory, rootOf } from "../../app/js/category-colors.js";
+import { colorForCategory, textColorForCategory } from "../../app/js/category-colors.js";
 
 test("category-colors: paleta validada de 12 colores + tintes de texto", () => {
   const byId = {
