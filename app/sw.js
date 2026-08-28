@@ -9,7 +9,7 @@ const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon.svg", "ic
   "js/onboarding.js", "js/screens/registro.js", "js/screens/inicio.js",
   "js/screens/movimientos.js", "js/screens/liquidar.js", "js/screens/periodo-nuevo.js",
   "js/screens/presupuesto.js", "js/screens/recurrentes.js", "js/screens/patrimonio.js",
-  "js/screens/ajustes.js",
+  "js/screens/ajustes.js", "js/screens/categorias.js",
   "vendor/sqlite-wasm/jswasm/sqlite3.mjs", "vendor/sqlite-wasm/jswasm/sqlite3.wasm"];
 self.addEventListener("install", (e) => {
   // cache: "reload" evita que una versión nueva de CACHE reutilice respuestas

@@ -1,8 +1,9 @@
-import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMetaMany } from "../repo.js";
+import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMetaMany, allCategoriesById } from "../repo.js";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
 import { hoyISO, fmtDiaCorto } from "../format.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 import { renderRecurrentes } from "./recurrentes.js";
+import { renderCategorias } from "./categorias.js";
 import { importN26Csv } from "../n26.js";
 import { encryptBackup, decryptBackup, isEncryptedBackup, WrongPassphraseError, MIN_PASSPHRASE } from "../backup-crypto.js";
 
@@ -79,8 +80,8 @@ function periodoCardHtml(period, partnerName) {
 }
 
 /** Pantalla de Ajustes: export/import de la hoja .xlsx (motor de fase 2), cierre del periodo
- *  abierto (asistente unificado de Task 8), import de CSV de N26 (Task 15, tarjeta "Banco") y
- *  copia JSON de emergencia. */
+ *  abierto (asistente unificado de Task 8), import de CSV de N26 (Task 15, tarjeta "Banco"),
+ *  entradas-enlace a Recurrentes y Categorías (PR D, Task 5) y copia JSON de emergencia. */
 export async function renderAjustes(container) {
   let openPeriod = null;
   try { openPeriod = await getOpenPeriod(); } catch { openPeriod = null; }
@@ -88,6 +89,13 @@ export async function renderAjustes(container) {
   let metaCfg = { currency: "EUR", locale: "es-ES" };
   try { metaCfg = { ...metaCfg, ...(await getMetaAll()) }; } catch {}
   const partnerName = (metaCfg.partner_name || "").trim();
+
+  // N vivo de la fila "Categorías" — try/catch propio (mismo criterio que openPeriod/metaCfg de
+  // arriba): un fallo aquí no debe dejar Ajustes en blanco, solo degradar el sub de esa fila sin
+  // el conteo (categoryCount null → catSubtitle omite "N categorías").
+  let categoryCount = null;
+  try { categoryCount = Object.keys(await allCategoriesById()).length; } catch { categoryCount = null; }
+  const catSubtitle = categoryCount != null ? `${categoryCount} categorías · colores e iconos` : "colores e iconos";
 
   const state = {
     errors: null, pending: null, busy: false, n26Result: null, n26Error: null,
@@ -186,6 +194,22 @@ export async function renderAjustes(container) {
       </div>
 
       <div class="card" style="margin-bottom:12px">
+        <button type="button" id="btn-categorias" class="list-row"
+          style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+          <div class="list-row-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle><circle cx="5" cy="6" r="2"></circle><circle cx="19" cy="6" r="2"></circle><circle cx="5" cy="18" r="2"></circle><circle cx="19" cy="18" r="2"></circle>
+            </svg>
+          </div>
+          <div class="list-row-body">
+            <div class="list-row-title">Categorías</div>
+            <div class="list-row-sub">${escHtml(catSubtitle)}</div>
+          </div>
+          <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
+        </button>
+      </div>
+
+      <div class="card" style="margin-bottom:12px">
         <p style="font-weight:600;margin-bottom:4px">Banco</p>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
           Importa el extracto CSV de N26: crea los movimientos que faltan y concilia los que ya
@@ -249,6 +273,10 @@ export async function renderAjustes(container) {
 
     container.querySelector("#btn-recurrentes").onclick = () => {
       renderRecurrentes(container, () => renderAjustes(container));
+    };
+
+    container.querySelector("#btn-categorias").onclick = () => {
+      renderCategorias(container, () => renderAjustes(container));
     };
 
     container.querySelector("#btn-n26-import").onclick = () => {
