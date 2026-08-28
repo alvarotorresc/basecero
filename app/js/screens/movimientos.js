@@ -30,13 +30,24 @@ function groupByDay(rows) {
   return groups;
 }
 
+// SVG del icono de transferencia — no existe ningún SVG de transferencia ya integrado en la app
+// (recurrentes.js/inicio.js usan el emoji "⇄" como icono de sustitución); se copia tal cual del
+// artboard de referencia (design/material-expresivo/Movimientos.dc.html:64-67), no se inventa.
+// El color va en `style="stroke:..."` (no en el atributo de presentación `stroke="var(...)"`,
+// que ningún otro SVG de la app usa con un custom property — ACCOUNT_ICON de patrimonio.js usa
+// hex literal, ICON_BACK de registro.js usa currentColor) para no depender de que el motor de
+// render resuelva var() dentro de un atributo de presentación SVG.
+const ICON_TRANSFER = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="stroke:var(--text-2);" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l-3 3 3 3M4 13h13M17 8l3-3-3-3M20 5H7"></path></svg>`;
+// Icono "+" del dotico punteado de una fila sin categorizar (artboard Movimientos.dc.html:46-48).
+const ICON_UNCAT = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="stroke:var(--text-2);" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>`;
+
 function movRowHtml(r, byId, accById) {
   if (r.type === "transfer") {
     const from = accById[r.account_id]?.name ?? "?";
     const to = accById[r.counter_account_id]?.name ?? "?";
     return `
     <button type="button" class="tx-row" data-tx="${r.id}" style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-      <div class="tx-icon" style="--cat:#5c646d;">⇄</div>
+      <div class="dotico" style="--cat:var(--card2);">${ICON_TRANSFER}</div>
       <div class="tx-body">
         <div class="tx-title">${escHtml(from)} → ${escHtml(to)}</div>
         <div class="tx-sub">${escHtml(r.merchant || r.note || "Transferencia")}</div>
@@ -48,7 +59,7 @@ function movRowHtml(r, byId, accById) {
     const isNeg = r.amount_cents < 0;
     return `
     <button type="button" class="tx-row" data-tx="${r.id}" style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-      <div class="tx-icon" style="--cat:#5c646d;">⚖️</div>
+      <div class="dotico" style="--cat:var(--card2);">⚖️</div>
       <div class="tx-body">
         <div class="tx-title">Ajuste</div>
         <div class="tx-sub">${escHtml(r.merchant || r.note || "")}</div>
@@ -58,19 +69,22 @@ function movRowHtml(r, byId, accById) {
   }
   const cat = byId[r.category_id];
   const catName = cat?.name ?? "";
-  const color = colorForCategory(r.category_id, byId);
-  const icon = iconForCategory(r.category_id, byId);
+  const uncategorized = isUncategorized(r);
+  const color = uncategorized ? "var(--card2)" : colorForCategory(r.category_id, byId);
+  const icon = uncategorized ? ICON_UNCAT : iconForCategory(r.category_id, byId);
+  const dashedStyle = uncategorized ? "border:1.5px dashed var(--rule);" : "";
   const title = r.merchant || catName || "Sin categorizar";
-  const sub = (catName || "Sin categorizar") + (r.is_shared ? ` · tu parte ${fmtMoney(r.my_amount_cents)}` : "");
+  const subBase = uncategorized ? "toca para categorizar" : (catName || "Sin categorizar");
+  const shareSuffix = r.is_shared ? ` · tu parte ${fmtMoney(r.my_amount_cents)}` : "";
   const isExpense = r.type === "expense";
   const amountClass = isExpense ? "negative" : "positive";
   const sign = isExpense ? "-" : "+";
   return `
   <button type="button" class="tx-row" data-tx="${r.id}" style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-    <div class="tx-icon" style="--cat:${color};">${icon}</div>
+    <div class="dotico" style="--cat:${color};${dashedStyle}">${icon}</div>
     <div class="tx-body">
       <div class="tx-title">${escHtml(title)}</div>
-      <div class="tx-sub">${escHtml(sub)}</div>
+      <div class="tx-sub" style="${uncategorized ? "color:var(--amber);" : ""}">${escHtml(subBase)}${escHtml(shareSuffix)}</div>
     </div>
     <div class="tx-amount num ${amountClass}">${sign}${fmtMoney(r.amount_cents)}</div>
   </button>`;
@@ -92,7 +106,7 @@ export async function renderMovimientos(container) {
     return;
   }
   if (periods.length === 0) {
-    container.innerHTML = `<header class="screen-header"><h1>Movimientos</h1></header>
+    container.innerHTML = `<header class="screen-header"><h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">Movimientos</h1></header>
       <div class="banner-aviso red">No hay ningún periodo todavía.</div>`;
     return;
   }
@@ -311,11 +325,11 @@ export async function renderMovimientos(container) {
         </label>
         ${d.isShared ? `
         <div style="display:flex; gap:8px; padding:0 0 14px;">
-          <div style="flex:1; background:#1b1e21; border-radius:14px; padding:10px 11px;">
+          <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
             <div style="font-size:10px; color:var(--text-3);">Tu parte · ${pct}%</div>
             <div class="num" id="mov-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
           </div>
-          <div style="flex:1; background:#1b1e21; border-radius:14px; padding:10px 11px;">
+          <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
             <div style="font-size:10px; color:var(--text-3);">${escHtml(partnerName) || "Contraparte"} · ${100 - pct}%</div>
             <div class="num" id="mov-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerCents)}</div>
           </div>
@@ -453,18 +467,21 @@ export async function renderMovimientos(container) {
       : `<div class="card" style="display:flex;flex-direction:column;gap:16px;">
           <div style="display:flex;flex-direction:column;gap:12px;">
             ${groupByDay(visible).map((g) => `
-              <div class="day-header">${g.date === hoy ? "Hoy" : fmtDiaLargo(g.date)}</div>
+              <div class="day-label">${g.date === hoy ? "Hoy" : fmtDiaLargo(g.date)}</div>
               ${g.rows.map((r) => movRowHtml(r, byId, accById)).join("")}
             `).join("")}
           </div>
         </div>`;
 
-    const chipAmberStyle = state.filterUncat
-      ? "background:var(--amber);border-color:var(--amber);color:#1a1300;"
-      : "background:color-mix(in srgb, var(--amber) 14%, var(--card));border-color:color-mix(in srgb, var(--amber) 40%, var(--border));color:var(--amber);";
+    // Chip de filtro (artboard Movimientos.dc.html:35): activo = tinta invertida (.chip.active del
+    // sistema); inactivo = borde discontinuo --rule, mismo criterio que la chip "Sin categoría · N"
+    // del artboard (padding simétrico porque, a diferencia de .chip-icon, esta chip no lleva icono).
+    const chipStyle = state.filterUncat
+      ? "padding:0 14px;"
+      : "padding:0 14px;background:transparent;border:1px dashed var(--rule);";
 
     container.innerHTML = `
-      <header class="screen-header"><h1>Movimientos</h1></header>
+      <header class="screen-header"><h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">Movimientos</h1></header>
 
       <label class="field field-stack" style="margin-bottom:14px;">
         <span class="field-label">Periodo</span>
@@ -475,8 +492,8 @@ export async function renderMovimientos(container) {
 
       ${state.uncategorizedCount > 0 ? `
       <div style="margin-bottom:14px;">
-        <button type="button" id="mov-chip-uncat" class="chip" style="${chipAmberStyle}">
-          ${state.uncategorizedCount} sin categorizar
+        <button type="button" id="mov-chip-uncat" class="chip${state.filterUncat ? " active" : ""}" style="${chipStyle}">
+          Sin categoría · ${state.uncategorizedCount}
         </button>
       </div>` : ""}
 
