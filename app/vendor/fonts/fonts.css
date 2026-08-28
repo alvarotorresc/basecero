@@ -1,63 +1,55 @@
-/* Fuentes vendorizadas — Plus Jakarta Sans + Space Grotesk (subset latin)
-   Origen: https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap
-   Solo se conserva el subset latin; los subsets no latinos (cyrillic-ext, vietnamese, latin-ext) se omiten. */
+/* Fuentes vendorizadas — Outfit (subset latin)
+   Origen: https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap
+   Solo se conserva el subset latin; los subsets no latinos (cyrillic-ext, vietnamese, latin-ext) se omiten.
+   Outfit es una fuente variable: Google Fonts sirve un único fichero woff2 (eje wght 100-900)
+   para los 5 pesos declarados; el navegador instancia el peso vía la variation axis. */
 
 /* latin */
 @font-face {
-  font-family: 'Plus Jakarta Sans';
+  font-family: 'Outfit';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url(./LDIbaomQNQcsA88c7O9yZ4KMCoOg4IA6-91aHEjcWuA_qU79TR_V.woff2) format('woff2');
+  src: url(./QGYvz_MVcBeNP4NJtEtq.woff2) format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 /* latin */
 @font-face {
-  font-family: 'Plus Jakarta Sans';
+  font-family: 'Outfit';
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url(./LDIbaomQNQcsA88c7O9yZ4KMCoOg4IA6-91aHEjcWuA_m079TR_V.woff2) format('woff2');
+  src: url(./QGYvz_MVcBeNP4NJtEtq.woff2) format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 /* latin */
 @font-face {
-  font-family: 'Plus Jakarta Sans';
+  font-family: 'Outfit';
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url(./LDIbaomQNQcsA88c7O9yZ4KMCoOg4IA6-91aHEjcWuA_d0n9TR_V.woff2) format('woff2');
+  src: url(./QGYvz_MVcBeNP4NJtEtq.woff2) format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 /* latin */
 @font-face {
-  font-family: 'Plus Jakarta Sans';
+  font-family: 'Outfit';
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url(./LDIbaomQNQcsA88c7O9yZ4KMCoOg4IA6-91aHEjcWuA_Tkn9TR_V.woff2) format('woff2');
+  src: url(./QGYvz_MVcBeNP4NJtEtq.woff2) format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 /* latin */
 @font-face {
-  font-family: 'Space Grotesk';
+  font-family: 'Outfit';
   font-style: normal;
-  font-weight: 500;
+  font-weight: 800;
   font-display: swap;
-  src: url(./V8mQoQDjQSkFtoMM3T6r8E7mF71Q-gOoraIAEj7aUXskPMA.woff2) format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-/* latin */
-@font-face {
-  font-family: 'Space Grotesk';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url(./V8mQoQDjQSkFtoMM3T6r8E7mF71Q-gOoraIAEj4PVnskPMA.woff2) format('woff2');
+  src: url(./QGYvz_MVcBeNP4NJtEtq.woff2) format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
