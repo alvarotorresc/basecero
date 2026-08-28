@@ -153,6 +153,10 @@ export async function renderMovimientos(container) {
       accountId: row.account_id,
       counterAccountId: row.counter_account_id,
       isShared: !!row.is_shared,
+      // Fija en apertura si el movimiento YA era compartido, distinto del isShared vivo que cambia
+      // con el toggle: gatea la visibilidad del bloque compartido para que no desaparezca al desmarcar
+      // sin contraparte configurada, dejando al usuario sin forma de volver a marcarlo antes de guardar.
+      wasShared: !!row.is_shared,
       sharePctOverride: row.share_pct_override,
       fecha: row.date,
       merchant: row.merchant,
@@ -296,7 +300,7 @@ export async function renderMovimientos(container) {
         <input type="text" id="mov-note" value="${escAttr(d.note)}" placeholder="Opcional">
       </label>
 
-      ${needsCategory(d.type) && (d.isShared || partnerName) ? `
+      ${needsCategory(d.type) && (d.wasShared || partnerName) ? `
       <div class="card" style="padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:${locked ? "default" : "pointer"};${locked ? "opacity:.5;" : ""}">
           <span style="font-size:15px; font-weight:600;">Compartido con ${escHtml(partnerName) || "la contraparte"}</span>

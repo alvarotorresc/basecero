@@ -378,6 +378,8 @@ export async function renderAjustes(container) {
       try {
         // Los tres campos de la tarjeta en UN execMany (vía setMetaMany): o quedan las tres
         // claves guardadas o ninguna, así currency/locale/partner_name nunca quedan a medias.
+        // partner_name va sin bcSanitizeCell a propósito: SheetJS exporta la celda como string (sin riesgo
+        // de fórmula) y sanitizar ensuciaría el nombre en toda la UI («+Ana» → «'+Ana»).
         await setMetaMany([["currency", currency], ["locale", locale], ["partner_name", partner]]);
         location.reload();
       } catch (err) {

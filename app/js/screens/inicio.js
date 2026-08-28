@@ -106,6 +106,7 @@ function partnerBannerHtml() {
       <input type="text" id="partner-banner-input" placeholder="Su nombre" style="flex:1; min-width:0;">
       <button type="button" id="partner-banner-save" class="btn-primary" style="width:auto; padding:0 18px;">Guardar</button>
     </div>
+    <div id="partner-banner-error" class="banner-aviso red" style="display:none;"></div>
   </div>`;
 }
 
@@ -390,6 +391,8 @@ export async function renderInicio(container) {
   const partnerBannerSaveBtn = container.querySelector("#partner-banner-save");
   if (partnerBannerSaveBtn) partnerBannerSaveBtn.onclick = async () => {
     const input = container.querySelector("#partner-banner-input");
+    const errEl = container.querySelector("#partner-banner-error");
+    if (errEl) errEl.style.display = "none";
     const value = (input.value || "").trim();
     if (!value) {
       partnerBannerSaveBtn.classList.add("shake");
@@ -398,12 +401,18 @@ export async function renderInicio(container) {
     }
     partnerBannerSaveBtn.disabled = true;
     try {
+      // partner_name va sin bcSanitizeCell a propósito: SheetJS exporta la celda como string (sin riesgo
+      // de fórmula) y sanitizar ensuciaría el nombre en toda la UI («+Ana» → «'+Ana»).
       await setMeta("partner_name", value);
       renderInicio(container);
     } catch (e) {
       partnerBannerSaveBtn.disabled = false;
       partnerBannerSaveBtn.classList.add("shake");
       setTimeout(() => partnerBannerSaveBtn.classList.remove("shake"), 400);
+      if (errEl) {
+        errEl.innerHTML = `No se pudo guardar: ${escHtml(e.message)}`;
+        errEl.style.display = "";
+      }
     }
   };
 
