@@ -9,18 +9,18 @@ import { seedStatements } from "../../app/js/seeds.js";
 import { sha256Hex, externalIdFor } from "../../app/js/n26.js";
 
 const require = createRequire(import.meta.url);
-const pure = require("../../apps_script/pure.js");
+const pure = require("../../app/vendor/pure.js");
 
 // app/js/n26.js llama a bcBuildExternalId como GLOBAL (lo carga <script src="vendor/pure.js">
-// en el navegador, sin import — ver cabecera de n26.js). apps_script/pure.js es la misma lógica
-// pero como módulo CommonJS (require, no globales); aquí se expone la única función de pure.js
+// en el navegador, sin import — ver cabecera de n26.js). Aquí se importa el mismo
+// app/vendor/pure.js vía CommonJS (require, no globales); se expone la única función de pure.js
 // que n26.js invoca de verdad (externalIdFor) para que funcione igual bajo Node.
 globalThis.bcBuildExternalId = pure.bcBuildExternalId;
 
 const T = "2026-08-24T18:00:00Z";
 const NOW = "2026-08-24T19:00:00Z";
 // hash síncrono determinista para los tests que no quieren depender de crypto.subtle (async) —
-// mismo patrón que apps_script/tests/pure.test.mjs.
+// mismo patrón que tests/app/pure.test.mjs.
 const sha256hex = (s) => createHash("sha256").update(s, "utf8").digest("hex");
 
 function db() {
@@ -48,7 +48,7 @@ const CSV_2ROWS = [CSV_HEADER, csvRow(), csvRow({ date: "2026-08-21", partner: "
  *  disponible en Node (db.js depende de él), así que — mismo patrón que el resto de
  *  tests/app/*.test.mjs (repo-sql, recurrentes...) — se compone la SQL a mano en vez de invocar
  *  repo.js/n26.js directamente. Usa las MISMAS funciones puras que la implementación real:
- *  pure.bcParseN26Csv/bcDecideImportAction (apps_script/pure.js, idéntico a vendor/pure.js) y el
+ *  pure.bcParseN26Csv/bcDecideImportAction (app/vendor/pure.js) y el
  *  externalIdFor REAL de n26.js (adaptador de captura incluido). */
 async function runImport(d, text, hashFn = sha256hex) {
   const existing = d.prepare(SQL.n26Existing).all("acc-n26").map((t) => ({
