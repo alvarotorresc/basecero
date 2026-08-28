@@ -167,6 +167,30 @@ test("SQL.hasActiveLinkedRefund: true solo con un refund ACTIVO que apunte por r
     "un refund BORRADO no cuenta como enlace activo (mismo criterio que unsettleIfNoActiveRefunds)");
 });
 
+// ---- Task 5 (PR C, contraparte): banner de migración de Inicio ------------------------
+
+test("hasShared: detecta transacciones y reglas compartidas activas (borradas no cuentan)", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const has = () => !!(db.prepare(SQL.hasSharedTx).get() || db.prepare(SQL.hasSharedRule).get());
+  assert.equal(has(), false);
+
+  const txId = ins(db, { id: "tx-shared", shared: 1 });
+  assert.equal(has(), true, "una transacción compartida activa cuenta");
+
+  db.prepare("UPDATE transactions SET deleted=1 WHERE id=?").run(txId);
+  assert.equal(has(), false, "transacción compartida borrada no cuenta");
+
+  db.prepare(SQL.insertRule).run(
+    "rule-shared", "Netflix", "expense", 1500, "cat-casa-alquiler", "acc-n26", "",
+    "monthly", 1, null, 1, 1, T, T,
+  );
+  assert.equal(has(), true, "una regla recurrente compartida activa también cuenta");
+
+  db.prepare("UPDATE recurring_rules SET deleted=1 WHERE id=?").run("rule-shared");
+  assert.equal(has(), false, "regla compartida borrada no cuenta");
+});
+
 test("sharedFieldsLocked: pura, sin DB — replica exactamente lo que updateTransaction debe bloquear", () => {
   const settledExpense = { type: "expense", settled: 1, amount_cents: 4550, is_shared: 1, share_pct_override: null };
 

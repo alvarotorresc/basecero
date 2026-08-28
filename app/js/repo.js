@@ -76,6 +76,15 @@ export async function setMeta(key, value) {
   await exec(SQL.upsertMeta, [key, value]);
 }
 
+/** PR C (contraparte), Task 5: ¿hay algún gasto o regla compartidos activos (sin importar
+ *  meta.partner_name)? La usa Inicio para el banner de migración de una sola vez cuando una BD
+ *  trae compartidos de antes de que la contraparte fuera configurable (partner_name vacío pero
+ *  ya hay is_shared=1 en la BD). */
+export async function hasSharedData() {
+  const [t, r] = await Promise.all([query(SQL.hasSharedTx), query(SQL.hasSharedRule)]);
+  return t.length > 0 || r.length > 0;
+}
+
 /** Cuenta destino del import CSV / cuenta por defecto de formularios, resueltas desde meta
  *  (vacío ⇒ primera checking activa; null ⇒ no hay cuentas). */
 export async function importAccountId() {

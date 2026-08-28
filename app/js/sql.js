@@ -81,6 +81,14 @@ export const SQL = {
     WHERE t.type='expense' AND t.is_shared=1 AND t.settled=0 AND t.deleted=0
       AND t.amount_cents - ${MY_AMOUNT} > 0`,
 
+  // PR C (contraparte), Task 5: ¿existe alguna transacción o regla con is_shared=1, de
+  // cualquier tipo? Detecta el caso "BD con compartidos de antes de la contraparte configurable"
+  // para el banner de migración de una sola vez de Inicio (repo.hasSharedData) — a diferencia de
+  // pendingShared, aquí no importa el type ni si está settled: solo si alguna vez se marcó algo
+  // como compartido.
+  hasSharedTx: `SELECT 1 FROM transactions WHERE is_shared=1 AND deleted=0 LIMIT 1`,
+  hasSharedRule: `SELECT 1 FROM recurring_rules WHERE is_shared=1 AND deleted=0 LIMIT 1`,
+
   closePeriod: `UPDATE periods SET end_date=?, status='closed', updated_at=? WHERE id=?`,
   // Suma por categoría RAÍZ de gasto (parent_id='') el gasto de toda su subárbol (ella misma +
   // hijas directas): child.id=root.id cubre el gasto registrado directamente en la raíz, y

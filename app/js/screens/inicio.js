@@ -1,7 +1,7 @@
 import {
   getOpenPeriod, spentOfPeriod, incomeOfPeriod, listByDay, allCategoriesById,
   pendingShared, pendingSharedTotalCents, budgetsOfPeriod, previsionOfPeriod,
-  spentByRootCategory, spentLast7Days,
+  spentByRootCategory, spentLast7Days, getMetaAll, setMeta, hasSharedData,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtNum2, fmtPct, currencyCode } from "../format.js";
@@ -61,16 +61,18 @@ function txRowHtml(r, byId) {
 
 /** Bloque de compartidos: pendiente de que devuelva, de TODOS los periodos (pendingShared/-Total
  *  cubren cualquier gasto compartido sin liquidar, no solo el del periodo abierto). Se oculta
- *  entero si no hay nada pendiente. */
-function sharedBlockHtml(period, sharedRows, sharedTotal) {
-  if (sharedRows.length === 0 && sharedTotal === 0) return "";
+ *  entero si no hay partnerName configurado (PR C, Task 5: sin nombre no hay a quién liquidar —
+ *  ver partnerBannerHtml para el caso "hay compartidos pero falta el nombre") o si no hay nada
+ *  pendiente. */
+function sharedBlockHtml(period, sharedRows, sharedTotal, partnerName) {
+  if (!partnerName || (sharedRows.length === 0 && sharedTotal === 0)) return "";
   const miPct = period.my_share_pct;
   const n = sharedRows.length;
   const masAntiguo = sharedRows[0]?.date;
   return `
     <div class="card" style="display:flex;flex-direction:column;gap:14px;margin-bottom:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="font-size:15px;font-weight:700;">Con Sara</div>
+        <div style="font-size:15px;font-weight:700;">Con ${escHtml(partnerName)}</div>
         <div style="font-size:11px;font-weight:600;color:var(--text-2);background:#1b1e21;border-radius:8px;padding:5px 9px;">
           Este periodo: ${miPct} / ${100 - miPct}
         </div>
@@ -88,6 +90,23 @@ function sharedBlockHtml(period, sharedRows, sharedTotal) {
         ${n} gasto${n === 1 ? "" : "s"} sin liquidar · el más antiguo del ${fmtDiaCorto(masAntiguo)}
       </div>` : ""}
     </div>`;
+}
+
+/** Banner de migración de una sola vez (PR C, Task 5): se pinta sobre el resumen cuando la BD
+ *  trae gastos/reglas compartidos de antes de la contraparte configurable (partner_name vacío
+ *  pero hasSharedData() true) — sin nombre, sharedBlockHtml se oculta y este banner es la única
+ *  forma de recuperarlo. Desaparece en cuanto se guarda un nombre (partner_name deja de estar
+ *  vacío) y no vuelve a aparecer. */
+function partnerBannerHtml() {
+  return `
+  <div class="card" style="margin-bottom:16px; display:flex; flex-direction:column; gap:10px;">
+    <div style="font-size:15px; font-weight:700;">¿Con quién compartes gastos?</div>
+    <div style="font-size:12px; color:var(--text-2);">Tienes gastos compartidos registrados. Di su nombre para recuperar el bloque de pendientes y «Liquidar».</div>
+    <div style="display:flex; gap:8px;">
+      <input type="text" id="partner-banner-input" placeholder="Su nombre" style="flex:1; min-width:0;">
+      <button type="button" id="partner-banner-save" class="btn-primary" style="width:auto; padding:0 18px;">Guardar</button>
+    </div>
+  </div>`;
 }
 
 function previsionRowHtml(item, byId) {
@@ -276,14 +295,15 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupue
  *  tarjetas "Flujo de gasto" y "Gasto por categoría", bloque de compartidos (pendiente/liquidar),
  *  bloque "Previsión" (reglas recurrentes del mes) y sus movimientos agrupados por día. */
 export async function renderInicio(container) {
-  let period, spent, income, rows, byId, sharedRows, sharedTotal, budgets, prevision, rootRows, days7;
+  let period, spent, income, rows, byId, sharedRows, sharedTotal, budgets, prevision, rootRows, days7,
+    meta, partnerName, showPartnerBanner;
   try {
     period = await getOpenPeriod();
     if (!period) {
       container.innerHTML = `<div class="banner-aviso red">No hay ningún periodo abierto.</div>`;
       return;
     }
-    [spent, income, rows, byId, sharedRows, sharedTotal, budgets, prevision, rootRows, days7] = await Promise.all([
+    [spent, income, rows, byId, sharedRows, sharedTotal, budgets, prevision, rootRows, days7, meta] = await Promise.all([
       spentOfPeriod(period.id),
       incomeOfPeriod(period.id),
       listByDay(period.id),
@@ -294,7 +314,12 @@ export async function renderInicio(container) {
       previsionOfPeriod(period),
       spentByRootCategory(period.id),
       spentLast7Days(period.id),
+      getMetaAll(),
     ]);
+    partnerName = (meta.partner_name || "").trim();
+    // Sin nombre, comprobamos si hay compartidos "huérfanos" (Task 5): con nombre ya configurado
+    // no hace falta esta query extra — sharedBlockHtml decide solo con sharedRows/sharedTotal.
+    showPartnerBanner = !partnerName && await hasSharedData();
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">No se pudo cargar Inicio: ${escHtml(e.message)}</div>`;
     return;
@@ -320,6 +345,8 @@ export async function renderInicio(container) {
       </div>`;
 
   container.innerHTML = `
+    ${showPartnerBanner ? partnerBannerHtml() : ""}
+
     <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
       <button type="button" id="inicio-periodo-header" style="all:unset;cursor:pointer;display:flex;flex-direction:column;gap:3px;-webkit-tap-highlight-color:transparent;">
         <div style="font-size:24px;font-weight:700;letter-spacing:-0.02em;">${escHtml(period.name)}</div>
@@ -353,12 +380,32 @@ export async function renderInicio(container) {
 
     ${gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, budgets.length > 0)}
 
-    ${sharedBlockHtml(period, sharedRows, sharedTotal)}
+    ${sharedBlockHtml(period, sharedRows, sharedTotal, partnerName)}
 
     ${previsionHtml(prevision, byId)}
 
     ${movimientosHtml}
   `;
+
+  const partnerBannerSaveBtn = container.querySelector("#partner-banner-save");
+  if (partnerBannerSaveBtn) partnerBannerSaveBtn.onclick = async () => {
+    const input = container.querySelector("#partner-banner-input");
+    const value = (input.value || "").trim();
+    if (!value) {
+      partnerBannerSaveBtn.classList.add("shake");
+      setTimeout(() => partnerBannerSaveBtn.classList.remove("shake"), 400);
+      return;
+    }
+    partnerBannerSaveBtn.disabled = true;
+    try {
+      await setMeta("partner_name", value);
+      renderInicio(container);
+    } catch (e) {
+      partnerBannerSaveBtn.disabled = false;
+      partnerBannerSaveBtn.classList.add("shake");
+      setTimeout(() => partnerBannerSaveBtn.classList.remove("shake"), 400);
+    }
+  };
 
   const liquidarBtn = container.querySelector("#shared-liquidar");
   if (liquidarBtn) liquidarBtn.onclick = () => renderLiquidar(container, () => renderInicio(container));
