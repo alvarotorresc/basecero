@@ -4,7 +4,7 @@ const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon.svg", "ic
   "css/tokens.css", "css/app.css", "vendor/pure.js", "vendor/xlsx/xlsx.full.min.js", "vendor/fonts/fonts.css",
   "vendor/fonts/QGYvz_MVcBeNP4NJtEtq.woff2",
   "js/main.js", "js/format.js", "js/db.js", "js/db-worker.js", "js/schema.sql",
-  "js/sql.js", "js/seeds.js", "js/category-colors.js", "js/repo.js",
+  "js/sql.js", "js/seeds.js", "js/category-colors.js", "js/category-order.js", "js/repo.js",
   "js/account-defaults.js", "js/contract.js", "js/xlsx.js", "js/prevision.js", "js/charts.js", "js/n26.js", "js/backup-crypto.js",
   "js/onboarding.js", "js/screens/registro.js", "js/screens/inicio.js",
   "js/screens/movimientos.js", "js/screens/liquidar.js", "js/screens/periodo-nuevo.js",
