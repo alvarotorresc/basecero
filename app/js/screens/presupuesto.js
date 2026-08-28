@@ -1,8 +1,16 @@
 import { getOpenPeriod, spentByRootCategory, budgetsOfPeriod, allCategoriesById } from "../repo.js";
-import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtDiaCorto, hoyISO } from "../format.js";
+import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
+import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO } from "../format.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+// Compone un importe con los céntimos reducidos en <small> (patrón .amount-hero del design
+// system, ver DesignSystem.dc.html / inicio.js#moneyPartsHtml): main + <small>céntimos</small> +
+// sufijo, sin reimplementar el locale — fmtMoneyParts (format.js) ya hace el split posicional.
+const moneyPartsHtml = (cents) => {
+  const { main, cents: c, suffix } = fmtMoneyParts(cents);
+  return `${escHtml(main)}<small>${escHtml(c)}</small>${escHtml(suffix)}`;
+};
 
 /** Estado de una categoría (o del total) frente a su límite. Umbrales: ok < 85 %,
  *  warn >= 85 % (incluye el 100 % justo), over > 100 %. Sin límite (0/null/undefined) -> null:
@@ -15,11 +23,11 @@ export function budgetStatus(spent, limit) {
   return { pct, level };
 }
 
-const ICON_CHECK = (color) =>
-  `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5 10-11"></path></svg>`;
-const ICON_TRIANGLE = (color) =>
-  `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5L21.2 19.5H2.8z"></path><path d="M12 10.2v4M12 17.2h.01"></path></svg>`;
-const ICON_CHEVRON = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#656c74" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5l7 7-7 7"></path></svg>`;
+// Icono ⓘ del recuadro informativo (design/material-expresivo/Presupuesto.dc.html:102, círculo +
+// línea/punto) — color en style="stroke:..." (no en el atributo de presentación stroke="var(...)"),
+// mismo criterio que ICON_ARROW de patrimonio.js: var() en style está garantizado por CSS Values,
+// no depende de que el motor resuelva custom properties dentro de un atributo SVG.
+const ICON_INFO = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="stroke:var(--text-2);flex-shrink:0;" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.01"></path></svg>`;
 
 const fmtPctInt = (pct) => `${Math.round(pct)} %`;
 
@@ -31,77 +39,83 @@ function joinConMas(names, max = 3) {
   return `${names.slice(0, max).join(", ")} y ${names.length - max} más`;
 }
 
-/** Color del número grande y de la barra: en 'ok' el propio color de la categoría (sin alarma),
- *  en 'warn'/'over' el color de estado (ámbar/rojo) pisa al de la categoría — ver design/Presupuesto.dc.html:
- *  Alimentación/Ocio (ok) muestran su color de categoría, Casa/Restauración (warn) y Transporte (over)
- *  muestran ámbar/rojo aunque su color de categoría sea otro. */
-function statusColor(level, catColor) {
-  if (level === "warn") return "var(--amber)";
-  if (level === "over") return "var(--red)";
-  return catColor;
+/** Color del número grande y de la barra de una fila de categoría. En 'ok' van desacoplados —
+ *  número en textColorForCategory (paleta clara, legible como texto) y barra en colorForCategory
+ *  (paleta sólida, la misma que el dotico) — ver design/Presupuesto.dc.html: Alimentación tiene
+ *  dotico/barra en #629D3B pero el número en #7FB554 (su TEXT_COLORS). En 'warn'/'over' AMBOS
+ *  (número Y barra) pisan al color de categoría con el color de estado (ámbar/rojo) — Restauración
+ *  (warn) y Transporte (over) del artboard muestran número Y barra en su color de estado, no en
+ *  ningún tono de su propia categoría. */
+function statusColors(level, rootColor, textColor) {
+  if (level === "warn") return { num: "var(--amber)", bar: "var(--amber)" };
+  if (level === "over") return { num: "var(--red)", bar: "var(--red)" };
+  return { num: textColor, bar: rootColor };
 }
 
-function categoryCardHtml(row, budgetCents, byId) {
+/** Fila de categoría con límite: dotico + nombre + importe (spent / budget) + barra + subtexto de
+ *  estado — réplica de design/Presupuesto.dc.html:44-98 (fila `.cat`, sin envoltorio de tarjeta
+ *  propio: la lista completa comparte una única `.card` con `<hr class="divider">` entre filas,
+ *  mismo criterio que patrimonio.js#cuentaRowHtml/cuentasCardHtml).
+ *
+ *  Formato del importe: el artboard usa "312,40 / 420 €" (símbolo solo en el límite); reproducirlo
+ *  exigiría trocear la salida de fmtMoney (format.js:45-53 documenta por qué eso está descartado:
+ *  rompe con monedas/locales donde el símbolo no va de sufijo). Se usa fmtMoney en ambos números
+ *  ("312,40 € / 420,00 €") — mismo criterio que el resto de la app, sin fabricar un formato nuevo.
+ *
+ *  Subtexto de estado: SE CONSERVAN los 3 (ok/warn/over) tal cual estaban — "sus subtextos
+ *  existentes re-estilados" del brief se lee como preservación, no recorte; el artboard no muestra
+ *  ninguno en las filas 'ok' (Alimentación/Casa/Suscripciones/Salud), pero "Te quedan X" es
+ *  información real que ya se calculaba, así que no se quita. Sí se quitan los iconos
+ *  (ICON_CHECK/ICON_TRIANGLE de la versión anterior): el artboard no lleva icono en NINGÚN estado. */
+function categoryRowHtml(row, budgetCents, byId) {
   const st = budgetStatus(row.spent_cents, budgetCents);
-  const color = colorForCategory(row.root_id, byId);
+  const rootColor = colorForCategory(row.root_id, byId);
+  const textColor = textColorForCategory(row.root_id, byId);
   const icon = iconForCategory(row.root_id, byId);
-  const numColor = statusColor(st.level, color);
+  const { num: numColor, bar: barColor } = statusColors(st.level, rootColor, textColor);
   const barPct = Math.min(100, Math.max(0, st.pct));
   const remaining = budgetCents - row.spent_cents;
   const over = st.level === "over";
-  const borderStyle = over ? "border-color:color-mix(in srgb, var(--red) 35%, var(--border));" : "";
 
   let statusLineHtml;
   if (over) {
-    statusLineHtml = `
-      <div style="display:flex;">
-        <div style="display:flex;align-items:center;gap:7px;background:color-mix(in srgb, var(--red) 14%, var(--card));border-radius:10px;padding:7px 11px;">
-          ${ICON_TRIANGLE("var(--red)")}
-          <div style="font-size:12px;font-weight:600;color:var(--red);">Superado por ${fmtMoney(-remaining)}</div>
-        </div>
-      </div>`;
+    statusLineHtml = `<div style="font-size:11px;color:var(--red);">Superado por ${fmtMoney(-remaining)}</div>`;
   } else if (st.level === "warn") {
-    statusLineHtml = `
-      <div style="display:flex;align-items:center;gap:7px;">
-        ${ICON_TRIANGLE("var(--amber)")}
-        <div style="font-size:12px;color:var(--amber);">Casi al límite · te quedan ${fmtMoney(remaining)}</div>
-      </div>`;
+    statusLineHtml = `<div style="font-size:11px;color:var(--amber);">Casi al límite · te quedan ${fmtMoney(remaining)}</div>`;
   } else {
-    statusLineHtml = `
-      <div style="display:flex;align-items:center;gap:7px;">
-        ${ICON_CHECK("var(--green)")}
-        <div style="font-size:12px;color:var(--text-2);">Te quedan ${fmtMoney(remaining)}</div>
-      </div>`;
+    statusLineHtml = `<div style="font-size:11px;color:var(--text-3);">Te quedan ${fmtMoney(remaining)}</div>`;
   }
 
   return `
-    <div class="card" style="display:flex;flex-direction:column;gap:13px;${borderStyle}">
-      <div style="display:flex;align-items:center;gap:13px;">
-        <div class="tx-icon" style="--cat:${color};width:44px;height:44px;border-radius:15px;font-size:21px;">${icon}</div>
-        <div style="display:flex;flex-direction:column;gap:3px;flex-grow:1;min-width:0;">
-          <div style="font-size:15px;font-weight:600;">${escHtml(row.name)}</div>
-          <div class="num" style="font-size:12px;color:var(--text-3);">${fmtMoney(row.spent_cents)} de ${fmtMoney(budgetCents)}</div>
+    <div style="display:flex;flex-direction:column;gap:8px;padding:13px 0;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="dotico" style="--cat:${rootColor};">${icon}</div>
+        <div style="flex:1;min-width:0;font-size:13.5px;font-weight:600;">${escHtml(row.name)}</div>
+        <div class="num" style="font-size:14px;font-weight:700;color:${numColor};white-space:nowrap;flex-shrink:0;">
+          ${fmtMoney(row.spent_cents)} <span style="font-size:11px;font-weight:500;color:var(--text-3);">/ ${fmtMoney(budgetCents)}</span>
         </div>
-        <div class="num" style="font-size:22px;font-weight:700;color:${numColor};flex-shrink:0;">${fmtPctInt(st.pct)}</div>
       </div>
-      <div style="height:10px;background:#1e2225;border-radius:999px;overflow:hidden;">
-        <div style="width:${barPct}%;height:10px;background:${numColor};border-radius:999px;"></div>
-      </div>
+      <div class="bar" style="--cat:${barColor};"><i style="width:${barPct}%;"></i></div>
       ${statusLineHtml}
     </div>`;
 }
 
+/** Recuadro "Sin límite este periodo": card informativa (radius-sm, ver DesignSystem.dc.html) +
+ *  icono ⓘ del artboard (Presupuesto.dc.html:101-104) — mismo texto/datos de siempre (nombres +
+ *  total gastado de las categorías sin límite con gasto real), solo cambia el contenedor (antes:
+ *  caja de borde punteado + chevron; ahora: card-16 + ⓘ, igual criterio visual que el resto del
+ *  sistema para notas informativas). */
 function sinLimiteHtml(rows) {
   if (rows.length === 0) return "";
   const total = rows.reduce((s, r) => s + r.spent_cents, 0);
   const nombres = joinConMas(rows.map((r) => r.name));
   return `
-    <div style="display:flex;align-items:center;gap:10px;background:#131517;border:1px dashed #2a2f34;border-radius:18px;padding:14px 16px;">
-      <div style="display:flex;flex-direction:column;gap:3px;flex-grow:1;">
+    <div style="display:flex;align-items:center;gap:10px;background:var(--card);border-radius:var(--radius-sm);padding:12px 16px;">
+      ${ICON_INFO}
+      <div style="display:flex;flex-direction:column;gap:3px;flex-grow:1;min-width:0;">
         <div style="font-size:13px;font-weight:600;color:var(--text-2);">Sin límite este periodo</div>
         <div style="font-size:11px;color:var(--text-3);">${escHtml(nombres)} · ${fmtMoney(total)} gastados</div>
       </div>
-      ${ICON_CHEVRON}
     </div>`;
 }
 
@@ -109,7 +123,9 @@ function sinLimiteHtml(rows) {
  *  de este periodo) + una tarjeta por categoría con límite + recuadro "Sin límite este periodo"
  *  para el resto. Periodos son manuales y sin fecha fin conocida mientras están abiertos (ver
  *  ajustes.js periodoCardHtml), así que la cabecera muestra "abierto el {fecha} · N días" en vez
- *  de "quedan N días" como en design/Presupuesto.dc.html (que asume fecha fin fija). */
+ *  de "quedan N días" como en design/Presupuesto.dc.html (que asume fecha fin fija) — mismo motivo
+ *  por el que la barra total NO lleva la leyenda "N % del periodo por delante" del artboard: no
+ *  hay fecha fin de la que derivarla sin fabricarla. */
 export async function renderPresupuesto(container, onBack) {
   let period, rootRows, budgetRows, byId;
   try {
@@ -128,10 +144,10 @@ export async function renderPresupuesto(container, onBack) {
     return;
   }
 
-  // > 0, no != null: budgetStatus() (y por tanto categoryCardHtml) trata un límite 0/null como
+  // > 0, no != null: budgetStatus() (y por tanto categoryRowHtml) trata un límite 0/null como
   // "sin estado", así que una fila con amount_cents=0 (p.ej. colada por un import xlsx a mano;
   // periodo-nuevo.js nunca escribe una así, filtra n>0 al guardar) NO debe acabar en conLimite:
-  // reventaría categoryCardHtml al leer st.level de un budgetStatus() que devolvió null.
+  // reventaría categoryRowHtml al leer st.level de un budgetStatus() que devolvió null.
   const budgetByCategory = Object.fromEntries(budgetRows.map((b) => [b.category_id, b.amount_cents]));
   const conLimite = rootRows.filter((r) => (budgetByCategory[r.root_id] ?? 0) > 0);
   // Solo categorías CON gasto real: si no tiene límite y tampoco se ha tocado este periodo,
@@ -152,7 +168,7 @@ export async function renderPresupuesto(container, onBack) {
 
   container.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-      <button type="button" class="icon-btn" id="presu-back" aria-label="Volver">←</button>
+      <button type="button" class="icon-btn" id="presu-back" aria-label="Volver" style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>
       <div style="display:flex;flex-direction:column;gap:2px;">
         <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">Presupuesto</div>
         <div style="font-size:11px;color:var(--text-3);">${escHtml(period.name)} · abierto el ${fmtDiaCorto(period.start_date)}${diasTxt}</div>
@@ -166,17 +182,15 @@ export async function renderPresupuesto(container, onBack) {
     <div class="card" style="display:flex;flex-direction:column;gap:14px;margin-bottom:16px;">
       <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;">
         <div style="display:flex;flex-direction:column;gap:6px;">
-          <div style="font-size:12px;font-weight:600;color:var(--text-2);">Gastado de lo presupuestado</div>
+          <div class="section-title">Gastado de lo presupuestado</div>
           <div style="display:flex;align-items:baseline;gap:7px;">
-            <div class="num" style="font-size:30px;font-weight:600;line-height:1;letter-spacing:-0.02em;">${fmtMoney(totalSpent)}</div>
-            <div class="num" style="font-size:13px;color:var(--text-3);">de ${fmtMoney(totalLimit)}</div>
+            <div class="amount-hero num">${moneyPartsHtml(totalSpent)}</div>
+            <div class="num" style="font-size:13px;color:var(--text-3);">de ${fmtMoney(totalLimit)} con presupuesto</div>
           </div>
         </div>
-        <div class="num" style="font-size:24px;font-weight:700;line-height:1;color:var(--accent);">${fmtPctInt(totalSt.pct)}</div>
+        <div class="num" style="font-size:24px;font-weight:700;line-height:1;">${fmtPctInt(totalSt.pct)}</div>
       </div>
-      <div style="height:10px;background:#1e2225;border-radius:999px;overflow:hidden;">
-        <div style="width:${totalBarPct}%;height:10px;background:var(--accent);border-radius:999px;"></div>
-      </div>
+      <div class="bar" style="--cat:var(--text);height:10px;"><i style="width:${totalBarPct}%;"></i></div>
       <div style="font-size:11px;color:var(--text-3);">
         ${totalRemaining >= 0
           ? `Te quedan <span style="color:var(--green);font-weight:700;">${fmtMoney(totalRemaining)}</span> en las ${n} categoría${n === 1 ? "" : "s"} con límite`
@@ -189,8 +203,8 @@ export async function renderPresupuesto(container, onBack) {
       <div style="font-size:11px;color:var(--text-3);">${n} con límite este periodo</div>
     </div>
 
-    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px;">
-      ${conLimite.map((r) => categoryCardHtml(r, budgetByCategory[r.root_id], byId)).join("")}
+    <div class="card" style="padding:6px 16px;display:flex;flex-direction:column;margin-bottom:16px;">
+      ${conLimite.map((r) => categoryRowHtml(r, budgetByCategory[r.root_id], byId)).join('<hr class="divider">')}
     </div>`}
 
     ${sinLimiteHtml(sinLimite)}

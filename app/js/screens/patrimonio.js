@@ -4,7 +4,7 @@ import {
   createGoal, updateGoal, softDeleteGoal,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, hoyISO, fmtDec1, currencySymbol, currencyCode } from "../format.js";
+import { fmtMoney, fmtMoneyParts, hoyISO, fmtDec1, currencySymbol, currencyCode } from "../format.js";
 import { sparklineSvg } from "../charts.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -13,10 +13,21 @@ const centsToRaw = (cents) => (cents ? (Math.abs(cents) / 100).toFixed(2).replac
 
 // ---- tarjeta "Patrimonio neto" --------------------------------------------
 
+// Color en style="stroke:..." (no en el atributo de presentación stroke="var(...)"), mismo
+// criterio que ICON_TRANSFER/ICON_UNCAT de movimientos.js — var() en style está garantizado por
+// CSS Values, no depende de que el motor resuelva custom properties en un atributo SVG.
 const ICON_ARROW = (up) => `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-    stroke="${up ? "#4ade80" : "#f87171"}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    style="stroke:${up ? "var(--green)" : "var(--red)"};" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
     ${up ? '<path d="M12 19V5M12 5l-6 6M12 5l6 6"></path>' : '<path d="M12 5v14M12 19l-6-6M12 19l6-6"></path>'}
   </svg>`;
+
+// Compone un importe con los céntimos reducidos en <small> (patrón .amount-hero del design
+// system, ver DesignSystem.dc.html / inicio.js#moneyPartsHtml): main + <small>céntimos</small> +
+// sufijo, sin reimplementar el locale — fmtMoneyParts (format.js) ya hace el split posicional.
+const moneyPartsHtml = (cents) => {
+  const { main, cents: c, suffix } = fmtMoneyParts(cents);
+  return `${escHtml(main)}<small>${escHtml(c)}</small>${escHtml(suffix)}`;
+};
 
 /** Sparkline + fila de etiquetas de mes debajo — sparklineSvg (Task 12) NO pinta las etiquetas
  *  (ver su comentario en charts.js), así que esta pantalla arma la fila propia, con el mes actual
@@ -35,8 +46,8 @@ function netWorthSparkHtml(series) {
     </div>`;
 }
 
-/** Tarjeta "Patrimonio neto": importe (38px) + badge de variación ABSOLUTA vs el último periodo
- *  CERRADO + sparkline — réplica de design/Patrimonio.dc.html:32-59. La variación es el propio
+/** Tarjeta "Patrimonio neto": importe héroe (.amount-hero, 34/700) + badge de variación ABSOLUTA
+ *  vs el último periodo CERRADO + sparkline — réplica de design/Patrimonio.dc.html:32-59. La variación es el propio
  *  penúltimo vs último punto de `series` (el último es siempre "hoy"; el penúltimo, si existe, es
  *  el del último cerrado — mismos puntos que ya trae netWorthSeries, sin repetir la query). Sin
  *  ningún cerrado (series.length<2) no hay nada con qué comparar: se oculta el badge entero. */
@@ -44,18 +55,20 @@ function netWorthCardHtml(netWorthCents, series) {
   const n = series.length;
   const variation = n >= 2 ? series[n - 1].cents - series[n - 2].cents : null;
   const up = variation === null || variation >= 0;
+  // Badge re-estilado como píldora con fondo tintado (mismo criterio color-mix que .banner-aviso /
+  // el badge "Este periodo: X/Y" de inicio.js), en vez del fondo hexadecimal fijo anterior.
   const badgeHtml = variation === null ? "" : `
-    <div style="display:flex;align-items:center;gap:5px;background:${up ? "#14261d" : "#2a1c1c"};border-radius:10px;padding:6px 9px;flex-shrink:0;">
+    <div style="display:flex;align-items:center;gap:5px;background:color-mix(in srgb, ${up ? "var(--green)" : "var(--red)"} 16%, var(--card));border-radius:999px;padding:6px 10px;flex-shrink:0;">
       ${ICON_ARROW(up)}
-      <div style="font-size:11px;font-weight:700;color:${up ? "var(--green)" : "var(--red)"};">${fmtMoney(Math.abs(variation))}</div>
+      <div class="num" style="font-size:11px;font-weight:700;color:${up ? "var(--green)" : "var(--red)"};">${fmtMoney(Math.abs(variation))}</div>
     </div>`;
 
   return `
     <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
         <div style="display:flex;flex-direction:column;gap:6px;">
-          <div style="font-size:12px;font-weight:600;color:var(--text-2);">Patrimonio neto</div>
-          <div class="num" style="font-size:38px;font-weight:600;line-height:1;letter-spacing:-0.02em;">${fmtMoney(netWorthCents)}</div>
+          <div class="section-title">Patrimonio neto</div>
+          <div class="amount-hero num">${moneyPartsHtml(netWorthCents)}</div>
         </div>
         ${badgeHtml}
       </div>
@@ -67,10 +80,13 @@ function netWorthCardHtml(netWorthCents, series) {
 
 // Trazos de los iconos SVG de design/Patrimonio.dc.html:71-118 (uno por tipo de cuenta, no por
 // cuenta concreta: aquí solo hay 3 tipos). El color entra como --cat en .list-row-icon (mismo
-// mecanismo de tinte que .tx-icon con las categorías, ver app.css).
+// mecanismo de tinte que .tx-icon con las categorías, ver app.css). Paleta propia de tipo de
+// cuenta, independiente de category-colors.js (checking/liability no están en la lista de hex
+// viejos de categoría, así que se dejan tal cual; el morado de savings SÍ coincidía por accidente
+// con el hex viejo retirado de cat-suscripciones — migrado al mismo sucesor morado, tarea 9).
 const ACCOUNT_ICON = {
   checking: { color: "#7aa2ff", paths: '<rect x="3" y="5.5" width="18" height="13" rx="3.5"></rect><path d="M3 10.5h18"></path>' },
-  savings: { color: "#b08be8", paths: '<path d="M5 8.5h14a1.6 1.6 0 011.6 1.6v7.3A1.6 1.6 0 0119 19H5a1.6 1.6 0 01-1.6-1.6V6.6A1.6 1.6 0 015 5h10"></path><circle cx="16.5" cy="13.8" r="1.2"></circle>' },
+  savings: { color: "#9153AB", paths: '<path d="M5 8.5h14a1.6 1.6 0 011.6 1.6v7.3A1.6 1.6 0 0119 19H5a1.6 1.6 0 01-1.6-1.6V6.6A1.6 1.6 0 015 5h10"></path><circle cx="16.5" cy="13.8" r="1.2"></circle>' },
   liability: { color: "#f87171", paths: '<path d="M4.2 16.2h15.6v-3.8l-1.7-4.1a1.6 1.6 0 00-1.5-1H7.4a1.6 1.6 0 00-1.5 1l-1.7 4.1z"></path><path d="M6 16.2v2.4h2.6v-2.4M15.4 16.2v2.4H18v-2.4"></path>' },
 };
 
@@ -103,13 +119,20 @@ function cuentaRowHtml(a, isDefault) {
         <div class="list-row-title">${escHtml(a.name)}</div>
         <div class="list-row-sub">${accountSubtitle(a.type, isDefault)}</div>
       </div>
-      <div class="num" style="font-size:15px;font-weight:600;${isLiability ? "color:var(--red);" : ""}">${fmtMoney(a.balance_cents)}</div>
+      <div style="text-align:right;">
+        <div class="num" style="font-size:15px;font-weight:600;${isLiability ? "color:var(--red);" : ""}">${fmtMoney(a.balance_cents)}</div>
+        <div style="font-size:10.5px;color:var(--text-3);">hoy</div>
+      </div>
     </button>`;
 }
 
 /** Tarjeta "Cuentas": una fila por cuenta activa (balancesAt ya excluye archivadas/borradas),
  *  separadas por <hr class="divider"> — réplica de design/Patrimonio.dc.html:61-121, + botón
- *  "Nueva cuenta" en la cabecera. Cada fila abre la subvista de edición (Task 14). */
+ *  "Nueva cuenta" en la cabecera. Cada fila abre la subvista de edición (Task 14). El lado derecho
+ *  es a dos líneas (saldo + "hoy", como el artboard) para las 3 cuentas: "hoy" es el único
+ *  subtítulo que aplica siempre y sin inventar nada (balancesAt se pide con hoyISO()) — el
+ *  artboard muestra "quedan 20 cuotas" para el pasivo, pero no hay ningún campo de nº de cuotas en
+ *  el esquema (mismo hueco que accountSubtitle ya documenta arriba), así que no se replica. */
 function cuentasCardHtml(accounts) {
   const n = accounts.length;
   const header = `
@@ -156,8 +179,18 @@ const GOAL_TYPE_LABEL = Object.fromEntries(GOAL_TYPES.map((t) => [t.id, t.label]
 
 // Tipos con hucha propia (mismo criterio que repo.js#HUCHA_GOAL_TYPES): al crearlos sin cuenta
 // se les crea una savings dedicada — la UI usa este set para saber cuándo mostrar la nota y el
-// bloque de "hucha vinculada" al editar.
+// bloque de "hucha vinculada" al editar, Y (Task 6) para decidir el layout de anillo vs. barra
+// en la tarjeta Objetivos (artboard Patrimonio.dc.html: los 2 goals con hucha llevan anillo,
+// "Tope de Restauración" — spending_cap, sin hucha — lleva barra).
 const HUCHA_GOAL_TYPES = new Set(["emergency_fund", "savings_target", "provision"]);
+
+// Paleta de anillos de Objetivos (brief Task 6): color = paleta[i % 12] sobre el índice del goal
+// en el orden de listado (SQL.listGoals ORDER BY created_at, ya determinista) — no se persiste
+// nada, se deriva en cada render.
+const GOAL_RING_PALETTE = [
+  "#629D3B", "#6B61C2", "#A09600", "#9153AB", "#15AC7D", "#986603",
+  "#12A7A7", "#B45018", "#00A1CB", "#AA4985", "#4F94E9", "#B64656",
+];
 
 /** savings_rate guarda puntos porcentuales en currentCents/targetCents (ver repo.goalProgress):
  *  se muestran como "%", el resto de tipos como € (fmtMoney). */
@@ -165,13 +198,14 @@ function fmtGoalAmount(goal, cents) {
   return goal.type === "savings_rate" ? `${fmtDec1(cents)} %` : fmtMoney(cents);
 }
 
-/** Fila de un goal: título + "actual / objetivo", barra de 8px, subtítulo contextual a la
- *  izquierda + % en negrita a la derecha — réplica de design/Patrimonio.dc.html:130-186. El color
- *  (verde/ámbar/rojo) sigue el `level` de repo.goalProgress: solo se colorea texto (número grande,
- *  subtítulo, %) cuando level≠'ok' — en 'ok' se queda en los tonos neutros del resto de la
- *  pantalla, la barra es la única que lleva siempre su color de estado. La fila entera es un
- *  botón (Task 14): abre la subvista de edición. */
-function goalRowHtml(g) {
+/** Fila de un goal SIN hucha (spending_cap/savings_rate): título + "actual / objetivo", barra
+ *  .bar de 8px, subtítulo contextual a la izquierda + % en negrita a la derecha — réplica de
+ *  design/Patrimonio.dc.html:104-112 (fila "Tope de Restauración"). El color (verde/ámbar/rojo)
+ *  sigue el `level` de repo.goalProgress: solo se colorea texto (número grande, subtítulo, %)
+ *  cuando level≠'ok' — en 'ok' se queda en los tonos neutros del resto de la pantalla, la barra
+ *  es la única que lleva siempre su color de estado. La fila entera es un botón (Task 14): abre
+ *  la subvista de edición. */
+function goalBarRowHtml(g) {
   const { goal, currentCents, targetCents, pct, level, subtitle } = g;
   const barColor = LEVEL_COLOR[level];
   const stateColor = level === "ok" ? null : LEVEL_COLOR[level];
@@ -186,8 +220,8 @@ function goalRowHtml(g) {
           ${fmtGoalAmount(goal, currentCents)} <span style="color:var(--text-3);">/ ${fmtGoalAmount(goal, targetCents)}</span>
         </div>
       </div>
-      <div style="height:8px;background:#1e2225;border-radius:999px;overflow:hidden;">
-        <div style="width:${barPct}%;height:8px;background:${barColor};border-radius:999px;"></div>
+      <div class="bar" style="--cat:${barColor};">
+        <i style="width:${barPct}%;"></i>
       </div>
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
         <div style="font-size:11px;color:${stateColor ?? "var(--text-3)"};">${escHtml(subtitle)}</div>
@@ -196,8 +230,35 @@ function goalRowHtml(g) {
     </button>`;
 }
 
-/** Tarjeta "Objetivos": una fila por goal activo — réplica de design/Patrimonio.dc.html:123-189,
- *  + botón "Nuevo objetivo" en la cabecera. Cada fila abre la subvista de edición (Task 14). */
+/** Fila de un goal CON hucha (emergency_fund/savings_target/provision): anillo .ring de 52px
+ *  (el artboard usa 52px, más grande que el .ring base de 46px — override inline por instancia,
+ *  ver app.css#.ring) con el % en el centro, nombre + subtítulo real de repo.goalProgress a la
+ *  derecha (con el progreso en importes delante, mismo dato que goalBarRowHtml muestra en su fila
+ *  de cabecera) — réplica de design/Patrimonio.dc.html:84-103. Color = paleta[i % 12] por el
+ *  índice del goal en el orden de listado (determinista, sin persistir nada). Fila-botón, igual
+ *  criterio que goalBarRowHtml. */
+function goalRingRowHtml(g, color) {
+  const { goal, currentCents, targetCents, pct, subtitle } = g;
+  const ringPct = Math.min(100, Math.max(0, pct));
+
+  return `
+    <button type="button" data-goal="${goal.id}"
+      style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;gap:14px;">
+      <div class="ring" style="width:52px;height:52px;--pct:${ringPct};--cat:${color};">
+        <span class="num" style="font-size:12px;font-weight:700;">${Math.round(pct)}%</span>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13.5px;font-weight:600;">${escHtml(goal.name)}</div>
+        <div style="font-size:11px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          ${escHtml(fmtGoalAmount(goal, currentCents))} de ${escHtml(fmtGoalAmount(goal, targetCents))} · ${escHtml(subtitle)}
+        </div>
+      </div>
+    </button>`;
+}
+
+/** Tarjeta "Objetivos": una fila por goal activo, anillo (hucha) o barra (sin hucha) según
+ *  HUCHA_GOAL_TYPES — réplica de design/Patrimonio.dc.html:123-189, + botón "Nuevo objetivo" en
+ *  la cabecera. Cada fila abre la subvista de edición (Task 14). */
 function objetivosCardHtml(goals) {
   const n = goals.length;
   const header = `
@@ -221,7 +282,9 @@ function objetivosCardHtml(goals) {
     <div style="display:flex;flex-direction:column;gap:10px;">
       ${header}
       <div class="card" style="display:flex;flex-direction:column;gap:18px;">
-        ${goals.map(goalRowHtml).join("")}
+        ${goals.map((g, i) => HUCHA_GOAL_TYPES.has(g.goal.type)
+          ? goalRingRowHtml(g, GOAL_RING_PALETTE[i % GOAL_RING_PALETTE.length])
+          : goalBarRowHtml(g)).join("")}
       </div>
     </div>`;
 }
@@ -544,7 +607,7 @@ export async function renderPatrimonio(container) {
       ${editing ? `
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
         <span class="field-label">Tipo</span>
-        <div style="padding:14px 16px;font-size:15px;font-weight:600;background:#1b1e21;border-radius:var(--radius-sm);">${escHtml(GOAL_TYPE_LABEL[f.type])}</div>
+        <div style="padding:14px 16px;font-size:15px;font-weight:600;background:var(--card2);border-radius:var(--radius-sm);">${escHtml(GOAL_TYPE_LABEL[f.type])}</div>
         <div style="font-size:11px;color:var(--text-3);">El tipo no se puede cambiar una vez creado el objetivo. Para cambiarlo, bórralo y crea uno nuevo.</div>
       </div>` : `
       <div class="segmented" style="margin-bottom:18px;">
@@ -681,7 +744,7 @@ export async function renderPatrimonio(container) {
   function renderMain() {
     container.innerHTML = `
       <header class="screen-header">
-        <h1>Patrimonio</h1>
+        <h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">Patrimonio</h1>
         <p>Calculado con todos tus movimientos · hoy</p>
       </header>
 

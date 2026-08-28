@@ -1,7 +1,7 @@
 {
   "name": "BaseCero", "short_name": "BaseCero", "lang": "es",
   "start_url": ".", "scope": ".", "display": "standalone",
-  "background_color": "#0b0c0e", "theme_color": "#0b0c0e",
+  "background_color": "#121214", "theme_color": "#121214",
   "icons": [
     { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "icons/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }

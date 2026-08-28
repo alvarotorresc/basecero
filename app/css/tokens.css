@@ -1,17 +1,18 @@
 @import url("../vendor/fonts/fonts.css");
 :root {
-  --bg: #0b0c0e; --card: #151719; --border: #23272b;
-  --text: #e7e9ec; --text-2: #9aa1a9; --text-3: #656c74;
-  --accent: #2f6bff; --red: #f87171; --green: #4ade80; --amber: #fbbf24;
-  --radius: 20px; --radius-sm: 14px;
-  --font-ui: "Plus Jakarta Sans", system-ui, sans-serif;
-  --font-num: "Space Grotesk", var(--font-ui);
+  --bg: #121214; --card: #1C1C21; --card2: #26262D;
+  --text: #F0EFF4; --text-2: #9A99A6; --text-3: var(--text-2);
+  --rule: rgba(154, 153, 166, 0.16);
+  --accent: var(--text); --red: #FF7A70; --green: #4FD99A; --amber: #FFBE4D;
+  --radius: 22px; --radius-sm: 16px;
+  --font-ui: 'Outfit', system-ui, sans-serif;
+  --font-num: var(--font-ui);
 }
 * { box-sizing: border-box; margin: 0; }
 html { background: var(--bg); }
 body { font-family: var(--font-ui); color: var(--text); background: var(--bg); }
 .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
-.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
-.btn-primary { background: var(--accent); color: #fff; border: 0; border-radius: var(--radius-sm);
+.card { background: var(--card); border-radius: var(--radius); padding: 16px; }
+.btn-primary { background: var(--accent); color: var(--bg); border: 0; border-radius: var(--radius-sm);
   padding: 16px; width: 100%; font: 600 16px var(--font-ui); cursor: pointer; }
 .text-red { color: var(--red); } .text-green { color: var(--green); }

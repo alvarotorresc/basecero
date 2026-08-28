@@ -9,11 +9,15 @@ import { encryptBackup, decryptBackup, isEncryptedBackup, WrongPassphraseError, 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
-const BTN_SECONDARY = "background:transparent;color:var(--text);border:1px solid var(--border);"
-  + "border-radius:var(--radius-sm);padding:16px;width:100%;font:600 16px var(--font-ui);cursor:pointer;";
+// Botón secundario del sistema (app.css .btn-secondary: píldora --card2, sin borde) — width:100%
+// por instancia porque aquí sigue siendo un CTA de ancho completo (mismo criterio de tap-target
+// que antes), no el auto-width de la fila de píldoras del artboard.
+const BTN_FULL_WIDTH = "width:100%;";
 
-const INPUT_STYLE = "background:transparent;color:var(--text);border:1px solid var(--border);"
-  + "border-radius:var(--radius-sm);padding:12px;width:100%;font:400 15px var(--font-ui);";
+// Input plano sin borde: tile --card2, mismo criterio que los tiles de
+// fecha/nombre de periodo-nuevo.js.
+const INPUT_STYLE = "background:var(--card2);color:var(--text);border:0;"
+  + "border-radius:var(--radius-sm);padding:12px 14px;width:100%;font:500 15px var(--font-ui);outline:none;";
 
 const CURRENCIES = ["EUR", "USD", "GBP", "CHF", "MXN", "ARS", "COP", "PEN", "UYU", "BRL", "DOP"];
 const LOCALES = [
@@ -59,12 +63,12 @@ function periodoCardHtml(period, partnerName) {
             Abierto el ${fmtDiaCorto(period.start_date)}${diasTxt} · reparto ${period.my_share_pct} / ${100 - period.my_share_pct}
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:6px;background:#1b1e21;border-radius:10px;padding:6px 9px;flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:6px;background:var(--card2);border-radius:10px;padding:6px 9px;flex-shrink:0">
           <div style="width:7px;height:7px;border-radius:4px;background:var(--green)"></div>
           <div style="font-size:11px;font-weight:600;color:var(--text-2)">Abierto</div>
         </div>
       </div>
-      <button type="button" class="btn-primary" id="btn-cerrar-periodo">Cerrar periodo y abrir el siguiente</button>
+      <button type="button" class="btn-secondary" id="btn-cerrar-periodo" style="width:100%">Cerrar periodo y abrir el siguiente</button>
       <div style="font-size:11px;color:var(--text-3);line-height:1.5">
         ${partnerName
           ? `Al cerrar fijarás la fecha final y elegirás el reparto con ${escHtml(partnerName)} del periodo nuevo. Ábrelo el día que entre la nómina.`
@@ -110,7 +114,7 @@ export async function renderAjustes(container) {
 
   function render() {
     container.innerHTML = `
-      <header class="screen-header"><h1>Ajustes</h1></header>
+      <header class="screen-header"><h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">Ajustes</h1></header>
 
       <div class="card" style="margin-bottom:12px">
         <p style="font-weight:600;margin-bottom:4px">Tu hoja de cálculo</p>
@@ -118,7 +122,7 @@ export async function renderAjustes(container) {
           Exporta todos tus datos a un .xlsx editable en LibreOffice/Sheets, o importa una hoja para sustituir
           los datos actuales. La copia cifrada (.bce) también se importa desde aquí.</p>
         <button type="button" class="btn-primary" id="btn-xlsx-export" ${state.busy ? "disabled" : ""}>Exportar hoja (.xlsx)</button>
-        <button type="button" id="btn-xlsx-import" style="${BTN_SECONDARY}margin-top:10px" ${state.busy ? "disabled" : ""}>Importar hoja (.xlsx)</button>
+        <button type="button" class="btn-secondary" id="btn-xlsx-import" style="${BTN_FULL_WIDTH}margin-top:10px" ${state.busy ? "disabled" : ""}>Importar hoja (.xlsx)</button>
         <input type="file" id="xlsx-file-input" accept=".xlsx,.bce" style="display:none">
 
         ${state.encExport ? `
@@ -130,11 +134,11 @@ export async function renderAjustes(container) {
           <input type="password" id="enc-pass-2" style="${INPUT_STYLE}" placeholder="Repite la contraseña">
           <div id="enc-error" class="banner-aviso red" style="display:none"></div>
           <div style="display:flex;gap:8px">
-            <button type="button" id="btn-enc-cancel" style="${BTN_SECONDARY}flex:1" ${state.busy ? "disabled" : ""}>Cancelar</button>
+            <button type="button" class="btn-secondary" id="btn-enc-cancel" style="flex:1" ${state.busy ? "disabled" : ""}>Cancelar</button>
             <button type="button" class="btn-primary" id="btn-enc-confirm" style="flex:1" ${state.busy ? "disabled" : ""}>Exportar cifrada</button>
           </div>
         </div>` : `
-        <button type="button" id="btn-enc-export" style="${BTN_SECONDARY}margin-top:10px" ${state.busy ? "disabled" : ""}>Exportar copia cifrada (.bce)</button>`}
+        <button type="button" class="btn-secondary" id="btn-enc-export" style="${BTN_FULL_WIDTH}margin-top:10px" ${state.busy ? "disabled" : ""}>Exportar copia cifrada (.bce)</button>`}
 
         ${state.errors ? `
         <div class="banner-aviso red" style="margin-top:12px;max-height:200px;overflow-y:auto;display:block">
@@ -148,7 +152,7 @@ export async function renderAjustes(container) {
           <input type="password" id="dec-pass" style="${INPUT_STYLE}" placeholder="Contraseña de la copia">
           <div id="dec-error" class="banner-aviso red" style="display:none"></div>
           <div style="display:flex;gap:8px">
-            <button type="button" id="btn-dec-cancel" style="${BTN_SECONDARY}flex:1" ${state.busy ? "disabled" : ""}>Cancelar</button>
+            <button type="button" class="btn-secondary" id="btn-dec-cancel" style="flex:1" ${state.busy ? "disabled" : ""}>Cancelar</button>
             <button type="button" class="btn-primary" id="btn-dec-confirm" style="flex:1" ${state.busy ? "disabled" : ""}>Descifrar</button>
           </div>
         </div>` : ""}
@@ -159,7 +163,7 @@ export async function renderAjustes(container) {
           Se descargará una copia antes.</p>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px">
-          <button type="button" id="btn-import-cancel" style="${BTN_SECONDARY}flex:1" ${state.busy ? "disabled" : ""}>Cancelar</button>
+          <button type="button" class="btn-secondary" id="btn-import-cancel" style="flex:1" ${state.busy ? "disabled" : ""}>Cancelar</button>
           <button type="button" class="btn-primary" id="btn-import-confirm" style="flex:1" ${state.busy ? "disabled" : ""}>Reemplazar</button>
         </div>` : ""}
       </div>
@@ -167,11 +171,26 @@ export async function renderAjustes(container) {
       ${periodoCardHtml(openPeriod, partnerName)}
 
       <div class="card" style="margin-bottom:12px">
+        <button type="button" id="btn-recurrentes" class="list-row"
+          style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+          <div class="list-row-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 019-9 9 9 0 018 4.6M21 12a9 9 0 01-9 9 9 9 0 01-8-4.6"></path><path d="M20 3v5h-5M4 21v-5h5"></path>
+            </svg>
+          </div>
+          <div class="list-row-body">
+            <div class="list-row-title">Gastos e ingresos recurrentes</div>
+          </div>
+          <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
+        </button>
+      </div>
+
+      <div class="card" style="margin-bottom:12px">
         <p style="font-weight:600;margin-bottom:4px">Banco</p>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
           Importa el extracto CSV de N26: crea los movimientos que faltan y concilia los que ya
           registraste a mano (mismo importe y sentido, ±3 días). Las duplicadas se saltan solas.</p>
-        <button type="button" id="btn-n26-import" style="${BTN_SECONDARY}" ${state.busy ? "disabled" : ""}>Importar CSV de N26</button>
+        <button type="button" class="btn-secondary" id="btn-n26-import" style="${BTN_FULL_WIDTH}" ${state.busy ? "disabled" : ""}>Importar CSV de N26</button>
         <input type="file" id="n26-file-input" accept=".csv" style="display:none">
 
         ${state.n26Result ? `
@@ -185,26 +204,28 @@ export async function renderAjustes(container) {
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
           Divisa de los importes y formato de números y fechas. Se aplican al guardar (recarga la app).</p>
         <div style="display:flex;gap:8px;margin-bottom:12px">
-          <select id="pref-currency" style="${INPUT_STYLE}">${currencyOptionsHtml(metaCfg.currency)}</select>
-          <select id="pref-locale" style="${INPUT_STYLE}">${localeOptionsHtml(metaCfg.locale)}</select>
+          <div style="flex:1;background:var(--card2);border-radius:16px;padding:8px 12px;">
+            <div class="section-title" style="margin-bottom:2px;">Moneda</div>
+            <select id="pref-currency" style="background:none;border:0;color:var(--text);font:700 14px var(--font-ui);width:100%;padding:2px 0;outline:none;">${currencyOptionsHtml(metaCfg.currency)}</select>
+          </div>
+          <div style="flex:1;background:var(--card2);border-radius:16px;padding:8px 12px;">
+            <div class="section-title" style="margin-bottom:2px;">Formato</div>
+            <select id="pref-locale" style="background:none;border:0;color:var(--text);font:700 14px var(--font-ui);width:100%;padding:2px 0;outline:none;">${localeOptionsHtml(metaCfg.locale)}</select>
+          </div>
         </div>
         <label class="field field-stack" style="margin-top:12px;">
           <span class="field-label">Compartes gastos con</span>
           <input type="text" id="cfg-partner" value="${escAttr(metaCfg.partner_name || "")}" placeholder="Nadie — déjalo vacío si llevas tus cuentas solo">
         </label>
         <div style="font-size:11px;color:var(--text-3);">Con nombre, aparecen el reparto y «Liquidar». Vacío, la app es solo tuya.</div>
-        <button type="button" id="btn-prefs-save" style="${BTN_SECONDARY}margin-top:12px" ${state.busy ? "disabled" : ""}>Guardar preferencias</button>
-      </div>
-
-      <div class="card" style="margin-bottom:12px">
-        <button type="button" id="btn-recurrentes" style="${BTN_SECONDARY}">Gastos e ingresos recurrentes</button>
+        <button type="button" class="btn-secondary" id="btn-prefs-save" style="${BTN_FULL_WIDTH}margin-top:12px" ${state.busy ? "disabled" : ""}>Guardar preferencias</button>
       </div>
 
       <div class="card">
         <p style="font-weight:600;margin-bottom:4px">Copia de emergencia</p>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
           🔒 Tus datos viven solo en este dispositivo. Sin cuentas, sin nube.</p>
-        <button type="button" id="btn-json-export" style="${BTN_SECONDARY}">Exportar copia de seguridad (JSON)</button>
+        <button type="button" class="btn-secondary" id="btn-json-export" style="${BTN_FULL_WIDTH}">Exportar copia de seguridad (JSON)</button>
       </div>
     `;
     wire();
