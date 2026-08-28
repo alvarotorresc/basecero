@@ -285,5 +285,94 @@ export async function renderOnboarding(container, { onDone }) {
     }
   }
 
-  function renderImportView() { /* Task 3 */ }
+  function renderImportView() {
+    const imp = state.imp ?? (state.imp = { fileName: "", needsPass: false, pass: "", errors: [], pending: null, summary: "", busy: false });
+    container.innerHTML = `
+      <div style="display:flex;flex-direction:column;min-height:calc(100vh - 48px);padding-top:8px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+          <button type="button" class="icon-btn" id="onb-imp-back" aria-label="Volver"
+            style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>
+          <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">Traer tu copia</div>
+        </div>
+        <div style="font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:14px;">Una hoja <b style="color:var(--text);">.xlsx</b> exportada desde BaseCero o un backup cifrado <b style="color:var(--text);">.bce</b>. Se carga entera en este dispositivo.</div>
+        ${!imp.fileName ? `
+        <label class="btn-primary" style="width:100%;text-align:center;cursor:pointer;">Elegir fichero
+          <input type="file" id="onb-imp-file" accept=".xlsx,.bce" style="display:none;">
+        </label>` : `
+        <div style="${BOX}display:flex;align-items:center;gap:12px;">
+          <div style="flex:1;min-width:0;font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(imp.fileName)}</div>
+          <button type="button" id="onb-imp-clear" class="btn-secondary" style="height:36px;padding:0 14px;border-radius:999px;flex-shrink:0;">Cambiar</button>
+        </div>`}
+        ${imp.needsPass ? `
+        <div style="background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;margin-top:14px;">
+          <div class="section-title">Backup cifrado</div>
+          <input type="password" id="onb-imp-pass" placeholder="Contraseña del backup" autocomplete="off"
+            style="border:0;border-radius:14px;background:var(--card2);padding:12px 14px;color:var(--text);font-family:inherit;font-size:14px;outline:none;">
+          <button type="button" class="btn-primary" id="onb-imp-decrypt" style="width:100%;" ${imp.busy ? "disabled" : ""}>${imp.busy ? "Descifrando…" : "Descifrar"}</button>
+        </div>` : ""}
+        ${imp.errors.length ? `
+        <div class="banner-aviso red" style="display:block;margin-top:14px;"><p>${imp.errors.map(escHtml).join("<br>")}</p></div>` : ""}
+        ${imp.pending ? `
+        <div style="background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;margin-top:14px;">
+          <div class="section-title">Listo para cargar</div>
+          <div style="font-size:13px;color:var(--text-2);">${escHtml(imp.summary)}</div>
+          <button type="button" class="btn-primary" id="onb-imp-go" style="width:100%;" ${imp.busy ? "disabled" : ""}>${imp.busy ? "Cargando…" : "Cargar mi copia"}</button>
+        </div>` : ""}
+      </div>`;
+    wireImportView(imp);
+  }
+
+  function wireImportView(imp) {
+    const q = (sel) => container.querySelector(sel);
+    q("#onb-imp-back").onclick = () => { state.view = "steps"; state.imp = null; render(); };
+    const file = q("#onb-imp-file");
+    if (file) file.onchange = async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      imp.fileName = f.name; imp.errors = []; imp.pending = null; imp.needsPass = false;
+      const buf = new Uint8Array(await f.arrayBuffer());
+      if (isEncryptedBackup(buf)) { imp.buffer = buf; imp.needsPass = true; render(); return; }
+      await parseAndOffer(imp, buf);
+    };
+    const clear = q("#onb-imp-clear");
+    if (clear) clear.onclick = () => { state.imp = null; render(); };
+    const dec = q("#onb-imp-decrypt");
+    if (dec) dec.onclick = async () => {
+      if (imp.busy) return;
+      // Se lee el input ANTES de re-renderizar (el render de "busy" reconstruye el DOM).
+      const pass = q("#onb-imp-pass").value;
+      imp.busy = true; imp.errors = []; render();
+      try {
+        const plain = await decryptBackup(imp.buffer, pass);
+        imp.busy = false; imp.needsPass = false;
+        await parseAndOffer(imp, plain);
+      } catch (e) {
+        imp.busy = false;
+        imp.errors = [e instanceof WrongPassphraseError ? "La contraseña no es correcta." : "No se pudo descifrar el backup: " + e.message];
+        render();
+      }
+    };
+    const go = q("#onb-imp-go");
+    if (go) go.onclick = async () => {
+      if (imp.busy) return;
+      imp.busy = true; render();
+      try {
+        // Sin backup previo (a diferencia de Ajustes): la BD todavía está virgen.
+        await replaceAll(imp.pending);
+        location.reload(); // boot() reevalúa el gate: con periodos en la copia, el onboarding no vuelve.
+      } catch (e) { imp.busy = false; imp.errors = ["No se pudo cargar la copia: " + e.message]; imp.pending = null; render(); }
+    };
+  }
+
+  async function parseAndOffer(imp, plainBuf) {
+    try {
+      const wb = window.XLSX.read(plainBuf, { type: "array" });
+      const { data, errors: parseErrors } = workbookToRows(window.XLSX, wb);
+      const errors = [...parseErrors, ...validateImport(data)];
+      if (errors.length) { imp.errors = errors.slice(0, 5); render(); return; }
+      imp.pending = data;
+      imp.summary = `${data.accounts.length} cuenta${data.accounts.length === 1 ? "" : "s"} · ${data.periods.length} periodo${data.periods.length === 1 ? "" : "s"} · ${data.transactions.length} movimiento${data.transactions.length === 1 ? "" : "s"}`;
+      render();
+    } catch (e) { imp.errors = ["No se pudo leer el fichero: " + e.message]; render(); }
+  }
 }
