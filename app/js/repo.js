@@ -75,6 +75,12 @@ export async function getMetaAll() {
 export async function setMeta(key, value) {
   await exec(SQL.upsertMeta, [key, value]);
 }
+/** Guarda varias claves de meta EN EL MISMO execMany: o quedan todas escritas o ninguna (una
+ *  tarjeta de Ajustes con varios campos —p.ej. moneda, locale y contraparte— no debe poder
+ *  quedar a medio guardar si algo falla entre un setMeta y el siguiente). pairs: [[key, value]]. */
+export async function setMetaMany(pairs) {
+  await execMany(pairs.map(([key, value]) => ({ sql: SQL.upsertMeta, bind: [key, value] })));
+}
 
 /** PR C (contraparte), Task 5: ¿hay algún gasto o regla compartidos activos (sin importar
  *  meta.partner_name)? La usa Inicio para el banner de migración de una sola vez cuando una BD

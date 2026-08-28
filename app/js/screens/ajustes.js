@@ -1,4 +1,4 @@
-import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta } from "../repo.js";
+import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMetaMany } from "../repo.js";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
 import { hoyISO, fmtDiaCorto } from "../format.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
@@ -188,7 +188,12 @@ export async function renderAjustes(container) {
           <select id="pref-currency" style="${INPUT_STYLE}">${currencyOptionsHtml(metaCfg.currency)}</select>
           <select id="pref-locale" style="${INPUT_STYLE}">${localeOptionsHtml(metaCfg.locale)}</select>
         </div>
-        <button type="button" id="btn-prefs-save" style="${BTN_SECONDARY}" ${state.busy ? "disabled" : ""}>Guardar preferencias</button>
+        <label class="field field-stack" style="margin-top:12px;">
+          <span class="field-label">Compartes gastos con</span>
+          <input type="text" id="cfg-partner" value="${escAttr(metaCfg.partner_name || "")}" placeholder="Nadie — déjalo vacío si llevas tus cuentas solo">
+        </label>
+        <div style="font-size:11px;color:var(--text-3);">Con nombre, aparecen el reparto y «Liquidar». Vacío, la app es solo tuya.</div>
+        <button type="button" id="btn-prefs-save" style="${BTN_SECONDARY}margin-top:12px" ${state.busy ? "disabled" : ""}>Guardar preferencias</button>
       </div>
 
       <div class="card" style="margin-bottom:12px">
@@ -364,14 +369,16 @@ export async function renderAjustes(container) {
     }
 
     container.querySelector("#btn-prefs-save").onclick = async () => {
-      // Leer los selects ANTES de render(): reconstruye el DOM desde metaCfg (el valor
+      // Leer los inputs ANTES de render(): reconstruye el DOM desde metaCfg (el valor
       // guardado), así que leerlos después devolvería el valor antiguo, no el elegido.
       const currency = container.querySelector("#pref-currency").value;
       const locale = container.querySelector("#pref-locale").value;
+      const partner = container.querySelector("#cfg-partner").value.trim();
       state.busy = true; render();
       try {
-        await setMeta("currency", currency);
-        await setMeta("locale", locale);
+        // Los tres campos de la tarjeta en UN execMany (vía setMetaMany): o quedan las tres
+        // claves guardadas o ninguna, así currency/locale/partner_name nunca quedan a medias.
+        await setMetaMany([["currency", currency], ["locale", locale], ["partner_name", partner]]);
         location.reload();
       } catch (err) {
         state.busy = false;
