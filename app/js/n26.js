@@ -116,6 +116,12 @@ export async function importWithProfile(text, profile) {
  *  que la UI (Task 6) abra el asistente — SIN tocar la base de datos más allá de la lectura de
  *  meta necesaria para decidir. */
 export async function importCsv(text) {
+  // Guard temprano (ruling de la review de Task 5): sin periodo abierto, CUALQUIER CSV — incluso
+  // basura irreconocible que de otro modo caería en needsMapping — debe fallar con este mensaje
+  // accionable ANTES de llegar al sniff, para que gane siempre sobre "cabecera no reconocida"
+  // (runImportPipeline ya repetía esta misma comprobación, pero solo se alcanza en los caminos
+  // N26/perfil; needsMapping no pasaba nunca por ahí).
+  if (!(await getOpenPeriod())) throw new Error("No hay ningún periodo abierto");
   const { headers, sample } = sniffCsv(text, bcParseCsvLine);
   if (isN26Headers(headers)) {
     const res = await importN26Csv(text);

@@ -34,6 +34,16 @@ function db() {
   return d;
 }
 
+/** Misma base que db() pero SIN periodo abierto — para el test del guard temprano de importCsv. */
+function dbNoPeriod() {
+  const d = new DatabaseSync(":memory:");
+  d.exec(readFileSync(new URL("../../app/js/schema.sql", import.meta.url), "utf8"));
+  for (const { sql, rows } of seedStatements(T)) for (const r of rows) d.prepare(sql).run(...r);
+  d.prepare(`INSERT INTO accounts (id,name,type,opening_balance_cents,display_order,is_archived,created_at,updated_at,deleted)
+             VALUES ('acc-n26','N26','checking',0,1,0,?,?,0)`).run(T, T);
+  return d;
+}
+
 const CSV_HEADER = '"Booking Date","Value Date","Partner Name","Partner Iban","Type",'
   + '"Payment Reference","Account Name","Amount (EUR)","Original Amount","Original Currency","Exchange Rate"';
 
@@ -97,6 +107,9 @@ const setMetaValue = (d, key, value) => d.prepare(`UPDATE meta SET value=? WHERE
  *  si no hay match → needsMapping SIN tocar la base de datos (ni siquiera se llega a leer meta si
  *  ya hace falta la comprobación N26, pero tampoco se escribe nada en ningún camino). */
 async function runImportRouter(d, text, hashFn = sha256hex) {
+  // Guard temprano (ruling de la review de Task 5, replicado del importCsv real de n26.js): sin
+  // periodo abierto, ni siquiera CSV basura irreconocible llega al sniff.
+  if (!d.prepare(SQL.getOpenPeriod).get()) throw new Error("No hay ningún periodo abierto");
   const { headers, sample } = sniffCsv(text, pure.bcParseCsvLine);
   if (isN26Headers(headers)) {
     const res = await runImport(d, text, hashFn);
@@ -265,6 +278,14 @@ test("importCsv (router): reimportar el MISMO texto -> dedupe por external_id, t
   const second = await runImportRouter(d, GENERIC_2ROWS);
   assert.deepEqual(second, { created: 0, reconciled: 0, skipped: 2, via: "profile", omitted: 0 });
   assert.equal(n26Rows(d).length, 2);
+});
+
+test("importCsv (router): sin periodo abierto, ni un CSV basura llega al sniff — gana el mensaje de periodo", async () => {
+  const d = dbNoPeriod();
+  await assert.rejects(
+    () => runImportRouter(d, "esto,no,es,csv,de,ningun,banco\n1,2,3,4,5,6,7"),
+    /No hay ningún periodo abierto/,
+  );
 });
 
 test("importCsv (router): filas con fecha/importe inválidos van a omitted, el resto se importa", async () => {
