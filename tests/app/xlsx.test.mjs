@@ -110,8 +110,8 @@ test("validate: PK vacía", () => {
 });
 test("validate: PK duplicada (dentro de la misma pestaña, meta usa key)", () => {
   const d = parse((x) => { x.meta.push({ key: "schema_version", value: "1" }); });
-  // el duplicado se reporta en la fila de la SEGUNDA aparición (fila 8: las 6 semillas + esta)
-  assert.match(validateImport(d).join("\n"), /pestaña «meta» fila 8: id duplicado \(«schema_version»\)/);
+  // el duplicado se reporta en la fila de la SEGUNDA aparición (fila 9: las 7 semillas + esta)
+  assert.match(validateImport(d).join("\n"), /pestaña «meta» fila 9: id duplicado \(«schema_version»\)/);
 });
 test("validate: dos periodos open", () => {
   const d = parse((x) => { x.periods.push({ ...x.periods[0], id: "per-2", name: "Otro" }); });
