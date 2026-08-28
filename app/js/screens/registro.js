@@ -2,7 +2,7 @@ import {
   addTransaction, getOpenPeriod, listExpenseLeafCategories, listIncomeCategories,
   listAccounts, allCategoriesById, recentForRefund, getMetaAll,
 } from "../repo.js";
-import { colorForCategory, iconForCategory } from "../category-colors.js";
+import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
 import { fmtMoney, hoyISO, currencySymbol } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 
@@ -176,13 +176,13 @@ export async function renderRegistro(container, onDone, prefill) {
   function renderAccountsSection() {
     if (state.tipo === "transfer") {
       return `
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+      <div class="card" style="border-radius:16px; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
         <div class="section-title">Desde</div>
         <div class="chips">
           ${accounts.map((a) => `<button type="button" class="chip${state.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
         </div>
       </div>
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+      <div class="card" style="border-radius:16px; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
         <div class="section-title">Hacia</div>
         <div class="chips">
           ${accountsAll.filter((a) => a.id !== state.accountId).map((a) => `<button type="button" class="chip${state.counterAccountId === a.id ? " active" : ""}" data-counter-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
@@ -190,7 +190,7 @@ export async function renderRegistro(container, onDone, prefill) {
       </div>`;
     }
     return `
-    <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+    <div class="card" style="border-radius:16px; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
       <div class="section-title">${state.tipo === "refund" ? "Cuenta destino" : "Cuenta"}</div>
       <div class="chips">
         ${accounts.map((a) => `<button type="button" class="chip${state.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
@@ -202,6 +202,12 @@ export async function renderRegistro(container, onDone, prefill) {
     const cats = categoriesFor();
     const myCents = state.isShared ? Math.round((state.cents * pct) / 100) : state.cents;
     const partnerCents = state.isShared ? state.cents - myCents : 0;
+    // Color del display/importe y del botón de guardar: se leen del state en CADA pintado, así
+    // que basta con el render() que ya dispara el click de categoría — sin estado nuevo.
+    const amountColor = state.categoryId ? textColorForCategory(state.categoryId, byId) : "var(--text)";
+    const saveStyle = needsCategory(state.tipo) && state.categoryId
+      ? `background:${colorForCategory(state.categoryId, byId)};color:#FFF4EC;`
+      : "";
 
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
 
@@ -211,16 +217,22 @@ export async function renderRegistro(container, onDone, prefill) {
         <button type="button" class="icon-btn" id="reg-close" aria-label="Cerrar">✕</button>
       </div>
 
-      <div class="segmented" style="margin-bottom:18px;">
-        ${TIPOS.map((t) => `<button type="button" data-tipo="${t.id}" class="${state.tipo === t.id ? "active" : ""}">${t.label}</button>`).join("")}
+      <div class="segmented" style="margin-bottom:18px;border-radius:999px;">
+        ${TIPOS.map((t) => {
+          const active = state.tipo === t.id;
+          const segStyle = active
+            ? "border-radius:999px;background:var(--card2);color:var(--text);font-weight:700;"
+            : "border-radius:999px;";
+          return `<button type="button" data-tipo="${t.id}" class="${active ? "active" : ""}" style="${segStyle}">${t.label}</button>`;
+        }).join("")}
       </div>
 
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
         <div class="section-title">Importe</div>
-        <div class="amount-display" style="align-items:center;">
+        <div class="amount-display" style="align-items:baseline; justify-content:flex-end;">
           ${state.tipo === "adjustment" ? `<button type="button" class="icon-btn" id="reg-sign" aria-label="Cambiar signo" style="font-size:18px; font-weight:700;">${state.adjustmentSign}</button>` : ""}
-          <span class="num">${state.tipo === "adjustment" && state.adjustmentSign === "-" ? "−" : ""}${escHtml(state.raw || "0")}</span>
-          <span class="amount-currency">${currencySymbol()}</span>
+          <span class="num" style="font-size:52px; font-weight:700; letter-spacing:-0.01em; color:${amountColor};">${state.tipo === "adjustment" && state.adjustmentSign === "-" ? "−" : ""}${escHtml(state.raw || "0")}</span>
+          <span class="amount-currency" style="color:${amountColor};">${currencySymbol()}</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
       </div>
@@ -231,9 +243,13 @@ export async function renderRegistro(container, onDone, prefill) {
         <div class="chips-scroll">
           ${cats.map((c) => {
             const color = colorForCategory(c.id, byId);
+            const textColor = textColorForCategory(c.id, byId);
             const icon = iconForCategory(c.id, byId);
             const active = state.categoryId === c.id;
-            return `<button type="button" class="chip-v${active ? " active" : ""}" data-cat="${c.id}" style="--cat:${color};">
+            const chipStyle = active
+              ? `--cat:${color};background:color-mix(in srgb, ${color} 18%, transparent);color:${textColor};font-weight:700;`
+              : `--cat:${color};`;
+            return `<button type="button" class="chip-v${active ? " active" : ""}" data-cat="${c.id}" style="${chipStyle}">
               <span class="chip-icon">${icon}</span><span>${escHtml(c.name)}</span>
             </button>`;
           }).join("")}
@@ -260,7 +276,7 @@ export async function renderRegistro(container, onDone, prefill) {
       </label>
 
       ${needsCategory(state.tipo) && partnerName ? `
-      <div class="card" style="padding:0 16px; margin-bottom:18px;">
+      <div class="card" style="border-radius:16px; padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
           <span style="font-size:15px; font-weight:600;">Compartido con ${escHtml(partnerName)}</span>
           <span class="toggle">
@@ -270,11 +286,11 @@ export async function renderRegistro(container, onDone, prefill) {
         </label>
         ${state.isShared ? `
         <div style="display:flex; gap:8px; padding:0 0 14px;">
-          <div style="flex:1; background:#1b1e21; border-radius:14px; padding:10px 11px;">
+          <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
             <div style="font-size:10px; color:var(--text-3);">Tu parte · ${pct}%</div>
             <div class="num" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
           </div>
-          <div style="flex:1; background:#1b1e21; border-radius:14px; padding:10px 11px;">
+          <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
             <div style="font-size:10px; color:var(--text-3);">${escHtml(partnerName)} · ${100 - pct}%</div>
             <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerCents)}</div>
           </div>
@@ -283,14 +299,14 @@ export async function renderRegistro(container, onDone, prefill) {
 
       <div class="keypad" style="margin-bottom:18px;">
         ${KEYS.map((k) => k === "back"
-          ? `<button type="button" class="key key-back" data-key="back" aria-label="Borrar">${ICON_BACK}</button>`
-          : `<button type="button" class="key${k === "," ? " key-comma" : ""}" data-key="${k}">${k}</button>`
+          ? `<button type="button" class="key key-back" data-key="back" aria-label="Borrar" style="height:52px;border:0;border-radius:16px;background:var(--card);">${ICON_BACK}</button>`
+          : `<button type="button" class="key${k === "," ? " key-comma" : ""}" data-key="${k}" style="height:52px;border:0;border-radius:16px;background:var(--card);font-size:19px;font-weight:600;">${k}</button>`
         ).join("")}
       </div>
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
-      <button type="button" class="btn-primary" id="reg-save">${SAVE_LABEL[state.tipo]}</button>
+      <button type="button" class="btn-primary" id="reg-save" style="${saveStyle}">${SAVE_LABEL[state.tipo]}</button>
     `;
 
     if (prevChipsScroll != null) {
