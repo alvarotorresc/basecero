@@ -3,12 +3,20 @@ import {
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { eurToCents } from "../contract.js";
-import { fmtMoney, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol } from "../format.js";
+import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol } from "../format.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-const BTN_SECONDARY = "background:transparent;color:var(--text);border:1px solid var(--border);"
-  + "border-radius:var(--radius-sm);padding:16px;flex:1;font:600 16px var(--font-ui);cursor:pointer;";
+const BTN_SECONDARY = "background:var(--card2);color:var(--text);border:0;"
+  + "border-radius:999px;padding:16px;flex:1;font:600 16px var(--font-ui);cursor:pointer;";
+
+// Compone un importe con los céntimos reducidos en <small> (patrón .amount-hero del design
+// system, ver DesignSystem.dc.html / inicio.js#moneyPartsHtml): main + <small>céntimos</small> +
+// sufijo, sin reimplementar el locale — fmtMoneyParts (format.js) ya hace el split posicional.
+const moneyPartsHtml = (cents) => {
+  const { main, cents: c, suffix } = fmtMoneyParts(cents);
+  return `${escHtml(main)}<small>${escHtml(c)}</small>${escHtml(suffix)}`;
+};
 
 /** Pantalla de error con recuperación: quien llama ya puso `body.onboarding` (chrome oculto,
  *  nav() bloqueado — ver main.js), así que un simple banner sin salida deja a quien lo use
@@ -95,7 +103,9 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
   function patchTotal() {
     const presupuestado = totalPresupuestadoCents();
     const presupEl = container.querySelector("#pn-presupuestado");
-    if (presupEl) presupEl.textContent = fmtMoney(presupuestado);
+    // innerHTML (no textContent): #pn-presupuestado ahora lleva moneyPartsHtml (main + <small>
+    // céntimos</small> + sufijo) — un textContent aquí borraría el <small> en el primer tecleo.
+    if (presupEl) presupEl.innerHTML = moneyPartsHtml(presupuestado);
     if (mode === "next") {
       const pctBarra = closingIncome > 0 ? Math.min(100, Math.round((presupuestado / closingIncome) * 100)) : 0;
       const sinAsignar = closingIncome - presupuestado;
@@ -106,12 +116,21 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
     }
   }
 
+  // Kicker versalitas verde (.day-label, misma fórmula que .section-title, --green del sistema):
+  // en modo 'next' compone "Cierra {periodo real} · abre el siguiente" con el nombre YA cargado
+  // (closingPeriod.name, el mismo dato que bloqueCierre usa debajo); en 'first' no hay periodo que
+  // cerrar, así que no hay dato del que derivar la frase del artboard — "Primer periodo" es la
+  // única etiqueta que no inventa nada. El sub "Paso único..." (copy real, ya existía en ambos
+  // modos) se conserva tal cual en vez del texto nuevo del artboard para esa línea.
   function bloqueHeader() {
+    const kicker = mode === "next" ? `Cierra ${escHtml(closingPeriod.name)} · abre el siguiente` : "Primer periodo";
     return `
     <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
-      ${mode === "next" ? `<button type="button" class="icon-btn" id="pn-back" aria-label="Volver">←</button>` : ""}
-      <div style="display:flex; flex-direction:column; gap:2px;">
-        <div style="font-size:17px; font-weight:700; letter-spacing:-0.01em;">Nuevo periodo</div>
+      ${mode === "next" ? `<button type="button" class="icon-btn" id="pn-back" aria-label="Volver"
+        style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>` : ""}
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <div class="day-label" style="color:var(--green);">${kicker}</div>
+        <div style="font-size:24px; font-weight:800; letter-spacing:-0.02em;">Nuevo periodo</div>
         <div style="font-size:11px; color:var(--text-3);">Paso único · se guarda al abrirlo</div>
       </div>
     </div>`;
@@ -148,37 +167,64 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
     </div>`;
   }
 
-  function bloqueCampos() {
+  // Tres cards independientes (una por bloque: nombre, fecha, reparto), réplica de la estructura
+  // de PeriodoNuevo.dc.html — antes era un único .card con <hr> entre secciones; el artboard las
+  // separa. Nombre/fecha siguen siendo <input> reales (el input manda, no se convierten a texto),
+  // solo re-vestidos como tile --card2 (antes hex #1b1e21 suelto).
+  function bloqueNombre() {
+    return `
+    <div class="card" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
+      <div class="section-title">Nombre</div>
+      <input type="text" id="pn-nombre" value="${escAttr(state.name)}"
+        style="height:44px; padding:0 14px; background:var(--card2); border:0; border-radius:16px; color:var(--text);
+        font:700 15px var(--font-ui); width:100%; outline:none;">
+    </div>`;
+  }
+
+  // Tile calendario decorativo (sin onclick): el input type=date ya trae su propio selector nativo
+  // en toda su superficie — añadirle un handler al tile duplicaría esa interacción sin aportar
+  // nada nuevo, y sería la única pieza de "lógica" de esta tarjeta que no viene ya del navegador.
+  function bloqueFecha() {
+    return `
+    <div class="card" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
+      <div class="section-title">Empieza el</div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <input type="date" id="pn-fecha" value="${state.startDate}"
+          style="flex:1; height:44px; padding:0 14px; background:var(--card2); border:0; border-radius:14px;
+          color:var(--text); font:600 14px var(--font-num); min-width:0;">
+        <div style="width:44px; height:44px; border-radius:14px; background:var(--card2); flex-shrink:0;
+          display:flex; align-items:center; justify-content:center;" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="stroke:var(--text);" stroke-width="1.6"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3.5" y="5" width="17" height="16" rx="2.5"></rect><path d="M3.5 9.5h17M8 3v4M16 3v4"></path>
+          </svg>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // Steppers 44px/radius14 (antes ▲/▼ apiladas de 20×19 — .stepper-btn base se pisa por instancia,
+  // mismo criterio que .ring 52px en patrimonio.js o el botón "+Nueva" 44px de recurrentes.js) +
+  // el texto del % existente, sin cambios de dato/copy.
+  function bloqueReparto() {
+    if (!partnerName) return "";
     const restante = 100 - state.sharePct;
     return `
-    <div class="card" style="padding:4px 16px; display:flex; flex-direction:column; margin-bottom:16px;">
-      <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 0;">
-        <span style="font-size:14px; font-weight:600;">Empieza el</span>
-        <input type="date" id="pn-fecha" value="${state.startDate}"
-          style="height:42px; padding:0 13px; background:#1b1e21; border:0; border-radius:14px; color:var(--text); font:600 14px var(--font-num);">
-      </label>
-      <hr class="divider">
-      <label style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 0;">
-        <span style="font-size:14px; font-weight:600;">Nombre</span>
-        <input type="text" id="pn-nombre" value="${escAttr(state.name)}"
-          style="height:42px; padding:0 13px; background:#1b1e21; border:0; border-radius:14px; color:var(--text);
-          font:600 14px var(--font-ui); text-align:right; min-width:0;">
-      </label>
-      ${partnerName ? `
-      <hr class="divider">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 0;">
-        <div style="display:flex; flex-direction:column; gap:3px;">
+    <div class="card" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
+      <div class="section-title">Gastos compartidos</div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="flex:1; min-width:0;">
           <div style="font-size:14px; font-weight:600;">Pagas de lo compartido</div>
           <div style="font-size:11px; color:var(--text-3);">${escHtml(partnerName)} pagará el ${restante} % restante</div>
         </div>
-        <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
-          <div class="num" style="font-size:15px; font-weight:600; min-width:44px; text-align:right;">${state.sharePct} %</div>
-          <div style="display:flex; flex-direction:column;">
-            <button type="button" id="pn-pct-up" class="stepper-btn" aria-label="Subir porcentaje">▲</button>
-            <button type="button" id="pn-pct-down" class="stepper-btn" aria-label="Bajar porcentaje">▼</button>
-          </div>
-        </div>
-      </div>` : ""}
+        <button type="button" id="pn-pct-down" class="stepper-btn"
+          style="width:44px; height:44px; border-radius:14px; background:var(--card2); color:var(--text); font-size:17px;"
+          aria-label="Bajar porcentaje">−</button>
+        <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${state.sharePct} %</div>
+        <button type="button" id="pn-pct-up" class="stepper-btn"
+          style="width:44px; height:44px; border-radius:14px; background:var(--card2); color:var(--text); font-size:17px;"
+          aria-label="Subir porcentaje">+</button>
+      </div>
     </div>`;
   }
 
@@ -228,10 +274,10 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
         <button type="button" id="pn-add-limite"
           style="display:flex; align-items:center; gap:12px; padding:14px 0; background:none; border:0; width:100%;
           text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent;">
-          <div class="tx-icon" style="--cat:var(--accent);">
+          <div class="tx-icon" style="--cat:var(--text);">
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13"></path></svg>
           </div>
-          <span style="font-size:14px; font-weight:600; color:var(--accent);">Añadir límite a otra categoría</span>
+          <span style="font-size:14px; font-weight:600; color:var(--text);">Añadir límite a otra categoría</span>
         </button>
         ${state.addOpen ? `
         <div style="display:flex; flex-direction:column; padding-bottom:10px;">
@@ -248,6 +294,14 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
     </div>`;
   }
 
+  // "Presupuestado" con céntimos small (fmtMoneyParts/moneyPartsHtml, patrón inicio.js/
+  // patrimonio.js/presupuesto.js): es un importe COMPUESTO/derivado (suma de los budget-input,
+  // no un campo editable en sí), así que sí se convierte al patrón .amount-hero — a diferencia de
+  // los budget-input de bloqueLimites, que siguen siendo inputs reales sin tocar. Barra: mismo
+  // patrón que presupuesto.js (tarea 7) — clase .bar con --cat:var(--text) en vez del
+  // var(--accent) suelto de antes. CTA + error se sacan a bloqueCTA() (bloque final separado,
+  // como en el artboard) — el id #pn-presupuestado/#pn-bar/#pn-nota los sigue actualizando
+  // patchTotal() sin re-render completo (ver su comentario más abajo).
   function bloqueTotal() {
     const presupuestado = totalPresupuestadoCents();
     const ingresos = mode === "next" ? closingIncome : null;
@@ -257,8 +311,8 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
     <div class="card" style="display:flex; flex-direction:column; gap:14px; margin-bottom:16px;">
       <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
         <div style="display:flex; flex-direction:column; gap:5px;">
-          <div style="font-size:12px; font-weight:600; color:var(--text-2);">Presupuestado</div>
-          <div class="num" id="pn-presupuestado" style="font-size:28px; font-weight:600; letter-spacing:-0.02em;">${fmtMoney(presupuestado)}</div>
+          <div class="section-title">Presupuestado</div>
+          <div class="amount-hero num" id="pn-presupuestado">${moneyPartsHtml(presupuestado)}</div>
         </div>
         ${ingresos != null ? `
         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;">
@@ -267,22 +321,30 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
         </div>` : ""}
       </div>
       ${ingresos != null ? `
-      <div style="height:8px; background:#1e2225; border-radius:999px; overflow:hidden;">
-        <div id="pn-bar" style="width:${pctBarra}%; height:8px; background:var(--accent); border-radius:999px;"></div>
-      </div>
+      <div class="bar" style="--cat:var(--text);"><i id="pn-bar" style="width:${pctBarra}%;"></i></div>
       <div id="pn-nota" style="font-size:11px; color:var(--text-3); line-height:1.5;">${notaSinAsignarHtml(sinAsignar)}</div>` : ""}
-      ${errorMsg ? `<div class="banner-aviso red">${escHtml(errorMsg)}</div>` : ""}
-      <button type="button" class="btn-primary" id="pn-submit" ${state.saving ? "disabled" : ""}>${state.saving ? "Abriendo…" : "Abrir periodo"}</button>
     </div>`;
+  }
+
+  // CTA final, fuera de la card del total (como en el artboard): mismo id/label EXISTENTE
+  // ("Abrir periodo"/"Abriendo…" — no el "Abrir Septiembre 2026" fijo del artboard, que fabricaría
+  // un texto con el nombre siempre en mayúscula fija en vez del state.name real).
+  function bloqueCTA() {
+    return `
+    ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
+    <button type="button" class="btn-primary" id="pn-submit" ${state.saving ? "disabled" : ""}>${state.saving ? "Abriendo…" : "Abrir periodo"}</button>`;
   }
 
   function render() {
     container.innerHTML = `
       ${bloqueHeader()}
       ${bloqueCierre()}
-      ${bloqueCampos()}
+      ${bloqueNombre()}
+      ${bloqueFecha()}
+      ${bloqueReparto()}
       ${bloqueLimites()}
       ${bloqueTotal()}
+      ${bloqueCTA()}
     `;
     wire();
   }

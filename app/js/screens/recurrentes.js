@@ -21,6 +21,12 @@ const FREQ_CHIPS = [
   { id: "yearly", label: "Anual" },
 ];
 const FREQ_LABEL = Object.fromEntries(FREQ_CHIPS.map((f) => [f.id, f.label.toLowerCase()]));
+// Nombre de mes para "próximo: {mes}" en el sub de reglas trimestrales/anuales (mismo patrón que
+// FREQ_LABEL: lookup local de presentación, due_month ya es un dato real de la regla).
+const MONTH_NAMES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+];
 const needsCategory = (tipo) => tipo === "expense" || tipo === "income";
 const needsMonth = (freq) => freq === "quarterly" || freq === "yearly";
 
@@ -51,23 +57,57 @@ export async function renderRecurrentes(container, onBack) {
     return { color: colorForCategory(r.category_id, byId), icon: iconForCategory(r.category_id, byId) };
   }
 
-  function ruleRowHtml(r) {
-    const { color, icon } = ruleIconColor(r);
+  // Sub de cada fila: frecuencia + día SIEMPRE visibles (la lista queda plana, sin agrupar por
+  // frecuencia como el artboard — ver informe de la tarea, brecha documentada), + "próximo: {mes}"
+  // para trimestral/anual (due_month, dato real de la regla), cuentas origen→destino en
+  // transferencias (accountsAll ya cargado) y "compartido"/"pausada" como banderas de datos reales
+  // (is_shared/is_active) — SIN inventar el "compartido 40 %" del artboard: ese % no existe en la
+  // regla (solo en el periodo abierto), así que se muestra el texto sin porcentaje.
+  function ruleSubtitle(r) {
     const freqLabel = FREQ_LABEL[r.frequency] ?? r.frequency;
-    let subtitle = `${fmtMoney(r.amount_cents)} · ${freqLabel} · día ${r.due_day}`;
-    if (r.due_month) subtitle += ` · mes ${r.due_month}`;
+    // día SIEMPRE visible (antes se omitía en trimestral/anual a favor de "próximo: {mes}",
+    // como el artboard — pero el artboard no lleva "día" porque agrupa por frecuencia; sin esa
+    // agrupación aquí, omitirlo perdía info real que la regla sí tiene, contra el criterio de la
+    // tarea 7: "no se quita info real sin que el brief lo pida").
+    const parts = [freqLabel, `día ${r.due_day}`];
+    if (needsMonth(r.frequency) && r.due_month) parts.push(`próximo: ${MONTH_NAMES[r.due_month - 1]}`);
+    if (r.type === "transfer") {
+      const from = accountsAll.find((a) => a.id === r.account_id)?.name;
+      const to = accountsAll.find((a) => a.id === r.counter_account_id)?.name;
+      if (from && to) parts.push(`${from} → ${to}`);
+    } else if (r.is_shared) {
+      parts.push("compartido");
+    }
+    if (!r.is_active) parts.push("pausada");
+    return parts.join(" · ");
+  }
+
+  // Fila plana (sin card propia) dentro de la lista compartida — mismo patrón que
+  // categoryRowHtml/cuentaRowHtml/rowHtml de presupuesto.js/patrimonio.js/liquidar.js (tarea 7):
+  // una única .card con <hr class="divider"> entre filas. Toggle de la derecha: indicador visual
+  // (NO interactivo — sin <input>, pointer-events:none) de is_active con los colores exactos del
+  // brief; el toggle REAL (que sí cambia el dato) vive en el formulario, y toda la fila sigue
+  // abriendo la edición al tocar en cualquier punto (mismo onclick que antes).
+  function ruleRowHtml(r, withDivider) {
+    const { color, icon } = ruleIconColor(r);
+    const amountColor = r.type === "transfer" ? "color:var(--text-3);" : "";
     return `
-    <div class="card" style="padding:14px;">
-      <button type="button" class="tx-row" data-rule="${r.id}"
-        style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-        <div class="tx-icon" style="--cat:${color};">${icon}</div>
-        <div class="tx-body">
-          <div class="tx-title">${escHtml(r.name)}</div>
-          <div class="tx-sub">${escHtml(subtitle)}</div>
-        </div>
-        ${!r.is_active ? `<span style="font-size:9px;font-weight:700;letter-spacing:0.04em;color:var(--text-3);background:#2a2f34;border-radius:6px;padding:3px 6px;flex-shrink:0;">Inactiva</span>` : ""}
-      </button>
-    </div>`;
+    ${withDivider ? '<hr class="divider">' : ""}
+    <button type="button" data-rule="${r.id}"
+      style="width:100%;display:flex;align-items:center;gap:12px;padding:13px 0;background:none;border:0;
+      text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;${!r.is_active ? "opacity:0.55;" : ""}">
+      <div class="dotico" style="--cat:${color};">${icon}</div>
+      <div class="tx-body">
+        <div class="tx-title">${escHtml(r.name)}</div>
+        <div class="tx-sub">${escHtml(ruleSubtitle(r))}</div>
+      </div>
+      <div class="num" style="font-size:14px;font-weight:700;flex-shrink:0;${amountColor}">${fmtMoney(r.amount_cents)}</div>
+      <span class="toggle" style="pointer-events:none;cursor:default;" aria-hidden="true">
+        <span class="toggle-track" style="background:${r.is_active ? "var(--green)" : "var(--card2)"};">
+          <span class="toggle-knob" style="background:${r.is_active ? "var(--bg)" : "var(--text-2)"};${r.is_active ? "transform:translateX(20px);" : ""}"></span>
+        </span>
+      </span>
+    </button>`;
   }
 
   function openNew() {
@@ -152,20 +192,21 @@ export async function renderRecurrentes(container, onBack) {
 
   function renderList() {
     container.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="rec-back" aria-label="Volver">←</button>
-        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">Recurrentes</h1>
-        <span style="width:36px;"></span>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+        <button type="button" class="icon-btn" id="rec-back" aria-label="Volver"
+          style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>
+        <h1 style="flex:1; font-size:20px; font-weight:700; letter-spacing:-0.015em;">Recurrentes</h1>
+        <button type="button" id="rec-new"
+          style="height:44px;padding:0 18px;border-radius:999px;background:var(--text);color:var(--bg);border:0;
+          font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">+ Nueva</button>
       </div>
-
-      <button type="button" class="btn-primary" id="rec-new" style="margin-bottom:16px;">Nueva regla</button>
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
       ${state.rules.length === 0
         ? `<div class="card" style="text-align:center;color:var(--text-3)"><p>Todavía no hay ninguna regla recurrente.</p></div>`
-        : `<div style="display:flex; flex-direction:column; gap:10px;">
-            ${state.rules.map((r) => ruleRowHtml(r)).join("")}
+        : `<div class="card" style="padding:4px 16px; display:flex; flex-direction:column;">
+            ${state.rules.map((r, i) => ruleRowHtml(r, i > 0)).join("")}
           </div>`}
     `;
     wireList();
@@ -190,10 +231,11 @@ export async function renderRecurrentes(container, onBack) {
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
 
     container.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="rec-form-back" aria-label="Volver">←</button>
-        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${state.editId ? "Editar regla" : "Nueva regla"}</h1>
-        <span style="width:36px;"></span>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+        <button type="button" class="icon-btn" id="rec-form-back" aria-label="Volver"
+          style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>
+        <h1 style="flex:1; font-size:20px; font-weight:700; letter-spacing:-0.015em;">${state.editId ? "Editar regla" : "Nueva regla"}</h1>
+        <span style="width:44px;"></span>
       </div>
 
       <label class="field field-stack" style="margin-bottom:18px;">
