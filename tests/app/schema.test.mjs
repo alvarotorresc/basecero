@@ -63,6 +63,8 @@ test("meta: las claves de cuenta entran vacías con INSERT OR IGNORE", () => {
   assert.equal(db.prepare("SELECT value FROM meta WHERE key='import_account_id'").get().value, "");
   assert.equal(db.prepare("SELECT value FROM meta WHERE key='default_account_id'").get().value, "");
   assert.equal(db.prepare("SELECT value FROM meta WHERE key='partner_name'").get().value, "");
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='category_style'").get().value, "{}");
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='csv_profile'").get().value, "");
   // re-ejecutar el esquema NO pisa un valor ya configurado
   db.prepare("UPDATE meta SET value='acc-x' WHERE key='import_account_id'").run();
   db.exec(schema);
@@ -70,4 +72,10 @@ test("meta: las claves de cuenta entran vacías con INSERT OR IGNORE", () => {
   db.prepare("UPDATE meta SET value='MARTA G.' WHERE key='partner_name'").run();
   db.exec(schema);
   assert.equal(db.prepare("SELECT value FROM meta WHERE key='partner_name'").get().value, "MARTA G.");
+  db.prepare("UPDATE meta SET value='{\"cat-x\":{\"color\":\"#629D3B\"}}' WHERE key='category_style'").run();
+  db.exec(schema);
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='category_style'").get().value, "{\"cat-x\":{\"color\":\"#629D3B\"}}");
+  db.prepare("UPDATE meta SET value='{\"headers\":[]}' WHERE key='csv_profile'").run();
+  db.exec(schema);
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='csv_profile'").get().value, "{\"headers\":[]}");
 });

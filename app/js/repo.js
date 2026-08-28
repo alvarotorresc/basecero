@@ -4,6 +4,7 @@ import { nowIso, hoyISO, prevDayIso, fmtMoney, fmtDec1, appLocale } from "./form
 import { CONTRACT, insertSql } from "./contract.js";
 import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
 import { resolveAccountId } from "./account-defaults.js";
+import { POOL, CURATED_ICONS, CATEGORY_ICONS, parseStyle, initCategoryStyle } from "./category-colors.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -586,6 +587,153 @@ export async function updateGoal(id, fields) {
 }
 
 export const softDeleteGoal = (id) => exec(SQL.softDeleteGoal, [nowIso(), id]);
+
+// ---- Categorías editables (PR D, Task 4) ------------------------------------
+
+export const listCategoriesAdmin = () => query(SQL.listCategoriesAdmin);
+export const getCategory = async (id) => (await query(SQL.getCategory, [id]))[0] ?? null;
+
+/** ¿Puede `parentId` ser el padre de una categoría de flow `flow`? Debe existir, ser una
+ *  categoría PRINCIPAL (parent_id='' — el árbol admite como mucho 2 niveles) y del MISMO flow
+ *  que la categoría que se está creando/moviendo (una de gasto no puede colgar de una de
+ *  ingreso, ni al revés). Lanza si no se cumple — la comparten createCategory y updateCategory. */
+async function assertValidParent(parentId, flow) {
+  const parent = await getCategory(parentId);
+  if (!parent || parent.parent_id !== "" || parent.flow !== flow) {
+    throw new Error("La categoría elegida como padre no es válida: debe ser una categoría principal del mismo tipo (gasto o ingreso)");
+  }
+}
+
+/** Crea una categoría. fields camelCase: {name, flow, needType, parentId}. Raíz (parentId
+ *  ausente/vacío) o hija (parentId debe apuntar a una principal del MISMO flow — assertValidParent).
+ *  El nombre se recorta (trim) antes de guardarlo — vacío tras el recorte es un error: a
+ *  diferencia de cuentas/objetivos/reglas (donde el recorte lo hace la propia pantalla antes de
+ *  llamar al repo), aquí el guard vive en el repo, última línea de defensa para una entidad nueva
+ *  de este PR. */
+export async function createCategory({ name, flow, needType, parentId }) {
+  const trimmed = String(name ?? "").trim();
+  if (!trimmed) throw new Error("El nombre de la categoría no puede estar vacío");
+  const pid = parentId || "";
+  if (pid) {
+    await assertValidParent(pid, flow);
+    // Item 4 (Important, review final): a propósito NO entra en assertValidParent (compartida con
+    // updateCategory) — save() en categorias.js manda parentId SIEMPRE en edición, incluso al
+    // renombrar una hija cuya raíz ya está archivada; si este check viviera ahí, ese rename (que
+    // hoy funciona y debe seguir funcionando) empezaría a lanzar. Solo alta bajo un padre archivado
+    // se bloquea aquí.
+    const parent = await getCategory(pid);
+    if (parent.is_archived) throw new Error("No se puede crear una subcategoría dentro de una categoría archivada");
+  }
+  const id = bcUlid();
+  const t = nowIso();
+  await exec(SQL.insertCategory, [id, bcSanitizeCell(trimmed), pid, flow, needType ?? "", t, t, flow, pid]);
+  return id;
+}
+
+/** Actualiza una categoría (name/needType/parentId — merge-on-current, mismo criterio que
+ *  updateAccount/updateRule/updateGoal). `flow` es INMUTABLE: a diferencia del resto de campos
+ *  (que si faltan conservan el valor actual), ni siquiera se acepta como clave — pasarla lanza,
+ *  no se ignora en silencio. SQL.updateCategory tampoco la tocaría aunque se colara (última
+ *  línea de defensa).
+ *
+ *  LIMITACIÓN CONOCIDA: al mover una hija a otro padre (o convertir hija en raíz, o raíz en
+ *  hija) el display_order NO se recalcula para el grupo (flow, parent_id) de destino — conserva
+ *  el número de su grupo anterior, que puede coincidir con el de alguna categoría ya presente en
+ *  el grupo nuevo. No rompe nada (display_order no es UNIQUE) pero el orden dentro del grupo de
+ *  destino queda indeterminado hasta el próximo reorderCategories. No se resuelve aquí: no lo
+ *  pide el brief de esta task, y el guard de arrastrar (Task 7) deja cualquier grupo en 1..n en
+ *  cuanto el usuario lo reordena. */
+export async function updateCategory(id, fields) {
+  if (fields.flow !== undefined) {
+    throw new Error("El tipo de la categoría (gasto o ingreso) no se puede cambiar una vez creada");
+  }
+  const cur = await getCategory(id);
+  if (!cur) throw new Error("Categoría no encontrada");
+
+  let name = cur.name;
+  if (fields.name !== undefined) {
+    const trimmed = String(fields.name).trim();
+    if (!trimmed) throw new Error("El nombre de la categoría no puede estar vacío");
+    name = bcSanitizeCell(trimmed);
+  }
+  const needType = fields.needType !== undefined ? fields.needType : cur.need_type;
+  const parentId = fields.parentId !== undefined ? fields.parentId : cur.parent_id;
+
+  if (parentId) {
+    await assertValidParent(parentId, cur.flow);
+    // Item 3 (review final): hasChildren, NO hasActiveChildren — incluso con solo hijas
+    // ARCHIVADAS, demotarla dejaría un árbol de 3 niveles (la hija sigue apuntando, vía
+    // parent_id, a una categoría que deja de ser raíz). El mensaje ya no dice "activas": el guard
+    // es sobre CUALQUIER hija, se refleje o no como tal en la lista (que solo cuenta activas).
+    const children = await query(SQL.hasChildren, [id]);
+    if (children.length > 0) {
+      throw new Error("Esta categoría tiene subcategorías: solo se permiten dos niveles, no puede convertirse en subcategoría de otra");
+    }
+  }
+
+  const t = nowIso();
+  await exec(SQL.updateCategory, [name, needType, parentId, t, id]);
+}
+
+/** Archiva una categoría. Si es una raíz con hijas ACTIVAS, las archiva en cascada EN EL MISMO
+ *  execMany (o quedan todas archivadas, o ninguna) — reutiliza SQL.setCategoryArchived una vez
+ *  por fila (la raíz + cada hija activa), mismo criterio que insertBudget dentro de
+ *  openNextPeriod. Una hija (que nunca tiene hijas propias — máx 2 niveles) simplemente no
+ *  encuentra ninguna en childrenOf y archiva solo su propia fila. */
+export async function archiveCategory(id) {
+  const kids = await query(SQL.childrenOf, [id]);
+  const t = nowIso();
+  const stmts = [
+    { sql: SQL.setCategoryArchived, bind: [1, t, id] },
+    ...kids.map((k) => ({ sql: SQL.setCategoryArchived, bind: [1, t, k.id] })),
+  ];
+  await execMany(stmts);
+}
+
+/** Desarchiva una categoría. A propósito NO desarchiva sus hijas (si se archivó en cascada, cada
+ *  hija se reactiva a mano, una por una): evita reactivar en bloque subcategorías que el usuario
+ *  quizá había archivado ella sola antes de archivar la raíz. */
+export const unarchiveCategory = (id) => exec(SQL.setCategoryArchived, [0, nowIso(), id]);
+
+/** Persiste el orden de un grupo (raíces de un flow, o hijas de una raíz) tras un arrastre: deja
+ *  display_order en 1..n según la posición de cada id en `orderedIds`, en un único execMany (o
+ *  se guarda el orden completo, o no se guarda nada). `orderedIds` ya viene calculado por
+ *  computeReorder (pura, reexportada abajo) — esta función solo persiste. */
+export async function reorderCategories(orderedIds) {
+  const t = nowIso();
+  await execMany(orderedIds.map((catId, i) => ({ sql: SQL.updateCategoryOrder, bind: [i + 1, t, catId] })));
+}
+
+// Pura, sin DB: vive en category-order.js (no en este archivo, que importa db.js → Worker del
+// navegador, no importable en Node) para que sea testeable directamente. Se reexporta aquí para
+// que las pantallas tengan un único punto de import para todo lo de categorías.
+export { computeReorder } from "./category-order.js";
+
+/** Color/icono de override de UNA categoría raíz (las hijas heredan el estilo de su raíz — ver
+ *  category-colors.js#rootOf, no tiene sentido un estilo propio de hija). Read-modify-write de
+ *  meta.category_style: lee el JSON completo, toca SOLO la clave `rootId`, reescribe entero.
+ *  REEMPLAZA la entrada de `rootId` por completo (no fusiona con lo que hubiera antes de la
+ *  llamada): la pantalla de edición siempre manda el estado final deseado (color+icono elegidos,
+ *  o ninguno de los dos si el usuario quiere volver al color/icono por defecto) — así "si la
+ *  entrada queda vacía, se elimina la clave" tiene sentido como la acción de "quitar el
+ *  override". `color`/`icon` ausentes o `undefined` son válidos (sin override para ese campo);
+ *  cualquier otro valor fuera de POOL / CURATED_ICONS+CATEGORY_ICONS lanza. */
+export async function setCategoryStyle(rootId, { color, icon } = {}) {
+  if (color !== undefined && !POOL.includes(color)) throw new Error("Ese color no está disponible");
+  const iconValid = icon === undefined || CURATED_ICONS.includes(icon) || Object.values(CATEGORY_ICONS).includes(icon);
+  if (!iconValid) throw new Error("Ese icono no está disponible");
+
+  const meta = await getMetaAll();
+  const styleMap = parseStyle(meta.category_style);
+  const entry = {};
+  if (color) entry.color = color;
+  if (icon) entry.icon = icon;
+  if (Object.keys(entry).length === 0) delete styleMap[rootId];
+  else styleMap[rootId] = entry;
+
+  await setMeta("category_style", JSON.stringify(styleMap));
+  initCategoryStyle(styleMap);
+}
 
 // ---- Import CSV N26 (Task 15) -----------------------------------------------
 

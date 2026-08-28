@@ -27,12 +27,27 @@ export const SQL = {
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.period_id=? AND t.deleted=0 AND t.type IN ('expense','income','refund')
     ORDER BY t.date DESC, t.created_at DESC`,
+  // PR D (categorías editables), Task 4 fix round: el NOT EXISTS comprobaba h.deleted=0 pero NO
+  // h.is_archived — una raíz con su única hija archivada (no borrada) seguía "teniendo hijas"
+  // para esta query y desaparecía del selector junto a ella. Con AND h.is_archived=0, una hija
+  // archivada deja de contar: la raíz vuelve a ser hoja efectiva y reaparece (ver
+  // tests/app/categorias.test.mjs, test de regresión).
+  // Item 5 (Important, review final): el ORDER BY ya no es solo c.display_order — ese es el
+  // display_order DENTRO del grupo (raíces entre sí, hijas de una misma raíz entre sí), así que
+  // tras reordenar hijas de una raíz, sus posiciones (1..n) podían intercalarse con las de OTRA
+  // raíz que casualmente compartiera los mismos números, descolocando el selector de Registro. El
+  // COALESCE ordena primero por el display_order de la RAÍZ de cada hoja (su propio display_order
+  // si ya es raíz, como en listIncomeCategories), agrupando las hojas por la posición de su árbol;
+  // c.parent_id de tiebreak dentro de esa raíz pone a la raíz ('' ordena antes que cualquier id)
+  // justo antes de sus hijas en listIncomeCategories (que no filtra por hoja, incluye raíces e
+  // hijas mezcladas); c.display_order final decide el orden dentro de ese mismo grupo.
   listExpenseLeafCategories: `SELECT c.id, c.name FROM categories c
     WHERE c.flow='expense' AND c.deleted=0 AND c.is_archived=0
-      AND NOT EXISTS (SELECT 1 FROM categories h WHERE h.parent_id=c.id AND h.deleted=0)
-    ORDER BY c.display_order`,
+      AND NOT EXISTS (SELECT 1 FROM categories h WHERE h.parent_id=c.id AND h.deleted=0 AND h.is_archived=0)
+    ORDER BY COALESCE((SELECT p.display_order FROM categories p WHERE p.id=c.parent_id AND p.deleted=0), c.display_order), c.parent_id, c.display_order`,
   listIncomeCategories: `SELECT c.id, c.name FROM categories c
-    WHERE c.flow='income' AND c.deleted=0 AND c.is_archived=0 ORDER BY c.display_order`,
+    WHERE c.flow='income' AND c.deleted=0 AND c.is_archived=0
+    ORDER BY COALESCE((SELECT p.display_order FROM categories p WHERE p.id=c.parent_id AND p.deleted=0), c.display_order), c.parent_id, c.display_order`,
   listAccounts: `SELECT id, name, type FROM accounts WHERE deleted=0 AND is_archived=0 ORDER BY display_order`,
   allCategories: `SELECT id, name, parent_id FROM categories WHERE deleted=0`,
   dumpTable: (t) => `SELECT * FROM ${t}`,   // solo para exportAllJson; t viene de la lista fija de tablas
@@ -185,5 +200,50 @@ export const SQL = {
   reconcileTx: `UPDATE transactions SET external_id=?, status='reconciled', updated_at=? WHERE id=?`,
   upsertMeta: `INSERT INTO meta (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`,
   allMeta: `SELECT key, value FROM meta`,
+
+  // ---- Categorías editables (PR D, Task 4) -----------------------------------
+
+  // Pantalla de administración: TODAS (incl. archivadas — el admin necesita poder reactivarlas),
+  // con el conteo de hijas ACTIVAS de cada una (lo usa el guard "máx 2 niveles" de updateCategory:
+  // una categoría con children>0 no puede convertirse en hija de otra). Orden por
+  // (flow, parent_id, display_order) — no solo display_order a secas (literal del brief): así
+  // cada raíz queda agrupada con sus propias hijas (parent_id='' ordena antes que cualquier id
+  // no vacío), con display_order decidiendo el orden dentro de cada grupo — el mismo grupo que
+  // usa insertCategory para calcular el +1.
+  listCategoriesAdmin: `SELECT c.*,
+      (SELECT COUNT(*) FROM categories h WHERE h.parent_id=c.id AND h.deleted=0 AND h.is_archived=0) AS children
+    FROM categories c WHERE c.deleted=0 ORDER BY c.flow, c.parent_id, c.display_order`,
+  // No estaba en la lista de "SQL nuevos" del brief, pero updateCategory la necesita para el
+  // merge-on-current (mismo patrón que getAccount/getRule/getGoal) y para leer el flow real de
+  // la categoría que se edita (el guard de padre compara contra ESE flow, nunca el que mande el
+  // caller: flow es inmutable).
+  getCategory: `SELECT * FROM categories WHERE id=? AND deleted=0`,
+  // display_order = MAX del grupo (flow, parent_id) + 1 en la MISMA sentencia — mismo patrón que
+  // insertAccount: un agregado SIN GROUP BY sobre el subconjunto ya filtrado por WHERE colapsa
+  // siempre a una fila (incluso con 0 filas, COALESCE cubre el NULL de MAX de una tabla vacía).
+  insertCategory: `INSERT INTO categories (id,name,parent_id,flow,need_type,display_order,is_archived,created_at,updated_at,deleted)
+    SELECT ?,?,?,?,?, COALESCE(MAX(display_order),0)+1, 0, ?,?,0
+    FROM categories WHERE flow=? AND parent_id=? AND deleted=0`,
+  // flow NO está en el SET a propósito: es inmutable tras crear la categoría. repo.updateCategory
+  // ya rechaza la clave antes de llegar aquí, pero la propia SQL es la última línea de defensa —
+  // aunque alguien se saltara el guard del repo, no hay forma de tocar flow con esta sentencia.
+  updateCategory: `UPDATE categories SET name=?, need_type=?, parent_id=?, updated_at=? WHERE id=?`,
+  setCategoryArchived: `UPDATE categories SET is_archived=?, updated_at=? WHERE id=?`,
+  updateCategoryOrder: `UPDATE categories SET display_order=?, updated_at=? WHERE id=?`,
+  // Hijas ACTIVAS de una categoría: archiveCategory las recorre para archivarlas en cascada (una
+  // SQL.setCategoryArchived por cada una, en el MISMO execMany que la de la propia raíz).
+  childrenOf: `SELECT id FROM categories WHERE parent_id=? AND deleted=0 AND is_archived=0`,
+  // ¿Tiene `id` alguna hija ACTIVA? Ya NO la usa el guard de updateCategory (ver hasChildren) —
+  // se conserva porque el label de cascada de archivar SÍ es active-only a propósito (archiveCategory
+  // solo archiva en cascada las hijas activas, ver childrenOf) y porque tests/app/categorias.test.mjs
+  // la ejerce directamente. Mismo patrón que hasActiveLinkedRefund (SELECT 1 ... LIMIT 1, solo
+  // interesa la existencia).
+  hasActiveChildren: `SELECT 1 FROM categories WHERE parent_id=? AND deleted=0 AND is_archived=0 LIMIT 1`,
+  // Item 3 (Important, review final): ¿tiene `id` alguna hija, ACTIVA o ARCHIVADA? Guard real de
+  // "máx 2 niveles" de updateCategory: hasActiveChildren (arriba) dejaba demotar una raíz cuya
+  // ÚNICA hija estaba archivada (activeChildren=0) — la hija archivada seguía apuntando, vía
+  // parent_id, a una categoría que dejaba de ser raíz, dejando un árbol de 3 niveles (huérfana en
+  // los hechos, aunque nunca se borra la fila). Sin filtro is_archived: cuenta cualquier hija.
+  hasChildren: `SELECT 1 FROM categories WHERE parent_id=? AND deleted=0 LIMIT 1`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"];

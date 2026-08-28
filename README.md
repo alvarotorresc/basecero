@@ -79,9 +79,10 @@ siguiente sección).
    y seleccionar `dist/BaseCero.xlsx`, eligiendo la opción
    **"Reemplazar hoja de cálculo"**.
 2. Abrir **Extensiones > Apps Script** y crear dos archivos de script:
-   `pure.gs` y `main.gs`, pegando en cada uno el contenido de
-   [`apps_script/pure.js`](apps_script/pure.js) y
-   [`apps_script/main.js`](apps_script/main.js) respectivamente. Guardar el
+   `pure.gs` y `main.gs`. En `pure.gs`, pegar el contenido de
+   `app/vendor/pure.js`; en `main.gs`, el antiguo `apps_script/main.js`,
+   retirado del repo en la PR de import genérico — se recupera del
+   historial con `git show 76bfdfb^:apps_script/main.js`. Guardar el
    proyecto.
 3. Configurar el activador (icono del reloj ⏰ del editor de Apps Script):
    **Añadir activador** → función `onEditInstalable`, evento "De hoja de
@@ -116,9 +117,8 @@ resuelve a partir de ellas los `*_id` ocultos correspondientes.
 - [ ] Una regla mensual en `recurring_rules` → aparece "⏳ pendiente" en
       Previsión; tras registrarla eligiendo su `_rule` → pasa a
       "✅ pagado".
-- [ ] Menú BaseCero > Importar CSV de N26… con
-      `apps_script/fixtures/n26_sample.csv` → 3 nuevas, 1 saltada; al
-      reimportar el mismo fichero → 0 nuevas, 4 saltadas.
+- [ ] Menú BaseCero > Importar CSV de N26… con un CSV de prueba → importa correctamente;
+      al reimportar el mismo fichero → 0 nuevas, N saltadas (ver historial de git para fixture de ejemplo; retirado en la PR E).
 - [ ] Un gasto manual de 45,20 € del 19-08 seguido del import del fixture →
       esa fila queda `reconciled` sin duplicarse.
 - [ ] Reclasificar el Bizum de Sara importado: `type=refund`, `ref_id` del

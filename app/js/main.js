@@ -1,6 +1,7 @@
 import { initDb } from "./db.js";
 import { getOpenPeriod, getMetaAll } from "./repo.js";
 import { initFormat } from "./format.js";
+import { initCategoryStyle, parseStyle } from "./category-colors.js";
 import { showOnboarding } from "./onboarding.js";
 import { renderInicio } from "./screens/inicio.js";
 import { renderRegistro } from "./screens/registro.js";
@@ -49,6 +50,7 @@ async function boot() {
     try {
       const meta = await getMetaAll();
       initFormat(meta);
+      initCategoryStyle(parseStyle(meta.category_style));
       document.documentElement.lang = (meta.locale || "es-ES").split("-")[0];
     } catch {} // si meta no se puede leer, la app arranca con es-ES/EUR
     if (!(await getOpenPeriod())) await showOnboarding(screen);

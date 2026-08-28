@@ -62,5 +62,5 @@ test("categorías hoja de gasto para los chips (sin raíces con hijas, sin incom
   const rows = d.prepare(SQL.listExpenseLeafCategories).all();
   const names = rows.map((r) => r.name);
   assert.ok(names.includes("Supermercado") && names.includes("Ropa y cuidado personal"));
-  assert.ok(!names.includes("Casa") && !names.includes("Nómina"));
+  assert.ok(!names.includes("Casa") && !names.includes("Ingresos"));
 });

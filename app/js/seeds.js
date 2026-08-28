@@ -38,7 +38,7 @@ export const SEED_CATEGORIES = [
   ["cat-regalos", "Regalos y donaciones", "", "expense", "want", 100],
   ["cat-impuestos", "Impuestos y tasas", "", "expense", "need", 110],
   ["cat-otros", "Otros gastos", "", "expense", "want", 120],
-  ["cat-nomina", "Nómina", "", "income", "", 910],
+  ["cat-nomina", "Ingresos", "", "income", "", 910],
   ["cat-puntuales", "Ingresos puntuales", "", "income", "", 920],
   ["cat-intereses", "Intereses de ahorro", "", "income", "", 930],
 ];

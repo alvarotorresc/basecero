@@ -68,6 +68,13 @@ export function validateImport(data) {
   // check, una fila con PK vacía se cuela en el Set de ids de abajo indistinguible de "sin FK", y
   // una PK duplicada sobrescribe en silencio la fila anterior al hacer replaceAll — el bug real
   // que motivó este hallazgo era justo eso (dos {key:"",value:""}).
+  //
+  // Item 2 (Important, review final): charset cerrado del id/key — sin este check, un id/key con
+  // comillas o "<" (payload de XSS) sobrevive el import y acaba, sin escapar, en algún atributo
+  // HTML de una pantalla (categorias.js, movimientos, etc). [A-Za-z0-9_-]{1,64} cubre los 3 formatos
+  // reales que usa la app: seeds kebab-case (cat-casa-alquiler), ULIDs Crockford (bcUlid, 26 chars
+  // en 0-9A-Z) y claves de meta con underscore (category_style, import_account_id...).
+  const ID_CHARS_RE = /^[A-Za-z0-9_-]{1,64}$/;
   for (const table of Object.keys(CONTRACT)) {
     const pkCol = table === "meta" ? "key" : "id";
     const seen = new Set();
@@ -76,6 +83,7 @@ export function validateImport(data) {
       if (pk === "" || pk == null) { errs.push(`pestaña «${table}» fila ${i + 2}: id vacío`); return; }
       if (seen.has(pk)) errs.push(`pestaña «${table}» fila ${i + 2}: id duplicado («${pk}»)`);
       else seen.add(pk);
+      if (!ID_CHARS_RE.test(String(pk))) errs.push(`pestaña «${table}» fila ${i + 2}: id con caracteres no válidos («${pk}»)`);
     });
   }
 

@@ -108,10 +108,24 @@ test("validate: PK vacía", () => {
   const d = parse((x) => { x.accounts[0].id = ""; });
   assert.match(validateImport(d)[0], /pestaña «accounts» fila 2: id vacío/);
 });
+// Item 2 (Important, review final): un id con caracteres fuera de [A-Za-z0-9_-] (payload de XSS
+// tipo atributo roto, o cualquier otro basura) se rechaza — cubre tanto la key de meta como el id
+// de una tabla de datos. El fixture normal (seeds kebab-case, ULIDs Crockford, keys de meta con
+// underscore) NO debe disparar este check en el resto de la suite: control de "no demasiado estricto".
+test("validate: id con caracteres no válidos se rechaza — en meta.key y en categories.id", () => {
+  const d = parse((x) => {
+    x.meta.push({ key: 'x" onfocus="a', value: "1" });
+    const alquiler = x.categories.find((c) => c.id === "cat-casa-alquiler");
+    alquiler.id = "cat-casa-alquiler<script>";
+  });
+  const errs = validateImport(d).join("\n");
+  assert.match(errs, /pestaña «meta».*id con caracteres no válidos \(«x" onfocus="a»\)/);
+  assert.match(errs, /pestaña «categories».*id con caracteres no válidos \(«cat-casa-alquiler<script>»\)/);
+});
 test("validate: PK duplicada (dentro de la misma pestaña, meta usa key)", () => {
   const d = parse((x) => { x.meta.push({ key: "schema_version", value: "1" }); });
-  // el duplicado se reporta en la fila de la SEGUNDA aparición (fila 9: las 7 semillas + esta)
-  assert.match(validateImport(d).join("\n"), /pestaña «meta» fila 9: id duplicado \(«schema_version»\)/);
+  // el duplicado se reporta en la fila de la SEGUNDA aparición (fila 11: las 9 semillas + esta)
+  assert.match(validateImport(d).join("\n"), /pestaña «meta» fila 11: id duplicado \(«schema_version»\)/);
 });
 test("validate: dos periodos open", () => {
   const d = parse((x) => { x.periods.push({ ...x.periods[0], id: "per-2", name: "Otro" }); });
