@@ -194,7 +194,7 @@ export async function renderRecurrentes(container, onBack) {
     container.innerHTML = `
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
         <button type="button" class="icon-btn" id="rec-back" aria-label="${t("common.goBack")}"
-          style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>
+          style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
         <h1 style="flex:1; font-size:20px; font-weight:700; letter-spacing:-0.015em;">${t("recurrentes.title")}</h1>
         <button type="button" id="rec-new"
           style="height:44px;padding:0 18px;border-radius:999px;background:var(--text);color:var(--bg);border:0;
@@ -233,7 +233,7 @@ export async function renderRecurrentes(container, onBack) {
     container.innerHTML = `
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
         <button type="button" class="icon-btn" id="rec-form-back" aria-label="${t("common.goBack")}"
-          style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>
+          style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
         <h1 style="flex:1; font-size:20px; font-weight:700; letter-spacing:-0.015em;">${state.editId ? t("recurrentes.form.title.edit") : t("recurrentes.form.title.new")}</h1>
         <span style="width:44px;"></span>
       </div>

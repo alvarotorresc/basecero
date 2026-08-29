@@ -368,7 +368,7 @@ export async function renderPatrimonio(container) {
 
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="acc-back" aria-label="${t("common.goBack")}">←</button>
+        <button type="button" class="icon-btn" id="acc-back" aria-label="${t("common.goBack")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
         <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${editing ? t("patrimonio.account.title.edit") : t("patrimonio.accounts.new")}</h1>
         <span style="width:36px;"></span>
       </div>
@@ -595,7 +595,7 @@ export async function renderPatrimonio(container) {
 
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="goal-back" aria-label="${t("common.goBack")}">←</button>
+        <button type="button" class="icon-btn" id="goal-back" aria-label="${t("common.goBack")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
         <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${editing ? t("patrimonio.goal.title.edit") : t("patrimonio.goals.new")}</h1>
         <span style="width:36px;"></span>
       </div>

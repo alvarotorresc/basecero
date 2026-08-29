@@ -128,7 +128,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
     return `
     <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
       ${mode === "next" || onBack ? `<button type="button" class="icon-btn" id="pn-back" aria-label="${t("common.goBack")}"
-        style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>` : ""}
+        style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>` : ""}
       <div style="display:flex; flex-direction:column; gap:4px;">
         <div class="day-label" style="color:var(--green);">${kicker}</div>
         <div style="font-size:24px; font-weight:800; letter-spacing:-0.02em;">${t("periodo.header.title")}</div>
