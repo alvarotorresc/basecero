@@ -30,14 +30,26 @@ export const BOOL_COLS = {
 export const NULLABLE_NUM = new Set(["share_pct_override","due_day","due_month","target_amount_cents","target_months","target_pct"]);
 
 // optional=true → '' permitido (FK vacía). ref_id/rule_id/parent_id/counter_account_id son opcionales por contrato.
+//
+// allowDeletedRef=true → xlsx.js NO exige que esta FK, en una fila viva, apunte a un referente
+// vivo. Hoy (pre-Task 6 del PR de seguridad) el repo permite estados alcanzables por USO NORMAL
+// donde una fila viva queda apuntando a una borrada:
+//  - transactions.ref_id: softDeleteTransaction borra el gasto original sin comprobar si tiene un
+//    refund activo enlazado (el propio hallazgo M5/Task 6: "borrar el gasto liquidado deja el
+//    reembolso huérfano") — el refund (vivo) se queda con ref_id → gasto (borrado).
+//  - transactions.rule_id: softDeleteRule no hace cascada; las transacciones ya generadas por esa
+//    regla (rule_id) siguen vivas y la regla puede borrarse después sin problema.
+// Sin este flag, exportar y reimportar una BD real que ya esté en uno de estos estados (ambos
+// alcanzables sin ningún import de por medio) se rechazaría — el import es un guarda de INTEGRIDAD
+// ESTRUCTURAL del archivo, no debe bloquear datos que el propio repo ya permite crear.
 export const FKS = [
   { table: "categories", col: "parent_id", ref: "categories", optional: true },
   { table: "transactions", col: "period_id", ref: "periods", optional: false },
   { table: "transactions", col: "account_id", ref: "accounts", optional: false },
   { table: "transactions", col: "counter_account_id", ref: "accounts", optional: true },
   { table: "transactions", col: "category_id", ref: "categories", optional: true },
-  { table: "transactions", col: "ref_id", ref: "transactions", optional: true },
-  { table: "transactions", col: "rule_id", ref: "recurring_rules", optional: true },
+  { table: "transactions", col: "ref_id", ref: "transactions", optional: true, allowDeletedRef: true },
+  { table: "transactions", col: "rule_id", ref: "recurring_rules", optional: true, allowDeletedRef: true },
   { table: "recurring_rules", col: "category_id", ref: "categories", optional: true },
   { table: "recurring_rules", col: "account_id", ref: "accounts", optional: false },
   { table: "recurring_rules", col: "counter_account_id", ref: "accounts", optional: true },

@@ -685,6 +685,13 @@ export const EN = {
       fkMissing: "sheet “{table}” row {row}: {col} points to “{value}”, which doesn’t exist in {ref}",
       multipleOpen: "periods: {n} open periods (maximum 1)",
       amountNotPositive: "sheet “transactions” row {row}: amount must be > 0",
+      parentSelf: "sheet “categories” row {row}: parent_id can’t point to itself",
+      parentNotRoot: "sheet “categories” row {row}: parent_id must point to a root category (with empty parent_id)",
+      parentFlow: "sheet “categories” row {row}: flow doesn’t match its parent category’s flow",
+      dateFormat: "sheet “{table}” row {row}: {col} is not a valid ISO date (“{value}”)",
+      periodEndMismatch: "sheet “periods” row {row}: end_date must be empty when status is open, and set when closed",
+      periodOrder: "sheet “periods” row {row}: start_date is after end_date",
+      fkDeleted: "sheet “{table}” row {row}: {col} points to “{value}”, which is deleted in {ref}",
     },
     csvGeneric: {
       invalidHeaders: "invalid headers",

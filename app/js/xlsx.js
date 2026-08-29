@@ -24,6 +24,17 @@ export function rowsToWorkbook(X, dump) {
 
 const DATE_COLS = new Set(["date", "start_date", "end_date", "target_date"]);
 
+// Parseo real de calendario (no solo forma): rechaza "2026-13-40", "2026-02-30", etc. — un
+// regex de forma por sí solo deja pasar meses/días fuera de rango.
+function isValidIsoDate(v) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (!m) return false;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return false;
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d;
+}
+
 export function workbookToRows(X, wb) {
   const data = {}, errors = [];
   for (const table of Object.keys(CONTRACT)) {
@@ -88,9 +99,13 @@ export function validateImport(data) {
     });
   }
 
-  const ids = {};   // tabla → Set de ids (para FKs)
-  for (const tbl of Object.keys(CONTRACT))
-    ids[tbl] = new Set((data[tbl] ?? []).map((r) => r.id ?? r.key));
+  const ids = {};       // tabla → Set de ids (para FKs, incluye soft-deleted)
+  const liveIds = {};   // tabla → Set de ids de filas NO borradas (deleted !== 1)
+  for (const tbl of Object.keys(CONTRACT)) {
+    const rows = data[tbl] ?? [];
+    ids[tbl] = new Set(rows.map((r) => r.id ?? r.key));
+    liveIds[tbl] = new Set(rows.filter((r) => r.deleted !== 1).map((r) => r.id ?? r.key));
+  }
 
   for (const [table, spec] of Object.entries(ENUMS))
     (data[table] ?? []).forEach((row, i) => {
@@ -99,15 +114,60 @@ export function validateImport(data) {
           errs.push(t("errors.xlsx.enumInvalid", { table, row: i + 2, col, value: row[col] }));
     });
 
+  // FKs: existencia (fkMissing, ya existía) + integridad viva (fkDeleted, nuevo) — una fila NO
+  // borrada no puede referenciar, vía FK, una fila que SÍ está borrada. Una fila borrada puede
+  // seguir apuntando a otra borrada sin problema (soft-delete en cascada de una exportación real).
+  // FKS.allowDeletedRef exime a ref_id/rule_id de este check vivo→vivo (ver comentario en
+  // contract.js): son estados que el repo YA permite crear en uso normal, pre-Task 6.
   for (const fk of FKS)
     (data[fk.table] ?? []).forEach((row, i) => {
       const v = row[fk.col];
       if (v === "" || v == null) { if (!fk.optional) errs.push(t("errors.xlsx.fkEmpty", { table: fk.table, row: i + 2, col: fk.col })); return; }
-      if (!ids[fk.ref].has(v)) errs.push(t("errors.xlsx.fkMissing", { table: fk.table, row: i + 2, col: fk.col, value: v, ref: fk.ref }));
+      if (!ids[fk.ref].has(v)) { errs.push(t("errors.xlsx.fkMissing", { table: fk.table, row: i + 2, col: fk.col, value: v, ref: fk.ref })); return; }
+      if (!fk.allowDeletedRef && row.deleted !== 1 && !liveIds[fk.ref].has(v))
+        errs.push(t("errors.xlsx.fkDeleted", { table: fk.table, row: i + 2, col: fk.col, value: v, ref: fk.ref }));
     });
+
+  // Árbol de categorías: replica assertValidParent (repo.js) — sin padre, o padre RAÍZ del
+  // MISMO flow. Con esto un ciclo o un árbol de más de 2 niveles es estructuralmente imposible:
+  // si el padre referenciado no es raíz, es error, así que nunca puede haber un "nieto".
+  const catById = Object.fromEntries((data.categories ?? []).map((r) => [r.id, r]));
+  (data.categories ?? []).forEach((row, i) => {
+    if (row.parent_id === "") return;
+    if (row.parent_id === row.id) { errs.push(t("errors.xlsx.parentSelf", { row: i + 2 })); return; }
+    const parent = catById[row.parent_id];
+    if (!parent) return; // ya reportado arriba como fkMissing
+    if (parent.parent_id !== "") errs.push(t("errors.xlsx.parentNotRoot", { row: i + 2 }));
+    if (parent.flow !== row.flow) errs.push(t("errors.xlsx.parentFlow", { row: i + 2 }));
+  });
+
+  // Fechas: toda columna DATE_COLS con valor no vacío debe ser una fecha ISO real (forma +
+  // calendario) — no solo dígitos con guiones ("2026-13-40" tiene la forma pero no es fecha).
+  for (const table of Object.keys(CONTRACT)) {
+    const dateCols = CONTRACT[table].cols.filter((c) => DATE_COLS.has(c));
+    if (!dateCols.length) continue;
+    (data[table] ?? []).forEach((row, i) => {
+      for (const col of dateCols) {
+        const v = row[col];
+        if (v === "" || v == null) continue;
+        if (!isValidIsoDate(String(v)))
+          errs.push(t("errors.xlsx.dateFormat", { table, row: i + 2, col, value: v }));
+      }
+    });
+  }
 
   const open = (data.periods ?? []).filter((p) => p.status === "open" && p.deleted !== 1);
   if (open.length > 1) errs.push(t("errors.xlsx.multipleOpen", { n: open.length }));
+
+  // Invariante open/closed: end_date vacío ⟺ status open; en closed, start_date <= end_date.
+  (data.periods ?? []).forEach((row, i) => {
+    if (row.status === "open") {
+      if (row.end_date !== "") errs.push(t("errors.xlsx.periodEndMismatch", { row: i + 2 }));
+    } else if (row.status === "closed") {
+      if (row.end_date === "") errs.push(t("errors.xlsx.periodEndMismatch", { row: i + 2 }));
+      else if (row.start_date > row.end_date) errs.push(t("errors.xlsx.periodOrder", { row: i + 2 }));
+    }
+  });
 
   (data.transactions ?? []).forEach((row, i) => {
     if (row.type !== "adjustment" && !(row.amount_cents > 0))

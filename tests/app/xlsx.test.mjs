@@ -143,6 +143,115 @@ test("validate: importe no positivo salvo adjustment", () => {
   assert.deepEqual(validateImport(d), []);
 });
 
+// Fila base de transacción válida (contra la semilla) — reutilizada por varios tests de esta
+// familia; cada test solo toca el campo bajo prueba.
+const txBase = { id: "tx-x", date: "2026-08-01", period_id: "per-1", type: "expense", amount_cents: 100,
+  account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler", merchant: "", note: "",
+  is_shared: 0, share_pct_override: null, settled: 0, ref_id: "", rule_id: "", external_id: "",
+  status: "pending", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 0 };
+
+test("validate: categoría con parent_id === id → error", () => {
+  const d = parse((x) => {
+    const c = x.categories.find((c) => c.id === "cat-casa-alquiler");
+    c.parent_id = c.id;
+  });
+  assert.deepEqual(validateImport(d), ["pestaña «categories» fila 3: parent_id no puede apuntar a sí misma"]);
+});
+
+test("validate: árbol de categorías de 3 niveles (nieto→hijo→raíz) → error", () => {
+  const d = parse((x) => {
+    const hijo = x.categories.find((c) => c.id === "cat-casa-alquiler");
+    x.categories.push({ ...hijo, id: "cat-nieto", name: "Nieto", parent_id: "cat-casa-alquiler" });
+  });
+  assert.deepEqual(validateImport(d),
+    ["pestaña «categories» fila 5: parent_id debe apuntar a una categoría raíz (con parent_id vacío)"]);
+});
+
+test("validate: categoría hija con flow distinto al del padre → error", () => {
+  const d = parse((x) => {
+    const raiz = x.categories.find((c) => c.id === "cat-nomina"); // raíz income
+    x.categories.push({ ...raiz, id: "cat-flow-bad", name: "Flow malo", parent_id: "cat-casa" }); // padre cat-casa es expense
+  });
+  assert.deepEqual(validateImport(d), ["pestaña «categories» fila 5: flow no coincide con el de su categoría padre"]);
+});
+
+test("validate: fecha no-ISO en columna de fecha no vacía → error", () => {
+  const d = parse((x) => {
+    x.transactions.push({ ...txBase, id: "tx-d1", date: "9999-99-99" });
+    x.transactions.push({ ...txBase, id: "tx-d2", date: "not-a-date" });
+    x.transactions.push({ ...txBase, id: "tx-d3", date: "2026-13-40" });
+  });
+  assert.deepEqual(validateImport(d), [
+    "pestaña «transactions» fila 2: date no es una fecha ISO válida («9999-99-99»)",
+    "pestaña «transactions» fila 3: date no es una fecha ISO válida («not-a-date»)",
+    "pestaña «transactions» fila 4: date no es una fecha ISO válida («2026-13-40»)",
+  ]);
+});
+
+test("validate: periodo closed con end_date vacío → error", () => {
+  const d = parse((x) => { x.periods[0].status = "closed"; });
+  assert.deepEqual(validateImport(d),
+    ["pestaña «periods» fila 2: end_date debe estar vacío si status es open, y con valor si es closed"]);
+});
+
+test("validate: periodo open con end_date no vacío → error", () => {
+  const d = parse((x) => { x.periods[0].end_date = "2026-08-31"; });
+  assert.deepEqual(validateImport(d),
+    ["pestaña «periods» fila 2: end_date debe estar vacío si status es open, y con valor si es closed"]);
+});
+
+test("validate: start_date posterior a end_date en periodo closed → error", () => {
+  const d = parse((x) => { x.periods[0].status = "closed"; x.periods[0].end_date = "2026-01-01"; });
+  assert.deepEqual(validateImport(d), ["pestaña «periods» fila 2: start_date es posterior a end_date"]);
+});
+
+test("validate: transacción viva con period_id a un periodo deleted=1 → error", () => {
+  const d = parse((x) => {
+    x.periods.push({ ...x.periods[0], id: "per-deleted", status: "closed", end_date: "2026-07-31", deleted: 1 });
+    x.transactions.push({ ...txBase, id: "tx-live-deleted-period", period_id: "per-deleted" });
+  });
+  assert.deepEqual(validateImport(d),
+    ["pestaña «transactions» fila 2: period_id apunta a «per-deleted» que está borrado en periods"]);
+});
+
+// CRÍTICO (contrato de este check): una exportación real puede tener soft-deletes encadenados —
+// una fila BORRADA referenciando, vía FK, a otra fila también borrada — sin que eso sea un error.
+// Solo VIVO→borrado es el error (fkDeleted). Prueba con una FK sin excepción (account_id, sin
+// allowDeletedRef) para fijar la regla general, no el caso especial de abajo.
+test("validate: fila borrada referenciando (FK) otra fila borrada no es error", () => {
+  const d = parse((x) => {
+    x.accounts.push({ ...x.accounts[0], id: "acc-dead", deleted: 1 });
+    x.transactions.push({ ...txBase, id: "tx-dead", account_id: "acc-dead", deleted: 1 });
+  });
+  assert.deepEqual(validateImport(d), []);
+});
+
+// Excepción documentada en contract.js (FKS[].allowDeletedRef): softDeleteTransaction (repo.js)
+// no comprueba, pre-Task 6, si el gasto que borra tiene un refund ACTIVO enlazado por ref_id — deja
+// un refund VIVO apuntando a un gasto BORRADO. Es un estado alcanzable por uso normal HOY (borrar
+// el gasto original de un reparto ya liquidado), así que el import no debe rechazar una BD real que
+// ya esté en ese estado.
+test("validate: refund vivo con ref_id a un gasto borrado no es error (allowDeletedRef, bug pre-Task 6)", () => {
+  const d = parse((x) => {
+    x.transactions.push({ ...txBase, id: "tx-gasto-borrado", settled: 1, deleted: 1 });
+    x.transactions.push({ ...txBase, id: "tx-refund-huerfano", type: "refund", category_id: "", ref_id: "tx-gasto-borrado" });
+  });
+  assert.deepEqual(validateImport(d), []);
+});
+
+// Misma excepción para rule_id: softDeleteRule (repo.js) no hace cascada — las transacciones ya
+// generadas por una regla (rule_id) siguen vivas cuando la regla se borra después.
+test("validate: transacción viva con rule_id a una regla borrada no es error (allowDeletedRef)", () => {
+  const d = parse((x) => {
+    x.recurring_rules.push({ id: "rr-borrada", name: "Vieja", type: "expense", amount_cents: 1000,
+      category_id: "cat-casa-alquiler", account_id: "acc-n26", counter_account_id: "", frequency: "monthly",
+      due_day: 1, due_month: null, is_shared: 0, is_active: 0,
+      created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 1 });
+    x.transactions.push({ ...txBase, id: "tx-de-regla-borrada", rule_id: "rr-borrada" });
+  });
+  assert.deepEqual(validateImport(d), []);
+});
+
 test("import: nullable numeric columns round-trip como null", () => {
   const T = "2026-08-01T00:00:00Z";
   const db = openDb(); seedMinimal(db);

@@ -688,6 +688,13 @@ export const ES = {
       fkMissing: "pestaña «{table}» fila {row}: {col} apunta a «{value}» que no existe en {ref}",
       multipleOpen: "periods: hay {n} periodos open (máximo 1)",
       amountNotPositive: "pestaña «transactions» fila {row}: amount debe ser > 0",
+      parentSelf: "pestaña «categories» fila {row}: parent_id no puede apuntar a sí misma",
+      parentNotRoot: "pestaña «categories» fila {row}: parent_id debe apuntar a una categoría raíz (con parent_id vacío)",
+      parentFlow: "pestaña «categories» fila {row}: flow no coincide con el de su categoría padre",
+      dateFormat: "pestaña «{table}» fila {row}: {col} no es una fecha ISO válida («{value}»)",
+      periodEndMismatch: "pestaña «periods» fila {row}: end_date debe estar vacío si status es open, y con valor si es closed",
+      periodOrder: "pestaña «periods» fila {row}: start_date es posterior a end_date",
+      fkDeleted: "pestaña «{table}» fila {row}: {col} apunta a «{value}» que está borrado en {ref}",
     },
     csvGeneric: {
       invalidHeaders: "cabeceras inválidas",
