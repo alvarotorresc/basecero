@@ -29,6 +29,9 @@ export const ES = {
     note: "Nota",
     optional: "Opcional",
     today: "Hoy",
+    // H1 de la pantalla Movimientos (y section-title del bloque de movimientos en Inicio) —
+    // hoy mismo texto que main.tabs.movimientos (la etiqueta de la pestaña), pero es una clave
+    // deliberadamente separada: no fusionar ni dejar que diverjan sin querer en el futuro.
     movements: "Movimientos",
     settle: "Liquidar",
     type: {

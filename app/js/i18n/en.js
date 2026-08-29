@@ -29,6 +29,9 @@ export const EN = {
     note: "Note",
     optional: "Optional",
     today: "Today",
+    // H1 de la pantalla Movimientos (y section-title del bloque de movimientos en Inicio) —
+    // hoy mismo texto que main.tabs.movimientos (la etiqueta de la pestaña), pero es una clave
+    // deliberadamente separada: no fusionar ni dejar que diverjan sin querer en el futuro.
     movements: "Transactions",
     settle: "Settle up",
     type: {
@@ -87,7 +90,7 @@ export const EN = {
       title: "Spending by category",
       subtitle: "Only your share of shared expenses",
       empty: "No categorized spending yet this period.",
-      others: "Other {n}",
+      others: "{n} others",
       spent: "{currency} spent",
       of: "of {limit}",
       noLimit: "no limit",
@@ -97,8 +100,8 @@ export const EN = {
       periodSplit: "This period: {mine} / {theirs}",
       pendingLabel: "Pending for them to pay back",
       oldest: {
-        one: "{n} expense unsettled · oldest from {date}",
-        other: "{n} expenses unsettled · oldest from {date}",
+        one: "{n} unsettled expense · oldest from {date}",
+        other: "{n} unsettled expenses · oldest from {date}",
       },
     },
     partnerBanner: {
@@ -125,7 +128,7 @@ export const EN = {
   },
   registro: {
     error: { load: "Couldn’t load the entry screen: {error}" },
-    title: "Log entry",
+    title: "Log transaction",
     close: "Close",
     type: { transfer: "Transfer" },
     save: {
@@ -141,7 +144,7 @@ export const EN = {
       empty: "No recent expenses.",
       sharedSuffix: " · shared",
     },
-    keypad: { delete: "Delete" },
+    keypad: { delete: "Backspace" },
   },
   movimientos: {
     error: {
@@ -150,7 +153,7 @@ export const EN = {
       loadPeriod: "Couldn’t load the period: {error}",
       delete: "Couldn’t delete: {error}",
     },
-    noPeriods: "There’s no period yet.",
+    noPeriods: "No periods yet.",
     periodLabel: "Period",
     uncategorized: "Uncategorized",
     tapToCategorize: "tap to categorize",
@@ -195,7 +198,7 @@ export const EN = {
     },
     empty: "This period has no category with a limit.",
     total: {
-      title: "Spent of budgeted",
+      title: "Spent of budget",
       ofBudgeted: "of {amount} budgeted",
       remaining: {
         one: "You have {amount} left in the {n} category with a limit",
