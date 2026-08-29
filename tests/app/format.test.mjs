@@ -76,6 +76,20 @@ test("parseCentsRaw: separador de miles ya no rompe el importe", () => {
   assert.equal(parseCentsRaw("12.5"), 1250);          // punto suelto sin coma = decimal tecleado
 });
 
+// B4: formato en-US (coma de millar, punto decimal) — antes de este fix, cualquier coma
+// disparaba la rama "coma = decimal" y se comía el punto real como si fuera de millar
+// («1,250.50» → 1,25 €, error ×1000 silencioso). Regla: cuando aparecen los DOS separadores,
+// gana el que va último (es el decimal); con uno solo, el comportamiento de arriba no cambia.
+test("parseCentsRaw: gana el último separador con coma Y punto a la vez (en-US)", () => {
+  assert.equal(parseCentsRaw("1,250.50"), 125050);    // en-US: coma millar, punto decimal
+  assert.equal(parseCentsRaw("1.250,50"), 125050);    // es-ES: punto millar, coma decimal (ya cubierto arriba)
+  assert.equal(parseCentsRaw("12.5"), 1250);          // un solo separador: sin cambios
+  // Un solo separador (coma) sigue siendo SIEMPRE decimal, sin importar cuántos dígitos la
+  // sigan — "gana el último" es un desempate entre coma y punto, no una reinterpretación de
+  // un separador solitario. "1,234" → 1,234 € (no 1.234 €).
+  assert.equal(parseCentsRaw("1,234"), 123);
+});
+
 test("centsToRaw: inverso para precargar inputs", () => {
   assert.equal(centsToRaw(125050), "1250,50");
   assert.equal(centsToRaw(-30000), "300,00");

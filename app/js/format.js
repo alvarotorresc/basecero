@@ -86,10 +86,18 @@ export const fmtDiaLargo = (iso) =>
 // suelto sin coma se trata como decimal tecleado («12.5» → 12,50 €). NaN/vacío → 0
 // (contrato de los 6 llamantes); el signo del texto se respeta y el flip (pasivos,
 // ajustes) queda SIEMPRE en el llamante.
+// B4: cuando aparecen coma Y punto a la vez (pegar un importe en-US como «1,250.50», locale que
+// la propia app ofrece), gana el separador que va ÚLTIMO — es el decimal, el otro es de millar.
+// Es un desempate, no una reescritura: con un solo tipo de separador el comportamiento de
+// arriba no cambia ni un bit (verificado contra las 9 assertions previas de format.test.mjs).
 export function parseCentsRaw(raw) {
   let s = String(raw ?? "").trim();
   if (!s) return 0;
-  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  if (s.includes(",") && s.includes(".")) {
+    s = s.lastIndexOf(",") > s.lastIndexOf(".")
+      ? s.replace(/\./g, "").replace(",", ".")
+      : s.replace(/,/g, "");
+  } else if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
   else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
   return Math.round(parseFloat(s) * 100) || 0;
 }
