@@ -30,7 +30,7 @@ const moneyPartsHtml = (cents) => {
 
 /** Tarjeta "Patrimonio neto": importe héroe (.amount-hero, 34/700) + badge de variación ABSOLUTA
  *  vs el último periodo CERRADO + evolución en barras (netWorthBarsHtml, charts.js) — réplica de
- *  design/Patrimonio.dc.html:32-59. La variación es el propio penúltimo vs último punto de
+ *  docs/design/material-expresivo/Patrimonio.dc.html:32-59. La variación es el propio penúltimo vs último punto de
  *  `series` (el último es siempre "hoy"; el penúltimo, si existe, es el del último cerrado —
  *  mismos puntos que ya trae netWorthSeries, sin repetir la query, y que pinta netWorthBarsHtml).
  *  Sin ningún cerrado (series.length<2) no hay nada con qué comparar: se ocultan el badge y la
@@ -78,7 +78,7 @@ function netWorthCardHtml(netWorthCents, series) {
 
 // ---- tarjeta "Cuentas" -----------------------------------------------------
 
-// Trazos de los iconos SVG de design/Patrimonio.dc.html:71-118 (uno por tipo de cuenta, no por
+// Trazos de los iconos SVG de docs/design/material-expresivo/Patrimonio.dc.html:71-118 (uno por tipo de cuenta, no por
 // cuenta concreta: aquí solo hay 3 tipos). El color entra como --cat en .list-row-icon (mismo
 // mecanismo de tinte que .tx-icon con las categorías, ver app.css). Paleta propia de tipo de
 // cuenta, independiente de category-colors.js (checking/liability no están en la lista de hex
@@ -127,7 +127,7 @@ function cuentaRowHtml(a, isDefault) {
 }
 
 /** Tarjeta "Cuentas": una fila por cuenta activa (balancesAt ya excluye archivadas/borradas),
- *  separadas por <hr class="divider"> — réplica de design/Patrimonio.dc.html:61-121, + botón
+ *  separadas por <hr class="divider"> — réplica de docs/design/material-expresivo/Patrimonio.dc.html:61-121, + botón
  *  "Nueva cuenta" en la cabecera. Cada fila abre la subvista de edición (Task 14). El lado derecho
  *  es a dos líneas (saldo + "hoy", como el artboard) para las 3 cuentas: "hoy" es el único
  *  subtítulo que aplica siempre y sin inventar nada (balancesAt se pide con hoyISO()) — el
@@ -200,7 +200,7 @@ function fmtGoalAmount(goal, cents) {
 
 /** Fila de un goal SIN hucha (spending_cap/savings_rate): título + "actual / objetivo", barra
  *  .bar de 8px, subtítulo contextual a la izquierda + % en negrita a la derecha — réplica de
- *  design/Patrimonio.dc.html:104-112 (fila "Tope de Restauración"). El color (verde/ámbar/rojo)
+ *  docs/design/material-expresivo/Patrimonio.dc.html:104-112 (fila "Tope de Restauración"). El color (verde/ámbar/rojo)
  *  sigue el `level` de repo.goalProgress: solo se colorea texto (número grande, subtítulo, %)
  *  cuando level≠'ok' — en 'ok' se queda en los tonos neutros del resto de la pantalla, la barra
  *  es la única que lleva siempre su color de estado. La fila entera es un botón (Task 14): abre
@@ -234,7 +234,7 @@ function goalBarRowHtml(g) {
  *  (el artboard usa 52px, más grande que el .ring base de 46px — override inline por instancia,
  *  ver app.css#.ring) con el % en el centro, nombre + subtítulo real de repo.goalProgress a la
  *  derecha (con el progreso en importes delante, mismo dato que goalBarRowHtml muestra en su fila
- *  de cabecera) — réplica de design/Patrimonio.dc.html:84-103. Color = paleta[i % 12] por el
+ *  de cabecera) — réplica de docs/design/material-expresivo/Patrimonio.dc.html:84-103. Color = paleta[i % 12] por el
  *  índice del goal en el orden de listado (determinista, sin persistir nada). Fila-botón, igual
  *  criterio que goalBarRowHtml. */
 function goalRingRowHtml(g, color) {
@@ -257,7 +257,7 @@ function goalRingRowHtml(g, color) {
 }
 
 /** Tarjeta "Objetivos": una fila por goal activo, anillo (hucha) o barra (sin hucha) según
- *  HUCHA_GOAL_TYPES — réplica de design/Patrimonio.dc.html:123-189, + botón "Nuevo objetivo" en
+ *  HUCHA_GOAL_TYPES — réplica de docs/design/material-expresivo/Patrimonio.dc.html:123-189, + botón "Nuevo objetivo" en
  *  la cabecera. Cada fila abre la subvista de edición (Task 14). */
 function objetivosCardHtml(goals) {
   const n = goals.length;

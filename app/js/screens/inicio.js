@@ -27,7 +27,7 @@ const moneyPartsHtml = (cents) => {
 };
 
 // Cuántas categorías raíz se listan individualmente en el donut antes de agrupar el resto en
-// "Otras N" — mismo criterio visual que design/Resumen.dc.html:139-213 (6 + "Otras 3").
+// "Otras N" — mismo criterio visual que docs/design/material-expresivo/Resumen.dc.html:139-213 (6 + "Otras 3").
 const DONUT_TOP_N = 6;
 // Mismo gris que DEFAULT_COLOR en category-colors.js — no se importa porque este módulo no
 // tiene ninguna categoría real que resolver a "sin color", solo el grupo "Otras N".
@@ -175,7 +175,7 @@ function previsionHtml(prevision, byId) {
 }
 
 /** Tarjeta "Flujo de gasto": barChartSvg de los últimos 7 días naturales (hoy incluido y
- *  marcado como activo) — réplica de design/Resumen.dc.html:67-107. days7 viene de
+ *  marcado como activo) — réplica de docs/design/material-expresivo/Resumen.dc.html:67-107. days7 viene de
  *  repo.spentLast7Days: 7 entradas {date, cents} ya rellenas con 0 en los días sin movimiento. */
 function flujoDeGastoHtml(days7) {
   const hoy = hoyISO();
@@ -195,7 +195,7 @@ function flujoDeGastoHtml(days7) {
  *  presupuesto.js#statusColor (ok -> color propio de la categoría, warn/over -> ámbar/rojo). No
  *  se reutiliza directamente porque presupuesto.js no la exporta (es de detalle interno de esa
  *  pantalla) — aquí además el texto NO se colorea en warn (solo la barra), a diferencia de
- *  Presupuesto: ver design/Resumen.dc.html:146 (Casa, warn, texto blanco) vs :189 (Transporte,
+ *  Presupuesto: ver docs/design/material-expresivo/Resumen.dc.html:146 (Casa, warn, texto blanco) vs :189 (Transporte,
  *  over, texto rojo). */
 function donutBarColor(level, catColor) {
   if (level === "warn") return "var(--amber)";
@@ -205,7 +205,7 @@ function donutBarColor(level, catColor) {
 
 /** Una fila de la lista de categorías del donut: punto de color + nombre + "X € de Y €" con
  *  mini-barra (categorías CON límite este periodo) o "X € sin límite" sin barra (el resto y el
- *  grupo "Otras N") — réplica de design/Resumen.dc.html:140-213. */
+ *  grupo "Otras N") — réplica de docs/design/material-expresivo/Resumen.dc.html:140-213. */
 function categoriaDonutRowHtml(name, color, spentCents, limitCents) {
   if (limitCents > 0) {
     const st = budgetStatus(spentCents, limitCents);
@@ -237,7 +237,7 @@ function categoriaDonutRowHtml(name, color, spentCents, limitCents) {
 }
 
 /** Tarjeta "Gasto por categoría": donut + lista de categorías raíz con gasto, agrupando las que
- *  sobran más allá de DONUT_TOP_N en "Otras N" — réplica de design/Resumen.dc.html:109-215.
+ *  sobran más allá de DONUT_TOP_N en "Otras N" — réplica de docs/design/material-expresivo/Resumen.dc.html:109-215.
  *
  *  El centro del donut muestra la SUMA DE LAS RAÍCES (= suma de los arcos), NO spentOfPeriod():
  *  un movimiento sin categorizar (category_id='') no cae bajo ninguna raíz (spentByRootCategory

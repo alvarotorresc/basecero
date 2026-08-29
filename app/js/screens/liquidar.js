@@ -30,7 +30,7 @@ const BTN_SETTLE_CONFIRM = "height:34px;padding:0 14px;border-radius:999px;backg
   + "-webkit-tap-highlight-color:transparent;white-space:nowrap;";
 
 /** Fila de gasto pendiente: .dotico + nombre + sub (fecha · importe original · % de la contraparte)
- *  — réplica de design/Liquidar.dc.html:38-57 (clase `.tx`, sin envoltorio de tarjeta propio: la
+ *  — réplica de docs/design/material-expresivo/Liquidar.dc.html:38-57 (clase `.tx`, sin envoltorio de tarjeta propio: la
  *  lista completa comparte una única `.card` con `<hr class="divider">` entre filas, mismo criterio
  *  que presupuesto.js/patrimonio.js#cuentasCardHtml).
  *
@@ -75,7 +75,7 @@ function rowHtml(r, byId, confirmId) {
  *  accountId en cada toque (ver wire() más abajo), así que el usuario necesita poder elegir cuenta
  *  antes de poder liquidar ninguna fila — el artboard es una foto fija sin ese flujo interactivo.
  *
- *  NO se replica la nota "Se crea una devolución enlazada..." de design/Liquidar.dc.html:68-71: es
+ *  NO se replica la nota "Se crea una devolución enlazada..." de docs/design/material-expresivo/Liquidar.dc.html:68-71: es
  *  copy nuevo, no hay ningún texto equivalente ya en esta pantalla (grep `devoluci|refund|enlazad`
  *  sobre app/js/screens/*.js y repo.js: solo comentarios internos, ningún string de UI) — brecha
  *  documentada, no fabricada (regla explícita del brief). */
