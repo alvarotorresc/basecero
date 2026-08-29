@@ -316,7 +316,7 @@ function disponibleCardHtml(budgets, spent, period, sharedTotal, partnerName) {
   const over = delta > 0;
   const badge = `<span class="num" style="font-size:11px;font-weight:700;border-radius:999px;padding:4px 10px;color:${over ? "var(--amber)" : "var(--green)"};background:${over ? "rgba(255,190,77,0.14)" : "rgba(79,217,154,0.14)"};">${over ? "▲" : "▼"} ${escHtml(fmtMoney(Math.abs(delta)))} ${over ? "sobre" : "bajo"} el ritmo del plan</span>`;
   const liquidar = partnerName && sharedTotal > 0
-    ? `<button type="button" id="disp-liquidar" class="num" style="height:44px;padding:0 18px;border-radius:999px;border:0;background:var(--card2);color:var(--text);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Liquidar · ${escHtml(fmtMoney(sharedTotal))}</button>`
+    ? `<button type="button" id="disp-liquidar" class="num" style="height:44px;padding:0 18px;border-radius:999px;border:0;background:var(--card2);color:var(--text);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">Liquidar · ${escHtml(fmtMoney(sharedTotal))}</button>`
     : "";
   return `
   <section class="card" style="margin-bottom:16px;">

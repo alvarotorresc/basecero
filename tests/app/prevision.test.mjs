@@ -199,6 +199,11 @@ test("dayIndexOfPeriod: 1-based y nunca menor que 1", () => {
   assert.equal(dayIndexOfPeriod("2026-08-27", "2026-08-20"), 1);
 });
 
+test("dayIndexOfPeriod: regresión DST primavera (última madrugada de marzo)", () => {
+  // Regresión: el periodo cruza el cambio de hora de primavera.
+  assert.equal(dayIndexOfPeriod("2026-03-15", "2026-03-30"), 16);
+});
+
 test("expectedPeriodDays: mes nominal con ajuste de fin de mes", () => {
   assert.equal(expectedPeriodDays("2026-08-27"), 31); // 27 ago → 27 sep
   assert.equal(expectedPeriodDays("2026-01-31"), 28); // 31 ene → 28 feb (2026 no bisiesto)
