@@ -14,6 +14,7 @@ import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 import { isEncryptedBackup, decryptBackup, WrongPassphraseError } from "../backup-crypto.js";
 import { workbookToRows, validateImport } from "../xlsx.js";
 import { t, LANGS, activeLang, initI18n } from "../i18n/index.js";
+import { loadXlsx } from "../xlsx-loader.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -409,8 +410,9 @@ export async function renderOnboarding(container, { onDone }) {
 
   async function parseAndOffer(imp, plainBuf) {
     try {
-      const wb = window.XLSX.read(plainBuf, { type: "array" });
-      const { data, errors: parseErrors } = workbookToRows(window.XLSX, wb);
+      const XLSX = await loadXlsx();
+      const wb = XLSX.read(plainBuf, { type: "array" });
+      const { data, errors: parseErrors } = workbookToRows(XLSX, wb);
       const errors = [...parseErrors, ...validateImport(data)];
       if (errors.length) { imp.errors = errors.slice(0, 5); render(); return; }
       imp.pending = data;

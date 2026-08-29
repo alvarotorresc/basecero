@@ -6,11 +6,27 @@ const ROOT_COLORS = {
   "cat-nomina": "#15AC7D", "cat-puntuales": "#15AC7D", "cat-intereses": "#15AC7D",
 };
 const DEFAULT_COLOR = "#9A99A6";
+// Contraste texto/tinte (Task 2 P2, WCAG 1.4.3 AA ≥4.5:1), verificado sobre las dos superficies
+// reales donde se usa TEXT_COLORS: en registro.js chipStyle el texto va sobre su propio tinte al
+// 18% (color-mix(in srgb, <color> 18%, transparent)) compuesto sobre --bg #121214; en
+// presupuesto.js categoryRowHtml el texto va sólido (sin tinte) sobre --card #1C1C21 igualmente
+// sólido, dando ≥5.33:1 para las 12 — la superficie exigente es el tinte sobre --bg. 5 de las 12
+// entradas fallaban 4.5:1 ahí con el hex original (aunque ya pasaban de sobra sobre --card
+// sólido); se subió su lightness en OKLCH manteniendo hue/chroma hasta despejar 4.5:1 con margen
+// sobre el tinte (script ad-hoc, no versionado — ver report de Task 2). Ratios sobre tinte 18% /
+// --bg, antes → después:
+//   cat-coche          #B2802A → #BB8934  (4.261 → 4.711)
+//   cat-ocio           #8A82D6 → #9088DD  (4.390 → 4.683)
+//   cat-suscripciones  #AB74C4 → #B37CCD  (4.250 → 4.650)
+//   cat-ropa           #CD6472 → #DA707D  (4.072 → 4.623)
+//   cat-regalos        #C4699F → #CF73A9  (4.185 → 4.678)
+// Las otras 7 (incl. restauracion, 4.676, el "casi" más próximo) ya pasaban 4.5:1 en esa misma
+// superficie y no se tocan.
 const TEXT_COLORS = {
   "cat-casa": "#6FA8F0", "cat-alimentacion": "#7FB554", "cat-restauracion": "#D97742",
-  "cat-transporte": "#3FB7DC", "cat-coche": "#B2802A", "cat-ocio": "#8A82D6",
-  "cat-salud": "#3FBDBD", "cat-suscripciones": "#AB74C4",
-  "cat-ropa": "#CD6472", "cat-regalos": "#C4699F", "cat-impuestos": "#BDB32A",
+  "cat-transporte": "#3FB7DC", "cat-coche": "#BB8934", "cat-ocio": "#9088DD",
+  "cat-salud": "#3FBDBD", "cat-suscripciones": "#B37CCD",
+  "cat-ropa": "#DA707D", "cat-regalos": "#CF73A9", "cat-impuestos": "#BDB32A",
   "cat-nomina": "#3DC299", "cat-puntuales": "#3DC299", "cat-intereses": "#3DC299",
 };
 export const CATEGORY_ICONS = {
@@ -35,10 +51,13 @@ export const POOL = [
   "#629D3B", "#6B61C2", "#A09600", "#9153AB", "#15AC7D", "#986603",
   "#12A7A7", "#B45018", "#00A1CB", "#AA4985", "#4F94E9", "#B64656",
 ];
+// Mismos 5 hexes aclarados que TEXT_COLORS (misma justificación arriba): POOL_TEXT es la fuente
+// para overrides de usuario y categorías hasheadas, así que debe llevar los mismos valores o esos
+// caminos volverían a renderizar el hex sin aclarar sobre el mismo tinte al 18%.
 const POOL_TEXT = {
-  "#629D3B": "#7FB554", "#6B61C2": "#8A82D6", "#A09600": "#BDB32A", "#9153AB": "#AB74C4",
-  "#15AC7D": "#3DC299", "#986603": "#B2802A", "#12A7A7": "#3FBDBD", "#B45018": "#D97742",
-  "#00A1CB": "#3FB7DC", "#AA4985": "#C4699F", "#4F94E9": "#6FA8F0", "#B64656": "#CD6472",
+  "#629D3B": "#7FB554", "#6B61C2": "#9088DD", "#A09600": "#BDB32A", "#9153AB": "#B37CCD",
+  "#15AC7D": "#3DC299", "#986603": "#BB8934", "#12A7A7": "#3FBDBD", "#B45018": "#D97742",
+  "#00A1CB": "#3FB7DC", "#AA4985": "#CF73A9", "#4F94E9": "#6FA8F0", "#B64656": "#DA707D",
 };
 // 8 iconos curados ofrecidos en el selector de icono de categoría (pantalla de edición).
 export const CURATED_ICONS = ["🐾", "🎓", "✈️", "👶", "💻", "🎮", "🌱", "📦"];

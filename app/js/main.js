@@ -23,7 +23,12 @@ export function nav(tab) {
   // Durante el asistente de Nuevo periodo (onboarding o cierre normal) el chrome está oculto
   // (ver app.css `body.onboarding`): ignora cualquier navegación mientras dure.
   if (document.body.classList.contains("onboarding")) return;
-  document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll(".tab").forEach((b) => {
+    const isActive = b.dataset.tab === tab;
+    b.classList.toggle("active", isActive);
+    if (isActive) b.setAttribute("aria-current", "page");
+    else b.removeAttribute("aria-current");
+  });
   RUTAS[tab]();
 }
 
@@ -33,6 +38,7 @@ export function nav(tab) {
 function relabelChrome() {
   document.querySelectorAll(".tab").forEach((b) => { b.lastChild.textContent = " " + t("main.tabs." + b.dataset.tab); });
   document.getElementById("btn-registro").setAttribute("aria-label", t("main.fab"));
+  document.querySelector(".tabbar").setAttribute("aria-label", t("main.tabsNav"));
 }
 
 async function boot() {

@@ -73,6 +73,7 @@ export const ES = {
       patrimonio: "Patrimonio",
       ajustes: "Ajustes",
     },
+    tabsNav: "Secciones",
     fab: "Registrar gasto",
   },
   inicio: {
@@ -506,6 +507,12 @@ export const ES = {
       title: "Copia de emergencia",
       body: "🔒 Tus datos viven solo en este dispositivo. Sin cuentas, sin nube.",
       exportBtn: "Exportar copia de seguridad (JSON)",
+    },
+    about: {
+      title: "Acerca de BaseCero",
+      privacy: "Política de privacidad",
+      source: "Código fuente",
+      license: "Licencia MIT",
     },
     importResult: {
       summary: "Nuevas: {created} · Conciliadas: {reconciled} · Duplicadas (saltadas): {skipped}",

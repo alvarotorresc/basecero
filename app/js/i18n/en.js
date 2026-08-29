@@ -73,6 +73,7 @@ export const EN = {
       patrimonio: "Net worth",
       ajustes: "Settings",
     },
+    tabsNav: "Sections",
     fab: "Log expense",
   },
   inicio: {
@@ -508,6 +509,12 @@ export const EN = {
       title: "Emergency backup",
       body: "🔒 Your data lives only on this device. No accounts, no cloud.",
       exportBtn: "Export backup copy (JSON)",
+    },
+    about: {
+      title: "About BaseCero",
+      privacy: "Privacy policy",
+      source: "Source code",
+      license: "MIT license",
     },
     importResult: {
       summary: "New: {created} · Reconciled: {reconciled} · Duplicates (skipped): {skipped}",
