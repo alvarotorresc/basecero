@@ -23,6 +23,10 @@ const BTN_FULL_WIDTH = "width:100%;";
 const INPUT_STYLE = "background:var(--card2);color:var(--text);border:0;"
   + "border-radius:var(--radius-sm);padding:12px 14px;width:100%;font:500 15px var(--font-ui);outline:none;";
 
+// Formulario público de fallos («¿No funciona?» en Acerca de). Se responde sin cuenta; la app no
+// envía nada por su cuenta — solo abre el formulario en una pestaña nueva si el usuario lo pulsa.
+const FEEDBACK_URL = "https://tally.so/r/PdJa6B";
+
 const CURRENCIES = ["EUR", "USD", "GBP", "CHF", "MXN", "ARS", "COP", "PEN", "UYU", "BRL", "DOP"];
 const LOCALES = [
   ["es-ES", "Español (España)"], ["es-MX", "Español (México)"], ["es-AR", "Español (Argentina)"],
@@ -396,10 +400,12 @@ export async function renderAjustes(container) {
       <div class="card">
         <p style="font-weight:600;margin-bottom:12px">${t("ajustes.about.title")}</p>
         <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
+          <a href="${FEEDBACK_URL}" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.feedback")}</a>
           <a href="${escAttr(activeLang() === "en" ? "en/privacy.html" : "privacidad.html")}" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.privacy")}</a>
           <a href="https://github.com/alvarotorresc/basecero" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.source")}</a>
           <a href="https://github.com/alvarotorresc/basecero/blob/main/LICENSE" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.license")}</a>
         </div>
+        <p style="color:var(--text-2);font-size:11.5px;margin-top:12px">${t("ajustes.about.feedbackNote")}</p>
       </div>
     `;
     wireMain();

@@ -528,9 +528,11 @@ export const EN = {
     },
     about: {
       title: "About BaseCero",
+      feedback: "Something not working?",
       privacy: "Privacy policy",
       source: "Source code",
       license: "MIT license",
+      feedbackNote: "The form opens in Tally, outside the app: only what you type there is sent.",
     },
     importResult: {
       summary: "New: {created} · Reconciled: {reconciled} · Duplicates (skipped): {skipped}",
