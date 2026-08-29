@@ -15,7 +15,7 @@
    La landing es casi monocroma (tinta + un verde). El verde NUNCA toca una
    cifra: en la app #4FD99A significa «importe positivo».
 
-   Las clases .lp-header / .lp-brand / .lp-tile / .lp-lang / .lp-footer /
+   Las clases .lp-header / .lp-brand / .lp-mark / .lp-lang / .lp-footer /
    .lp-legal / .lp-updated las comparten las páginas legales, cuyo marcado no
    se toca aquí: no cambiar sus selectores. Todo lo nuevo va con prefijo .bc-.
    ========================================================================== */
@@ -211,12 +211,6 @@ code {
   text-decoration: none; color: var(--text); min-height: 44px;
 }
 .lp-brand strong { font-weight: 800; font-size: 16px; letter-spacing: -0.015em; }
-/* Tile con las letras — lo usan las páginas legales */
-.lp-tile {
-  width: 32px; height: 32px; border-radius: 10px; background: var(--card2);
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  font: 800 12px var(--font-ui); letter-spacing: -0.04em;
-}
 /* Marca de la landing. Si /img/logo.svg aún no existe, un <img alt=""> que
    falla no pinta nada: la palabra «BaseCero» de al lado sigue nombrando el
    enlace. */
@@ -267,7 +261,7 @@ code {
   }
   .lp-brand { gap: 11px; }
   .lp-brand strong { font-size: 17px; }
-  .lp-tile, .lp-mark { width: 34px; height: 34px; border-radius: 11px; }
+  .lp-mark { width: 34px; height: 34px; border-radius: 11px; }
   .bc-hdr-right { gap: 10px; }
   .bc-hdr-nav { display: flex; margin-right: 14px; }
   .bc-hdr-icon { display: grid; }
@@ -558,7 +552,7 @@ code {
 
 .bc-foot { padding: 32px 0 calc(28px + env(safe-area-inset-bottom, 0px)); }
 .bc-foot-brand { display: flex; align-items: center; gap: 10px; }
-.bc-foot-brand .lp-tile, .bc-foot-brand .lp-mark { width: 36px; height: 36px; border-radius: 12px; }
+.bc-foot-brand .lp-mark { width: 36px; height: 36px; border-radius: 12px; }
 .bc-foot-brand strong { font-weight: 800; font-size: 16px; letter-spacing: -0.015em; }
 .bc-foot-tag { margin-top: 12px; font-size: 13.5px; line-height: 1.55; color: var(--text-2); }
 .bc-foot-cols {
@@ -583,7 +577,7 @@ code {
   .bc-foot-grid { display: flex; gap: 70px; }
   .bc-foot-intro { width: 330px; flex-shrink: 0; }
   .bc-foot-brand { gap: 11px; }
-  .bc-foot-brand .lp-tile, .bc-foot-brand .lp-mark { width: 38px; height: 38px; }
+  .bc-foot-brand .lp-mark { width: 38px; height: 38px; }
   .bc-foot-brand strong { font-size: 17px; }
   .bc-foot-tag { margin-top: 14px; font-size: 14px; }
   .bc-foot-cols {
