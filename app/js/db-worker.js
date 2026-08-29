@@ -50,6 +50,6 @@ self.onmessage = async (e) => {
       } catch (e) { db.exec("ROLLBACK"); throw e; }
       postMessage({ id, rows: [] }); return;
     }
-    postMessage({ id, error: "op desconocida: " + op });
+    postMessage({ id, error: "unknown_op:" + op });
   } catch (err) { postMessage({ id, error: String(err && err.message || err) }); }
 };

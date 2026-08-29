@@ -1,7 +1,8 @@
 // Módulo ES puro (Task 4, PR E): sniff/mapeo/parseo genérico de CSV para bancos sin soporte
-// dedicado. CERO imports — toda función que necesite trocear líneas CSV recibe `parseLine` como
-// parámetro (patrón externalIdFor de n26.js): el navegador pasa el global `bcParseCsvLine`
-// (vendor/pure.js), los tests el require de ese mismo fichero. Nada de este módulo toca DB/DOM.
+// dedicado. Único import: i18n (también puro, sin DB/DOM) — toda función que necesite trocear
+// líneas CSV recibe `parseLine` como parámetro (patrón externalIdFor de n26.js): el navegador
+// pasa el global `bcParseCsvLine` (vendor/pure.js), los tests el require de ese mismo fichero.
+// Nada de este módulo toca DB/DOM.
 //
 // El perfil guardado en meta.csv_profile (Decisión 1 del plan, docs/superpowers/plans/
 // 2026-08-28-pr-e-import-generico.md) tiene esta forma exacta:
@@ -10,6 +11,8 @@
 //     amount: { kind:"single", col: string, decimal: ","|"." }
 //           | { kind:"split", debit: string, credit: string, decimal: ","|"." } }
 // Match de perfil = igualdad EXACTA del array de cabeceras (profileMatches).
+
+import { t } from "./i18n/index.js";
 
 // Cabeceras EXACTAS del CSV de N26 actual (ver tests/app/fixtures/n26_sample.csv línea 1). Sirven
 // para reconocer el camino N26 (bcParseN26Csv, intacto) sin pasar por el asistente de mapeo.
@@ -143,7 +146,7 @@ function normalizeCounterparty(counterparty) {
 // consume la UI del asistente, Task 6, para mostrar la nota de validación).
 export function buildProfile({ headers, date, concept, counterparty, amountKind, amountCol,
   debitCol, creditCol, sample }) {
-  if (!Array.isArray(headers)) return { error: "cabeceras inválidas" };
+  if (!Array.isArray(headers)) return { error: t("errors.csvGeneric.invalidHeaders") };
   const idx = (h) => headers.indexOf(h);
   const rows = Array.isArray(sample) ? sample : [];
 
@@ -171,7 +174,7 @@ export function buildProfile({ headers, date, concept, counterparty, amountKind,
 
   const dateSampleValues = rows.map((r) => r[idx(date)]);
   const dateFormat = detectDateFormat(dateSampleValues);
-  if (!dateFormat) return { error: "la muestra no tiene ninguna fecha válida para autodetectar el formato" };
+  if (!dateFormat) return { error: t("errors.csvGeneric.noSampleDate") };
 
   amount.decimal = detectDecimal(amountSampleValues);
   return { headers: [...headers], date, dateFormat, concept, counterparty: cp, amount };
@@ -202,21 +205,21 @@ export function applyProfile(text, profile, parseLine) {
     const cells = parseLine(lines[i]);
 
     const bookingDate = parseDateIso(cells[dateIdx], profile.dateFormat);
-    if (!bookingDate) { errors.push({ line: lineNo, reason: "fecha inválida" }); continue; }
+    if (!bookingDate) { errors.push({ line: lineNo, reason: t("errors.csvGeneric.invalidDate") }); continue; }
 
     let amountCents;
     if (!isSplit) {
       amountCents = parseAmountCents(cells[amountIdx], decimal);
-      if (amountCents === null) { errors.push({ line: lineNo, reason: "importe inválido" }); continue; }
+      if (amountCents === null) { errors.push({ line: lineNo, reason: t("errors.csvGeneric.invalidAmount") }); continue; }
     } else {
       const debitRaw = cells[debitIdx];
       const creditRaw = cells[creditIdx];
       const hasDebit = debitRaw !== undefined && String(debitRaw).trim() !== "";
       const hasCredit = creditRaw !== undefined && String(creditRaw).trim() !== "";
-      if (hasDebit && hasCredit) { errors.push({ line: lineNo, reason: "cargo y abono con valor a la vez" }); continue; }
-      if (!hasDebit && !hasCredit) { errors.push({ line: lineNo, reason: "cargo y abono vacíos" }); continue; }
+      if (hasDebit && hasCredit) { errors.push({ line: lineNo, reason: t("errors.csvGeneric.debitCreditBoth") }); continue; }
+      if (!hasDebit && !hasCredit) { errors.push({ line: lineNo, reason: t("errors.csvGeneric.debitCreditEmpty") }); continue; }
       const parsed = parseAmountCents(hasDebit ? debitRaw : creditRaw, decimal);
-      if (parsed === null) { errors.push({ line: lineNo, reason: "importe inválido" }); continue; }
+      if (parsed === null) { errors.push({ line: lineNo, reason: t("errors.csvGeneric.invalidAmount") }); continue; }
       amountCents = hasDebit ? -Math.abs(parsed) : Math.abs(parsed);
     }
 

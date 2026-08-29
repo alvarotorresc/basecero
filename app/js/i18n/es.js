@@ -633,4 +633,88 @@ export const ES = {
       summaryMovements: { one: "{n} movimiento", other: "{n} movimientos" },
     },
   },
+  // Task 5 (PR i18n): errores de capas no-UI (repo/n26/xlsx/csv-generic/backup-crypto/db-worker) —
+  // el string ES es el mensaje literal que ya lanzaban esas capas (byte-exacto, lo pinnean los
+  // asserts de xlsx.test/patrimonio.test/categorias.test bajo el idioma por defecto).
+  errors: {
+    repo: {
+      periodStartTooEarly: "La fecha debe ser posterior al inicio del periodo actual",
+      settleNotFound: "Gasto compartido no encontrado o ya liquidado",
+      txNotFound: "Movimiento no encontrado",
+      txLockedSettled: "Gasto ya liquidado: borra su liquidación en Movimientos antes de cambiar el importe o el reparto.",
+      ruleNotFound: "Regla no encontrada",
+      accountNotFound: "Cuenta no encontrada",
+      goalNotFound: "Objetivo no encontrado",
+      invalidParent: "La categoría elegida como padre no es válida: debe ser una categoría principal del mismo tipo (gasto o ingreso)",
+      categoryNameEmpty: "El nombre de la categoría no puede estar vacío",
+      parentArchived: "No se puede crear una subcategoría dentro de una categoría archivada",
+      flowImmutable: "El tipo de la categoría (gasto o ingreso) no se puede cambiar una vez creada",
+      categoryNotFound: "Categoría no encontrada",
+      categoryHasChildren: "Esta categoría tiene subcategorías: solo se permiten dos niveles, no puede convertirse en subcategoría de otra",
+      colorUnavailable: "Ese color no está disponible",
+      iconUnavailable: "Ese icono no está disponible",
+    },
+    // Compartida entre repo.js y n26.js (3 sitios, mismo mensaje EXACTO): distinta de
+    // common.noOpenPeriod (esa lleva punto final, esta no — no son byte-idénticas).
+    common: {
+      noOpenPeriod: "No hay ningún periodo abierto",
+    },
+    n26: {
+      noAccount: "No hay ninguna cuenta donde importar: crea una en Patrimonio",
+    },
+    backupCrypto: {
+      notEncrypted: "No es una copia cifrada de BaseCero",
+      truncated: "El archivo está truncado o dañado",
+      newerVersion: "Copia de una versión más nueva (formato {version}). Actualiza BaseCero.",
+      invalidHeader: "Cabecera inválida (iteraciones fuera de rango)",
+      wrongPassphrase: "Contraseña incorrecta o archivo dañado",
+    },
+    xlsx: {
+      missingSheet: "falta la pestaña «{table}»",
+      schemaVersion: "meta: schema_version debe ser 1 (es «{value}»)",
+      createdWith: "meta: created_with no reconocido («{value}»)",
+      pkEmpty: "pestaña «{table}» fila {row}: id vacío",
+      pkDuplicate: "pestaña «{table}» fila {row}: id duplicado («{pk}»)",
+      pkInvalidChars: "pestaña «{table}» fila {row}: id con caracteres no válidos («{pk}»)",
+      enumInvalid: "pestaña «{table}» fila {row}: {col} inválido («{value}»)",
+      fkEmpty: "pestaña «{table}» fila {row}: {col} vacío",
+      fkMissing: "pestaña «{table}» fila {row}: {col} apunta a «{value}» que no existe en {ref}",
+      multipleOpen: "periods: hay {n} periodos open (máximo 1)",
+      amountNotPositive: "pestaña «transactions» fila {row}: amount debe ser > 0",
+    },
+    csvGeneric: {
+      invalidHeaders: "cabeceras inválidas",
+      noSampleDate: "la muestra no tiene ninguna fecha válida para autodetectar el formato",
+      invalidDate: "fecha inválida",
+      invalidAmount: "importe inválido",
+      debitCreditBoth: "cargo y abono con valor a la vez",
+      debitCreditEmpty: "cargo y abono vacíos",
+    },
+    worker: {
+      unknownOp: "Operación desconocida: {op}",
+      failed: "Error en el worker de base de datos: ",
+    },
+  },
+  // Subtítulos de goalProgress (repo.js) por tipo de objetivo — «Superado», «antes de», «/mes»…
+  // ES byte-exacto: patrimonio.test.mjs los comprueba con includes/match bajo el idioma por defecto.
+  goals: {
+    emergencyFund: {
+      withAvg: "Hucha en {account} · cubre {months} meses de gasto",
+      noAvg: "Hucha en {account} · todavía sin periodos cerrados para calcular el gasto medio",
+    },
+    savingsTarget: {
+      base: "Hucha en {account}",
+      beforeDate: " · antes de {date}",
+    },
+    provision: {
+      subtitle: "Provisión · {amount} al mes",
+    },
+    spendingCap: {
+      over: "Superado por {amount}",
+      remaining: "Te quedan {amount} para el cierre del periodo",
+    },
+    savingsRate: {
+      subtitle: "Tasa de ahorro del periodo abierto",
+    },
+  },
 };

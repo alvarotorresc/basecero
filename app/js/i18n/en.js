@@ -635,4 +635,81 @@ export const EN = {
       summaryMovements: { one: "{n} transaction", other: "{n} transactions" },
     },
   },
+  errors: {
+    repo: {
+      periodStartTooEarly: "The date must be after the current period’s start",
+      settleNotFound: "Shared expense not found or already settled",
+      txNotFound: "Transaction not found",
+      txLockedSettled: "This expense is already settled: delete its settlement in Transactions before changing the amount or split.",
+      ruleNotFound: "Rule not found",
+      accountNotFound: "Account not found",
+      goalNotFound: "Goal not found",
+      invalidParent: "The chosen parent category isn’t valid: it must be a top-level category of the same type (expense or income)",
+      categoryNameEmpty: "The category name can’t be empty",
+      parentArchived: "Can’t create a subcategory inside an archived category",
+      flowImmutable: "The category type (expense or income) can’t be changed once created",
+      categoryNotFound: "Category not found",
+      categoryHasChildren: "This category has subcategories: only two levels are allowed, it can’t become a subcategory of another one",
+      colorUnavailable: "That color isn’t available",
+      iconUnavailable: "That icon isn’t available",
+    },
+    common: {
+      noOpenPeriod: "There’s no open period",
+    },
+    n26: {
+      noAccount: "There’s no account to import into: create one in Net worth",
+    },
+    backupCrypto: {
+      notEncrypted: "This isn’t a BaseCero encrypted backup",
+      truncated: "The file is truncated or corrupted",
+      newerVersion: "Backup from a newer version (format {version}). Update BaseCero.",
+      invalidHeader: "Invalid header (iterations out of range)",
+      wrongPassphrase: "Incorrect password or corrupted file",
+    },
+    xlsx: {
+      missingSheet: "missing sheet «{table}»",
+      schemaVersion: "meta: schema_version must be 1 (got «{value}»)",
+      createdWith: "meta: created_with not recognized («{value}»)",
+      pkEmpty: "sheet «{table}» row {row}: empty id",
+      pkDuplicate: "sheet «{table}» row {row}: duplicate id («{pk}»)",
+      pkInvalidChars: "sheet «{table}» row {row}: id with invalid characters («{pk}»)",
+      enumInvalid: "sheet «{table}» row {row}: invalid {col} («{value}»)",
+      fkEmpty: "sheet «{table}» row {row}: empty {col}",
+      fkMissing: "sheet «{table}» row {row}: {col} points to «{value}», which doesn’t exist in {ref}",
+      multipleOpen: "periods: {n} open periods (maximum 1)",
+      amountNotPositive: "sheet «transactions» row {row}: amount must be > 0",
+    },
+    csvGeneric: {
+      invalidHeaders: "invalid headers",
+      noSampleDate: "the sample has no valid date to auto-detect the format",
+      invalidDate: "invalid date",
+      invalidAmount: "invalid amount",
+      debitCreditBoth: "both debit and credit have a value",
+      debitCreditEmpty: "debit and credit are both empty",
+    },
+    worker: {
+      unknownOp: "Unknown operation: {op}",
+      failed: "Database worker error: ",
+    },
+  },
+  goals: {
+    emergencyFund: {
+      withAvg: "Savings in {account} · covers {months} months of spending",
+      noAvg: "Savings in {account} · no closed periods yet to calculate average spending",
+    },
+    savingsTarget: {
+      base: "Savings in {account}",
+      beforeDate: " · before {date}",
+    },
+    provision: {
+      subtitle: "Provision · {amount} per month",
+    },
+    spendingCap: {
+      over: "Over by {amount}",
+      remaining: "{amount} left until the period closes",
+    },
+    savingsRate: {
+      subtitle: "Savings rate for the open period",
+    },
+  },
 };

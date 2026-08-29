@@ -5,6 +5,7 @@ import { CONTRACT, insertSql } from "./contract.js";
 import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
 import { resolveAccountId } from "./account-defaults.js";
 import { POOL, CURATED_ICONS, CATEGORY_ICONS, parseStyle, initCategoryStyle } from "./category-colors.js";
+import { t } from "./i18n/index.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -24,7 +25,7 @@ export const periodStartTooEarly = (open, startDate) => !!open && startDate <= o
 export async function openNextPeriod({ name, startDate, sharePct, budgets = [] }) {
   const current = await getOpenPeriod();
   if (periodStartTooEarly(current, startDate))
-    throw new Error("La fecha debe ser posterior al inicio del periodo actual");
+    throw new Error(t("errors.repo.periodStartTooEarly"));
   const t = nowIso();
   const newId = bcUlid();
   const stmts = [];
@@ -42,7 +43,7 @@ export async function addTransaction({
   counterAccountId = "", sharePctOverride = null, refId = "", ruleId = "", externalId = "", status = "pending",
 }) {
   const p = await getOpenPeriod();
-  if (!p) throw new Error("No hay ningún periodo abierto");
+  if (!p) throw new Error(t("errors.common.noOpenPeriod"));
   const t = nowIso();
   const insertStmt = {
     sql: SQL.insertTransaction,
@@ -168,7 +169,7 @@ export async function spentLast7Days(pid) {
  *  en vez de recalcular el pct aquí. El settled=1 del original lo pone addTransaction({refId}) solo. */
 export async function settleShared(txId, accountId) {
   const row = (await pendingShared()).find((r) => r.id === txId);
-  if (!row) throw new Error("Gasto compartido no encontrado o ya liquidado");
+  if (!row) throw new Error(t("errors.repo.settleNotFound"));
   await addTransaction({
     type: "refund",
     amountCents: row.partner_amount_cents,
@@ -187,7 +188,7 @@ export async function settleShared(txId, accountId) {
  *  no expone `status`, la fila mantiene su status ('pending'/'reconciled') tal cual estaba. */
 export async function updateTransaction(id, fields) {
   const cur = await getTransaction(id);
-  if (!cur) throw new Error("Movimiento no encontrado");
+  if (!cur) throw new Error(t("errors.repo.txNotFound"));
   const f = {
     type: fields.type ?? cur.type,
     amountCents: fields.amountCents ?? cur.amount_cents,
@@ -209,7 +210,7 @@ export async function updateTransaction(id, fields) {
   // server-side (no solo UI, que ya bloquea los campos): un save que NO toca esos campos
   // (solo categoría/fecha/nota/comercio) sigue funcionando con normalidad.
   if (sharedFieldsLocked(cur, f) && (await hasActiveLinkedRefund(id))) {
-    throw new Error("Gasto ya liquidado: borra su liquidación en Movimientos antes de cambiar el importe o el reparto.");
+    throw new Error(t("errors.repo.txLockedSettled"));
   }
   const t = nowIso();
   await exec(SQL.updateTransaction, [
@@ -257,7 +258,7 @@ export async function createRule(fields) {
  *  Los campos ausentes conservan el valor actual — mismo criterio que repo.updateTransaction. */
 export async function updateRule(id, fields) {
   const cur = await getRule(id);
-  if (!cur) throw new Error("Regla no encontrada");
+  if (!cur) throw new Error(t("errors.repo.ruleNotFound"));
   const f = {
     name: fields.name ?? cur.name,
     type: fields.type ?? cur.type,
@@ -415,8 +416,8 @@ export function goalProgress(goal, ctx) {
     const pct = safeDiv(currentCents, targetCents);
     const accName = accountNameById[goal.account_id] ?? "";
     const subtitle = avgSpentCents > 0
-      ? `Hucha en ${accName} · cubre ${fmtDec1(currentCents / avgSpentCents)} meses de gasto`
-      : `Hucha en ${accName} · todavía sin periodos cerrados para calcular el gasto medio`;
+      ? t("goals.emergencyFund.withAvg", { account: accName, months: fmtDec1(currentCents / avgSpentCents) })
+      : t("goals.emergencyFund.noAvg", { account: accName });
     return { goal, currentCents, targetCents, pct, level: "ok", subtitle };
   }
 
@@ -425,8 +426,9 @@ export function goalProgress(goal, ctx) {
     const targetCents = goal.target_amount_cents ?? 0;
     const pct = safeDiv(currentCents, targetCents);
     const accName = accountNameById[goal.account_id] ?? "";
-    const fecha = goal.target_date ? ` · antes de ${fmtMesAnio(goal.target_date)}` : "";
-    return { goal, currentCents, targetCents, pct, level: "ok", subtitle: `Hucha en ${accName}${fecha}` };
+    const fecha = goal.target_date ? t("goals.savingsTarget.beforeDate", { date: fmtMesAnio(goal.target_date) }) : "";
+    const subtitle = t("goals.savingsTarget.base", { account: accName }) + fecha;
+    return { goal, currentCents, targetCents, pct, level: "ok", subtitle };
   }
 
   if (goal.type === "provision") {
@@ -434,7 +436,8 @@ export function goalProgress(goal, ctx) {
     const targetCents = goal.target_amount_cents ?? 0;
     const pct = safeDiv(currentCents, targetCents);
     const monthlyCents = Math.round(targetCents / 12);
-    return { goal, currentCents, targetCents, pct, level: "ok", subtitle: `Provisión · ${fmtMoney(monthlyCents)} al mes` };
+    const subtitle = t("goals.provision.subtitle", { amount: fmtMoney(monthlyCents) });
+    return { goal, currentCents, targetCents, pct, level: "ok", subtitle };
   }
 
   if (goal.type === "spending_cap") {
@@ -448,8 +451,8 @@ export function goalProgress(goal, ctx) {
     const level = pct > 100 ? "over" : pct >= 85 ? "warn" : "ok";
     const remaining = targetCents - currentCents;
     const subtitle = level === "over"
-      ? `Superado por ${fmtMoney(-remaining)}`
-      : `Te quedan ${fmtMoney(remaining)} para el cierre del periodo`;
+      ? t("goals.spendingCap.over", { amount: fmtMoney(-remaining) })
+      : t("goals.spendingCap.remaining", { amount: fmtMoney(remaining) });
     return { goal, currentCents, targetCents, pct, level, subtitle };
   }
 
@@ -459,7 +462,7 @@ export function goalProgress(goal, ctx) {
   const targetCents = goal.target_pct ?? 0;
   const pct = safeDiv(currentCents, targetCents);
   const level = currentCents >= targetCents ? "ok" : "warn";
-  return { goal, currentCents, targetCents, pct, level, subtitle: "Tasa de ahorro del periodo abierto" };
+  return { goal, currentCents, targetCents, pct, level, subtitle: t("goals.savingsRate.subtitle") };
 }
 
 /** Progreso de todos los goals activos — tarjeta "Objetivos" de Patrimonio. Arma el ctx UNA vez
@@ -511,7 +514,7 @@ export async function createAccount({ name, type, openingBalanceCents }) {
  *  repo.updateRule. */
 export async function updateAccount(id, fields) {
   const cur = await getAccount(id);
-  if (!cur) throw new Error("Cuenta no encontrada");
+  if (!cur) throw new Error(t("errors.repo.accountNotFound"));
   const name = fields.name ?? cur.name;
   const type = fields.type ?? cur.type;
   const openingBalanceCents = fields.openingBalanceCents ?? cur.opening_balance_cents;
@@ -567,7 +570,7 @@ export async function createGoal(fields) {
  *  está en el alcance de esta task. */
 export async function updateGoal(id, fields) {
   const cur = await getGoal(id);
-  if (!cur) throw new Error("Objetivo no encontrado");
+  if (!cur) throw new Error(t("errors.repo.goalNotFound"));
   const f = {
     name: fields.name ?? cur.name,
     type: fields.type ?? cur.type,
@@ -600,7 +603,7 @@ export const getCategory = async (id) => (await query(SQL.getCategory, [id]))[0]
 async function assertValidParent(parentId, flow) {
   const parent = await getCategory(parentId);
   if (!parent || parent.parent_id !== "" || parent.flow !== flow) {
-    throw new Error("La categoría elegida como padre no es válida: debe ser una categoría principal del mismo tipo (gasto o ingreso)");
+    throw new Error(t("errors.repo.invalidParent"));
   }
 }
 
@@ -612,7 +615,7 @@ async function assertValidParent(parentId, flow) {
  *  de este PR. */
 export async function createCategory({ name, flow, needType, parentId }) {
   const trimmed = String(name ?? "").trim();
-  if (!trimmed) throw new Error("El nombre de la categoría no puede estar vacío");
+  if (!trimmed) throw new Error(t("errors.repo.categoryNameEmpty"));
   const pid = parentId || "";
   if (pid) {
     await assertValidParent(pid, flow);
@@ -622,7 +625,7 @@ export async function createCategory({ name, flow, needType, parentId }) {
     // hoy funciona y debe seguir funcionando) empezaría a lanzar. Solo alta bajo un padre archivado
     // se bloquea aquí.
     const parent = await getCategory(pid);
-    if (parent.is_archived) throw new Error("No se puede crear una subcategoría dentro de una categoría archivada");
+    if (parent.is_archived) throw new Error(t("errors.repo.parentArchived"));
   }
   const id = bcUlid();
   const t = nowIso();
@@ -645,15 +648,15 @@ export async function createCategory({ name, flow, needType, parentId }) {
  *  cuanto el usuario lo reordena. */
 export async function updateCategory(id, fields) {
   if (fields.flow !== undefined) {
-    throw new Error("El tipo de la categoría (gasto o ingreso) no se puede cambiar una vez creada");
+    throw new Error(t("errors.repo.flowImmutable"));
   }
   const cur = await getCategory(id);
-  if (!cur) throw new Error("Categoría no encontrada");
+  if (!cur) throw new Error(t("errors.repo.categoryNotFound"));
 
   let name = cur.name;
   if (fields.name !== undefined) {
     const trimmed = String(fields.name).trim();
-    if (!trimmed) throw new Error("El nombre de la categoría no puede estar vacío");
+    if (!trimmed) throw new Error(t("errors.repo.categoryNameEmpty"));
     name = bcSanitizeCell(trimmed);
   }
   const needType = fields.needType !== undefined ? fields.needType : cur.need_type;
@@ -667,7 +670,7 @@ export async function updateCategory(id, fields) {
     // es sobre CUALQUIER hija, se refleje o no como tal en la lista (que solo cuenta activas).
     const children = await query(SQL.hasChildren, [id]);
     if (children.length > 0) {
-      throw new Error("Esta categoría tiene subcategorías: solo se permiten dos niveles, no puede convertirse en subcategoría de otra");
+      throw new Error(t("errors.repo.categoryHasChildren"));
     }
   }
 
@@ -719,9 +722,9 @@ export { computeReorder } from "./category-order.js";
  *  override". `color`/`icon` ausentes o `undefined` son válidos (sin override para ese campo);
  *  cualquier otro valor fuera de POOL / CURATED_ICONS+CATEGORY_ICONS lanza. */
 export async function setCategoryStyle(rootId, { color, icon } = {}) {
-  if (color !== undefined && !POOL.includes(color)) throw new Error("Ese color no está disponible");
+  if (color !== undefined && !POOL.includes(color)) throw new Error(t("errors.repo.colorUnavailable"));
   const iconValid = icon === undefined || CURATED_ICONS.includes(icon) || Object.values(CATEGORY_ICONS).includes(icon);
-  if (!iconValid) throw new Error("Ese icono no está disponible");
+  if (!iconValid) throw new Error(t("errors.repo.iconUnavailable"));
 
   const meta = await getMetaAll();
   const styleMap = parseStyle(meta.category_style);

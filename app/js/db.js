@@ -1,3 +1,5 @@
+import { t } from "./i18n/index.js";
+
 let worker = null, seq = 0;
 const pending = new Map();
 
@@ -15,12 +17,16 @@ export function initDb() {
     const { id, error, ...rest } = e.data;
     const p = pending.get(id); if (!p) return;
     pending.delete(id);
-    error ? p.reject(new Error(error)) : p.resolve(rest);
+    if (!error) { p.resolve(rest); return; }
+    const err = error.startsWith("unknown_op:")
+      ? new Error(t("errors.worker.unknownOp", { op: error.slice("unknown_op:".length) }))
+      : new Error(error);
+    p.reject(err);
   };
   // Sin esto, un fallo al cargar/ejecutar db-worker.js (p.ej. 404) deja las
   // promesas pendientes (incluida la de init) colgadas para siempre.
   worker.onerror = (e) => {
-    const err = new Error("Error en el worker de base de datos: " + (e.message || "desconocido"));
+    const err = new Error(t("errors.worker.failed") + (e.message || "desconocido"));
     for (const [id, p] of pending) { pending.delete(id); p.reject(err); }
   };
   return call("init");
