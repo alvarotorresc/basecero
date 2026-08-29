@@ -73,6 +73,7 @@ export const EN = {
       patrimonio: "Net worth",
       ajustes: "Settings",
     },
+    tabsNav: "Sections",
     fab: "Log expense",
   },
   inicio: {

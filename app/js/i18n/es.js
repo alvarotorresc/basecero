@@ -73,6 +73,7 @@ export const ES = {
       patrimonio: "Patrimonio",
       ajustes: "Ajustes",
     },
+    tabsNav: "Secciones",
     fab: "Registrar gasto",
   },
   inicio: {

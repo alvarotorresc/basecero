@@ -6,11 +6,23 @@ const ROOT_COLORS = {
   "cat-nomina": "#15AC7D", "cat-puntuales": "#15AC7D", "cat-intereses": "#15AC7D",
 };
 const DEFAULT_COLOR = "#9A99A6";
+// Contraste texto/tinte (Task 2 P2, WCAG 1.4.3 AA ≥4.5:1): cada TEXT_COLORS se pinta sobre su
+// propio tinte al 18% (color-mix(in srgb, <color> 18%, transparent) sobre --card #1C1C21, ver
+// registro.js chipStyle / presupuesto.js categoryRowHtml). 5 de las 12 entradas fallaban ese
+// umbral con el hex original; se subió su lightness en OKLCH manteniendo hue/chroma hasta
+// despejar 4.5:1 con margen (script ad-hoc, no versionado — ver report de Task 2 para la tabla
+// completa de ratios antes/después de los 12):
+//   cat-coche          #B2802A → #BB8934  (4.077 → 4.569)
+//   cat-ocio           #8A82D6 → #9088DD  (4.225 → 4.568)
+//   cat-suscripciones  #AB74C4 → #B37CCD  (4.107 → 4.552)
+//   cat-ropa           #CD6472 → #DA707D  (3.911 → 4.555)
+//   cat-regalos        #C4699F → #CF73A9  (4.031 → 4.587)
+// Las otras 7 (incl. restauracion, 4.586, el "casi" más próximo) ya pasaban 4.5:1 y no se tocan.
 const TEXT_COLORS = {
   "cat-casa": "#6FA8F0", "cat-alimentacion": "#7FB554", "cat-restauracion": "#D97742",
-  "cat-transporte": "#3FB7DC", "cat-coche": "#B2802A", "cat-ocio": "#8A82D6",
-  "cat-salud": "#3FBDBD", "cat-suscripciones": "#AB74C4",
-  "cat-ropa": "#CD6472", "cat-regalos": "#C4699F", "cat-impuestos": "#BDB32A",
+  "cat-transporte": "#3FB7DC", "cat-coche": "#BB8934", "cat-ocio": "#9088DD",
+  "cat-salud": "#3FBDBD", "cat-suscripciones": "#B37CCD",
+  "cat-ropa": "#DA707D", "cat-regalos": "#CF73A9", "cat-impuestos": "#BDB32A",
   "cat-nomina": "#3DC299", "cat-puntuales": "#3DC299", "cat-intereses": "#3DC299",
 };
 export const CATEGORY_ICONS = {
@@ -35,10 +47,13 @@ export const POOL = [
   "#629D3B", "#6B61C2", "#A09600", "#9153AB", "#15AC7D", "#986603",
   "#12A7A7", "#B45018", "#00A1CB", "#AA4985", "#4F94E9", "#B64656",
 ];
+// Mismos 5 hexes aclarados que TEXT_COLORS (misma justificación arriba): POOL_TEXT es la fuente
+// para overrides de usuario y categorías hasheadas, así que debe llevar los mismos valores o esos
+// caminos volverían a renderizar el hex sin aclarar sobre el mismo tinte al 18%.
 const POOL_TEXT = {
-  "#629D3B": "#7FB554", "#6B61C2": "#8A82D6", "#A09600": "#BDB32A", "#9153AB": "#AB74C4",
-  "#15AC7D": "#3DC299", "#986603": "#B2802A", "#12A7A7": "#3FBDBD", "#B45018": "#D97742",
-  "#00A1CB": "#3FB7DC", "#AA4985": "#C4699F", "#4F94E9": "#6FA8F0", "#B64656": "#CD6472",
+  "#629D3B": "#7FB554", "#6B61C2": "#9088DD", "#A09600": "#BDB32A", "#9153AB": "#B37CCD",
+  "#15AC7D": "#3DC299", "#986603": "#BB8934", "#12A7A7": "#3FBDBD", "#B45018": "#D97742",
+  "#00A1CB": "#3FB7DC", "#AA4985": "#CF73A9", "#4F94E9": "#6FA8F0", "#B64656": "#DA707D",
 };
 // 8 iconos curados ofrecidos en el selector de icono de categoría (pantalla de edición).
 export const CURATED_ICONS = ["🐾", "🎓", "✈️", "👶", "💻", "🎮", "🌱", "📦"];
