@@ -692,6 +692,9 @@ export const EN = {
       periodEndMismatch: "sheet “periods” row {row}: end_date must be empty when status is open, and set when closed",
       periodOrder: "sheet “periods” row {row}: start_date is after end_date",
       fkDeleted: "sheet “{table}” row {row}: {col} points to “{value}”, which is deleted in {ref}",
+      numericInvalid: "sheet “{table}” row {row}: {col} is not a valid number (“{value}”)",
+      numericRange: "sheet “{table}” row {row}: {col} out of range [{min}, {max}] (“{value}”)",
+      booleanInvalid: "sheet “{table}” row {row}: {col} is not a valid boolean (“{value}”)",
     },
     csvGeneric: {
       invalidHeaders: "invalid headers",

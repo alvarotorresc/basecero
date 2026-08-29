@@ -695,6 +695,9 @@ export const ES = {
       periodEndMismatch: "pestaña «periods» fila {row}: end_date debe estar vacío si status es open, y con valor si es closed",
       periodOrder: "pestaña «periods» fila {row}: start_date es posterior a end_date",
       fkDeleted: "pestaña «{table}» fila {row}: {col} apunta a «{value}» que está borrado en {ref}",
+      numericInvalid: "pestaña «{table}» fila {row}: {col} no es un número válido («{value}»)",
+      numericRange: "pestaña «{table}» fila {row}: {col} fuera de rango [{min}, {max}] («{value}»)",
+      booleanInvalid: "pestaña «{table}» fila {row}: {col} no es un valor booleano válido («{value}»)",
     },
     csvGeneric: {
       invalidHeaders: "cabeceras inválidas",

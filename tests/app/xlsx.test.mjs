@@ -252,6 +252,82 @@ test("validate: transacción viva con rule_id a una regla borrada no es error (a
   assert.deepEqual(validateImport(d), []);
 });
 
+// Columnas numéricas NO-*_cents: workbookToRows las deja pasar tal cual (ni coerción ni
+// parseo) — sin este bloque de checks, un "lunes" en my_share_pct sobrevive intacto hasta
+// SQLite como TEXT (afinidad dinámica) y produce "NaN €"/"NaN %" en cualquier pantalla que
+// haga aritmética con la columna.
+test("validate: my_share_pct no numérico → error", () => {
+  const d = parse((x) => { x.periods[0].my_share_pct = "lunes"; });
+  assert.match(validateImport(d).join("\n"), /pestaña «periods».*my_share_pct no es un número válido \(«lunes»\)/s);
+});
+
+test("validate: due_day fuera de rango (32) → error de rango", () => {
+  const d = parse((x) => {
+    x.recurring_rules.push({ id: "rr-1", name: "Alquiler", type: "expense", amount_cents: 1000,
+      category_id: "cat-casa-alquiler", account_id: "acc-n26", counter_account_id: "", frequency: "monthly",
+      due_day: 32, due_month: null, is_shared: 0, is_active: 1,
+      created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 0 });
+  });
+  assert.match(validateImport(d).join("\n"), /pestaña «recurring_rules».*due_day fuera de rango \[1, 31\] \(«32»\)/s);
+});
+
+test("validate: due_month fuera de rango (13) → error", () => {
+  const d = parse((x) => {
+    x.recurring_rules.push({ id: "rr-1", name: "Alquiler", type: "expense", amount_cents: 1000,
+      category_id: "cat-casa-alquiler", account_id: "acc-n26", counter_account_id: "", frequency: "monthly",
+      due_day: null, due_month: 13, is_shared: 0, is_active: 1,
+      created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 0 });
+  });
+  assert.match(validateImport(d).join("\n"), /pestaña «recurring_rules».*due_month fuera de rango \[1, 12\] \(«13»\)/s);
+});
+
+test("validate: display_order no numérico → error", () => {
+  const d = parse((x) => { x.accounts[0].display_order = "x"; });
+  assert.match(validateImport(d).join("\n"), /pestaña «accounts».*display_order no es un número válido \(«x»\)/s);
+});
+
+// Columnas booleanas: la única forma real de inyectar un valor "crudo" no reconocido es
+// escribiéndolo directamente en la celda del workbook — un dump de la propia app (vía
+// rowsToWorkbook) SIEMPRE produce 0/1 limpios, así que el vector de ataque real es un xlsx
+// editado a mano o corrupto, no una re-exportación de la app.
+test("validate: columna booleana con valor no reconocido (\"yes\"/\"maybe\") → error, sin coerción silenciosa a false", () => {
+  const wb = wbFromSeed();
+  const ws = wb.Sheets.transactions;
+  const header = X.utils.sheet_to_json(ws, { header: 1 })[0];
+  const row = { id: "tx-bool", date: "2026-08-01", period_id: "per-1", type: "expense", amount: 1,
+    account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler", merchant: "", note: "",
+    is_shared: "yes", share_pct_override: "", settled: "maybe", ref_id: "", rule_id: "", external_id: "",
+    status: "pending", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 0 };
+  wb.Sheets.transactions = X.utils.aoa_to_sheet([header, header.map((h) => row[h] ?? "")]);
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []); // el parseo en sí no falla: "yes"/"maybe" sobreviven crudos a data
+  const errs = validateImport(data).join("\n");
+  assert.match(errs, /pestaña «transactions».*is_shared no es un valor booleano válido \(«yes»\)/s);
+  assert.match(errs, /pestaña «transactions».*settled no es un valor booleano válido \(«maybe»\)/s);
+});
+
+// Contrato explícito: una celda booleana en blanco (hoja rellenada a mano, dropdown sin elegir
+// todavía) NO es un error — se coerciona a false, igual que hacía el código antes de este fix.
+// Sin este test, alguien podría "cerrar" el enum quitando "" de BOOL_FALSE pensando que endurece
+// la validación, y rompería el import de cualquier hoja del generador con booleanos sin rellenar.
+test("validate: celda booleana vacía → false, no error (hoja rellenada a mano)", () => {
+  const wb = wbFromSeed();
+  const ws = wb.Sheets.transactions;
+  const header = X.utils.sheet_to_json(ws, { header: 1 })[0];
+  const row = { id: "tx-bool-blank", date: "2026-08-01", period_id: "per-1", type: "expense", amount: 1,
+    account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler", merchant: "", note: "",
+    is_shared: "", share_pct_override: "", settled: "", ref_id: "", rule_id: "", external_id: "",
+    status: "pending", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: "" };
+  wb.Sheets.transactions = X.utils.aoa_to_sheet([header, header.map((h) => row[h] ?? "")]);
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  const tx = data.transactions.find((r) => r.id === "tx-bool-blank");
+  assert.equal(tx.is_shared, 0);
+  assert.equal(tx.settled, 0);
+  assert.equal(tx.deleted, 0);
+  assert.deepEqual(validateImport(data), []);
+});
+
 test("import: nullable numeric columns round-trip como null", () => {
   const T = "2026-08-01T00:00:00Z";
   const db = openDb(); seedMinimal(db);

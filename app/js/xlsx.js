@@ -24,6 +24,17 @@ export function rowsToWorkbook(X, dump) {
 
 const DATE_COLS = new Set(["date", "start_date", "end_date", "target_date"]);
 
+// Representaciones reconocidas de un booleano en una celda de xlsx — lo que hoy produce un
+// export real (rowsToWorkbook escribe un boolean JS nativo) y lo que sobrevive un round-trip
+// binario (X.write/X.read conservan el tipo de celda: boolean, number o string tal cual). Todo
+// lo que NO esté en estos dos sets se deja SIN COERCIONAR (ver workbookToRows más abajo) para
+// que validateImport lo rechace como fila inválida en vez de colar un 0 silencioso.
+// "" cuenta como false: una hoja rellenada a mano (created_with: basecero-sheets-mvp) deja
+// celdas booleanas en blanco por defecto — comportamiento YA existente hoy (el ternario previo
+// caía a 0 para cualquier no-true), así que no es una coerción nueva, solo se preserva.
+const BOOL_TRUE = new Set([true, "TRUE", 1, "1"]);
+const BOOL_FALSE = new Set([false, "FALSE", 0, "0", ""]);
+
 // Parseo real de calendario (no solo forma): rechaza "2026-13-40", "2026-02-30", etc. — un
 // regex de forma por sí solo deja pasar meses/días fuera de rango.
 function isValidIsoDate(v) {
@@ -58,7 +69,7 @@ export function workbookToRows(X, wb) {
           if (!col) continue;                                   // "_account", desconocidas… se ignoran
           if (NULLABLE_NUM.has(col) && v === "") row[col] = null;
           else if (col.endsWith("_cents")) row[col] = v === "" ? null : eurToCents(v);
-          else if (bools.has(col)) row[col] = v === true || v === "TRUE" || v === 1 ? 1 : 0;
+          else if (bools.has(col)) row[col] = BOOL_TRUE.has(v) ? 1 : BOOL_FALSE.has(v) ? 0 : v;
           else if (DATE_COLS.has(col)) row[col] = toIsoDate(v);
           else row[col] = v;
         }
@@ -173,5 +184,70 @@ export function validateImport(data) {
     if (row.type !== "adjustment" && !(row.amount_cents > 0))
       errs.push(t("errors.xlsx.amountNotPositive", { row: i + 2 }));
   });
+
+  // Columnas numéricas NO-*_cents del contrato: workbookToRows las deja pasar tal cual llegan
+  // de la celda (ni coerción ni parseo), así que un "lunes" en my_share_pct sobrevive intacto
+  // hasta aquí como string — sin este check, acaba en SQLite como TEXT (afinidad dinámica) y
+  // produce "NaN €"/"NaN %" en cualquier pantalla que haga aritmética con la columna. Solo se
+  // valida cuando hay valor (las columnas NULLABLE_NUM ya llegan a null si la celda estaba
+  // vacía; las no-nullable llegan a "" — ambas se saltan, no son responsabilidad de este check).
+  // schema_version NO es una columna del contrato (vive como fila key/value en meta) y ya se
+  // valida arriba con igualdad estricta — no se repite aquí.
+  const NUMERIC_COLS = {
+    accounts: { display_order: { integer: true } },
+    categories: { display_order: { integer: true } },
+    periods: { my_share_pct: { min: 0, max: 100 } },                    // REAL, no entero
+    transactions: { share_pct_override: { min: 0, max: 100 } },          // REAL, nullable
+    recurring_rules: {
+      due_day: { integer: true, min: 1, max: 31 },
+      due_month: { integer: true, min: 1, max: 12 },
+    },
+    goals: { target_months: { integer: true }, target_pct: {} },         // target_pct REAL
+  };
+  for (const [table, spec] of Object.entries(NUMERIC_COLS))
+    (data[table] ?? []).forEach((row, i) => {
+      for (const [col, { integer, min, max }] of Object.entries(spec)) {
+        const v = row[col];
+        if (v === "" || v == null) continue;
+        const n = Number(v);
+        if (!Number.isFinite(n) || (integer && !Number.isInteger(n))) {
+          errs.push(t("errors.xlsx.numericInvalid", { table, row: i + 2, col, value: v }));
+          continue;
+        }
+        if (min != null && (n < min || n > max))
+          errs.push(t("errors.xlsx.numericRange", { table, row: i + 2, col, value: v, min, max }));
+      }
+    });
+
+  // Columnas *_cents: workbookToRows YA las convirtió con eurToCents (Math.round(Number(v)*100))
+  // antes de llegar aquí, así que un valor no numérico ya es NaN (siempre entero o NaN, nunca un
+  // finito no entero: Math.round lo garantiza) — el único fallo posible es "no finito".
+  for (const table of Object.keys(CONTRACT)) {
+    const centsCols = CONTRACT[table].cols.filter((c) => c.endsWith("_cents"));
+    if (!centsCols.length) continue;
+    (data[table] ?? []).forEach((row, i) => {
+      for (const col of centsCols) {
+        const v = row[col];
+        if (v == null) continue;
+        if (!Number.isFinite(v)) errs.push(t("errors.xlsx.numericInvalid", { table, row: i + 2, col, value: v }));
+      }
+    });
+  }
+
+  // Booleanos: workbookToRows ya normalizó todo valor reconocido (BOOL_TRUE/BOOL_FALSE) a 1/0 y
+  // dejó SIN TOCAR cualquier otra cosa ("yes", "maybe"…) para que aquí se rechace como error de
+  // fila — la alternativa (coercionar en silencio a 0) es indistinguible de un false legítimo y
+  // esconde el defecto en vez de bloquear el import.
+  for (const table of Object.keys(CONTRACT)) {
+    const bools = BOOL_COLS[table] ?? [];
+    if (!bools.length) continue;
+    (data[table] ?? []).forEach((row, i) => {
+      for (const col of bools) {
+        const v = row[col];
+        if (v !== 0 && v !== 1) errs.push(t("errors.xlsx.booleanInvalid", { table, row: i + 2, col, value: v }));
+      }
+    });
+  }
+
   return errs;
 }
