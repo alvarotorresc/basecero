@@ -265,6 +265,7 @@ export const EN = {
     accountSubtitle: {
       checking: "Checking account",
       checkingDefault: "Checking account · default",
+      installmentsLeft: { one: "{n} installment left", other: "{n} installments left" },
     },
     accounts: {
       title: "Accounts",
@@ -282,6 +283,7 @@ export const EN = {
       },
       create: "Create account",
       validation: { name: "Give the account a name." },
+      monthlyInstallment: "Monthly installment",
     },
     goals: {
       title: "Goals",

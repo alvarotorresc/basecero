@@ -3,7 +3,7 @@ import { query, exec, execMany } from "./db.js";
 import { nowIso, hoyISO, prevDayIso, fmtMoney, fmtDec1, appLocale } from "./format.js";
 import { CONTRACT, insertSql } from "./contract.js";
 import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
-import { resolveAccountId } from "./account-defaults.js";
+import { resolveAccountId, sanitizeLoanMap, parseLoanMap } from "./account-defaults.js";
 import { POOL, CURATED_ICONS, CATEGORY_ICONS, parseStyle, initCategoryStyle } from "./category-colors.js";
 import { SEED_NAMES } from "./seeds.js";
 import { t, monthShort } from "./i18n/index.js";
@@ -625,6 +625,36 @@ export async function updateAccount(id, fields) {
   const openingBalanceCents = fields.openingBalanceCents ?? cur.opening_balance_cents;
   const now = nowIso();
   await exec(SQL.updateAccount, [bcSanitizeCell(name), type, openingBalanceCents, now, id]);
+}
+
+/** Cuota mensual de un pasivo (Task 6, CONFIG-IN-META — mismo patrón que setCategoryStyle, sin
+ *  migración de esquema ni cambio de contrato xlsx). Read-modify-write de meta.account_loans:
+ *  lee el JSON completo, toca SOLO `accountId`, reescribe entero. `monthlyCents` no positivo (o
+ *  ausente) BORRA la entrada — "sin cuota definida", mismo criterio "objeto vacío quita el
+ *  override" que setCategoryStyle. sanitizeLoanMap se aplica ANTES de escribir: defensa en
+ *  profundidad (un accountId corrupto no debería llegar aquí desde la UI, que solo ofrece ids
+ *  reales, pero esta es la última línea).
+ *  Cuentas borradas/archivadas: hoy no existe ningún flujo de borrado/archivado de CUENTAS en el
+ *  repo (a diferencia de categorías, que sí tienen setCategoryArchived) — createAccount/
+ *  updateAccount son las únicas operaciones. No hay, por tanto, ningún punto donde limpiar la
+ *  entrada de account_loans al borrar/archivar una cuenta; se documenta aquí para cuando esa
+ *  funcionalidad exista. */
+export async function setAccountLoan(accountId, monthlyCents) {
+  const meta = await getMetaAll();
+  const loanMap = parseLoanMap(meta.account_loans);
+  if (monthlyCents > 0) loanMap[accountId] = { monthlyCents };
+  else delete loanMap[accountId];
+  await setMeta("account_loans", JSON.stringify(sanitizeLoanMap(loanMap)));
+}
+
+/** Mapa saneado {accountId: {monthlyCents}} de meta.account_loans. A diferencia de
+ *  category_style (singleton inicializado en el boot de main.js porque colorForCategory/
+ *  iconForCategory se llaman desde varias pantallas), account_loans SOLO lo consume Patrimonio
+ *  (accountSubtitle, "quedan N cuotas") — se carga en patrimonio.js#loadData vía esta función,
+ *  sin necesidad de un estado global ni de tocar el boot. */
+export async function getAccountLoans() {
+  const meta = await getMetaAll();
+  return parseLoanMap(meta.account_loans);
 }
 
 export const getGoal = async (id) => (await query(SQL.getGoal, [id]))[0] ?? null;

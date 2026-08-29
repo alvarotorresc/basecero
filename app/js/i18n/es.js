@@ -263,6 +263,7 @@ export const ES = {
     accountSubtitle: {
       checking: "Cuenta corriente",
       checkingDefault: "Cuenta corriente · por defecto",
+      installmentsLeft: { one: "queda {n} cuota", other: "quedan {n} cuotas" },
     },
     accounts: {
       title: "Cuentas",
@@ -280,6 +281,7 @@ export const ES = {
       },
       create: "Crear cuenta",
       validation: { name: "Ponle un nombre a la cuenta." },
+      monthlyInstallment: "Cuota mensual",
     },
     goals: {
       title: "Objetivos",

@@ -66,6 +66,7 @@ test("meta: las claves de cuenta entran vacías con INSERT OR IGNORE", () => {
   assert.equal(db.prepare("SELECT value FROM meta WHERE key='category_style'").get().value, "{}");
   assert.equal(db.prepare("SELECT value FROM meta WHERE key='csv_profile'").get().value, "");
   assert.equal(db.prepare("SELECT value FROM meta WHERE key='lang'").get().value, "");
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='account_loans'").get().value, "{}");
   // re-ejecutar el esquema NO pisa un valor ya configurado
   db.prepare("UPDATE meta SET value='acc-x' WHERE key='import_account_id'").run();
   db.exec(schema);
@@ -82,4 +83,7 @@ test("meta: las claves de cuenta entran vacías con INSERT OR IGNORE", () => {
   db.prepare("UPDATE meta SET value='en' WHERE key='lang'").run();
   db.exec(schema);
   assert.equal(db.prepare("SELECT value FROM meta WHERE key='lang'").get().value, "en");
+  db.prepare("UPDATE meta SET value='{\"acc-x\":{\"monthlyCents\":18900}}' WHERE key='account_loans'").run();
+  db.exec(schema);
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='account_loans'").get().value, "{\"acc-x\":{\"monthlyCents\":18900}}");
 });
