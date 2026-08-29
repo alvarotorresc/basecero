@@ -4,13 +4,13 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
-import { SQL } from "../../app/js/sql.js";
-import { seedStatements } from "../../app/js/seeds.js";
-import { sha256Hex, externalIdFor, signedAmountCents } from "../../app/js/n26.js";
-import { sniffCsv, isN26Headers, applyProfile, parseCsvProfile, profileMatches } from "../../app/js/csv-generic.js";
+import { SQL } from "../../app/app/js/sql.js";
+import { seedStatements } from "../../app/app/js/seeds.js";
+import { sha256Hex, externalIdFor, signedAmountCents } from "../../app/app/js/n26.js";
+import { sniffCsv, isN26Headers, applyProfile, parseCsvProfile, profileMatches } from "../../app/app/js/csv-generic.js";
 
 const require = createRequire(import.meta.url);
-const pure = require("../../app/vendor/pure.js");
+const pure = require("../../app/app/vendor/pure.js");
 
 // app/js/n26.js llama a bcBuildExternalId como GLOBAL (lo carga <script src="vendor/pure.js">
 // en el navegador, sin import — ver cabecera de n26.js). Aquí se importa el mismo
@@ -26,7 +26,7 @@ const sha256hex = (s) => createHash("sha256").update(s, "utf8").digest("hex");
 
 function db() {
   const d = new DatabaseSync(":memory:");
-  d.exec(readFileSync(new URL("../../app/js/schema.sql", import.meta.url), "utf8"));
+  d.exec(readFileSync(new URL("../../app/app/js/schema.sql", import.meta.url), "utf8"));
   for (const { sql, rows } of seedStatements(T)) for (const r of rows) d.prepare(sql).run(...r);
   d.prepare(`INSERT INTO accounts (id,name,type,opening_balance_cents,display_order,is_archived,created_at,updated_at,deleted)
              VALUES ('acc-n26','N26','checking',0,1,0,?,?,0)`).run(T, T);
@@ -37,7 +37,7 @@ function db() {
 /** Misma base que db() pero SIN periodo abierto — para el test del guard temprano de importCsv. */
 function dbNoPeriod() {
   const d = new DatabaseSync(":memory:");
-  d.exec(readFileSync(new URL("../../app/js/schema.sql", import.meta.url), "utf8"));
+  d.exec(readFileSync(new URL("../../app/app/js/schema.sql", import.meta.url), "utf8"));
   for (const { sql, rows } of seedStatements(T)) for (const r of rows) d.prepare(sql).run(...r);
   d.prepare(`INSERT INTO accounts (id,name,type,opening_balance_cents,display_order,is_archived,created_at,updated_at,deleted)
              VALUES ('acc-n26','N26','checking',0,1,0,?,?,0)`).run(T, T);

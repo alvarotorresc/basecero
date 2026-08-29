@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { openDb, seedMinimal, dumpAll, X } from "./helpers.mjs";
-import { rowsToWorkbook, workbookToRows, validateImport } from "../../app/js/xlsx.js";
-import { insertSql, CONTRACT } from "../../app/js/contract.js";
-import { replaceAllStmts } from "../../app/js/repo.js";
-import { SQL } from "../../app/js/sql.js";
+import { rowsToWorkbook, workbookToRows, validateImport } from "../../app/app/js/xlsx.js";
+import { insertSql, CONTRACT } from "../../app/app/js/contract.js";
+import { replaceAllStmts } from "../../app/app/js/repo.js";
+import { SQL } from "../../app/app/js/sql.js";
 
 test("export: pestaña por tabla, euros, bools y cabeceras sin _cents", () => {
   const db = openDb(); seedMinimal(db);

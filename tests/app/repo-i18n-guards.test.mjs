@@ -17,8 +17,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { createCategory, updateCategory, setCategoryStyle } from "../../app/js/repo.js";
-import { t } from "../../app/js/i18n/index.js";
+import { createCategory, updateCategory, setCategoryStyle } from "../../app/app/js/repo.js";
+import { t } from "../../app/app/js/i18n/index.js";
 
 test("createCategory con nombre vacío: lanza el mensaje localizado, no ReferenceError (repo.js:618, TDZ de `const t = nowIso()` en línea posterior)", async () => {
   await assert.rejects(
@@ -68,7 +68,7 @@ test("setCategoryStyle con color inválido: ya devuelve el mensaje localizado ho
 // es el invariante exacto que el bug violó, y cubre las ~13 funciones que ningún test de Node
 // puede ejercer directamente.
 test("ningún fichero que importa el `t` de i18n declara un `const t`/`let t` local que lo tape", () => {
-  const jsDir = fileURLToPath(new URL("../../app/js/", import.meta.url));
+  const jsDir = fileURLToPath(new URL("../../app/app/js/", import.meta.url));
   const files = [];
   const walk = (dir, prefix) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {

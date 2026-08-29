@@ -4,51 +4,153 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121214">
-<meta name="description" content="Tu cuaderno de gastos: offline, sin cuentas, sin nube. Periodos de nómina a nómina, presupuesto por categorías y gastos compartidos.">
+<meta name="description" content="App de finanzas personales offline, open source y gratuita. Instálala como PWA: sin servidor, sin cuentas, sin nube.">
 <meta name="robots" content="index,follow">
 <meta name="color-scheme" content="dark">
-<link rel="canonical" href="https://alvarotorresc.github.io/basecero/">
+<link rel="canonical" href="https://basecero.alvarotc.com/">
+<link rel="alternate" hreflang="es" href="https://basecero.alvarotc.com/">
+<link rel="alternate" hreflang="en" href="https://basecero.alvarotc.com/en/">
+<link rel="alternate" hreflang="x-default" href="https://basecero.alvarotc.com/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="BaseCero">
-<meta property="og:title" content="BaseCero — finanzas personales offline">
-<meta property="og:description" content="Tu cuaderno de gastos: offline, sin cuentas, sin nube.">
-<meta property="og:url" content="https://alvarotorresc.github.io/basecero/">
-<meta property="og:image" content="https://alvarotorresc.github.io/basecero/img/og.png">
+<meta property="og:title" content="BaseCero — Tu dinero, desde cero">
+<meta property="og:description" content="App de finanzas personales offline, open source y gratuita. Instálala como PWA: sin servidor, sin cuentas, sin nube.">
+<meta property="og:url" content="https://basecero.alvarotc.com/">
+<meta property="og:image" content="https://basecero.alvarotc.com/img/og.png">
 <meta property="og:locale" content="es_ES">
 <meta name="twitter:card" content="summary_large_image">
-<title>BaseCero — finanzas personales offline</title>
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="512x512" href="img/favicon-512.png">
-<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/tokens.css">
-<link rel="stylesheet" href="css/app.css">
-<script src="vendor/pure.js" defer></script>
+<title>BaseCero — Tu dinero, desde cero</title>
+<link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/img/favicon-512.png">
+<link rel="icon" href="/app/icons/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="/app/manifest.webmanifest">
+<link rel="stylesheet" href="/app/css/tokens.css">
+<link rel="stylesheet" href="/css/landing.css">
 </head>
 <body>
-<main id="screen" aria-live="polite"></main>
-<nav class="tabbar" aria-label="Secciones">
-  <button class="tab active" data-tab="inicio">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.6L12 4.2l8 6.4V19a1.6 1.6 0 01-1.6 1.6H5.6A1.6 1.6 0 014 19z"></path></svg>
-    Inicio
-  </button>
-  <button class="tab" data-tab="movimientos">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h10M8 12h10M8 18h10"></path><circle cx="4.5" cy="6" r="1" fill="currentColor" stroke="none"></circle><circle cx="4.5" cy="12" r="1" fill="currentColor" stroke="none"></circle><circle cx="4.5" cy="18" r="1" fill="currentColor" stroke="none"></circle></svg>
-    Movimientos
-  </button>
-  <button class="tab" data-tab="patrimonio">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5h16"></path><path d="M7 19.5v-6M12 19.5V6M17 19.5v-9"></path></svg>
-    Patrimonio
-  </button>
-  <button class="tab" data-tab="ajustes">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"></circle><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"></path></svg>
-    Ajustes
-  </button>
-  <button class="fab" id="btn-registro" aria-label="Registrar gasto">＋</button>
-</nav>
-<script type="module" src="js/main.js"></script>
-<script>
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
-</script>
+<header class="lp-header">
+  <a class="lp-brand" href="/"><span class="lp-tile">B0</span><strong>BaseCero</strong></a>
+  <nav class="lp-lang" aria-label="Idioma">
+    <span aria-current="page">ES</span>
+    <a href="/en/" hreflang="en">EN</a>
+  </nav>
+</header>
+
+<main>
+  <section class="lp-hero">
+    <h1>Tu dinero,<br>desde cero.</h1>
+    <p class="lp-subtitle">App de finanzas personales open source y totalmente offline. Periodos de nómina a nómina, presupuesto por categorías y gastos compartidos — sin servidor, sin cuentas, sin nube.</p>
+    <div class="lp-cta-row">
+      <a class="btn-primary" href="/app/">Abrir BaseCero</a>
+      <a class="btn-secondary" href="https://github.com/alvarotorresc/basecero" target="_blank" rel="noopener">Ver el código</a>
+    </div>
+  </section>
+
+  <section class="lp-features" aria-label="Características">
+    <div class="lp-feature-card">
+      <div class="lp-feature-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 018 0v3"></path></svg>
+      </div>
+      <h3>Todo local y offline</h3>
+      <p>Sin servidor y sin registro. Funciona hasta sin conexión: tus datos nunca salen del dispositivo.</p>
+    </div>
+    <div class="lp-feature-card">
+      <div class="lp-feature-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4F94E9" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3H6.5A1.5 1.5 0 005 4.5v15A1.5 1.5 0 006.5 21h11a1.5 1.5 0 001.5-1.5V9z"></path><path d="M13 3v6h6"></path></svg>
+      </div>
+      <h3>Tu dato es una hoja de cálculo</h3>
+      <p>Exporta e importa cuando quieras, en <code>.xlsx</code>: tus datos nunca están atrapados dentro de la app.</p>
+    </div>
+    <div class="lp-feature-card">
+      <div class="lp-feature-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5"></rect><path d="M3.5 9.5h17M8 3v4M16 3v4"></path></svg>
+      </div>
+      <h3>Periodos de nómina a nómina</h3>
+      <p>Tu mes empieza cuando cobras, no el día 1. El presupuesto y el «disponible real» siguen ese ritmo.</p>
+    </div>
+    <div class="lp-feature-card">
+      <div class="lp-feature-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"></circle><path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6"></path><circle cx="16.5" cy="9" r="2.4"></circle><path d="M14.8 20c.3-2.7 2.1-4.8 4.3-4.8"></path></svg>
+      </div>
+      <h3>Gastos compartidos y presupuesto</h3>
+      <p>Liquida los gastos compartidos entre dos personas y controla el límite de cada categoría, periodo a periodo.</p>
+    </div>
+  </section>
+
+  <section class="lp-shots" aria-label="Capturas de la app">
+    <h2>La app, por dentro</h2>
+    <div class="lp-shots-track">
+      <img loading="lazy" src="/img/app-inicio.webp" alt="Pantalla de Inicio de BaseCero: disponible del periodo, gastado, ingresos, ahorro y gasto por categoría del día.">
+      <img loading="lazy" src="/img/app-movimientos.webp" alt="Pantalla de Movimientos: lista de gastos del periodo agrupados por día, con categoría e importe de cada uno.">
+      <img loading="lazy" src="/img/app-patrimonio.webp" alt="Pantalla de Patrimonio: patrimonio neto total, cuentas activas y objetivos de ahorro.">
+      <img loading="lazy" src="/img/app-presupuesto.webp" alt="Pantalla de Presupuesto: gasto por categoría frente al límite presupuestado, con barra de progreso y aviso al superarlo.">
+    </div>
+  </section>
+
+  <section class="lp-install" aria-label="Instalación">
+    <h2>Instálala en tu móvil o escritorio</h2>
+    <div class="lp-install-grid">
+      <div class="lp-install-card">
+        <h3>Android / Chrome</h3>
+        <ol>
+          <li>Abre <a href="/app/">BaseCero</a> en Chrome.</li>
+          <li>Toca el menú (⋮).</li>
+          <li>Elige «Añadir a pantalla de inicio» (o acepta el banner de instalación).</li>
+        </ol>
+      </div>
+      <div class="lp-install-card">
+        <h3>iPhone / Safari</h3>
+        <ol>
+          <li>Abre <a href="/app/">BaseCero</a> en Safari (en iOS solo funciona desde Safari).</li>
+          <li>Toca el botón Compartir.</li>
+          <li>Elige «Añadir a pantalla de inicio».</li>
+        </ol>
+      </div>
+      <div class="lp-install-card">
+        <h3>Escritorio</h3>
+        <ol>
+          <li>Abre <a href="/app/">BaseCero</a> en Chrome o Edge.</li>
+          <li>Pulsa el icono de instalación en la barra de direcciones.</li>
+          <li>Confirma «Instalar BaseCero».</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-faq" aria-label="Preguntas frecuentes">
+    <h2>Preguntas frecuentes</h2>
+    <details>
+      <summary>¿Dónde están mis datos?</summary>
+      <p>En tu dispositivo, en una base de datos local (OPFS del navegador). BaseCero no tiene servidor: nada sale de ahí salvo que tú lo exportes.</p>
+    </details>
+    <details>
+      <summary>¿Cómo hago copia de seguridad?</summary>
+      <p>Exporta un <code>.xlsx</code> sin cifrar (para abrir en Google Sheets o LibreOffice) o una copia <code>.bce</code> cifrada con contraseña. Tú decides cuándo y dónde guardarlas.</p>
+    </details>
+    <details>
+      <summary>¿Qué bancos puedo importar?</summary>
+      <p>N26 tiene un perfil de importación directo, con deduplicación. Para cualquier otro banco hay un asistente genérico que mapea las columnas de su CSV.</p>
+    </details>
+    <details>
+      <summary>¿Cuánto cuesta y qué licencia tiene?</summary>
+      <p>Es gratis y de código abierto, con licencia MIT. Puedes revisar, modificar y reutilizar el código libremente.</p>
+    </details>
+    <details>
+      <summary>¿Tiene analytics o cookies?</summary>
+      <p>Ninguno, por diseño. No hay servidor que reciba nada de lo que haces en la app, así que no hace falta banner de cookies: no hay nada que consentir.</p>
+    </details>
+    <details>
+      <summary>¿Y si pierdo el dispositivo?</summary>
+      <p>Los datos viven solo ahí. Si no exportaste una copia antes, se pierden con el dispositivo — por eso conviene exportar copias con regularidad.</p>
+    </details>
+  </section>
+</main>
+
+<footer class="lp-footer">
+  <a href="/privacidad.html">Privacidad</a>
+  <a href="/terminos.html">Términos</a>
+  <a href="https://github.com/alvarotorresc/basecero/blob/main/LICENSE" target="_blank" rel="noopener">Licencia</a>
+  <a href="https://github.com/alvarotorresc/basecero" target="_blank" rel="noopener">Código en GitHub</a>
+</footer>
 </body>
 </html>

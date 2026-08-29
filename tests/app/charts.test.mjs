@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { barChartSvg, donutSvg, sparklineSvg, netWorthBarsHtml } from "../../app/js/charts.js";
-import { SQL } from "../../app/js/sql.js";
-import { fillLast7Days } from "../../app/js/repo.js";
-import { fmtDiaIni } from "../../app/js/format.js";
+import { barChartSvg, donutSvg, sparklineSvg, netWorthBarsHtml } from "../../app/app/js/charts.js";
+import { SQL } from "../../app/app/js/sql.js";
+import { fillLast7Days } from "../../app/app/js/repo.js";
+import { fmtDiaIni } from "../../app/app/js/format.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
 const T = "2026-08-24T18:00:00Z";

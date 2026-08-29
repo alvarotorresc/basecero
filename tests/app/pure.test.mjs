@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
-const p = require("../../app/vendor/pure.js");
+const p = require("../../app/app/vendor/pure.js");
 
 const sha256hex = (s) => createHash("sha256").update(s, "utf8").digest("hex");
 const csv = readFileSync(new URL("./fixtures/n26_sample.csv", import.meta.url), "utf8");

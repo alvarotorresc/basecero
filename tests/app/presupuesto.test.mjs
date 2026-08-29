@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { budgetStatus } from "../../app/js/screens/presupuesto.js";
+import { budgetStatus } from "../../app/app/js/screens/presupuesto.js";
 
 test("budgetStatus: 82% del límite -> ok", () => {
   const s = budgetStatus(82, 100);

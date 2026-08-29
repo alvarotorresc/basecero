@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://alvarotorresc.github.io/basecero/</loc></url>
-  <url><loc>https://alvarotorresc.github.io/basecero/landing.html</loc></url>
-  <url><loc>https://alvarotorresc.github.io/basecero/en/landing.html</loc></url>
-  <url><loc>https://alvarotorresc.github.io/basecero/privacidad.html</loc></url>
-  <url><loc>https://alvarotorresc.github.io/basecero/en/privacy.html</loc></url>
-  <url><loc>https://alvarotorresc.github.io/basecero/terminos.html</loc></url>
-  <url><loc>https://alvarotorresc.github.io/basecero/en/terms.html</loc></url>
+  <url><loc>https://basecero.alvarotc.com/</loc></url>
+  <url><loc>https://basecero.alvarotc.com/en/</loc></url>
+  <url><loc>https://basecero.alvarotc.com/app/</loc></url>
+  <url><loc>https://basecero.alvarotc.com/privacidad.html</loc></url>
+  <url><loc>https://basecero.alvarotc.com/en/privacy.html</loc></url>
+  <url><loc>https://basecero.alvarotc.com/terminos.html</loc></url>
+  <url><loc>https://basecero.alvarotc.com/en/terms.html</loc></url>
 </urlset>

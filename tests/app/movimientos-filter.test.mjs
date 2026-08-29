@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { matchesFilter, isUncategorized } from "../../app/js/movimientos-filter.js";
+import { matchesFilter, isUncategorized } from "../../app/app/js/movimientos-filter.js";
 
 // byId con una raíz y una hoja bajo ella (mismo shape que allCategoriesById): rootOf necesita
 // parent_id para subir hasta la raíz.

@@ -1,10 +1,10 @@
-# BaseCero se sirve como GitHub Pages "project page" (github.io/basecero/): GitHub Pages
-# no expone un robots.txt propio por subruta, así que este fichero es en la práctica inerte
-# para los crawlers reales — no hay forma de que Google lo pida ni de confirmarlo. Se mantiene
-# de todas formas porque algunas herramientas SEO/lint lo esperan en la raíz publicada. La señal
-# de indexación real es la que SÍ llega: <meta name="robots"> en cada página + sitemap.xml,
-# ambos servidos junto al HTML.
+# BaseCero se sirve en su propio dominio (basecero.alvarotc.com), así que este fichero SÍ es
+# efectivo: vive en la raíz del origen y los crawlers lo piden y lo obedecen. Antes, como
+# "project page" de GitHub Pages (github.io/basecero/), era inerte — no había forma de que
+# Google lo pidiera. Ahora es la señal de indexación de primer nivel, junto con el
+# <meta name="robots"> de cada página y el sitemap.
+# Todo el sitio es público y estático: la landing (/, /en/), la app (/app/) y los legales.
 User-agent: *
 Allow: /
 
-Sitemap: https://alvarotorresc.github.io/basecero/sitemap.xml
+Sitemap: https://basecero.alvarotc.com/sitemap.xml

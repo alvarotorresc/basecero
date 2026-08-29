@@ -1,14 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { SQL } from "../../app/js/sql.js";
+import { SQL } from "../../app/app/js/sql.js";
 import {
   sharedFieldsLocked, refundAmountLocked, expenseDeleteLocked, settleAllSharedStmts,
-} from "../../app/js/repo.js";
+} from "../../app/app/js/repo.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
 const require = createRequire(import.meta.url);
-const pure = require("../../app/vendor/pure.js");
+const pure = require("../../app/app/vendor/pure.js");
 // repo.js#settleAllSharedStmts llama a bcUlid/bcSanitizeCell como GLOBALES (cargados por
 // <script src="vendor/pure.js"> en el navegador, igual que addTransaction/createAccount — ver
 // n26.js:5 sobre el mismo patrón, y n26.test.mjs:19 sobre cómo se expone en Node). Se importa

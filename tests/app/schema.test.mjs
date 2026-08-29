@@ -2,10 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
-import { seedStatements, SEED_CATEGORIES } from "../../app/js/seeds.js";
-import { SQL } from "../../app/js/sql.js";
+import { seedStatements, SEED_CATEGORIES } from "../../app/app/js/seeds.js";
+import { SQL } from "../../app/app/js/sql.js";
 
-const schema = readFileSync(new URL("../../app/js/schema.sql", import.meta.url), "utf8");
+const schema = readFileSync(new URL("../../app/app/js/schema.sql", import.meta.url), "utf8");
 function freshDb() {
   const db = new DatabaseSync(":memory:");
   db.exec(schema);
@@ -45,7 +45,7 @@ test("solo un periodo open", () => {
 });
 
 test("colores: hoja hereda de la raíz", async () => {
-  const { colorForCategory } = await import("../../app/js/category-colors.js");
+  const { colorForCategory } = await import("../../app/app/js/category-colors.js");
   const byId = Object.fromEntries(SEED_CATEGORIES.map((c) => [c[0], { id: c[0], parent_id: c[2] }]));
   assert.equal(colorForCategory("cat-casa-luz", byId), colorForCategory("cat-casa", byId));
   assert.match(colorForCategory("cat-casa", byId), /^#[0-9a-f]{6}$/i);

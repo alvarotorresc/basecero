@@ -1,6 +1,6 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { initFormat, fmtMoney, fmtMoneyParts, currencySymbol, currencyCode, appLocale, fmtNum2, fmtPct, fmtDec1, parseCentsRaw, centsToRaw } from "../../app/js/format.js";
+import { initFormat, fmtMoney, fmtMoneyParts, currencySymbol, currencyCode, appLocale, fmtNum2, fmtPct, fmtDec1, parseCentsRaw, centsToRaw } from "../../app/app/js/format.js";
 
 // Intl mete espacios no separadores (U+00A0/U+202F): normalizar antes de comparar.
 const norm = (s) => s.replace(/\u00A0|\u202F/g, " ");

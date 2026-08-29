@@ -5,10 +5,11 @@ offline**.
 
 ## La app
 
-**https://alvarotorresc.github.io/basecero/**
+**https://basecero.alvarotc.com/app/**
 
 Landing con capturas, instalación paso a paso y preguntas frecuentes:
-**[alvarotorresc.github.io/basecero/landing.html](https://alvarotorresc.github.io/basecero/landing.html)**.
+**[basecero.alvarotc.com](https://basecero.alvarotc.com/)** (en inglés,
+**[/en/](https://basecero.alvarotc.com/en/)**).
 
 - Onboarding guiado en 4 pasos: bienvenida, cuentas, preferencias (idioma,
   moneda, reparto de gastos compartidos) y primer periodo; puedes importar
@@ -26,8 +27,9 @@ Landing con capturas, instalación paso a paso y preguntas frecuentes:
   round-trip sin pérdidas) o una copia cifrada `.bce`.
 - Bilingüe, español e inglés.
 - 100% offline: PWA instalable, sin servidor.
-- El código de la app está en [`app/`](app/) (vanilla JS, sin build step);
-  se sirve tal cual desde GitHub Pages.
+- El código de la app está en [`app/app/`](app/app/) (vanilla JS, sin build
+  step); se sirve tal cual. `app/` es la raíz publicada del sitio: la landing
+  (`/`, `/en/`), los legales y la app bajo `/app/`.
 
 ## Instalación (PWA)
 
@@ -58,14 +60,17 @@ dispositivo.
 ## Para desarrolladores
 
 - Vanilla JS, sin build step ni dependencias de paquete: el código en
-  [`app/`](app/) se sirve tal cual. Para levantarlo en local basta un
-  servidor estático (necesario porque usa `<script type="module">` y
+  [`app/app/`](app/app/) se sirve tal cual. Para levantarlo en local basta
+  un servidor estático (necesario porque usa `<script type="module">` y
   Service Worker, que no funcionan sobre `file://`), por ejemplo:
-  `python3 -m http.server 8000` desde `app/` y abrir
-  `http://localhost:8000`.
-- Estructura: `app/js/` (lógica y pantallas), `app/js/screens/` (una
-  pantalla por fichero), `app/js/i18n/` (es/en), `app/css/`, `app/vendor/`
-  (SheetJS, SQLite WASM, fuente Outfit).
+  `python3 -m http.server 8000 -d app` y abrir `http://localhost:8000/`
+  (la landing) o `http://localhost:8000/app/` (la app).
+- Estructura publicada: `app/` es la raíz del sitio — `app/index.html` y
+  `app/en/index.html` (landing ES/EN), los legales, `app/css/landing.css`,
+  `app/img/`, `robots.txt` y `sitemap.xml`. La PWA entera vive en
+  `app/app/`: `app/app/js/` (lógica y pantallas), `app/app/js/screens/`
+  (una pantalla por fichero), `app/app/js/i18n/` (es/en), `app/app/css/`,
+  `app/app/vendor/` (SheetJS, SQLite WASM, fuente Outfit).
 - Tests con `node --test`, sin dependencias externas. El contrato de
   import/export `.xlsx` tiene su propio round-trip test
   ([`tests/app/contract.test.mjs`](tests/app/contract.test.mjs)): exporta,
@@ -87,7 +92,7 @@ completa, no `--depth 1`).
 
 MIT — ver [`LICENSE`](LICENSE).
 
-Incluye software de terceros en `app/vendor/`:
+Incluye software de terceros en `app/app/vendor/`:
 
 - [SheetJS](https://sheetjs.com/) (`xlsx.full.min.js`) — Apache-2.0.
 - [SQLite WASM](https://sqlite.org/wasm) — SQLite es de dominio público;

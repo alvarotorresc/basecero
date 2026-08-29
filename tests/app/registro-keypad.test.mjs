@@ -7,8 +7,8 @@
 // duplicar su lógica de negocio: son las mismas funciones exportadas que registro.js llama.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { foldPending } from "../../app/js/expr.js";
-import { parseCentsRaw, centsToRaw } from "../../app/js/format.js";
+import { foldPending } from "../../app/app/js/expr.js";
+import { parseCentsRaw, centsToRaw } from "../../app/app/js/format.js";
 
 // Mismo wrapper que computeRunning en registro.js.
 const computeRunning = (acc, op, raw) => foldPending(acc, op, parseCentsRaw(raw), raw !== "");
