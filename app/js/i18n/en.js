@@ -54,6 +54,11 @@ export const EN = {
       0: "Jan", 1: "Feb", 2: "Mar", 3: "Apr", 4: "May", 5: "Jun",
       6: "Jul", 7: "Aug", 8: "Sep", 9: "Oct", 10: "Nov", 11: "Dec",
     },
+    // Task 7 (6b): mirrors ES — see monthsLong there.
+    monthsLong: {
+      0: "January", 1: "February", 2: "March", 3: "April", 4: "May", 5: "June",
+      6: "July", 7: "August", 8: "September", 9: "October", 10: "November", 11: "December",
+    },
     weekdays: {
       0: "S", 1: "M", 2: "T", 3: "W", 4: "T", 5: "F", 6: "S",
     },
@@ -265,6 +270,9 @@ export const EN = {
     accountSubtitle: {
       checking: "Checking account",
       checkingDefault: "Checking account · default",
+      // Task 7 (6c): mirrors ES — see accountSubtitle there.
+      savings: "Savings",
+      liability: "Liability",
       installmentsLeft: { one: "{n} installment left", other: "{n} installments left" },
     },
     accounts: {
@@ -329,10 +337,6 @@ export const EN = {
       monthly: "Monthly",
       quarterly: "Quarterly",
       yearly: "Yearly",
-    },
-    month: {
-      0: "January", 1: "February", 2: "March", 3: "April", 4: "May", 5: "June",
-      6: "July", 7: "August", 8: "September", 9: "October", 10: "November", 11: "December",
     },
     subtitle: {
       day: "day {n}",

@@ -107,13 +107,13 @@ const ACCOUNT_TYPES = [
  *  siempre: es opcional, no todo pasivo tiene por qué llevar una. */
 function accountSubtitle(a, isDefault, accountLoans) {
   if (a.type === "checking") return isDefault ? t("patrimonio.accountSubtitle.checkingDefault") : t("patrimonio.accountSubtitle.checking");
-  if (a.type === "savings") return t("patrimonio.accountType.savings");
+  if (a.type === "savings") return t("patrimonio.accountSubtitle.savings");
   const monthlyCents = accountLoans[a.id]?.monthlyCents;
   if (monthlyCents > 0) {
     const n = Math.ceil(Math.abs(a.balance_cents) / monthlyCents);
     return t("patrimonio.accountSubtitle.installmentsLeft", { n });
   }
-  return t("patrimonio.accountType.liability");
+  return t("patrimonio.accountSubtitle.liability");
 }
 
 function cuentaRowHtml(a, isDefault, accountLoans) {

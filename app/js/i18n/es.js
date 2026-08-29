@@ -54,6 +54,12 @@ export const ES = {
       0: "ene", 1: "feb", 2: "mar", 3: "abr", 4: "may", 5: "jun",
       6: "jul", 7: "ago", 8: "sep", 9: "oct", 10: "nov", 11: "dic",
     },
+    // Task 7 (6b): nombres largos, antes solo bajo recurrentes.month.* — promovidos aquí para
+    // que cualquier pantalla los pueda usar vía monthLong(i), no solo Recurrentes.
+    monthsLong: {
+      0: "enero", 1: "febrero", 2: "marzo", 3: "abril", 4: "mayo", 5: "junio",
+      6: "julio", 7: "agosto", 8: "septiembre", 9: "octubre", 10: "noviembre", 11: "diciembre",
+    },
     weekdays: {
       0: "D", 1: "L", 2: "M", 3: "X", 4: "J", 5: "V", 6: "S",
     },
@@ -263,6 +269,10 @@ export const ES = {
     accountSubtitle: {
       checking: "Cuenta corriente",
       checkingDefault: "Cuenta corriente · por defecto",
+      // Task 7 (6c): antes accountSubtitle reutilizaba accountType.{savings,liability} (las
+      // etiquetas del segmented control) — mismo texto, claves propias para no acoplar ambos usos.
+      savings: "Ahorro",
+      liability: "Pasivo",
       installmentsLeft: { one: "queda {n} cuota", other: "quedan {n} cuotas" },
     },
     accounts: {
@@ -327,10 +337,6 @@ export const ES = {
       monthly: "Mensual",
       quarterly: "Trimestral",
       yearly: "Anual",
-    },
-    month: {
-      0: "enero", 1: "febrero", 2: "marzo", 3: "abril", 4: "mayo", 5: "junio",
-      6: "julio", 7: "agosto", 8: "septiembre", 9: "octubre", 10: "noviembre", 11: "diciembre",
     },
     subtitle: {
       day: "día {n}",
