@@ -1,6 +1,6 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { initFormat, fmtMoney, fmtMoneyParts, currencySymbol, currencyCode, appLocale, fmtNum2, fmtPct, fmtDec1 } from "../../app/js/format.js";
+import { initFormat, fmtMoney, fmtMoneyParts, currencySymbol, currencyCode, appLocale, fmtNum2, fmtPct, fmtDec1, parseCentsRaw, centsToRaw } from "../../app/js/format.js";
 
 // Intl mete espacios no separadores (U+00A0/U+202F): normalizar antes de comparar.
 const norm = (s) => s.replace(/\u00A0|\u202F/g, " ");
@@ -59,4 +59,25 @@ test("fmtMoneyParts con moneda sin decimales (JPY, ja-JP) deja cents vacío", ()
   const parts = fmtMoneyParts(128450);
   assert.equal(parts.cents, "");
   assert.match(parts.main, /\d$/); // main termina en dígito: sin separador decimal que arrastrar
+});
+
+test("parseCentsRaw: coma decimal y casos base", () => {
+  assert.equal(parseCentsRaw("1250,50"), 125050);
+  assert.equal(parseCentsRaw("12"), 1200);
+  assert.equal(parseCentsRaw(""), 0);
+  assert.equal(parseCentsRaw("abc"), 0);
+  assert.equal(parseCentsRaw("-300"), -30000);
+});
+
+test("parseCentsRaw: separador de miles ya no rompe el importe", () => {
+  assert.equal(parseCentsRaw("1.250,50"), 125050);   // antes: 125 (1,25 €)
+  assert.equal(parseCentsRaw("1.250"), 125000);       // solo puntos con grupos de 3 = millares
+  assert.equal(parseCentsRaw("-1.250,50"), -125050);
+  assert.equal(parseCentsRaw("12.5"), 1250);          // punto suelto sin coma = decimal tecleado
+});
+
+test("centsToRaw: inverso para precargar inputs", () => {
+  assert.equal(centsToRaw(125050), "1250,50");
+  assert.equal(centsToRaw(-30000), "300,00");
+  assert.equal(centsToRaw(0), "");
 });

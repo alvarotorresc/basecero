@@ -4,11 +4,10 @@ import {
   getMetaAll,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtDiaLargo, hoyISO, currencySymbol } from "../format.js";
+import { fmtMoney, fmtDiaLargo, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const centsToRaw = (cents) => (cents ? (Math.abs(cents) / 100).toFixed(2).replace(".", ",") : "");
 const needsCategory = (tipo) => tipo === "expense" || tipo === "income" || tipo === "refund";
 
 const TIPO_LABEL = {
@@ -376,7 +375,7 @@ export async function renderMovimientos(container) {
 
     container.querySelector("#mov-raw").oninput = (e) => {
       d.raw = e.target.value;
-      d.cents = Math.round(parseFloat((d.raw || "0").replace(",", ".")) * 100) || 0;
+      d.cents = parseCentsRaw(d.raw);
       errorMsg = "";
       state.deleteConfirm = false;
       // No se llama a render() aquí (perdería el foco/cursor del input mientras se escribe), pero

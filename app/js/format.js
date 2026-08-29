@@ -80,6 +80,23 @@ export const nowIso = () => new Date().toISOString().slice(0, 19) + "Z";
 export const fmtDiaLargo = (iso) =>
   new Date(iso + "T12:00:00").toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" });
 
+// Parseo de un importe tecleado a céntimos. Coma = decimal; los puntos son separador de
+// millar cuando hay coma o cuando forman grupos de 3 («1.250» → 1250,00 €); un punto
+// suelto sin coma se trata como decimal tecleado («12.5» → 12,50 €). NaN/vacío → 0
+// (contrato de los 6 llamantes); el signo del texto se respeta y el flip (pasivos,
+// ajustes) queda SIEMPRE en el llamante.
+export function parseCentsRaw(raw) {
+  let s = String(raw ?? "").trim();
+  if (!s) return 0;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  return Math.round(parseFloat(s) * 100) || 0;
+}
+
+// Inverso para precargar inputs de importe: céntimos → «1250,50» (absoluto, sin puntos
+// de millar — es un valor editable, no un formateado); 0 → cadena vacía.
+export const centsToRaw = (cents) => (cents ? (Math.abs(cents) / 100).toFixed(2).replace(".", ",") : "");
+
 // opfs-sahpool solo admite una instancia de la app: otra pestaña/PWA con la BD
 // abierta hace fallar createSyncAccessHandle con NoModificationAllowedError.
 // Ese fallo es recuperable ("locked": cierra la otra y reintenta); el resto

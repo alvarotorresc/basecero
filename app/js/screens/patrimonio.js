@@ -4,12 +4,11 @@ import {
   createGoal, updateGoal, softDeleteGoal,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtMoneyParts, hoyISO, fmtDec1, currencySymbol, currencyCode } from "../format.js";
+import { fmtMoney, fmtMoneyParts, hoyISO, fmtDec1, currencySymbol, currencyCode, parseCentsRaw, centsToRaw } from "../format.js";
 import { sparklineSvg } from "../charts.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-const centsToRaw = (cents) => (cents ? (Math.abs(cents) / 100).toFixed(2).replace(".", ",") : "");
 
 // ---- tarjeta "Patrimonio neto" --------------------------------------------
 
@@ -425,7 +424,7 @@ export async function renderPatrimonio(container) {
 
     container.querySelector("#acc-raw").oninput = (e) => {
       f.raw = e.target.value;
-      f.cents = Math.round(parseFloat((f.raw || "0").replace(",", ".")) * 100) || 0;
+      f.cents = parseCentsRaw(f.raw);
       errorMsg = "";
     };
 
@@ -672,7 +671,7 @@ export async function renderPatrimonio(container) {
     const rawInput = container.querySelector("#goal-raw");
     if (rawInput) rawInput.oninput = (e) => {
       f.raw = e.target.value;
-      f.cents = Math.round(parseFloat((f.raw || "0").replace(",", ".")) * 100) || 0;
+      f.cents = parseCentsRaw(f.raw);
       errorMsg = "";
       state.deleteConfirm = false;
     };
