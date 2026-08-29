@@ -54,6 +54,11 @@ export const EN = {
       0: "Jan", 1: "Feb", 2: "Mar", 3: "Apr", 4: "May", 5: "Jun",
       6: "Jul", 7: "Aug", 8: "Sep", 9: "Oct", 10: "Nov", 11: "Dec",
     },
+    // Task 7 (6b): mirrors ES — see monthsLong there.
+    monthsLong: {
+      0: "January", 1: "February", 2: "March", 3: "April", 4: "May", 5: "June",
+      6: "July", 7: "August", 8: "September", 9: "October", 10: "November", 11: "December",
+    },
     weekdays: {
       0: "S", 1: "M", 2: "T", 3: "W", 4: "T", 5: "F", 6: "S",
     },
@@ -153,7 +158,7 @@ export const EN = {
       empty: "No recent expenses.",
       sharedSuffix: " · shared",
     },
-    keypad: { delete: "Backspace" },
+    keypad: { delete: "Backspace", helper: "the keypad adds up receipts" },
   },
   movimientos: {
     error: {
@@ -167,6 +172,12 @@ export const EN = {
     uncategorized: "Uncategorized",
     tapToCategorize: "tap to categorize",
     uncategorizedChip: "No category · {n}",
+    chipAll: "All",
+    search: {
+      toggle: "Search",
+      label: "Search",
+      placeholder: "Merchant or note",
+    },
     type: { transfer: "Transfer" },
     detail: {
       lockedNote: "Settled. To edit the amount, first delete its settlement in Transactions.",
@@ -181,6 +192,7 @@ export const EN = {
     },
     empty: {
       noUncategorized: "No uncategorized transactions.",
+      noResults: "No transactions match the filter.",
       noPeriod: "No transactions in this period.",
     },
   },
@@ -195,7 +207,10 @@ export const EN = {
     empty: "Nothing left to settle.",
     row: {
       sub: "{date} · {amount} · their {pct}%",
-      confirm: "Yes, settle",
+    },
+    footer: {
+      settle: "Settle up {total}",
+      confirm: "Yes, settle up {total}",
     },
   },
   presupuesto: {
@@ -255,6 +270,10 @@ export const EN = {
     accountSubtitle: {
       checking: "Checking account",
       checkingDefault: "Checking account · default",
+      // Task 7 (6c): mirrors ES — see accountSubtitle there.
+      savings: "Savings",
+      liability: "Liability",
+      installmentsLeft: { one: "{n} installment left", other: "{n} installments left" },
     },
     accounts: {
       title: "Accounts",
@@ -272,6 +291,7 @@ export const EN = {
       },
       create: "Create account",
       validation: { name: "Give the account a name." },
+      monthlyInstallment: "Monthly installment",
     },
     goals: {
       title: "Goals",
@@ -317,10 +337,6 @@ export const EN = {
       monthly: "Monthly",
       quarterly: "Quarterly",
       yearly: "Yearly",
-    },
-    month: {
-      0: "January", 1: "February", 2: "March", 3: "April", 4: "May", 5: "June",
-      6: "July", 7: "August", 8: "September", 9: "October", 10: "November", 11: "December",
     },
     subtitle: {
       day: "day {n}",

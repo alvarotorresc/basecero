@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SQL } from "../../app/js/sql.js";
 import { netWorthOfBalances, shortMonthLabel, goalProgress } from "../../app/js/repo.js";
+import { sanitizeLoanMap, parseLoanMap } from "../../app/js/account-defaults.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
 const T = "2026-08-24T18:00:00Z";
@@ -485,6 +486,53 @@ test("createGoal con isActive:false: el goal se crea YA desactivado (is_active=0
   const goal = db.prepare("SELECT * FROM goals WHERE id=?").get(goalId);
   assert.equal(goal.is_active, 0, "isActive:false en create debe persistir como is_active=0, no quedar hardcodeado a 1");
   assert.deepEqual(db.prepare(SQL.listGoals).all().map((r) => r.id), [], "listGoals (is_active=1) no lo lista");
+});
+
+// ---- setAccountLoan / getAccountLoans (reproducido, Task 6) — CONFIG-IN-META en account_loans -
+
+/** Reproduce repo.setAccountLoan: read-modify-write de meta.account_loans, sanea antes de
+ *  escribir — mismo patrón que setCategoryStyleReproduced en categorias.test.mjs. */
+function setAccountLoanReproduced(db, accountId, monthlyCents) {
+  const metaRows = db.prepare(SQL.allMeta).all();
+  const meta = Object.fromEntries(metaRows.map((r) => [r.key, r.value]));
+  const loanMap = parseLoanMap(meta.account_loans);
+  if (monthlyCents > 0) loanMap[accountId] = { monthlyCents };
+  else delete loanMap[accountId];
+  const sanitized = sanitizeLoanMap(loanMap);
+  db.prepare(SQL.upsertMeta).run("account_loans", JSON.stringify(sanitized));
+  return sanitized;
+}
+
+test("setAccountLoan (reproducido): guarda monthlyCents para un pasivo", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const out = setAccountLoanReproduced(db, "acc-prestamo", 18900);
+  assert.deepEqual(out, { "acc-prestamo": { monthlyCents: 18900 } });
+  const row = db.prepare("SELECT value FROM meta WHERE key='account_loans'").get();
+  assert.equal(row.value, JSON.stringify({ "acc-prestamo": { monthlyCents: 18900 } }));
+});
+
+test("setAccountLoan (reproducido): monthlyCents<=0 borra la entrada existente (vuelve a 'sin cuota')", () => {
+  const db = openDb();
+  seedMinimal(db);
+  setAccountLoanReproduced(db, "acc-prestamo", 18900);
+  assert.deepEqual(setAccountLoanReproduced(db, "acc-prestamo", 0), {});
+});
+
+test("setAccountLoan (reproducido): toca SOLO la cuenta indicada, conserva las demás entradas del mapa", () => {
+  const db = openDb();
+  seedMinimal(db);
+  setAccountLoanReproduced(db, "acc-prestamo", 18900);
+  const out = setAccountLoanReproduced(db, "acc-revolut", 5000);
+  assert.deepEqual(out, { "acc-prestamo": { monthlyCents: 18900 }, "acc-revolut": { monthlyCents: 5000 } });
+});
+
+test("meta.account_loans arranca en '{}' (semilla schema.sql) — getAccountLoans (reproducido) da un mapa vacío", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const meta = Object.fromEntries(db.prepare(SQL.allMeta).all().map((r) => [r.key, r.value]));
+  assert.equal(meta.account_loans, "{}");
+  assert.deepEqual(parseLoanMap(meta.account_loans), {});
 });
 
 test("execMany: si el insert del goal falla tras crear su hucha, hace rollback completo (no queda ni la cuenta huérfana)", () => {

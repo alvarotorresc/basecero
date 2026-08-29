@@ -306,25 +306,29 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupue
 
 /** Tarjeta "Disponible del periodo" (PR polish): presupuesto total del periodo menos lo
  *  gastado, con el ritmo del plan (paceDeltaCents, prevision.js: cuánto por encima o por debajo
- *  del gasto prorrateado a hoy) y el botón «Liquidar» — mismo id/handler que
- *  #shared-liquidar en sharedBlockHtml, mismo gate literal que el spec (contraparte + pendiente
- *  > 0). Se oculta entera si no hay presupuestos definidos este periodo (budgetTotal === 0). */
-function disponibleCardHtml(budgets, spent, period, sharedTotal, partnerName) {
+ *  del gasto prorrateado a hoy). Se oculta entera si no hay presupuestos definidos este periodo
+ *  (budgetTotal === 0).
+ *
+ *  Task 7 (6f): esta tarjeta llevaba TAMBIÉN su propio botón «Liquidar» (#disp-liquidar), con
+ *  el mismo gate (partnerName && sharedTotal>0) y el mismo handler que #shared-liquidar en
+ *  sharedBlockHtml — un usuario con presupuestos definidos Y compartidos pendientes veía DOS
+ *  botones «Liquidar» a la vez. Consolidado en uno solo: se queda en sharedBlockHtml (la tarjeta
+ *  dedicada a compartidos, con nombre de la contraparte/reparto/importe pendiente ya de
+ *  contexto — el botón encaja ahí de forma natural) y se retira de aquí, que es sobre el
+ *  presupuesto, no sobre compartidos. */
+function disponibleCardHtml(budgets, spent, period) {
   const budgetTotal = budgets.reduce((s, b) => s + b.amount_cents, 0);
   if (!budgetTotal) return "";
   const disp = budgetTotal - spent;
   const delta = paceDeltaCents(budgetTotal, spent, period.start_date, hoyISO());
   const over = delta > 0;
   const badge = `<span class="num" style="font-size:11px;font-weight:700;border-radius:999px;padding:4px 10px;color:${over ? "var(--amber)" : "var(--green)"};background:${over ? "rgba(255,190,77,0.14)" : "rgba(79,217,154,0.14)"};">${t(over ? "inicio.available.paceOver" : "inicio.available.paceUnder", { amount: escHtml(fmtMoney(Math.abs(delta))) })}</span>`;
-  const liquidar = partnerName && sharedTotal > 0
-    ? `<button type="button" id="disp-liquidar" class="num" style="height:44px;padding:0 18px;border-radius:999px;border:0;background:var(--card2);color:var(--text);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">${t("inicio.available.settleWithAmount", { amount: escHtml(fmtMoney(sharedTotal)) })}</button>`
-    : "";
   return `
   <section class="card" style="margin-bottom:16px;">
     <div class="section-title">${t("inicio.available.title")}</div>
     <div class="amount-hero num">${moneyPartsHtml(disp)}</div>
     <div class="num" style="font-size:12px;color:var(--text-2);">${t("inicio.available.ofBudgeted", { amount: escHtml(fmtMoney(budgetTotal)) })}</div>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;">${badge}${liquidar}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;">${badge}</div>
   </section>`;
 }
 
@@ -393,7 +397,7 @@ export async function renderInicio(container) {
       <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;">${saludo}</div>
     </button>
 
-    ${disponibleCardHtml(budgets, spent, period, sharedTotal, partnerName)}
+    ${disponibleCardHtml(budgets, spent, period)}
 
     <div class="card" style="display:flex;flex-direction:column;gap:4px;margin-bottom:16px;">
       <div class="section-title">${t("inicio.spent.title")}</div>
@@ -456,11 +460,10 @@ export async function renderInicio(container) {
     }
   };
 
+  // Task 7 (6f): único botón Liquidar (antes también #disp-liquidar en disponibleCardHtml, ver
+  // comentario ahí) — un solo id, un solo listener.
   const liquidarBtn = container.querySelector("#shared-liquidar");
   if (liquidarBtn) liquidarBtn.onclick = () => renderLiquidar(container, () => renderInicio(container));
-
-  const dispLiquidarBtn = container.querySelector("#disp-liquidar");
-  if (dispLiquidarBtn) dispLiquidarBtn.onclick = () => renderLiquidar(container, () => renderInicio(container));
 
   const presuBtn = container.querySelector("#inicio-ver-presupuesto");
   if (presuBtn) presuBtn.onclick = () => renderPresupuesto(container, () => renderInicio(container));

@@ -124,8 +124,8 @@ test("validate: id con caracteres no válidos se rechaza — en meta.key y en ca
 });
 test("validate: PK duplicada (dentro de la misma pestaña, meta usa key)", () => {
   const d = parse((x) => { x.meta.push({ key: "schema_version", value: "1" }); });
-  // el duplicado se reporta en la fila de la SEGUNDA aparición (fila 12: las 10 semillas + esta)
-  assert.match(validateImport(d).join("\n"), /pestaña «meta» fila 12: id duplicado \(«schema_version»\)/);
+  // el duplicado se reporta en la fila de la SEGUNDA aparición (fila 13: las 11 semillas + esta)
+  assert.match(validateImport(d).join("\n"), /pestaña «meta» fila 13: id duplicado \(«schema_version»\)/);
 });
 test("validate: dos periodos open", () => {
   const d = parse((x) => { x.periods.push({ ...x.periods[0], id: "per-2", name: "Otro" }); });
@@ -467,6 +467,72 @@ test("import: pestaña sin cabecera de columna booleana (is_archived) → defaul
   assert.deepEqual(errors, []);
   assert.ok(data.accounts.length > 0);
   for (const r of data.accounts) assert.equal(r.is_archived, 0);
+  assert.deepEqual(validateImport(data), []);
+});
+
+// Task 8 (5c): created_at/updated_at son NOT NULL en schema.sql, pero "" satisface NOT NULL
+// (se guarda como texto vacío) — un residuo de storage silencioso, no un error de validación
+// (ninguna de las dos columnas está en DATE_COLS/REQUIRED_DATE_COLS ni en ningún otro check de
+// validateImport). Blanco de fábrica típico: hoja del generador con la columna presente pero sin
+// rellenar a mano. workbookToRows debe rellenarlas con un timestamp no vacío en vez de dejarlas "".
+test("import: created_at/updated_at en blanco se rellenan con timestamp no vacío (5c)", () => {
+  const wb = wbFromSeed();
+  const ws = wb.Sheets.accounts;
+  const header = X.utils.sheet_to_json(ws, { header: 1 })[0];
+  const rows = X.utils.sheet_to_json(ws, { defval: "" });
+  const aoa = [header, ...rows.map((r) =>
+    header.map((h) => (h === "created_at" || h === "updated_at") ? "" : r[h]))];
+  wb.Sheets.accounts = X.utils.aoa_to_sheet(aoa);
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  assert.ok(data.accounts.length > 0);
+  for (const r of data.accounts) {
+    assert.notEqual(r.created_at, "");
+    assert.notEqual(r.updated_at, "");
+  }
+  assert.deepEqual(validateImport(data), []);
+});
+
+// Determinismo (ruling 5): NO se llama a nowIso() directo dentro de workbookToRows de forma que
+// un test no pueda fijar el valor — el 3er parámetro `now` es inyectable, con default nowIso()
+// SOLO cuando el llamador (onboarding.js/ajustes.js) no pasa nada. Aquí se inyecta un valor fijo
+// y se comprueba que es EXACTAMENTE ese valor, no solo "no vacío".
+test("import: created_at/updated_at en blanco usan el `now` inyectado, no Date.now() (determinismo)", () => {
+  const wb = wbFromSeed();
+  const ws = wb.Sheets.accounts;
+  const header = X.utils.sheet_to_json(ws, { header: 1 })[0];
+  const rows = X.utils.sheet_to_json(ws, { defval: "" });
+  const aoa = [header, ...rows.map((r) =>
+    header.map((h) => (h === "created_at" || h === "updated_at") ? "" : r[h]))];
+  wb.Sheets.accounts = X.utils.aoa_to_sheet(aoa);
+  const NOW = "2026-08-29T12:00:00Z";
+  const { data, errors } = workbookToRows(X, wb, NOW);
+  assert.deepEqual(errors, []);
+  assert.ok(data.accounts.length > 0);
+  for (const r of data.accounts) {
+    assert.equal(r.created_at, NOW);
+    assert.equal(r.updated_at, NOW);
+  }
+});
+
+// Mismo default-fill cuando la CABECERA falta directamente (no solo la celda vacía) — mismo
+// criterio que el fix round 1 de is_archived (test de arriba): una columna NOT NULL ausente de
+// la hoja no debe colar "" hasta el INSERT.
+test("import: pestaña sin cabecera created_at/updated_at → default-fill, no vacío", () => {
+  const wb = wbFromSeed();
+  const ws = wb.Sheets.accounts;
+  const fullHeader = X.utils.sheet_to_json(ws, { header: 1 })[0];
+  const rows = X.utils.sheet_to_json(ws, { defval: "" });
+  const header = fullHeader.filter((h) => h !== "created_at" && h !== "updated_at");
+  const aoa = [header, ...rows.map((r) => header.map((h) => r[h]))];
+  wb.Sheets.accounts = X.utils.aoa_to_sheet(aoa);
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  assert.ok(data.accounts.length > 0);
+  for (const r of data.accounts) {
+    assert.notEqual(r.created_at, "");
+    assert.notEqual(r.updated_at, "");
+  }
   assert.deepEqual(validateImport(data), []);
 });
 

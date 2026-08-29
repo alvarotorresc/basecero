@@ -1,4 +1,5 @@
 import { CONTRACT, ENUMS, BOOL_COLS, NULLABLE_NUM, FKS, eurToCents, centsToEur, xlsxHeader, toIsoDate } from "./contract.js";
+import { nowIso } from "./format.js";
 import { t } from "./i18n/index.js";
 
 // dump: { tabla: [{col: valor SQLite}] } → workbook con una pestaña por tabla.
@@ -24,6 +25,13 @@ export function rowsToWorkbook(X, dump) {
 
 const DATE_COLS = new Set(["date", "start_date", "end_date", "target_date"]);
 
+// 5c: created_at/updated_at son NOT NULL en schema.sql, pero "" satisface NOT NULL (se guarda
+// como texto vacío) — un residuo de storage silencioso que ningún check de validateImport
+// atrapa (no están en DATE_COLS ni en ningún otro bloque de validación de contenido). Una hoja
+// rellenada a mano, o generada sin esas dos columnas, dejaba pasar timestamps vacíos hasta el
+// INSERT. Se rellenan aquí con `now` (ver firma de workbookToRows más abajo).
+const TIMESTAMP_COLS = new Set(["created_at", "updated_at"]);
+
 // Representaciones reconocidas de un booleano en una celda de xlsx — lo que hoy produce un
 // export real (rowsToWorkbook escribe un boolean JS nativo) y lo que sobrevive un round-trip
 // binario (X.write/X.read conservan el tipo de celda: boolean, number o string tal cual). Todo
@@ -46,7 +54,12 @@ function isValidIsoDate(v) {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d;
 }
 
-export function workbookToRows(X, wb) {
+// `now` es inyectable (ruling 5, determinismo): NUNCA se llama a nowIso() directo dentro del
+// cuerpo de la función, así un test puede fijar un valor exacto y afirmar igualdad estricta en
+// vez de solo "no vacío". El default nowIso() SOLO se evalúa cuando el llamador real
+// (onboarding.js, ajustes.js) no pasa un 3er argumento — ninguno de los dos lo hace hoy, así
+// que ambos siguen usando la hora real de importación, cero cambio de comportamiento para ellos.
+export function workbookToRows(X, wb, now = nowIso()) {
   const data = {}, errors = [];
   for (const table of Object.keys(CONTRACT)) {
     const ws = wb.Sheets[table];
@@ -71,9 +84,10 @@ export function workbookToRows(X, wb) {
           else if (col.endsWith("_cents")) row[col] = v === "" ? null : eurToCents(v);
           else if (bools.has(col)) row[col] = BOOL_TRUE.has(v) ? 1 : BOOL_FALSE.has(v) ? 0 : v;
           else if (DATE_COLS.has(col)) row[col] = toIsoDate(v);
+          else if (TIMESTAMP_COLS.has(col)) row[col] = v === "" ? now : v;
           else row[col] = v;
         }
-        for (const c of cols) if (!(c in row)) row[c] = bools.has(c) ? 0 : NULLABLE_NUM.has(c) ? null : (c.endsWith("_cents") ? null : "");
+        for (const c of cols) if (!(c in row)) row[c] = bools.has(c) ? 0 : NULLABLE_NUM.has(c) ? null : (c.endsWith("_cents") ? null : TIMESTAMP_COLS.has(c) ? now : "");
         return row;
       });
   }

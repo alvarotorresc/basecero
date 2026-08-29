@@ -1,7 +1,7 @@
 import {
   balancesAt, netWorthOfBalances, netWorthSeries, goalsWithProgress,
   getAccount, createAccount, updateAccount, listExpenseRootCategories, allCategoriesById,
-  createGoal, updateGoal, softDeleteGoal,
+  createGoal, updateGoal, softDeleteGoal, getAccountLoans, setAccountLoan,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, hoyISO, fmtDec1, currencySymbol, currencyCode, parseCentsRaw, centsToRaw } from "../format.js";
@@ -97,17 +97,26 @@ const ACCOUNT_TYPES = [
   { id: "liability", labelKey: "patrimonio.accountType.liability" },
 ];
 
-/** Subtítulo por tipo — "Cuenta corriente · por defecto" es el único texto literal que pide el
- *  brief; el resto ("Ahorro"/"Pasivo") queda deliberadamente genérico: no hay en el contrato
- *  ningún campo del que derivar "2 huchas con objetivo" o "cuota 189 €/mes" del mockup sin
- *  inventar datos, así que no se replican aquí. */
-function accountSubtitle(type, isDefault) {
-  if (type === "checking") return isDefault ? t("patrimonio.accountSubtitle.checkingDefault") : t("patrimonio.accountSubtitle.checking");
-  if (type === "savings") return t("patrimonio.accountType.savings");
-  return t("patrimonio.accountType.liability");
+/** Subtítulo por tipo — "Cuenta corriente · por defecto" es el único texto literal que pedía el
+ *  brief original; "Ahorro" queda deliberadamente genérico (no hay en el contrato ningún campo
+ *  del que derivar "2 huchas con objetivo" sin inventar datos). Para un PASIVO con cuota mensual
+ *  definida (Task 6, meta.account_loans — ver account-defaults.js#sanitizeLoanMap y
+ *  repo.setAccountLoan/getAccountLoans), en vez del genérico "Pasivo" se muestra "quedan N
+ *  cuotas" = techo(|balance| / monthlyCents) — balance_cents es negativo en un pasivo, de ahí el
+ *  valor absoluto. Sin cuota definida (mapa vacío o entrada saneada fuera), cae al "Pasivo" de
+ *  siempre: es opcional, no todo pasivo tiene por qué llevar una. */
+function accountSubtitle(a, isDefault, accountLoans) {
+  if (a.type === "checking") return isDefault ? t("patrimonio.accountSubtitle.checkingDefault") : t("patrimonio.accountSubtitle.checking");
+  if (a.type === "savings") return t("patrimonio.accountSubtitle.savings");
+  const monthlyCents = accountLoans[a.id]?.monthlyCents;
+  if (monthlyCents > 0) {
+    const n = Math.ceil(Math.abs(a.balance_cents) / monthlyCents);
+    return t("patrimonio.accountSubtitle.installmentsLeft", { n });
+  }
+  return t("patrimonio.accountSubtitle.liability");
 }
 
-function cuentaRowHtml(a, isDefault) {
+function cuentaRowHtml(a, isDefault, accountLoans) {
   const icon = ACCOUNT_ICON[a.type] ?? ACCOUNT_ICON.checking;
   const isLiability = a.type === "liability";
   return `
@@ -118,7 +127,7 @@ function cuentaRowHtml(a, isDefault) {
       </div>
       <div class="list-row-body">
         <div class="list-row-title">${escHtml(a.name)}</div>
-        <div class="list-row-sub">${accountSubtitle(a.type, isDefault)}</div>
+        <div class="list-row-sub">${accountSubtitle(a, isDefault, accountLoans)}</div>
       </div>
       <div style="text-align:right;">
         <div class="num" style="font-size:15px;font-weight:600;${isLiability ? "color:var(--red);" : ""}">${fmtMoney(a.balance_cents)}</div>
@@ -131,10 +140,10 @@ function cuentaRowHtml(a, isDefault) {
  *  separadas por <hr class="divider"> — réplica de docs/design/material-expresivo/Patrimonio.dc.html:61-121, + botón
  *  "Nueva cuenta" en la cabecera. Cada fila abre la subvista de edición (Task 14). El lado derecho
  *  es a dos líneas (saldo + "hoy", como el artboard) para las 3 cuentas: "hoy" es el único
- *  subtítulo que aplica siempre y sin inventar nada (balancesAt se pide con hoyISO()) — el
- *  artboard muestra "quedan 20 cuotas" para el pasivo, pero no hay ningún campo de nº de cuotas en
- *  el esquema (mismo hueco que accountSubtitle ya documenta arriba), así que no se replica. */
-function cuentasCardHtml(accounts) {
+ *  subtítulo que aplica siempre y sin inventar nada (balancesAt se pide con hoyISO()). Para un
+ *  pasivo CON cuota mensual definida, accountSubtitle sustituye ese subtítulo por "quedan N
+ *  cuotas" (Task 6) — accountLoans (meta.account_loans, cargado en loadData) viaja hasta aquí. */
+function cuentasCardHtml(accounts, accountLoans) {
   const n = accounts.length;
   const header = `
     <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -154,7 +163,7 @@ function cuentasCardHtml(accounts) {
   }
 
   const firstCheckingId = accounts.find((a) => a.type === "checking")?.id;
-  const rowsHtml = accounts.map((a) => cuentaRowHtml(a, a.id === firstCheckingId)).join('<hr class="divider">');
+  const rowsHtml = accounts.map((a) => cuentaRowHtml(a, a.id === firstCheckingId, accountLoans)).join('<hr class="divider">');
 
   return `
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
@@ -296,11 +305,16 @@ function objetivosCardHtml(goals) {
  *  view interno 'main' | 'account-form' | 'goal-form', sin onBack — Patrimonio es pestaña de
  *  nivel superior, la subvista siempre vuelve a su propio 'main'). */
 export async function renderPatrimonio(container) {
-  let series, accounts, goals, expenseRootCats, byId;
+  let series, accounts, goals, expenseRootCats, byId, accountLoans;
 
   async function loadData() {
-    [series, accounts, goals, expenseRootCats, byId] = await Promise.all([
+    // accountLoans (meta.account_loans, Task 6): a diferencia de category_style, que se
+    // inicializa como singleton en el boot (main.js) porque colorForCategory/iconForCategory se
+    // llaman desde varias pantallas, account_loans SOLO lo usa Patrimonio (accountSubtitle) — se
+    // carga aquí en cada loadData en vez de un estado global, sin tocar main.js.
+    [series, accounts, goals, expenseRootCats, byId, accountLoans] = await Promise.all([
       netWorthSeries(), balancesAt(hoyISO()), goalsWithProgress(), listExpenseRootCategories(), allCategoriesById(),
+      getAccountLoans(),
     ]);
   }
 
@@ -334,7 +348,7 @@ export async function renderPatrimonio(container) {
 
   function openAccountNew() {
     state.editingAccountId = null;
-    state.accountForm = { name: "", type: "checking", raw: "", cents: 0, sign: "+" };
+    state.accountForm = { name: "", type: "checking", raw: "", cents: 0, sign: "+", loanRaw: "", loanCents: 0 };
     errorMsg = "";
     state.view = "account-form";
     render();
@@ -351,11 +365,15 @@ export async function renderPatrimonio(container) {
     }
     if (!row) return;
     state.editingAccountId = id;
+    // monthlyCents (Task 6): precarga desde accountLoans (cargado en loadData), no desde `row` —
+    // vive en meta.account_loans, no en la tabla accounts (config-in-meta, sin migración).
+    const monthlyCents = accountLoans[id]?.monthlyCents ?? 0;
     state.accountForm = {
       name: row.name, type: row.type,
       raw: centsToRaw(row.opening_balance_cents),
       cents: Math.abs(row.opening_balance_cents),
       sign: row.opening_balance_cents < 0 ? "-" : "+",
+      loanRaw: centsToRaw(monthlyCents), loanCents: monthlyCents,
     };
     errorMsg = "";
     state.view = "account-form";
@@ -398,6 +416,17 @@ export async function renderPatrimonio(container) {
           : t("patrimonio.account.note.default")}
       </div>
 
+      ${f.type === "liability" ? `
+      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
+        <div class="section-title">${t("patrimonio.account.monthlyInstallment")}</div>
+        <div class="amount-display" style="align-items:center;">
+          <input type="text" inputmode="decimal" id="acc-loan-raw" value="${escAttr(f.loanRaw)}" placeholder="0"
+            style="border:0;background:none;color:var(--text);font:600 32px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
+          <span class="amount-currency">${currencySymbol()}</span>
+        </div>
+        <hr class="divider" style="margin-top:6px;">
+      </div>` : ""}
+
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
       <button type="button" class="btn-primary" id="acc-save">${editing ? t("common.saveChanges") : t("patrimonio.account.create")}</button>
@@ -430,6 +459,18 @@ export async function renderPatrimonio(container) {
       errorMsg = "";
     };
 
+    const loanRawInput = container.querySelector("#acc-loan-raw");
+    if (loanRawInput) loanRawInput.oninput = (e) => {
+      f.loanRaw = e.target.value;
+      // Math.abs: a diferencia de #acc-raw (saldo), este campo no tiene botón de signo — pero
+      // parseCentsRaw respeta el signo tecleado (el flip queda siempre en el llamante, ver
+      // format.js). En un pasivo el signo de #acc-raw ya suele ser "-": sin este abs, un usuario
+      // que teclee "-189" aquí guardaría monthlyCents negativo, que setAccountLoan interpretaría
+      // como "borrar la cuota" en silencio, sin ningún aviso.
+      f.loanCents = Math.abs(parseCentsRaw(f.loanRaw));
+      errorMsg = "";
+    };
+
     container.querySelector("#acc-save").onclick = async () => {
       const btn = container.querySelector("#acc-save");
       if (!f.name.trim()) {
@@ -443,11 +484,18 @@ export async function renderPatrimonio(container) {
       btn.disabled = true;
       try {
         const openingBalanceCents = f.sign === "-" ? -f.cents : f.cents;
-        if (state.editingAccountId) {
-          await updateAccount(state.editingAccountId, { name: f.name.trim(), type: f.type, openingBalanceCents });
+        // Cuota mensual (Task 6): solo se persiste para pasivos — un tipo distinto manda
+        // monthlyCents 0, que setAccountLoan interpreta como "borrar la entrada" (p.ej. si el
+        // usuario cambia el tipo de la cuenta de pasivo a otra cosa, no debe quedar una cuota
+        // huérfana en meta.account_loans).
+        const monthlyCents = f.type === "liability" ? f.loanCents : 0;
+        let accountId = state.editingAccountId;
+        if (accountId) {
+          await updateAccount(accountId, { name: f.name.trim(), type: f.type, openingBalanceCents });
         } else {
-          await createAccount({ name: f.name.trim(), type: f.type, openingBalanceCents });
+          accountId = await createAccount({ name: f.name.trim(), type: f.type, openingBalanceCents });
         }
+        await setAccountLoan(accountId, monthlyCents);
         await loadData();
         backToMain();
       } catch (e) {
@@ -752,7 +800,7 @@ export async function renderPatrimonio(container) {
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
       ${netWorthCardHtml(netWorthOfBalances(accounts), series)}
-      ${cuentasCardHtml(accounts)}
+      ${cuentasCardHtml(accounts, accountLoans)}
       ${objetivosCardHtml(goals)}
     `;
     wireMain();

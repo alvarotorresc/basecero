@@ -3,7 +3,8 @@ import {
   listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById, hasActiveLinkedRefund,
   getMetaAll,
 } from "../repo.js";
-import { colorForCategory, iconForCategory } from "../category-colors.js";
+import { colorForCategory, iconForCategory, textColorForCategory, rootOf } from "../category-colors.js";
+import { matchesFilter, isUncategorized } from "../movimientos-filter.js";
 import { fmtMoney, fmtDiaLargo, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { t } from "../i18n/index.js";
 
@@ -94,8 +95,6 @@ function movRowHtml(r, byId, accById) {
   </button>`;
 }
 
-const isUncategorized = (r) => r.category_id === "" && (r.type === "expense" || r.type === "income" || r.type === "refund");
-
 /** Pantalla Movimientos: selector de periodo, bandeja de sin-categorizar y lista agrupada por día
  *  (los 5 tipos), con subvista de detalle para editar/borrar cada movimiento. */
 export async function renderMovimientos(container) {
@@ -122,7 +121,15 @@ export async function renderMovimientos(container) {
     periodId: periods.find((p) => p.status === "open")?.id ?? periods[0].id,
     rows: [],
     uncategorizedCount: 0,
-    filterUncat: false,
+    // Task 4: filtro cliente sobre state.rows (buscador + chips por categoría raíz). Los tres
+    // campos se combinan con AND en matchesFilter (movimientos-filter.js); la UI garantiza que
+    // rootCatId y uncat no estén activos a la vez (chips de selección única, ver wireList).
+    // «Todos» = los tres en su valor neutro.
+    filter: { query: "", rootCatId: null, uncat: false },
+    // Muestra/oculta el input de búsqueda bajo la lupa del header — no forma parte del filtro en
+    // sí (tener texto buscado con el input oculto sería confuso, así que cerrar limpia
+    // filter.query, ver wireList#mov-search-toggle).
+    searchOpen: false,
     detailId: null,
     detail: null,
     deleteConfirm: false,
@@ -135,13 +142,32 @@ export async function renderMovimientos(container) {
     ]);
     // sin esto, categorizar/borrar el último movimiento sin categorizar con el filtro activo
     // deja la lista vacía sin forma de volver: el chip desaparece (count=0) pero el filtro seguía activo.
-    if (state.uncategorizedCount === 0) state.filterUncat = false;
+    if (state.uncategorizedCount === 0) state.filter.uncat = false;
+    // mismo invariante para la chip de categoría raíz activa: si el último movimiento de esa raíz
+    // se recategoriza/borra, su chip desaparece de presentRootCats() (ya no hay nada que mostrar
+    // en ella) pero el filtro seguía activo — la lista se quedaría vacía con ninguna chip marcada.
+    if (state.filter.rootCatId && !presentRootCats().includes(state.filter.rootCatId)) state.filter.rootCatId = null;
   }
 
   function categoriesFor(tipo) {
     if (tipo === "income") return incomeCats;
     if (needsCategory(tipo)) return expenseCats;
     return [];
+  }
+
+  /** Categorías raíz presentes en las rows cargadas del periodo (Task 4): una chip por cada una,
+   *  en orden de primera aparición (listAllByDay ya viene ordenado por fecha desc). transfer/
+   *  adjustment y filas sin categoría quedan fuera — no aportan chip de categoría (las sin
+   *  categoría tienen su propia chip "Sin categoría · N", ver renderList). */
+  function presentRootCats() {
+    const seen = new Set();
+    const out = [];
+    for (const r of state.rows) {
+      if (!needsCategory(r.type) || r.category_id === "") continue;
+      const root = rootOf(r.category_id, byId);
+      if (!seen.has(root)) { seen.add(root); out.push(root); }
+    }
+    return out;
   }
 
   function updateDetail(patch) {
@@ -191,6 +217,10 @@ export async function renderMovimientos(container) {
     // tocar el refund deja la deuda con la contraparte mal calculada y sin nada pendiente que lo delate.
     state.detail.settledLocked = row.type === "expense" && !!row.settled
       && (await hasActiveLinkedRefund(id).catch(() => false));
+    // Task 7 (5d): espejo en UI del guard refundAmountLocked (repo.js) — el lado del REFUND. Si el
+    // gasto enlazado ya está settled, bajar aquí el importe del refund descuadra la deuda liquidada
+    // en silencio (el guard de repo lo rechazaría en save, pero mejor prevenirlo en el input).
+    state.detail.refundLocked = row.type === "refund" && !!state.linkedRefund?.settled;
     state.view = "detail";
     errorMsg = "";
     render();
@@ -254,6 +284,9 @@ export async function renderMovimientos(container) {
     const myCents = d.isShared ? Math.round((d.cents * pct) / 100) : d.cents;
     const partnerCents = d.isShared ? d.cents - myCents : 0;
     const locked = !!d.settledLocked;
+    // Task 7 (5d): además de `locked` (lado del gasto), el importe del refund se bloquea si su
+    // gasto enlazado ya está settled — ver refundLocked en openDetail.
+    const amountLocked = locked || !!d.refundLocked;
 
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
 
@@ -273,8 +306,8 @@ export async function renderMovimientos(container) {
         <div class="section-title">${t("common.amount")}</div>
         <div class="amount-display" style="align-items:center;">
           ${d.type === "adjustment" ? `<button type="button" class="icon-btn" id="mov-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;" ${locked ? "disabled" : ""}>${d.sign}</button>` : ""}
-          <input type="text" inputmode="decimal" id="mov-raw" value="${escAttr(d.raw)}" placeholder="0" ${locked ? "disabled" : ""}
-            style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;${locked ? "opacity:.5;" : ""}">
+          <input type="text" inputmode="decimal" id="mov-raw" value="${escAttr(d.raw)}" placeholder="0" ${amountLocked ? "disabled" : ""}
+            style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;${amountLocked ? "opacity:.5;" : ""}">
           <span class="amount-currency">${currencySymbol()}</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
@@ -463,31 +496,90 @@ export async function renderMovimientos(container) {
     };
   }
 
-  function renderList() {
+  /** Cuerpo de la lista (día a día o vacío) filtrado con matchesFilter — Task 4. Vive en su propio
+   *  contenedor (#mov-list-body, ver renderList) para poder refrescarlo solo a él desde el
+   *  buscador sin recrear cabecera/chips/input: eso es lo que mantiene el foco/cursor del input
+   *  mientras se escribe (mismo motivo que el parche puntual de #mov-raw más abajo). */
+  function listBodyHtml() {
     const hoy = hoyISO();
-    const visible = state.filterUncat ? state.rows.filter(isUncategorized) : state.rows;
+    const visible = state.rows.filter((r) => matchesFilter(r, state.filter, byId));
 
-    const movimientosHtml = visible.length === 0
-      ? `<div class="card" style="text-align:center;color:var(--text-3)">
-          <p>${state.filterUncat ? t("movimientos.empty.noUncategorized") : t("movimientos.empty.noPeriod")}</p></div>`
-      : `<div class="card" style="display:flex;flex-direction:column;gap:16px;">
-          <div style="display:flex;flex-direction:column;gap:12px;">
-            ${groupByDay(visible).map((g) => `
-              <div class="day-label">${g.date === hoy ? t("common.today") : fmtDiaLargo(g.date)}</div>
-              ${g.rows.map((r) => movRowHtml(r, byId, accById)).join("")}
-            `).join("")}
-          </div>
-        </div>`;
+    if (visible.length === 0) {
+      // query primero: si hay texto buscado, "no hay coincidencias" es el mensaje relevante aunque
+      // la chip "Sin categoría" también esté activa (query+uncat se combinan con AND en
+      // matchesFilter) — solo sin query el vacío se atribuye a la chip de categoría.
+      const msg = state.rows.length === 0
+        ? t("movimientos.empty.noPeriod")
+        : state.filter.query
+          ? t("movimientos.empty.noResults")
+          : state.filter.uncat
+            ? t("movimientos.empty.noUncategorized")
+            : t("movimientos.empty.noResults");
+      return `<div class="card" style="text-align:center;color:var(--text-3)"><p>${msg}</p></div>`;
+    }
+    return `<div class="card" style="display:flex;flex-direction:column;gap:16px;">
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          ${groupByDay(visible).map((g) => `
+            <div class="day-label">${g.date === hoy ? t("common.today") : fmtDiaLargo(g.date)}</div>
+            ${g.rows.map((r) => movRowHtml(r, byId, accById)).join("")}
+          `).join("")}
+        </div>
+      </div>`;
+  }
 
-    // Chip de filtro (artboard Movimientos.dc.html:35): activo = tinta invertida (.chip.active del
-    // sistema); inactivo = borde discontinuo --rule, mismo criterio que la chip "Sin categoría · N"
-    // del artboard (padding simétrico porque, a diferencia de .chip-icon, esta chip no lleva icono).
-    const chipStyle = state.filterUncat
-      ? "padding:0 14px;"
-      : "padding:0 14px;background:transparent;border:1px dashed var(--rule);";
+  function wireListBody() {
+    container.querySelectorAll("#mov-list-body [data-tx]").forEach((b) => {
+      b.onclick = () => openDetail(b.dataset.tx);
+    });
+  }
+
+  /** Refresca SOLO #mov-list-body (sin tocar cabecera/chips/input de búsqueda) — ver comentario de
+   *  listBodyHtml. Es lo que llama el oninput del buscador en vez de render(). */
+  function refreshListBody() {
+    const body = container.querySelector("#mov-list-body");
+    if (!body) return;
+    body.innerHTML = listBodyHtml();
+    wireListBody();
+  }
+
+  function renderList() {
+    const rootCats = presentRootCats();
+    const allActive = !state.filter.rootCatId && !state.filter.uncat;
+
+    // Chips por categoría raíz (artboard Movimientos.dc.html:32-35): activa = tinta invertida
+    // (.chip.active del sistema). Un color inline SIEMPRE gana sobre una regla de clase, así que
+    // fijar style="color:X" también cuando está activa taparía el color:var(--bg) de .chip.active
+    // y rompería la inversión — por eso el textColorForCategory de la raíz solo se fija inline
+    // cuando la chip NO está activa; sin tinte de fondo (a diferencia de .chip-icon, que sí lleva
+    // círculo — el artboard aquí es texto plano con el emoji delante).
+    const catChipsHtml = rootCats.map((catId) => {
+      const active = state.filter.rootCatId === catId;
+      const icon = iconForCategory(catId, byId);
+      const name = byId[catId]?.name ?? "";
+      const color = textColorForCategory(catId, byId);
+      return `<button type="button" class="chip${active ? " active" : ""}" data-chip-cat="${catId}" style="padding:0 14px;${active ? "" : `color:${color};`}">${icon} ${escHtml(name)}</button>`;
+    }).join("");
+
+    // Chip "Sin categoría · N" (artboard Movimientos.dc.html:35): activa = tinta invertida;
+    // inactiva = borde discontinuo --rule, padding simétrico porque no lleva icono (mismo criterio
+    // que ya tenía antes de Task 4).
+    const uncatChipHtml = state.uncategorizedCount > 0
+      ? `<button type="button" data-chip-uncat class="chip${state.filter.uncat ? " active" : ""}" style="padding:0 14px;${state.filter.uncat ? "" : "background:transparent;border:1px dashed var(--rule);"}">${t("movimientos.uncategorizedChip", { n: state.uncategorizedCount })}</button>`
+      : "";
 
     container.innerHTML = `
-      <header class="screen-header"><h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">${t("common.movements")}</h1></header>
+      <header class="screen-header" style="flex-direction:row;align-items:center;justify-content:space-between;">
+        <h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">${t("common.movements")}</h1>
+        <button type="button" class="icon-btn" id="mov-search-toggle" aria-label="${t("movimientos.search.toggle")}">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4.2-4.2"></path></svg>
+        </button>
+      </header>
+
+      ${state.searchOpen ? `
+      <label class="field field-stack" style="margin-bottom:14px;">
+        <span class="field-label">${t("movimientos.search.label")}</span>
+        <input type="text" id="mov-search-input" value="${escAttr(state.filter.query)}" placeholder="${t("movimientos.search.placeholder")}">
+      </label>` : ""}
 
       <label class="field field-stack" style="margin-bottom:14px;">
         <span class="field-label">${t("movimientos.periodLabel")}</span>
@@ -496,16 +588,15 @@ export async function renderMovimientos(container) {
         </select>
       </label>
 
-      ${state.uncategorizedCount > 0 ? `
-      <div style="margin-bottom:14px;">
-        <button type="button" id="mov-chip-uncat" class="chip${state.filterUncat ? " active" : ""}" style="${chipStyle}">
-          ${t("movimientos.uncategorizedChip", { n: state.uncategorizedCount })}
-        </button>
-      </div>` : ""}
+      <div class="chips-row" style="margin-bottom:14px;">
+        <button type="button" data-chip-all class="chip${allActive ? " active" : ""}" style="padding:0 14px;">${t("movimientos.chipAll")}</button>
+        ${catChipsHtml}
+        ${uncatChipHtml}
+      </div>
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
-      ${movimientosHtml}
+      <div id="mov-list-body">${listBodyHtml()}</div>
     `;
     wireList();
   }
@@ -513,7 +604,8 @@ export async function renderMovimientos(container) {
   function wireList() {
     container.querySelector("#mov-period").onchange = async (e) => {
       state.periodId = e.target.value;
-      state.filterUncat = false;
+      state.filter = { query: "", rootCatId: null, uncat: false };
+      state.searchOpen = false;
       try {
         await loadPeriodData();
       } catch (err) {
@@ -522,15 +614,50 @@ export async function renderMovimientos(container) {
       render();
     };
 
-    const chip = container.querySelector("#mov-chip-uncat");
-    if (chip) chip.onclick = () => {
-      state.filterUncat = !state.filterUncat;
+    const searchToggle = container.querySelector("#mov-search-toggle");
+    if (searchToggle) searchToggle.onclick = () => {
+      const opening = !state.searchOpen;
+      state.searchOpen = opening;
+      // cerrar sin limpiar dejaría un filtro activo invisible (el input desaparece pero
+      // filter.query seguiría filtrando la lista sin ninguna pista de por qué).
+      if (!opening) state.filter.query = "";
+      render();
+      if (opening) container.querySelector("#mov-search-input")?.focus();
+    };
+
+    const searchInput = container.querySelector("#mov-search-input");
+    if (searchInput) searchInput.oninput = (e) => {
+      state.filter.query = e.target.value;
+      // NO se llama a render() aquí (perdería el foco/cursor del input mientras se escribe, mismo
+      // motivo que el oninput de #mov-raw en wireDetail): se refresca solo #mov-list-body.
+      refreshListBody();
+    };
+
+    const chipAll = container.querySelector("[data-chip-all]");
+    if (chipAll) chipAll.onclick = () => {
+      state.filter.rootCatId = null;
+      state.filter.uncat = false;
       render();
     };
 
-    container.querySelectorAll("[data-tx]").forEach((b) => {
-      b.onclick = () => openDetail(b.dataset.tx);
+    container.querySelectorAll("[data-chip-cat]").forEach((b) => {
+      b.onclick = () => {
+        const id = b.dataset.chipCat;
+        // tocar la chip ya activa vuelve a «Todos» (mismo toggle que ya tenía "Sin categoría").
+        state.filter.rootCatId = state.filter.rootCatId === id ? null : id;
+        state.filter.uncat = false;
+        render();
+      };
     });
+
+    const chipUncat = container.querySelector("[data-chip-uncat]");
+    if (chipUncat) chipUncat.onclick = () => {
+      state.filter.uncat = !state.filter.uncat;
+      if (state.filter.uncat) state.filter.rootCatId = null;
+      render();
+    };
+
+    wireListBody();
   }
 
   function render() {

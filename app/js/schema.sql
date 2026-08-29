@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version','1'),('currency','EUR'),('created_with','basecero-pwa'),('locale','es-ES'),('import_account_id',''),('default_account_id',''),('partner_name',''),('category_style','{}'),('csv_profile',''),('lang','');
+INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version','1'),('currency','EUR'),('created_with','basecero-pwa'),('locale','es-ES'),('import_account_id',''),('default_account_id',''),('partner_name',''),('category_style','{}'),('csv_profile',''),('lang',''),('account_loans','{}');
 
 CREATE TABLE IF NOT EXISTS accounts (
   id TEXT PRIMARY KEY, name TEXT NOT NULL,

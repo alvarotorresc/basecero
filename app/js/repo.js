@@ -3,7 +3,7 @@ import { query, exec, execMany } from "./db.js";
 import { nowIso, hoyISO, prevDayIso, fmtMoney, fmtDec1, appLocale } from "./format.js";
 import { CONTRACT, insertSql } from "./contract.js";
 import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
-import { resolveAccountId } from "./account-defaults.js";
+import { resolveAccountId, sanitizeLoanMap, parseLoanMap } from "./account-defaults.js";
 import { POOL, CURATED_ICONS, CATEGORY_ICONS, parseStyle, initCategoryStyle } from "./category-colors.js";
 import { SEED_NAMES } from "./seeds.js";
 import { t, monthShort } from "./i18n/index.js";
@@ -207,6 +207,64 @@ export async function settleShared(txId, accountId) {
     isShared: false,
     refId: txId,
   });
+}
+
+/** Task 5 (backlog, liquidar en bloque): construye los DOS statements (insert del refund +
+ *  update de settled=1) de CADA fila de `rows` — misma pareja que addTransaction({refId}) arma
+ *  para UNA liquidación (ver settleShared arriba), pero aquí NO se llama a addTransaction (eso
+ *  abriría un execMany por fila, con getOpenPeriod() repetido y sin atomicidad conjunta): se monta
+ *  el array completo a mano para que settleAllShared pueda mandarlo TODO a un único execMany.
+ *
+ *  PURA a propósito (mismo criterio que replaceAllStmts más abajo): recibe `rows` YA resueltas
+ *  (de pendingShared, filtradas por los ids pedidos), `periodId`/`date`/`now` ya calculados por el
+ *  caller — así es testeable en Node sin Worker, con datos a mano, y el test que comprueba el
+ *  ORDEN EXACTO del bind de insertTransaction llama a esta función real (no una reproducción a
+ *  mano que podría divergir en silencio si el bind order cambia aquí).
+ *
+ *  bcUlid/bcSanitizeCell son globales (cargados por <script src="vendor/pure.js">, igual que en
+ *  addTransaction/createAccount/createRule de este mismo archivo — ver n26.js:5 sobre el mismo
+ *  patrón). merchant pasa por bcSanitizeCell aunque ya viene sanitizado de la fila original: es
+ *  idempotente (bcSanitizeCell("'=X") no vuelve a anteponer otra comilla) y mantiene el mismo
+ *  tratamiento que settleShared→addTransaction, que sí lo sanitiza. */
+export function settleAllSharedStmts(rows, accountId, periodId, date, now) {
+  const stmts = [];
+  for (const row of rows) {
+    stmts.push({
+      sql: SQL.insertTransaction,
+      bind: [
+        bcUlid(), date, periodId, "refund", row.partner_amount_cents, accountId, "",
+        row.category_id, bcSanitizeCell(row.merchant ?? ""), "Liquidación", 0, null, 0,
+        row.id, "", "", "pending", now, now,
+      ],
+    });
+    stmts.push({ sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [now, row.id] });
+  }
+  return stmts;
+}
+
+/** Liquida VARIOS gastos compartidos pendientes DE GOLPE (botón «Liquidar {total}» al pie de
+ *  Liquidar.dc.html): un único getOpenPeriod() + una única pendingShared() (no una consulta por
+ *  fila) + settleAllSharedStmts (arriba) + UN SOLO execMany — o quedan liquidados TODOS los `ids`
+ *  pedidos, o ninguno (si algo falla a medias, la mitad de la deuda con la contraparte
+ *  desaparecería mientras la otra mitad sigue pendiente, un estado que ninguna pantalla sabría
+ *  explicar). `ids` vacío es un no-op silencioso (nada que liquidar, no es un error).
+ *
+ *  Guard de fila: si algún id de `ids` NO aparece en pendingShared() (ya liquidado por otra
+ *  pestaña, borrado, o directamente no existe), se LANZA (no se liquida un subconjunto en
+ *  silencio) — mismo mensaje que settleShared (errors.repo.settleNotFound), reutilizado porque es
+ *  exactamente la misma condición. Se filtra `pending` por `idSet` en vez de mapear `ids` uno a
+ *  uno para que un id DUPLICADO en `ids` no cree dos refunds sobre el mismo gasto (el filtro
+ *  dedupea; el length-check contra idSet.size detecta tanto duplicados como ids inexistentes). */
+export async function settleAllShared(ids, accountId) {
+  if (!ids || ids.length === 0) return;
+  const idSet = new Set(ids);
+  const period = await getOpenPeriod();
+  if (!period) throw new Error(t("errors.common.noOpenPeriod"));
+  const pending = await pendingShared();
+  const rows = pending.filter((r) => idSet.has(r.id));
+  if (rows.length !== idSet.size) throw new Error(t("errors.repo.settleNotFound"));
+  const now = nowIso();
+  await execMany(settleAllSharedStmts(rows, accountId, period.id, hoyISO(), now));
 }
 
 /** Actualiza los campos editables de un movimiento (mismas claves camelCase que addTransaction).
@@ -567,6 +625,36 @@ export async function updateAccount(id, fields) {
   const openingBalanceCents = fields.openingBalanceCents ?? cur.opening_balance_cents;
   const now = nowIso();
   await exec(SQL.updateAccount, [bcSanitizeCell(name), type, openingBalanceCents, now, id]);
+}
+
+/** Cuota mensual de un pasivo (Task 6, CONFIG-IN-META — mismo patrón que setCategoryStyle, sin
+ *  migración de esquema ni cambio de contrato xlsx). Read-modify-write de meta.account_loans:
+ *  lee el JSON completo, toca SOLO `accountId`, reescribe entero. `monthlyCents` no positivo (o
+ *  ausente) BORRA la entrada — "sin cuota definida", mismo criterio "objeto vacío quita el
+ *  override" que setCategoryStyle. sanitizeLoanMap se aplica ANTES de escribir: defensa en
+ *  profundidad (un accountId corrupto no debería llegar aquí desde la UI, que solo ofrece ids
+ *  reales, pero esta es la última línea).
+ *  Cuentas borradas/archivadas: hoy no existe ningún flujo de borrado/archivado de CUENTAS en el
+ *  repo (a diferencia de categorías, que sí tienen setCategoryArchived) — createAccount/
+ *  updateAccount son las únicas operaciones. No hay, por tanto, ningún punto donde limpiar la
+ *  entrada de account_loans al borrar/archivar una cuenta; se documenta aquí para cuando esa
+ *  funcionalidad exista. */
+export async function setAccountLoan(accountId, monthlyCents) {
+  const meta = await getMetaAll();
+  const loanMap = parseLoanMap(meta.account_loans);
+  if (monthlyCents > 0) loanMap[accountId] = { monthlyCents };
+  else delete loanMap[accountId];
+  await setMeta("account_loans", JSON.stringify(sanitizeLoanMap(loanMap)));
+}
+
+/** Mapa saneado {accountId: {monthlyCents}} de meta.account_loans. A diferencia de
+ *  category_style (singleton inicializado en el boot de main.js porque colorForCategory/
+ *  iconForCategory se llaman desde varias pantallas), account_loans SOLO lo consume Patrimonio
+ *  (accountSubtitle, "quedan N cuotas") — se carga en patrimonio.js#loadData vía esta función,
+ *  sin necesidad de un estado global ni de tocar el boot. */
+export async function getAccountLoans() {
+  const meta = await getMetaAll();
+  return parseLoanMap(meta.account_loans);
 }
 
 export const getGoal = async (id) => (await query(SQL.getGoal, [id]))[0] ?? null;

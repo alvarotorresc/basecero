@@ -291,6 +291,19 @@ main#screen {
   color: var(--bg);
 }
 
+/* fila de chips de filtro en una sola línea con scroll horizontal (Movimientos, Task 4: «Todos» +
+   una chip por categoría raíz presente + «Sin categoría · N») — mismo criterio de scroll oculto
+   que .segmented/.chips-scroll, pero en una fila (flex nowrap por defecto) en vez de grid 2 filas. */
+.chips-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.chips-row::-webkit-scrollbar { display: none; }
+.chips-row .chip { flex: 0 0 auto; }
+
 /* chips de categoría en 2 filas con scroll horizontal (pantalla Registro) */
 .chips-scroll {
   display: grid;
@@ -335,10 +348,10 @@ main#screen {
   font-weight: 700;
 }
 
-/* ===== teclado numérico ===== */
+/* ===== teclado numérico (con operadores, Task 3 — ver Registro.dc.html) ===== */
 .keypad {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
 .key {
@@ -359,6 +372,10 @@ main#screen {
 .key:active { background: var(--rule); }
 .key-comma { color: var(--text-2); }
 .key-back svg { width: 23px; height: 23px; stroke: var(--text-2); fill: none; }
+/* +/−/×/÷: fondo/color atenuados frente a los dígitos (artboard: .op) — back/coma se quedan con
+   su tratamiento de siempre (key-back/key-comma), decisión explícita, ver registro.js. */
+.key.op { background: var(--card2); color: var(--text-2); font-size: 17px; }
+.key.op:active { background: var(--rule); }
 
 /* ===== filas de movimiento ===== */
 .tx-row {

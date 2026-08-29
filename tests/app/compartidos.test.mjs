@@ -1,8 +1,22 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import { SQL } from "../../app/js/sql.js";
-import { sharedFieldsLocked, refundAmountLocked, expenseDeleteLocked } from "../../app/js/repo.js";
+import {
+  sharedFieldsLocked, refundAmountLocked, expenseDeleteLocked, settleAllSharedStmts,
+} from "../../app/js/repo.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
+
+const require = createRequire(import.meta.url);
+const pure = require("../../app/vendor/pure.js");
+// repo.js#settleAllSharedStmts llama a bcUlid/bcSanitizeCell como GLOBALES (cargados por
+// <script src="vendor/pure.js"> en el navegador, igual que addTransaction/createAccount — ver
+// n26.js:5 sobre el mismo patrón, y n26.test.mjs:19 sobre cómo se expone en Node). Se importa
+// settleAllSharedStmts REAL (no una reproducción) precisamente porque es la función PURA que
+// construye el bind exacto de insertTransaction — la que el brief pide verificar "orden exacto,
+// 19 campos"; una copia a mano en el test no detectaría un bug de orden introducido en repo.js.
+globalThis.bcUlid = pure.bcUlid;
+globalThis.bcSanitizeCell = pure.bcSanitizeCell;
 
 const T = "2026-08-24T18:00:00Z";
 const T2 = "2026-08-24T19:00:00Z";
@@ -145,6 +159,158 @@ test("el refund de liquidación NO altera spentOfPeriod: tiene ref_id, así que 
 
   const despues = db.prepare(SQL.spentOfPeriod).get("per-1").spent_cents;
   assert.equal(despues, antes, "el refund de liquidación (ref_id != '') no debe restar ni sumar nada");
+});
+
+// ---- Task 5 (backlog, liquidar en bloque): repo.settleAllShared -------------------------
+// execManyRaw reproduce EXACTAMENTE el op "execMany" de app/js/db-worker.js (BEGIN/COMMIT/
+// ROLLBACK) — mismo helper que tests/app/periodos.test.mjs, tests/app/patrimonio.test.mjs y
+// tests/app/categorias.test.mjs, necesario porque el Worker real no está disponible en Node.
+function execManyRaw(db, stmts) {
+  db.exec("BEGIN");
+  try {
+    for (const s of stmts) db.prepare(s.sql).run(...(s.bind ?? []));
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+}
+
+/** Reproduce la ORQUESTACIÓN de repo.settleAllShared (getOpenPeriod, pendingShared + filtro por
+ *  ids, el guard de "algún id no está pendiente"): repo.settleAllShared en sí no es alcanzable en
+ *  Node (depende del Worker vía query/execMany, mismo motivo por el que settleShared/
+ *  openNextPeriod de este mismo fichero se reproducen en vez de importarse). El ARRAY de
+ *  statements NO se reproduce a mano aquí: se delega en la settleAllSharedStmts REAL importada de
+ *  repo.js (arriba) — así un bug en el bind de insertTransaction (orden de los 19 campos) lo
+ *  detectaría este test, cosa que una copia manual del bind no podría hacer. */
+function settleAllSharedReproduced(db, ids, accountId, now, periodId = "per-1") {
+  if (!ids || ids.length === 0) return;
+  const idSet = new Set(ids);
+  const period = db.prepare(SQL.getOpenPeriod).get();
+  if (!period) throw new Error("No hay ningún periodo abierto");
+  const pending = db.prepare(SQL.pendingShared).all().filter((r) => idSet.has(r.id));
+  if (pending.length !== idSet.size) throw new Error("Gasto compartido no encontrado o ya liquidado");
+  const stmts = settleAllSharedStmts(pending, accountId, period.id, "2026-08-24", now);
+  execManyRaw(db, stmts);
+  return period.id;
+}
+
+test("settleAllShared (reproducido): liquida N pendientes de golpe — N refunds enlazados con el importe/categoría/comercio correctos y N settled=1, todo en UN execMany", () => {
+  const db = openDb();
+  seedMinimal(db);
+  db.prepare(`INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
+    VALUES ('per-2','Julio 2026','2026-06-27','2026-07-27','closed',50,'',?,?,0)`).run(T, T);
+
+  // a: per-1 (60/40) sin override → contraparte 4000. b: per-2 (50/50, YA CERRADO) → contraparte
+  // 4000 con SU PROPIO pct, no el del periodo abierto. c: per-1 con override=90 → contraparte 1000.
+  // El merchant de `c` lleva un prefijo de fórmula a propósito: prueba que bcSanitizeCell se aplica
+  // igual que en settleShared→addTransaction (mismo criterio que categorias.test.mjs:428).
+  const a = ins(db, { id: "gasto-a", date: "2026-08-10", period: "per-1", cents: 10000, shared: 1, category: "cat-casa-alquiler", merchant: "IKEA" });
+  const b = ins(db, { id: "gasto-b", date: "2026-08-05", period: "per-2", cents: 8000, shared: 1, category: "cat-casa-alquiler", merchant: "Super" });
+  const c = ins(db, { id: "gasto-c", date: "2026-08-15", period: "per-1", cents: 10000, shared: 1, override: 90, category: "cat-casa-alquiler", merchant: "=HACK()" });
+
+  const openPeriodId = settleAllSharedReproduced(db, [a, b, c], "acc-n26", T2);
+  assert.equal(openPeriodId, "per-1");
+
+  assert.deepEqual(db.prepare(SQL.pendingShared).all(), [], "los 3 quedan liquidados: nada pendiente");
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM transactions WHERE type='refund'").get().c, 3);
+
+  for (const id of [a, b, c]) {
+    assert.equal(db.prepare("SELECT settled FROM transactions WHERE id=?").get(id).settled, 1, `${id} debe quedar settled=1`);
+  }
+
+  const refundOf = (origId) => db.prepare("SELECT * FROM transactions WHERE ref_id=? AND type='refund'").get(origId);
+
+  const refA = refundOf(a);
+  assert.equal(refA.amount_cents, 4000, "10000 - 60% = 4000");
+  assert.equal(refA.category_id, "cat-casa-alquiler");
+  assert.equal(refA.merchant, "IKEA");
+  assert.equal(refA.account_id, "acc-n26");
+  assert.equal(refA.period_id, "per-1", "el refund se crea en el periodo ABIERTO");
+  assert.equal(refA.note, "Liquidación");
+  assert.equal(refA.is_shared, 0);
+  assert.equal(refA.status, "pending");
+  assert.equal(refA.date, "2026-08-24");
+
+  const refB = refundOf(b);
+  assert.equal(refB.amount_cents, 4000, "8000 - 50% (pct PROPIO de per-2, cerrado) = 4000");
+  assert.equal(refB.period_id, "per-1", "aunque el gasto original sea de per-2 (cerrado), el refund va al periodo ABIERTO");
+
+  const refC = refundOf(c);
+  assert.equal(refC.amount_cents, 1000, "10000 - 90% (override) = 1000");
+  assert.equal(refC.merchant, "'=HACK()", "bcSanitizeCell antepone ' a un merchant que empieza como fórmula");
+});
+
+test("settleAllShared (reproducido): ATOMICIDAD — una fila inválida en MEDIO del lote hace rollback completo, ni siquiera las filas que iban ANTES en el array quedan aplicadas", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const d = ins(db, { id: "gasto-d", date: "2026-08-10", cents: 5000, shared: 1 });
+  const e = ins(db, { id: "gasto-e", date: "2026-08-11", cents: 6000, shared: 1 });
+  const f = ins(db, { id: "gasto-f", date: "2026-08-12", cents: 7000, shared: 1 });
+
+  const pending = db.prepare(SQL.pendingShared).all();
+  const rowD = pending.find((r) => r.id === d);
+  const rowE = pending.find((r) => r.id === e);
+  // fila deliberadamente inválida: partner_amount_cents=0 hace que el INSERT de su refund
+  // incumpla el CHECK (type='adjustment' OR amount_cents>0) de transactions — puesta en MEDIO
+  // (no primero) para que el test demuestre un rollback REAL: si solo se comprobara que las filas
+  // POSTERIORES a la mala no se aplican, eso sería trivial (nunca se llegó a ejecutarlas); lo que
+  // hay que probar es que la fila ANTERIOR (rowD), que sí llegó a ejecutar su INSERT+UPDATE con
+  // éxito DENTRO de la misma transacción, también se deshace.
+  const rowBad = { ...pending.find((r) => r.id === f), partner_amount_cents: 0 };
+
+  const stmts = settleAllSharedStmts([rowD, rowBad, rowE], "acc-n26", "per-1", "2026-08-24", T2);
+  assert.equal(stmts.length, 6, "3 filas × 2 statements (insert refund + update settled)");
+
+  assert.throws(() => execManyRaw(db, stmts), /CHECK constraint failed/);
+
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM transactions WHERE type='refund'").get().c, 0,
+    "ningún refund debe quedar creado, ni siquiera el de rowD (ejecutado ANTES de la fila mala)");
+  for (const id of [d, e, f]) {
+    assert.equal(db.prepare("SELECT settled FROM transactions WHERE id=?").get(id).settled, 0,
+      `${id} debe seguir settled=0: rollback completo`);
+  }
+  assert.equal(db.prepare(SQL.pendingShared).all().length, 3, "los 3 gastos siguen pendientes tras el rollback");
+});
+
+test("settleAllShared (reproducido): ids=[] es un no-op — no toca la BD", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const id = ins(db, { id: "gasto-solo", cents: 5000, shared: 1 });
+
+  settleAllSharedReproduced(db, [], "acc-n26", T2);
+
+  assert.equal(db.prepare("SELECT settled FROM transactions WHERE id=?").get(id).settled, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM transactions WHERE type='refund'").get().c, 0);
+});
+
+test("settleAllShared (reproducido): un id que no está en pendingShared (ya liquidado, borrado o inexistente) se RECHAZA — no liquida un subconjunto en silencio", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const a = ins(db, { id: "gasto-valido", cents: 5000, shared: 1 });
+  const yaLiquidado = ins(db, { id: "gasto-ya-liquidado", cents: 3000, shared: 1, settled: 1 });
+
+  assert.throws(
+    () => settleAllSharedReproduced(db, [a, yaLiquidado], "acc-n26", T2),
+    /Gasto compartido no encontrado o ya liquidado/,
+  );
+
+  // nada se aplicó: NI SIQUIERA `a`, que por sí solo era válido — todo o nada, igual que el guard
+  // de duplicados de abajo.
+  assert.equal(db.prepare("SELECT settled FROM transactions WHERE id=?").get(a).settled, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM transactions WHERE type='refund'").get().c, 0);
+});
+
+test("settleAllShared (reproducido): un id duplicado en `ids` no crea dos refunds sobre el mismo gasto", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const a = ins(db, { id: "gasto-duplicado", cents: 5000, shared: 1 });
+
+  settleAllSharedReproduced(db, [a, a], "acc-n26", T2);
+
+  const refunds = db.prepare("SELECT * FROM transactions WHERE type='refund' AND ref_id=?").all(a);
+  assert.equal(refunds.length, 1, "un id repetido en la petición no debe generar dos refunds");
+  assert.equal(db.prepare("SELECT settled FROM transactions WHERE id=?").get(a).settled, 1);
 });
 
 // ---- Task 17 ronda 2 (controller ruling, finding A): guard de "gasto liquidado" ---------

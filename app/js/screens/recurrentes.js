@@ -4,7 +4,7 @@ import {
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
-import { t } from "../i18n/index.js";
+import { t, monthLong } from "../i18n/index.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -69,7 +69,7 @@ export async function renderRecurrentes(container, onBack) {
     // tarea 7: "no se quita info real sin que el brief lo pida").
     const parts = [freqLabel, t("recurrentes.subtitle.day", { n: r.due_day })];
     if (needsMonth(r.frequency) && r.due_month) {
-      parts.push(t("recurrentes.subtitle.next", { month: t("recurrentes.month." + (r.due_month - 1)) }));
+      parts.push(t("recurrentes.subtitle.next", { month: monthLong(r.due_month - 1) }));
     }
     if (r.type === "transfer") {
       const from = accountsAll.find((a) => a.id === r.account_id)?.name;

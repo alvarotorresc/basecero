@@ -38,4 +38,5 @@ export function t(key, params) {
 }
 
 export const monthShort = (i) => t("i18n.months." + i);
+export const monthLong = (i) => t("i18n.monthsLong." + i);
 export const weekdayInitial = (d) => t("i18n.weekdays." + d);

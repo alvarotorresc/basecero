@@ -90,6 +90,11 @@ test("parseCentsRaw: gana el último separador con coma Y punto a la vez (en-US)
   assert.equal(parseCentsRaw("1,234"), 123);
 });
 
+test("parseCentsRaw: guarda contra valores no finitos (Infinity)", () => {
+  assert.equal(parseCentsRaw("1e400"), 0);
+  assert.equal(parseCentsRaw("-1e400"), 0);
+});
+
 test("centsToRaw: inverso para precargar inputs", () => {
   assert.equal(centsToRaw(125050), "1250,50");
   assert.equal(centsToRaw(-30000), "300,00");
