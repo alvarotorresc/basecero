@@ -28,129 +28,384 @@
 <link rel="stylesheet" href="/css/landing.css">
 </head>
 <body>
+<a class="bc-skip" href="#contenido">Saltar al contenido</a>
+<div class="bc-rules" aria-hidden="true"></div>
+
 <header class="lp-header">
-  <a class="lp-brand" href="/"><span class="lp-tile">B0</span><strong>BaseCero</strong></a>
-  <nav class="lp-lang" aria-label="Idioma">
-    <span aria-current="page">ES</span>
-    <a href="/en/" hreflang="en">EN</a>
-  </nav>
+  <a class="lp-brand" href="/">
+    <img class="lp-mark" src="/img/logo.svg" alt="" width="34" height="34">
+    <strong>BaseCero</strong>
+  </a>
+  <div class="bc-hdr-right">
+    <nav class="bc-hdr-nav" aria-label="Secciones">
+      <a href="#instalar">Instalar</a>
+      <a href="#app">La app</a>
+      <a href="#faq">Preguntas</a>
+    </nav>
+    <nav class="lp-lang" aria-label="Idioma">
+      <span aria-current="page">ES</span>
+      <a href="/en/" hreflang="en">EN</a>
+    </nav>
+    <a class="bc-hdr-icon" href="https://github.com/alvarotorresc/basecero" target="_blank" rel="noopener" aria-label="Código en GitHub">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.2-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.9 1.2 1.9 1.2 3.2 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"></path></svg>
+    </a>
+    <a class="bc-hdr-cta" href="/app/">Abrir la app</a>
+  </div>
 </header>
 
-<main>
-  <section class="lp-hero">
-    <h1>Tu dinero,<br>desde cero.</h1>
-    <p class="lp-subtitle">App de finanzas personales open source y totalmente offline. Periodos de nómina a nómina, presupuesto por categorías y gastos compartidos — sin servidor, sin cuentas, sin nube.</p>
-    <div class="lp-cta-row">
-      <a class="btn-primary" href="/app/">Abrir BaseCero</a>
-      <a class="btn-secondary" href="https://github.com/alvarotorresc/basecero" target="_blank" rel="noopener">Ver el código</a>
-    </div>
-  </section>
+<main id="contenido" tabindex="-1">
 
-  <section class="lp-features" aria-label="Características">
-    <div class="lp-feature-card">
-      <div class="lp-feature-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 018 0v3"></path></svg>
-      </div>
-      <h3>Todo local y offline</h3>
-      <p>Sin servidor y sin registro. Funciona hasta sin conexión: tus datos nunca salen del dispositivo.</p>
-    </div>
-    <div class="lp-feature-card">
-      <div class="lp-feature-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4F94E9" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3H6.5A1.5 1.5 0 005 4.5v15A1.5 1.5 0 006.5 21h11a1.5 1.5 0 001.5-1.5V9z"></path><path d="M13 3v6h6"></path></svg>
-      </div>
-      <h3>Tu dato es una hoja de cálculo</h3>
-      <p>Exporta e importa cuando quieras, en <code>.xlsx</code>: tus datos nunca están atrapados dentro de la app.</p>
-    </div>
-    <div class="lp-feature-card">
-      <div class="lp-feature-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5"></rect><path d="M3.5 9.5h17M8 3v4M16 3v4"></path></svg>
-      </div>
-      <h3>Periodos de nómina a nómina</h3>
-      <p>Tu mes empieza cuando cobras, no el día 1. El presupuesto y el «disponible real» siguen ese ritmo.</p>
-    </div>
-    <div class="lp-feature-card">
-      <div class="lp-feature-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"></circle><path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6"></path><circle cx="16.5" cy="9" r="2.4"></circle><path d="M14.8 20c.3-2.7 2.1-4.8 4.3-4.8"></path></svg>
-      </div>
-      <h3>Gastos compartidos y presupuesto</h3>
-      <p>Liquida los gastos compartidos entre dos personas y controla el límite de cada categoría, periodo a periodo.</p>
-    </div>
-  </section>
+  <!-- ===================== HERO ===================== -->
+  <section class="bc-hero" aria-labelledby="titular">
+    <div class="bc-dots bc-dots--hero" aria-hidden="true"></div>
 
-  <section class="lp-shots" aria-label="Capturas de la app">
-    <h2>La app, por dentro</h2>
-    <div class="lp-shots-track">
-      <img loading="lazy" src="/img/app-inicio.webp" alt="Pantalla de Inicio de BaseCero: disponible del periodo, gastado, ingresos, ahorro y gasto por categoría del día.">
-      <img loading="lazy" src="/img/app-movimientos.webp" alt="Pantalla de Movimientos: lista de gastos del periodo agrupados por día, con categoría e importe de cada uno.">
-      <img loading="lazy" src="/img/app-patrimonio.webp" alt="Pantalla de Patrimonio: patrimonio neto total, cuentas activas y objetivos de ahorro.">
-      <img loading="lazy" src="/img/app-presupuesto.webp" alt="Pantalla de Presupuesto: gasto por categoría frente al límite presupuestado, con barra de progreso y aviso al superarlo.">
+    <div class="bc-wrap bc-hero-inner">
+      <p class="bc-eyebrow">// Local-first<span class="bc-wide"> · Código abierto</span> · Sin nube</p>
+      <h1 id="titular">Tu dinero,<br>desde <span class="bc-accent">cero</span>.</h1>
+      <p class="bc-hero-sub">Finanzas personales que viven enteras en tu dispositivo. Sin servidor, sin cuentas, sin nube. Y tu mes empieza el día que cobras, no el 1.</p>
+      <div class="bc-cta-row">
+        <a class="bc-btn bc-btn--primary" href="/app/">
+          Abrir BaseCero
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"></path></svg>
+        </a>
+        <a class="bc-btn bc-btn--ghost" href="https://github.com/alvarotorresc/basecero" target="_blank" rel="noopener">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.2-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.9 1.2 1.9 1.2 3.2 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"></path></svg>
+          Ver el código
+        </a>
+      </div>
+      <p class="bc-mono bc-hero-note">Se abre en el navegador · 0 instaladores<span class="bc-wide"> · 0 cuentas</span></p>
     </div>
-  </section>
 
-  <section class="lp-install" aria-label="Instalación">
-    <h2>Instálala en tu móvil o escritorio</h2>
-    <div class="lp-install-grid">
-      <div class="lp-install-card">
-        <h3>Android / Chrome</h3>
-        <ol>
-          <li>Abre <a href="/app/">BaseCero</a> en Chrome.</li>
-          <li>Toca el menú (⋮).</li>
-          <li>Elige «Añadir a pantalla de inicio» (o acepta el banner de instalación).</li>
-        </ol>
+    <div class="bc-hero-shots">
+      <div class="bc-hero-shot">
+        <img src="/img/app-inicio.webp" width="780" height="1688" alt="Pantalla de Inicio de BaseCero: 49,31 € disponibles del periodo, 1.498,69 € gastados y el flujo de gasto de los últimos siete días.">
       </div>
-      <div class="lp-install-card">
-        <h3>iPhone / Safari</h3>
-        <ol>
-          <li>Abre <a href="/app/">BaseCero</a> en Safari (en iOS solo funciona desde Safari).</li>
-          <li>Toca el botón Compartir.</li>
-          <li>Elige «Añadir a pantalla de inicio».</li>
-        </ol>
-      </div>
-      <div class="lp-install-card">
-        <h3>Escritorio</h3>
-        <ol>
-          <li>Abre <a href="/app/">BaseCero</a> en Chrome o Edge.</li>
-          <li>Pulsa el icono de instalación en la barra de direcciones.</li>
-          <li>Confirma «Instalar BaseCero».</li>
-        </ol>
+      <div class="bc-hero-shot bc-hero-shot--b">
+        <img src="/img/app-presupuesto.webp" width="780" height="1688" alt="Pantalla de Presupuesto de BaseCero: 1.305,99 € gastados de 1.548 y una barra por categoría, con Transporte superada en rojo.">
       </div>
     </div>
   </section>
 
-  <section class="lp-faq" aria-label="Preguntas frecuentes">
-    <h2>Preguntas frecuentes</h2>
-    <details>
-      <summary>¿Dónde están mis datos?</summary>
-      <p>En tu dispositivo, en una base de datos local (OPFS del navegador). BaseCero no tiene servidor: nada sale de ahí salvo que tú lo exportes.</p>
-    </details>
-    <details>
-      <summary>¿Cómo hago copia de seguridad?</summary>
-      <p>Exporta un <code>.xlsx</code> sin cifrar (para abrir en Google Sheets o LibreOffice) o una copia <code>.bce</code> cifrada con contraseña. Tú decides cuándo y dónde guardarlas.</p>
-    </details>
-    <details>
-      <summary>¿Qué bancos puedo importar?</summary>
-      <p>N26 tiene un perfil de importación directo, con deduplicación. Para cualquier otro banco hay un asistente genérico que mapea las columnas de su CSV.</p>
-    </details>
-    <details>
-      <summary>¿Cuánto cuesta y qué licencia tiene?</summary>
-      <p>Es gratis y de código abierto, con licencia MIT. Puedes revisar, modificar y reutilizar el código libremente.</p>
-    </details>
-    <details>
-      <summary>¿Tiene analytics o cookies?</summary>
-      <p>Ninguno, por diseño. No hay servidor que reciba nada de lo que haces en la app, así que no hace falta banner de cookies: no hay nada que consentir.</p>
-    </details>
-    <details>
-      <summary>¿Y si pierdo el dispositivo?</summary>
-      <p>Los datos viven solo ahí. Si no exportaste una copia antes, se pierden con el dispositivo — por eso conviene exportar copias con regularidad.</p>
-    </details>
+  <!-- ===================== CUATRO CEROS ===================== -->
+  <section class="bc-zeros bc-xh">
+    <div class="bc-wrap">
+      <h2 class="bc-lbl bc-divider"><span>// Lo que<span class="bc-wide"> BaseCero</span> no tiene</span></h2>
+      <div class="bc-zeros-grid">
+        <div class="bc-frame bc-zero">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="1.8"></rect><rect x="3" y="14" width="18" height="6" rx="1.8"></rect><path d="M7 7.5h.01M7 17h.01"></path></svg>
+          <p class="bc-zero-n">0</p>
+          <p class="bc-lbl">Servidores</p>
+        </div>
+        <div class="bc-frame bc-zero">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"></circle><path d="M4.5 20c0-3.9 3.4-6.4 7.5-6.4s7.5 2.5 7.5 6.4"></path></svg>
+          <p class="bc-zero-n">0</p>
+          <p class="bc-lbl">Cuentas de usuario</p>
+        </div>
+        <div class="bc-frame bc-zero">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12.5S6 6 12 6s9.5 6.5 9.5 6.5S18 19 12 19s-9.5-6.5-9.5-6.5z"></path><circle cx="12" cy="12.5" r="2.6"></circle><path d="M4 21L20 4"></path></svg>
+          <p class="bc-zero-n">0</p>
+          <p class="bc-lbl">Rastreadores y cookies</p>
+        </div>
+        <div class="bc-frame bc-zero">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"></path><path d="M16.5 7.2c-.9-1.3-2.6-2-4.5-2-2.5 0-4.2 1.2-4.2 3s1.6 2.5 4.2 3.1c2.9.7 4.7 1.5 4.7 3.4s-1.9 3.3-4.7 3.3c-2.1 0-3.9-.8-4.8-2.2"></path></svg>
+          <p class="bc-zero-n">0 €</p>
+          <p class="bc-lbl">Coste · licencia MIT</p>
+        </div>
+      </div>
+    </div>
   </section>
+
+  <!-- ===================== INSTALAR ===================== -->
+  <section class="bc-section bc-xh" id="instalar">
+    <div class="bc-wrap">
+      <p class="bc-eyebrow">// Instalación</p>
+      <h2>Se instala como una app.<br>Pero no hay tienda ni descarga.</h2>
+      <p class="bc-section-lead">BaseCero es una web que tu navegador guarda como aplicación: icono propio, pantalla completa y funcionamiento sin conexión. Tarda diez segundos y no pide nada a cambio.</p>
+
+      <div class="bc-install-grid">
+
+        <div class="bc-frame bc-plat">
+          <div class="bc-plat-head">
+            <span class="bc-sq">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 11.8h12v6.6a1.6 1.6 0 0 1-1.6 1.6H7.6A1.6 1.6 0 0 1 6 18.4z"></path><path d="M6 11.8C6 8.9 8.7 6.6 12 6.6s6 2.3 6 5.2"></path><path d="M9.4 4.4 10.5 6.4M14.6 4.4 13.5 6.4"></path><path d="M3.4 12.6v4.2M20.6 12.6v4.2"></path><path d="M10 9.7h.01M14 9.7h.01"></path></svg>
+            </span>
+            <div>
+              <h3>Android</h3>
+              <p class="bc-lbl">Chrome · Edge · Brave</p>
+            </div>
+          </div>
+          <div class="bc-plat-rule" aria-hidden="true"></div>
+          <ol class="bc-steps">
+            <li><span>Abre <a href="/app/">basecero.alvarotc.com/app/</a> en Chrome.</span></li>
+            <li><span>Acepta el aviso «Instalar aplicación» si aparece.</span></li>
+            <li><span>Si no aparece: menú <span class="bc-kbd">⋮</span> → «Añadir a pantalla de inicio».</span></li>
+          </ol>
+        </div>
+
+        <div class="bc-frame bc-plat">
+          <div class="bc-plat-head">
+            <span class="bc-sq">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.9-1.4-.1-2.8.9-3.5.9s-1.8-.8-3-.8c-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3.9-1.3 1.3-2.6 1.3-2.7 0 0-2.5-1-2.5-3.6z"></path><path d="M14.2 5.2c.6-.8 1.1-1.9 1-3-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1 .1 2-.5 2.7-1.3z"></path></svg>
+            </span>
+            <div>
+              <h3>iPhone y iPad</h3>
+              <p class="bc-lbl">Solo Safari</p>
+            </div>
+          </div>
+          <div class="bc-plat-rule" aria-hidden="true"></div>
+          <ol class="bc-steps">
+            <li><span>Abre <a href="/app/">la app</a> <b>en Safari</b>.</span></li>
+            <li><span>Toca el botón Compartir <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13M8 6.5 12 3l4 3.5"></path><path d="M6 12v7.5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V12"></path></svg> de la barra inferior.</span></li>
+            <li><span>Baja y elige «Añadir a pantalla de inicio».</span></li>
+          </ol>
+        </div>
+
+        <div class="bc-frame bc-plat">
+          <div class="bc-plat-head">
+            <span class="bc-sq">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.8" y="4.4" width="18.4" height="12.4" rx="2"></rect><path d="M8.5 20.4h7M12 16.8v3.6"></path></svg>
+            </span>
+            <div>
+              <h3>Escritorio</h3>
+              <p class="bc-lbl">Chrome · Edge</p>
+            </div>
+          </div>
+          <div class="bc-plat-rule" aria-hidden="true"></div>
+          <ol class="bc-steps">
+            <li><span>Abre <a href="/app/">la app</a> en Chrome o Edge.</span></li>
+            <li><span>Pulsa el icono <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5"></rect><path d="M12 8v8M8 12h8"></path></svg> de instalar, a la derecha de la barra de direcciones.</span></li>
+            <li><span>Confirma «Instalar BaseCero».</span></li>
+          </ol>
+        </div>
+
+      </div>
+
+      <p class="bc-notice">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.3v.01"></path></svg>
+        <span><b>En iPhone tiene que ser Safari.</b> iOS no permite instalar aplicaciones web desde Chrome ni Firefox. Es una limitación de Apple, no de BaseCero.</span>
+      </p>
+
+      <p class="bc-mono bc-install-note">Una vez instalada abre desde su icono y funciona sin conexión. Para desinstalarla basta con borrar el icono — y con él, tus datos.</p>
+    </div>
+  </section>
+
+  <!-- ===================== PROMESAS ===================== -->
+  <section class="bc-section bc-promises bc-xh">
+    <div class="bc-wrap">
+      <p class="bc-eyebrow">// Cómo funciona</p>
+      <h2>Tu mes empieza el día que <span class="bc-accent">cobras</span>.</h2>
+      <p class="bc-section-lead">No el 1. BaseCero ordena el dinero en periodos de nómina a nómina, y a partir de ahí todo lo demás encaja: el presupuesto, el disponible real y los gastos a medias.</p>
+
+      <p class="bc-lbl bc-divider bc-divider--center bc-promises-divider"><span>Las cuatro promesas</span></p>
+
+      <div class="bc-promises-grid">
+        <div class="bc-frame bc-promise">
+          <span class="bc-promise-idx" aria-hidden="true">01 / 04</span>
+          <span class="bc-sq">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>
+          </span>
+          <div>
+            <h3>Todo local, siempre</h3>
+            <p>Sin servidor y sin registro. Los datos viven en una base de datos de tu navegador. Funciona en modo avión.</p>
+          </div>
+        </div>
+        <div class="bc-frame bc-promise">
+          <span class="bc-promise-idx" aria-hidden="true">02 / 04</span>
+          <span class="bc-sq">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V9z"></path><path d="M13 3v6h6"></path><path d="M8.5 13h7M8.5 16.5h7M12 13v3.5"></path></svg>
+          </span>
+          <div>
+            <h3>Tu dato es una hoja de cálculo</h3>
+            <p>Exporta e importa en <code>.xlsx</code> cuando quieras. Nada queda atrapado dentro de la app.</p>
+          </div>
+        </div>
+        <div class="bc-frame bc-promise">
+          <span class="bc-promise-idx" aria-hidden="true">03 / 04</span>
+          <span class="bc-sq">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2.5"></rect><path d="M3.5 9.5h17M8 3v4M16 3v4"></path><path d="M11.5 13.5h5"></path></svg>
+          </span>
+          <div>
+            <h3>Periodos de nómina a nómina</h3>
+            <p>El presupuesto y el «disponible real» siguen tu ciclo de cobro, no el calendario.</p>
+          </div>
+        </div>
+        <div class="bc-frame bc-promise">
+          <span class="bc-promise-idx" aria-hidden="true">04 / 04</span>
+          <span class="bc-sq">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3"></circle><path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6"></path><circle cx="16.5" cy="9" r="2.4"></circle><path d="M14.8 20c.3-2.7 2.1-4.8 4.3-4.8"></path></svg>
+          </span>
+          <div>
+            <h3>Compartidos y presupuesto</h3>
+            <p>Liquida los gastos a medias con otra persona y vigila el límite de cada categoría, periodo a periodo.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== CAPTURAS ===================== -->
+  <section class="bc-section bc-shots bc-xh" id="app">
+    <div class="bc-dots bc-dots--shots" aria-hidden="true"></div>
+    <div class="bc-wrap">
+      <div class="bc-shots-head">
+        <div>
+          <p class="bc-eyebrow">// La app por dentro</p>
+          <h2>Cuatro pantallas.<br>Ninguna te pide nada.</h2>
+        </div>
+        <p class="bc-section-lead">El color no decora: lo pone la categoría. Cada gasto viaja siempre con su icono, su nombre y su color, para que se lea de un vistazo — también con daltonismo.</p>
+      </div>
+
+      <div class="bc-shots-track">
+        <figure class="bc-shot-item">
+          <div class="bc-shot">
+            <img loading="lazy" src="/img/app-inicio.webp" width="780" height="1688" alt="Pantalla de Inicio: día 29 de 31 del periodo, 49,31 € disponibles de 1.548,00 € presupuestados, aviso ámbar de ir 50,56 € por encima del ritmo del plan, 1.498,69 € gastados con ingresos y ahorro, y el gráfico de gasto de los últimos siete días.">
+          </div>
+          <figcaption class="bc-shot-cap">
+            <span class="bc-shot-num" aria-hidden="true">01</span>
+            <h3>Inicio</h3>
+            <p>Lo que te queda del periodo, en qué se ha ido y qué falta por pagar.</p>
+          </figcaption>
+        </figure>
+
+        <figure class="bc-shot-item">
+          <div class="bc-shot">
+            <img loading="lazy" src="/img/app-movimientos.webp" width="780" height="1688" alt="Pantalla de Movimientos: filtros de periodo y de categoría y los movimientos agrupados por día — Mercadona, Zara, un traspaso de Cuenta corriente a Ahorro, un gasto sin categorizar marcado en ámbar y un ingreso puntual en verde.">
+          </div>
+          <figcaption class="bc-shot-cap">
+            <span class="bc-shot-num" aria-hidden="true">02</span>
+            <h3>Movimientos</h3>
+            <p>Agrupados por día. Lo importado sin categoría se marca y se arregla en un toque.</p>
+          </figcaption>
+        </figure>
+
+        <figure class="bc-shot-item">
+          <div class="bc-shot">
+            <img loading="lazy" src="/img/app-presupuesto.webp" width="780" height="1688" alt="Pantalla de Presupuesto: 1.305,99 € gastados de 1.548,00 € (84 %) y una barra por categoría — Casa y Alimentación dentro del límite, Transporte superada por 19,25 € en rojo y Restauración en ámbar.">
+          </div>
+          <figcaption class="bc-shot-cap">
+            <span class="bc-shot-num" aria-hidden="true">03</span>
+            <h3>Presupuesto</h3>
+            <p>Un límite por categoría. El estado —bien, al límite, excedido— pisa al color.</p>
+          </figcaption>
+        </figure>
+
+        <figure class="bc-shot-item">
+          <div class="bc-shot">
+            <img loading="lazy" src="/img/app-patrimonio.webp" width="780" height="1688" alt="Pantalla de Patrimonio: 2.682,31 € de patrimonio neto con una subida de 407,31 € este periodo, tres cuentas —incluido un préstamo de coche en negativo— y el objetivo «Fondo de vacaciones» al 68 %.">
+          </div>
+          <figcaption class="bc-shot-cap">
+            <span class="bc-shot-num" aria-hidden="true">04</span>
+            <h3>Patrimonio</h3>
+            <p>Cuentas, deudas y objetivos de ahorro. El neto, periodo a periodo.</p>
+          </figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FAQ ===================== -->
+  <section class="bc-section bc-xh" id="faq">
+    <div class="bc-wrap bc-faq-grid">
+      <div class="bc-faq-intro">
+        <p class="bc-eyebrow">// Preguntas</p>
+        <h2>Lo que<br>suele preguntarse.</h2>
+        <p class="bc-section-lead">¿Falta alguna? Pregunta en el repositorio: se responden ahí, en abierto.</p>
+        <a class="bc-link bc-faq-cta" href="https://github.com/alvarotorresc/basecero/issues" target="_blank" rel="noopener">
+          Abrir una pregunta
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"></path></svg>
+        </a>
+      </div>
+
+      <div class="bc-faq-list">
+        <details open>
+          <summary>¿Dónde están mis datos?</summary>
+          <p>En tu dispositivo, en una base de datos local del navegador (OPFS). BaseCero no tiene servidor: nada sale de ahí salvo que tú lo exportes.</p>
+        </details>
+        <details>
+          <summary>¿Cómo hago copia de seguridad?</summary>
+          <p>Exporta un <code>.xlsx</code> sin cifrar (para abrir en Google Sheets o LibreOffice) o una copia <code>.bce</code> cifrada con contraseña. Tú decides cuándo y dónde guardarlas.</p>
+        </details>
+        <details>
+          <summary>¿Qué bancos puedo importar?</summary>
+          <p>N26 tiene un perfil de importación directo, con deduplicación. Para cualquier otro banco hay un asistente genérico que mapea las columnas de su CSV.</p>
+        </details>
+        <details>
+          <summary>¿Cuánto cuesta y qué licencia tiene?</summary>
+          <p>Es gratis y de código abierto, con licencia MIT. Puedes revisar, modificar y reutilizar el código libremente.</p>
+        </details>
+        <details>
+          <summary>¿Tiene analytics o cookies?</summary>
+          <p>Ninguno, por diseño. No hay servidor que reciba nada de lo que haces en la app, así que no hace falta banner de cookies: no hay nada que consentir.</p>
+        </details>
+        <details>
+          <summary>¿Y si pierdo el dispositivo?</summary>
+          <p>Los datos viven solo ahí. Si no exportaste una copia antes, se pierden con el dispositivo — por eso conviene exportar copias con regularidad.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== CIERRE ===================== -->
+  <section class="bc-close bc-xh bc-xh--bottom">
+    <div class="bc-dots bc-dots--band" aria-hidden="true"></div>
+    <div class="bc-wrap bc-close-inner">
+      <p class="bc-eyebrow">// Sin registro · Sin instalador · Sin coste</p>
+      <h2>Empieza en <span class="bc-accent">cero</span>.</h2>
+      <div class="bc-cta-row">
+        <a class="bc-btn bc-btn--primary" href="/app/">
+          Abrir BaseCero
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"></path></svg>
+        </a>
+        <a class="bc-btn bc-btn--ghost" href="#instalar">Cómo instalarla</a>
+      </div>
+    </div>
+  </section>
+
 </main>
 
-<footer class="lp-footer">
-  <a href="/privacidad.html">Privacidad</a>
-  <a href="/terminos.html">Términos</a>
-  <a href="https://github.com/alvarotorresc/basecero/blob/main/LICENSE" target="_blank" rel="noopener">Licencia</a>
-  <a href="https://github.com/alvarotorresc/basecero" target="_blank" rel="noopener">Código en GitHub</a>
+<footer class="bc-foot">
+  <div class="bc-wrap">
+    <div class="bc-foot-grid">
+      <div class="bc-foot-intro">
+        <div class="bc-foot-brand">
+          <img class="lp-mark" src="/img/logo.svg" alt="" width="38" height="38">
+          <strong>BaseCero</strong>
+        </div>
+        <p class="bc-foot-tag">Tu dinero, desde cero.<br>Finanzas personales local-first.</p>
+      </div>
+
+      <div class="bc-foot-cols">
+        <nav class="bc-foot-col" aria-label="Producto">
+          <p class="bc-lbl">Producto</p>
+          <a href="/app/">Abrir BaseCero</a>
+          <a href="#instalar">Cómo instalarla</a>
+          <a href="#app">La app por dentro</a>
+          <a href="#faq">Preguntas frecuentes</a>
+        </nav>
+        <nav class="bc-foot-col" aria-label="Proyecto">
+          <p class="bc-lbl">Proyecto</p>
+          <a href="https://github.com/alvarotorresc/basecero" target="_blank" rel="noopener">Código en GitHub</a>
+          <a href="https://github.com/alvarotorresc/basecero/blob/main/LICENSE" target="_blank" rel="noopener">Licencia MIT</a>
+          <a href="https://github.com/alvarotorresc/basecero/issues" target="_blank" rel="noopener">¿No funciona?</a>
+        </nav>
+        <div class="bc-foot-col">
+          <p class="bc-lbl">Legal</p>
+          <a href="/privacidad.html">Privacidad</a>
+          <a href="/terminos.html">Términos</a>
+          <div class="lp-lang">
+            <span aria-current="page">ES</span>
+            <a href="/en/" hreflang="en">EN</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bc-foot-rule" aria-hidden="true"></div>
+    <p class="bc-foot-legal">
+      <span>BaseCero — software libre bajo licencia MIT</span>
+      <span>Sin cookies. Sin analytics. Nada que consentir.</span>
+    </p>
+  </div>
 </footer>
 </body>
 </html>
