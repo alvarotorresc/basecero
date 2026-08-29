@@ -291,6 +291,19 @@ main#screen {
   color: var(--bg);
 }
 
+/* fila de chips de filtro en una sola línea con scroll horizontal (Movimientos, Task 4: «Todos» +
+   una chip por categoría raíz presente + «Sin categoría · N») — mismo criterio de scroll oculto
+   que .segmented/.chips-scroll, pero en una fila (flex nowrap por defecto) en vez de grid 2 filas. */
+.chips-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.chips-row::-webkit-scrollbar { display: none; }
+.chips-row .chip { flex: 0 0 auto; }
+
 /* chips de categoría en 2 filas con scroll horizontal (pantalla Registro) */
 .chips-scroll {
   display: grid;

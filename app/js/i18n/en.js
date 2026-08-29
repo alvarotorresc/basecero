@@ -167,6 +167,12 @@ export const EN = {
     uncategorized: "Uncategorized",
     tapToCategorize: "tap to categorize",
     uncategorizedChip: "No category · {n}",
+    chipAll: "All",
+    search: {
+      toggle: "Search",
+      label: "Search",
+      placeholder: "Merchant or note",
+    },
     type: { transfer: "Transfer" },
     detail: {
       lockedNote: "Settled. To edit the amount, first delete its settlement in Transactions.",
@@ -181,6 +187,7 @@ export const EN = {
     },
     empty: {
       noUncategorized: "No uncategorized transactions.",
+      noResults: "No transactions match the filter.",
       noPeriod: "No transactions in this period.",
     },
   },

@@ -167,6 +167,12 @@ export const ES = {
     uncategorized: "Sin categorizar",
     tapToCategorize: "toca para categorizar",
     uncategorizedChip: "Sin categoría · {n}",
+    chipAll: "Todos",
+    search: {
+      toggle: "Buscar",
+      label: "Buscar",
+      placeholder: "Comercio o nota",
+    },
     type: { transfer: "Transferencia" },
     detail: {
       lockedNote: "Liquidado. Para editar el importe, borra antes su liquidación en Movimientos.",
@@ -181,6 +187,7 @@ export const ES = {
     },
     empty: {
       noUncategorized: "No hay movimientos sin categorizar.",
+      noResults: "Ningún movimiento coincide con el filtro.",
       noPeriod: "No hay movimientos en este periodo.",
     },
   },
