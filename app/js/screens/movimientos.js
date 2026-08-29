@@ -320,7 +320,7 @@ export async function renderMovimientos(container) {
         <input type="text" id="mov-note" value="${escAttr(d.note)}" placeholder="${t("common.optional")}">
       </label>
 
-      ${needsCategory(d.type) && (d.wasShared || partnerName) ? `
+      ${needsCategory(d.type) && d.type !== "income" && (d.wasShared || partnerName) ? `
       <div class="card" style="padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:${locked ? "default" : "pointer"};${locked ? "opacity:.5;" : ""}">
           <span style="font-size:15px; font-weight:600;">${t("common.sharedWith", { name: escHtml(partnerName) || t("movimientos.shared.fallbackName") })}</span>
@@ -428,7 +428,7 @@ export async function renderMovimientos(container) {
           counterAccountId: d.type === "transfer" ? d.counterAccountId : "",
           merchant: d.merchant,
           note: d.note,
-          isShared: withCategory ? d.isShared : false,
+          isShared: withCategory && d.type !== "income" ? d.isShared : false,
           sharePctOverride: d.sharePctOverride,
           refId: d.refId,
           ruleId: d.ruleId,

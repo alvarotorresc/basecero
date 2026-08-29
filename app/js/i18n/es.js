@@ -687,6 +687,7 @@ export const ES = {
       pkInvalidChars: "pestaña «{table}» fila {row}: id con caracteres no válidos («{pk}»)",
       enumInvalid: "pestaña «{table}» fila {row}: {col} inválido («{value}»)",
       fkEmpty: "pestaña «{table}» fila {row}: {col} vacío",
+      required: "pestaña «{table}» fila {row}: {col} es obligatorio y está vacío",
       fkMissing: "pestaña «{table}» fila {row}: {col} apunta a «{value}» que no existe en {ref}",
       multipleOpen: "periods: hay {n} periodos open (máximo 1)",
       amountNotPositive: "pestaña «transactions» fila {row}: amount debe ser > 0",

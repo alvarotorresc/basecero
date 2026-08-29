@@ -154,13 +154,25 @@ export function validateImport(data) {
 
   // Fechas: toda columna DATE_COLS con valor no vacío debe ser una fecha ISO real (forma +
   // calendario) — no solo dígitos con guiones ("2026-13-40" tiene la forma pero no es fecha).
+  //
+  // I1 (revisión final): transactions.date y periods.start_date son NOT NULL en schema.sql — un
+  // blanco ahí NO es "sin valor que validar" (el continue de abajo), es una fila inválida: una
+  // fecha vacía en NOT NULL revienta el insert, o peor, si SQLite la admite como TEXT '' cuela
+  // silenciosa. periods.end_date se queda FUERA de este set a propósito: NOT NULL DEFAULT '' pero
+  // legítimamente vacío en un periodo open — su invariante ya lo valida periodEndMismatch más abajo,
+  // exigirlo aquí también rechazaría el caso normal (periodo abierto). goals.target_date es NOT
+  // NULL DEFAULT '' y opcional por contrato (no todo goal tiene fecha objetivo) — tampoco entra.
+  const REQUIRED_DATE_COLS = new Set(["date", "start_date"]);
   for (const table of Object.keys(CONTRACT)) {
     const dateCols = CONTRACT[table].cols.filter((c) => DATE_COLS.has(c));
     if (!dateCols.length) continue;
     (data[table] ?? []).forEach((row, i) => {
       for (const col of dateCols) {
         const v = row[col];
-        if (v === "" || v == null) continue;
+        if (v === "" || v == null) {
+          if (REQUIRED_DATE_COLS.has(col)) errs.push(t("errors.xlsx.required", { table, row: i + 2, col }));
+          continue;
+        }
         if (!isValidIsoDate(String(v)))
           errs.push(t("errors.xlsx.dateFormat", { table, row: i + 2, col, value: v }));
       }
@@ -192,11 +204,17 @@ export function validateImport(data) {
   // Columnas numéricas NO-*_cents del contrato: workbookToRows las deja pasar tal cual llegan
   // de la celda (ni coerción ni parseo), así que un "lunes" en my_share_pct sobrevive intacto
   // hasta aquí como string — sin este check, acaba en SQLite como TEXT (afinidad dinámica) y
-  // produce "NaN €"/"NaN %" en cualquier pantalla que haga aritmética con la columna. Solo se
-  // valida cuando hay valor (las columnas NULLABLE_NUM ya llegan a null si la celda estaba
-  // vacía; las no-nullable llegan a "" — ambas se saltan, no son responsabilidad de este check).
+  // produce "NaN €"/"NaN %" en cualquier pantalla que haga aritmética con la columna.
   // schema_version NO es una columna del contrato (vive como fila key/value en meta) y ya se
   // valida arriba con igualdad estricta — no se repite aquí.
+  //
+  // I1 (revisión final): un blanco aquí YA NO se salta sin más. NULLABLE_NUM (contract.js) es
+  // exactamente el set de columnas SIN NOT NULL en schema.sql (share_pct_override, due_day,
+  // due_month, target_amount_cents, target_months, target_pct) — para esas, blanco sigue siendo
+  // un skip legítimo. Para el resto de esta tabla (display_order en accounts/categories,
+  // my_share_pct en periods) la columna ES NOT NULL: un blanco ahí guardaba TEXT '' en una
+  // columna INTEGER/REAL, coló por este check y produjo el hallazgo real (my_share_pct='' →
+  // COALESCE no coalesce → reparto compartido se vuelve 0%/100% en silencio).
   const NUMERIC_COLS = {
     accounts: { display_order: { integer: true } },
     categories: { display_order: { integer: true } },
@@ -212,7 +230,16 @@ export function validateImport(data) {
     (data[table] ?? []).forEach((row, i) => {
       for (const [col, { integer, min, max }] of Object.entries(spec)) {
         const v = row[col];
-        if (v === "" || v == null) continue;
+        // trim(): a celda "solo espacio" (" ") no es === "" pero Number(" ") es 0 — un finito
+        // válido que se colaría en rango sin este trim, dejando pasar exactamente la misma
+        // corrupción silenciosa (TEXT no-numérico en columna REAL/INTEGER NOT NULL) que motivó
+        // este check. Solo aplica a este bucle: las columnas *_cents ya llegan numéricas (o null)
+        // desde workbookToRows vía eurToCents, y las de fecha pasan por toIsoDate/isValidIsoDate,
+        // que rechazan " " como fecha inválida sin necesitar trim aquí.
+        if (v == null || String(v).trim() === "") {
+          if (!NULLABLE_NUM.has(col)) errs.push(t("errors.xlsx.required", { table, row: i + 2, col }));
+          continue;
+        }
         const n = Number(v);
         if (!Number.isFinite(n) || (integer && !Number.isInteger(n))) {
           errs.push(t("errors.xlsx.numericInvalid", { table, row: i + 2, col, value: v }));
@@ -226,13 +253,23 @@ export function validateImport(data) {
   // Columnas *_cents: workbookToRows YA las convirtió con eurToCents (Math.round(Number(v)*100))
   // antes de llegar aquí, así que un valor no numérico ya es NaN (siempre entero o NaN, nunca un
   // finito no entero: Math.round lo garantiza) — el único fallo posible es "no finito".
+  //
+  // I1 (revisión final): workbookToRows deja un blanco de CUALQUIER columna *_cents como null,
+  // sea o no NULLABLE_NUM — la única *_cents nullable por contrato es goals.target_amount_cents
+  // (sin NOT NULL en schema.sql); el resto (opening_balance_cents, transactions.amount_cents,
+  // recurring_rules.amount_cents, budgets.amount_cents) SON NOT NULL: un blanco ahí antes pasaba
+  // como null hasta el INSERT y reventaba con el error crudo de SQLite (o, peor, si la columna
+  // tolerase null, corrompía en silencio). Se reporta con el mismo mensaje "required" que arriba.
   for (const table of Object.keys(CONTRACT)) {
     const centsCols = CONTRACT[table].cols.filter((c) => c.endsWith("_cents"));
     if (!centsCols.length) continue;
     (data[table] ?? []).forEach((row, i) => {
       for (const col of centsCols) {
         const v = row[col];
-        if (v == null) continue;
+        if (v == null) {
+          if (!NULLABLE_NUM.has(col)) errs.push(t("errors.xlsx.required", { table, row: i + 2, col }));
+          continue;
+        }
         if (!Number.isFinite(v)) errs.push(t("errors.xlsx.numericInvalid", { table, row: i + 2, col, value: v }));
       }
     });

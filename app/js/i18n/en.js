@@ -684,6 +684,7 @@ export const EN = {
       pkInvalidChars: "sheet “{table}” row {row}: id with invalid characters (“{pk}”)",
       enumInvalid: "sheet “{table}” row {row}: invalid {col} (“{value}”)",
       fkEmpty: "sheet “{table}” row {row}: empty {col}",
+      required: "sheet “{table}” row {row}: {col} is required and is empty",
       fkMissing: "sheet “{table}” row {row}: {col} points to “{value}”, which doesn’t exist in {ref}",
       multipleOpen: "periods: {n} open periods (maximum 1)",
       amountNotPositive: "sheet “transactions” row {row}: amount must be > 0",

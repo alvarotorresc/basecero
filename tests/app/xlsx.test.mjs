@@ -306,6 +306,108 @@ test("validate: display_order no numérico → error", () => {
   assert.match(validateImport(d).join("\n"), /pestaña «accounts».*display_order no es un número válido \(«x»\)/s);
 });
 
+// I1 (revisión final del PR de seguridad): todos los checks de arriba validan el FORMATO de un
+// valor presente, pero se saltaban "" / null sin más — una celda REQUERIDA (columna NOT NULL en
+// schema.sql) que llega en blanco pasaba validateImport limpia. Confirmado como corrupción
+// silenciosa: my_share_pct en blanco guarda TEXT '' en una columna NOT NULL → COALESCE no
+// coalesce ese '' → todo reparto compartido pasa a 0%/100% en silencio. amount_cents/
+// opening_balance_cents/budgets.amount_cents en blanco → null → pasa validateImport → el import
+// aborta con el error crudo de NOT NULL de SQLite. date/start_date en blanco → se aceptan y aplican.
+//
+// display_order (accounts/categories) entra en el mismo saco: es NOT NULL DEFAULT 0 y la misma
+// columna NUMERIC_COLS ya la itera — un blank ahí guarda TEXT '' en una columna INTEGER y rompe
+// cualquier ORDER BY display_order. No lo menciona el hallazgo original pero es la misma clase de
+// bug y el check ya pasa por esa columna, así que se incluye.
+//
+// Columnas NULLABLE_NUM (share_pct_override, due_day, due_month, target_amount_cents,
+// target_months, target_pct) y end_date/target_date NO son required — schema.sql las declara sin
+// NOT NULL (o con DEFAULT '' + invariante propio, caso de end_date) y deben seguir aceptando
+// blanco. Los tests negativos de abajo fijan justo eso.
+test("validate: my_share_pct en blanco (periodo) → error required, no se salta como un skip nullable", () => {
+  const d = parse((x) => { x.periods[0].my_share_pct = ""; });
+  assert.deepEqual(validateImport(d),
+    ["pestaña «periods» fila 2: my_share_pct es obligatorio y está vacío"]);
+});
+
+// " " (solo espacio) NO es === "" pero Number(" ") es 0 — un finito válido que, sin trim() en el
+// check, se colaría dentro de [0,100] y dejaría pasar la MISMA corrupción silenciosa (TEXT no
+// numérico en columna REAL NOT NULL) que este fix existe para cerrar.
+test("validate: my_share_pct con un solo espacio en blanco → error required (no Number(\" \")===0 colándose)", () => {
+  const d = parse((x) => { x.periods[0].my_share_pct = " "; });
+  assert.deepEqual(validateImport(d),
+    ["pestaña «periods» fila 2: my_share_pct es obligatorio y está vacío"]);
+});
+
+test("validate: display_order en blanco (accounts) → error required", () => {
+  const d = parse((x) => { x.accounts[0].display_order = ""; });
+  assert.deepEqual(validateImport(d),
+    ["pestaña «accounts» fila 2: display_order es obligatorio y está vacío"]);
+});
+
+test("validate: amount_cents en blanco (transacción) → error required, no null silencioso", () => {
+  const d = parse();
+  d.transactions.push({ ...txBase, id: "tx-blank-amount", amount_cents: null });
+  assert.deepEqual(validateImport(d),
+    ["pestaña «transactions» fila 2: amount_cents es obligatorio y está vacío"]);
+});
+
+test("validate: opening_balance_cents en blanco (cuenta) → error required", () => {
+  const d = parse((x) => { x.accounts[0].opening_balance_cents = null; });
+  assert.deepEqual(validateImport(d),
+    ["pestaña «accounts» fila 2: opening_balance_cents es obligatorio y está vacío"]);
+});
+
+test("validate: budgets.amount_cents en blanco → error required", () => {
+  const d = parse();
+  d.budgets.push({ id: "bud-blank", period_id: "per-1", category_id: "cat-casa-alquiler",
+    amount_cents: null, created_at: "x", updated_at: "x", deleted: 0 });
+  assert.deepEqual(validateImport(d),
+    ["pestaña «budgets» fila 2: amount_cents es obligatorio y está vacío"]);
+});
+
+test("validate: recurring_rules.amount_cents en blanco → error required", () => {
+  const d = parse();
+  d.recurring_rules.push({ id: "rr-blank", name: "Alquiler", type: "expense", amount_cents: null,
+    category_id: "cat-casa-alquiler", account_id: "acc-n26", counter_account_id: "", frequency: "monthly",
+    due_day: 1, due_month: null, is_shared: 0, is_active: 1,
+    created_at: "x", updated_at: "x", deleted: 0 });
+  assert.deepEqual(validateImport(d),
+    ["pestaña «recurring_rules» fila 2: amount_cents es obligatorio y está vacío"]);
+});
+
+test("validate: transactions.date en blanco → error required, sin fallar como fecha no-ISO", () => {
+  const d = parse();
+  d.transactions.push({ ...txBase, id: "tx-blank-date", date: "" });
+  assert.deepEqual(validateImport(d),
+    ["pestaña «transactions» fila 2: date es obligatorio y está vacío"]);
+});
+
+test("validate: periods.start_date en blanco → error required", () => {
+  const d = parse((x) => { x.periods[0].start_date = ""; });
+  assert.deepEqual(validateImport(d),
+    ["pestaña «periods» fila 2: start_date es obligatorio y está vacío"]);
+});
+
+// Negativos: blancos LEGÍTIMOS (columnas nullable/opcionales por contrato) siguen sin ser error —
+// control de "no demasiado estricto" simétrico al de arriba.
+test("validate: end_date en blanco en periodo open sigue sin ser error (blanco legítimo)", () => {
+  assert.deepEqual(validateImport(parse()), []); // per-1 (semilla) ya es open con end_date=""
+});
+
+test("validate: share_pct_override en blanco en una transacción sigue sin ser error (nullable)", () => {
+  const d = parse();
+  d.transactions.push({ ...txBase, id: "tx-null-pct", share_pct_override: null });
+  assert.deepEqual(validateImport(d), []);
+});
+
+test("validate: target_amount_cents/target_months/target_pct/target_date en blanco en un goal siguen sin ser error (nullable/opcional)", () => {
+  const d = parse();
+  d.goals.push({ id: "goal-blank", name: "Fondo", type: "emergency_fund",
+    target_amount_cents: null, target_months: null, target_pct: null, target_date: "",
+    account_id: "", category_id: "", is_active: 1, created_at: "x", updated_at: "x", deleted: 0 });
+  assert.deepEqual(validateImport(d), []);
+});
+
 // Columnas booleanas: la única forma real de inyectar un valor "crudo" no reconocido es
 // escribiéndolo directamente en la celda del workbook — un dump de la propia app (vía
 // rowsToWorkbook) SIEMPRE produce 0/1 limpios, así que el vector de ataque real es un xlsx
