@@ -125,6 +125,31 @@ export function sharedFieldsLocked(cur, f) {
     || !!f.isShared !== !!cur.is_shared
     || f.sharePctOverride !== cur.share_pct_override;
 }
+
+/** M5 (Task 6, review de seguridad): el guard de arriba solo mira el LADO DEL GASTO. Si en vez
+ *  de tocar el gasto se toca el REFUND enlazado (bajar su importe de 50€ a 5€), sharedFieldsLocked
+ *  nunca se evalúa — cur.type sería 'refund', no 'expense' — y la deuda de 45€ desaparece de
+ *  Liquidar en silencio mientras el gasto original sigue settled=1. Pura (mismo patrón que
+ *  sharedFieldsLocked): `linked` es la fila YA CARGADA del gasto que apunta cur.ref_id (o null si
+ *  no existe/está borrado — getTransaction filtra deleted=0, así que un refund que ya apunta a un
+ *  gasto huérfano de ANTES de este fix queda fuera del guard a propósito, ver nota en el report). */
+export function refundAmountLocked(cur, f, linked) {
+  return cur.type === "refund" && !!cur.ref_id
+    && f.amountCents !== cur.amount_cents
+    && !!linked?.settled;
+}
+
+/** M5 (Task 6): ¿debe bloquearse el borrado de `cur` porque es un gasto con al menos un refund
+ *  ACTIVO enlazado por ref_id? Deliberadamente NO mira cur.settled — un import a mano puede dejar
+ *  settled=1 sin ningún refund vivo (fila ya borrada a mano, o backup viejo), y bloquear por ese
+ *  campo dejaría el gasto sin ninguna vía para borrarse nunca. Se ancla solo en `hasActiveRefund`
+ *  (ya resuelto por el caller vía hasActiveLinkedRefund): así SIEMPRE hay una salida — borrar
+ *  primero el refund (rama existente de softDeleteTransaction: unsettle + borra) deja el gasto
+ *  como uno normal, no liquidado, borrable por la vía de siempre. */
+export function expenseDeleteLocked(cur, hasActiveRefund) {
+  return !!cur && cur.type === "expense" && !!hasActiveRefund;
+}
+
 export const countUncategorized = async (pid) => (await query(SQL.countUncategorized, [pid]))[0].n;
 export const pendingShared = () => query(SQL.pendingShared);
 export const pendingSharedTotalCents = async () => (await query(SQL.pendingSharedTotal))[0].total_cents;
@@ -213,6 +238,13 @@ export async function updateTransaction(id, fields) {
   if (sharedFieldsLocked(cur, f) && (await hasActiveLinkedRefund(id))) {
     throw new Error(t("errors.repo.txLockedSettled"));
   }
+  // Task 6 (M5): lado del refund del mismo guard — ver refundAmountLocked. cur.ref_id, si existe,
+  // apunta siempre a un gasto (nunca a otro refund), así que reutilizar getTransaction aquí es
+  // correcto y evita duplicar el SELECT.
+  const linkedExpense = cur.type === "refund" && cur.ref_id ? await getTransaction(cur.ref_id) : null;
+  if (refundAmountLocked(cur, f, linkedExpense)) {
+    throw new Error(t("errors.repo.refundLockedSettled"));
+  }
   const now = nowIso();
   await exec(SQL.updateTransaction, [
     f.type, f.amountCents, f.date, f.categoryId ?? "", f.accountId, f.counterAccountId ?? "",
@@ -223,9 +255,24 @@ export async function updateTransaction(id, fields) {
 
 /** Borra (soft) un movimiento. Si es un refund enlazado a un gasto (ref_id), revierte el
  *  settled=1 de ese gasto EN LA MISMA operación — salvo que quede algún otro refund activo
- *  apuntándole (p.ej. si alguna vez se permiten varios refunds parciales sobre el mismo gasto). */
+ *  apuntándole (p.ej. si alguna vez se permiten varios refunds parciales sobre el mismo gasto).
+ *
+ *  Task 6 (M5): si en cambio se intenta borrar el GASTO original y tiene algún refund activo
+ *  enlazado, se BLOQUEA (no se hace cascada) — ver expenseDeleteLocked. Elegido sobre des-liquidar
+ *  y borrar el refund en cascada porque bloquear NUNCA deja al usuario sin salida: la rama de
+ *  arriba (borrar el refund primero) ya des-liquida el gasto ella sola, así que borrar el refund y
+ *  LUEGO el gasto es un camino de dos pasos que ya funciona hoy sin tocar nada más. Una cascada
+ *  automática, en cambio, borraría en silencio una fila que representa dinero que ya se movió a
+ *  una cuenta real (el refund cuenta en accountBalance) como efecto secundario de borrar OTRA
+ *  fila — pérdida de datos silenciosa que el usuario no pidió. */
 export async function softDeleteTransaction(id) {
   const cur = await getTransaction(id);
+  // hasActiveLinkedRefund solo se consulta cuando cur.type==='expense': para el resto de tipos
+  // expenseDeleteLocked ya descarta por type sin necesidad del SELECT extra.
+  const hasActiveRefund = cur?.type === "expense" && (await hasActiveLinkedRefund(id));
+  if (expenseDeleteLocked(cur, hasActiveRefund)) {
+    throw new Error(t("errors.repo.expenseLockedHasRefund"));
+  }
   const now = nowIso();
   if (cur && cur.type === "refund" && cur.ref_id) {
     await execMany([

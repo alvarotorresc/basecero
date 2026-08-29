@@ -648,6 +648,8 @@ export const EN = {
       settleNotFound: "Shared expense not found or already settled",
       txNotFound: "Transaction not found",
       txLockedSettled: "This expense is already settled: delete its settlement in Transactions before changing the amount or split.",
+      refundLockedSettled: "This refund belongs to an already settled expense: the amount cannot be changed.",
+      expenseLockedHasRefund: "This expense is already settled: delete its settlement in Transactions before deleting the expense.",
       ruleNotFound: "Rule not found",
       accountNotFound: "Account not found",
       goalNotFound: "Goal not found",

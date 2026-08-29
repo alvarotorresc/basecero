@@ -649,6 +649,8 @@ export const ES = {
       settleNotFound: "Gasto compartido no encontrado o ya liquidado",
       txNotFound: "Movimiento no encontrado",
       txLockedSettled: "Gasto ya liquidado: borra su liquidación en Movimientos antes de cambiar el importe o el reparto.",
+      refundLockedSettled: "Este reembolso pertenece a un gasto ya liquidado: el importe no se puede cambiar.",
+      expenseLockedHasRefund: "Gasto ya liquidado: borra su liquidación en Movimientos antes de borrar el gasto.",
       ruleNotFound: "Regla no encontrada",
       accountNotFound: "Cuenta no encontrada",
       goalNotFound: "Objetivo no encontrado",
