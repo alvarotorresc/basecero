@@ -239,7 +239,9 @@ export const EN = {
     title: "Net worth",
     subtitle: "Calculated from all your transactions · today",
     netWorth: {
-      title: "Net worth",
+      // La card va justo bajo el H1 «Net worth»: en inglés se llama «Total» para no apilar
+      // la misma frase dos veces (en español Patrimonio / Patrimonio neto ya divergen solos).
+      title: "Total",
       deltaThisPeriod: "{amount} this period",
       closeContext: "close of {label}: {amount}",
     },
