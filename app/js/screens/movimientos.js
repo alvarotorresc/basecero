@@ -247,7 +247,9 @@ export async function renderMovimientos(container) {
   function renderDetail() {
     const d = state.detail;
     const period = periods.find((p) => p.id === state.periodId);
-    const pct = period?.my_share_pct ?? 100;
+    // B4: mismo COALESCE que MY_AMOUNT en sql.js (t.share_pct_override, p.my_share_pct, 100) —
+    // antes ignoraba el override por transacción y la lista/detalle mostraban importes distintos.
+    const pct = d.sharePctOverride ?? period?.my_share_pct ?? 100;
     const cats = categoriesFor(d.type);
     const myCents = d.isShared ? Math.round((d.cents * pct) / 100) : d.cents;
     const partnerCents = d.isShared ? d.cents - myCents : 0;
@@ -310,7 +312,7 @@ export async function renderMovimientos(container) {
         </label>
         <label class="field field-stack" style="flex:1;">
           <span class="field-label">${t("common.date")}</span>
-          <input type="date" id="mov-fecha" value="${d.fecha}">
+          <input type="date" id="mov-fecha" value="${escAttr(d.fecha)}">
         </label>
       </div>
       <label class="field field-stack" style="margin-bottom:18px;">
@@ -390,7 +392,7 @@ export async function renderMovimientos(container) {
       const partnerEl = container.querySelector("#mov-split-partner");
       if (d.isShared && mineEl && partnerEl) {
         const period = periods.find((p) => p.id === state.periodId);
-        const pct = period?.my_share_pct ?? 100;
+        const pct = d.sharePctOverride ?? period?.my_share_pct ?? 100;
         const myCents = Math.round((d.cents * pct) / 100);
         mineEl.textContent = fmtMoney(myCents);
         partnerEl.textContent = fmtMoney(d.cents - myCents);

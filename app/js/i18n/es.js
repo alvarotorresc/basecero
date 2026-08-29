@@ -713,6 +713,7 @@ export const ES = {
       unknownOp: "Operación desconocida: {op}",
       failed: "Error en el worker de base de datos: ",
       unknownDetail: "desconocido",
+      notInitialized: "La base de datos aún no está lista, inténtalo de nuevo en un momento",
     },
   },
   // Subtítulos de goalProgress (repo.js) por tipo de objetivo — «Superado», «antes de», «/mes»…

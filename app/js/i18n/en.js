@@ -710,6 +710,7 @@ export const EN = {
       unknownOp: "Unknown operation: {op}",
       failed: "Database worker error: ",
       unknownDetail: "unknown",
+      notInitialized: "The database isn't ready yet, try again in a moment",
     },
   },
   goals: {
