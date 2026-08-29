@@ -143,6 +143,26 @@ test("validate: importe no positivo salvo adjustment", () => {
   assert.deepEqual(validateImport(d), []);
 });
 
+// Fix round 1 (revisor): amount no numérico ("lunes") producía DOS errores — numericInvalid
+// (correcto: no es un número) Y amountNotPositive ("!(NaN > 0)" es true, así que además
+// diagnosticaba "no positivo", que es engañoso: el problema real es que no es un número en
+// absoluto). amountNotPositive ahora solo se evalúa cuando amount_cents es finito.
+test("validate: amount no numérico → SOLO numericInvalid, sin amountNotPositive duplicado", () => {
+  const wb = wbFromSeed();
+  const ws = wb.Sheets.transactions;
+  const header = X.utils.sheet_to_json(ws, { header: 1 })[0];
+  const row = { id: "tx-amt", date: "2026-08-01", period_id: "per-1", type: "expense", amount: "lunes",
+    account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler", merchant: "", note: "",
+    is_shared: 0, share_pct_override: "", settled: 0, ref_id: "", rule_id: "", external_id: "",
+    status: "pending", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 0 };
+  wb.Sheets.transactions = X.utils.aoa_to_sheet([header, header.map((h) => row[h] ?? "")]);
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  const amtErrs = validateImport(data).filter((e) => e.includes("amount"));
+  assert.equal(amtErrs.length, 1, `esperaba 1 error de amount, hubo ${amtErrs.length}: ${amtErrs.join(" | ")}`);
+  assert.match(amtErrs[0], /amount_cents no es un número válido \(«NaN»\)/);
+});
+
 // Fila base de transacción válida (contra la semilla) — reutilizada por varios tests de esta
 // familia; cada test solo toca el campo bajo prueba.
 const txBase = { id: "tx-x", date: "2026-08-01", period_id: "per-1", type: "expense", amount_cents: 100,
@@ -325,6 +345,26 @@ test("validate: celda booleana vacía → false, no error (hoja rellenada a mano
   assert.equal(tx.is_shared, 0);
   assert.equal(tx.settled, 0);
   assert.equal(tx.deleted, 0);
+  assert.deepEqual(validateImport(data), []);
+});
+
+// Fix round 1 (revisor): si la CABECERA de una columna booleana falta directamente en la hoja
+// (no solo la celda vacía), el default-fill (línea ~76) le asignaba "" — justo lo que el nuevo
+// booleanInvalid rechaza, anulando la tolerancia a hojas antiguas/del generador que la
+// inclusión de "" en BOOL_FALSE pretendía dar. El default-fill ahora asigna 0 para columnas
+// booleanas, igual que si la celda estuviera vacía (mismo criterio, misma constante bools).
+test("import: pestaña sin cabecera de columna booleana (is_archived) → default 0, sin error", () => {
+  const wb = wbFromSeed();
+  const ws = wb.Sheets.accounts;
+  const fullHeader = X.utils.sheet_to_json(ws, { header: 1 })[0];
+  const rows = X.utils.sheet_to_json(ws, { defval: "" });
+  const header = fullHeader.filter((h) => h !== "is_archived");
+  const aoa = [header, ...rows.map((r) => header.map((h) => r[h]))];
+  wb.Sheets.accounts = X.utils.aoa_to_sheet(aoa);
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  assert.ok(data.accounts.length > 0);
+  for (const r of data.accounts) assert.equal(r.is_archived, 0);
   assert.deepEqual(validateImport(data), []);
 });
 

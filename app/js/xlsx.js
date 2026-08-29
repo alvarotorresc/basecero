@@ -73,7 +73,7 @@ export function workbookToRows(X, wb) {
           else if (DATE_COLS.has(col)) row[col] = toIsoDate(v);
           else row[col] = v;
         }
-        for (const c of cols) if (!(c in row)) row[c] = NULLABLE_NUM.has(c) ? null : (c.endsWith("_cents") ? null : "");
+        for (const c of cols) if (!(c in row)) row[c] = bools.has(c) ? 0 : NULLABLE_NUM.has(c) ? null : (c.endsWith("_cents") ? null : "");
         return row;
       });
   }
@@ -180,8 +180,12 @@ export function validateImport(data) {
     }
   });
 
+  // Solo se evalúa >0 cuando amount_cents es un número real: si no es finito (import no
+  // numérico, p.ej. "lunes" → NaN vía eurToCents), el check de abajo (numericInvalid en
+  // *_cents) ya lo reporta — sin esta guarda, "!(NaN > 0)" es true y se duplica el error
+  // diagnosticando "no positivo" en vez de "no es un número", que es engañoso.
   (data.transactions ?? []).forEach((row, i) => {
-    if (row.type !== "adjustment" && !(row.amount_cents > 0))
+    if (row.type !== "adjustment" && Number.isFinite(row.amount_cents) && !(row.amount_cents > 0))
       errs.push(t("errors.xlsx.amountNotPositive", { row: i + 2 }));
   });
 
