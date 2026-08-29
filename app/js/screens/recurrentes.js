@@ -4,28 +4,26 @@ import {
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { t } from "../i18n/index.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
 const TIPOS_RULE = [
-  { id: "expense", label: "Gasto" },
-  { id: "income", label: "Ingreso" },
-  { id: "transfer", label: "Transfer." },
+  { id: "expense", labelKey: "common.type.expense" },
+  { id: "income", labelKey: "common.type.income" },
+  { id: "transfer", labelKey: "recurrentes.type.transfer" },
 ];
 const FREQ_CHIPS = [
-  { id: "weekly", label: "Semanal" },
-  { id: "monthly", label: "Mensual" },
-  { id: "quarterly", label: "Trimestral" },
-  { id: "yearly", label: "Anual" },
+  { id: "weekly", labelKey: "recurrentes.freq.weekly" },
+  { id: "monthly", labelKey: "recurrentes.freq.monthly" },
+  { id: "quarterly", labelKey: "recurrentes.freq.quarterly" },
+  { id: "yearly", labelKey: "recurrentes.freq.yearly" },
 ];
-const FREQ_LABEL = Object.fromEntries(FREQ_CHIPS.map((f) => [f.id, f.label.toLowerCase()]));
-// Nombre de mes para "próximo: {mes}" en el sub de reglas trimestrales/anuales (mismo patrón que
-// FREQ_LABEL: lookup local de presentación, due_month ya es un dato real de la regla).
-const MONTH_NAMES = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-];
+// Guarda la CLAVE del diccionario, no el texto resuelto: FREQ_CHIPS/TIPOS_RULE son const de
+// módulo, evaluadas antes de initI18n(meta) — resolver aquí con t() congelaría el idioma en el
+// que arrancó la app. ruleSubtitle() resuelve con t() en cada render, ya con el idioma real.
+const FREQ_KEY = Object.fromEntries(FREQ_CHIPS.map((f) => [f.id, f.labelKey]));
 const needsCategory = (tipo) => tipo === "expense" || tipo === "income";
 const needsMonth = (freq) => freq === "quarterly" || freq === "yearly";
 
@@ -40,7 +38,7 @@ export async function renderRecurrentes(container, onBack) {
       getMetaAll(),
     ]);
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">No se pudo cargar Recurrentes: ${escHtml(e.message)}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("recurrentes.error.load", { error: escHtml(e.message) })}</div>`;
     return;
   }
   const accounts = accountsAll.filter((a) => a.type !== "liability");
@@ -63,21 +61,24 @@ export async function renderRecurrentes(container, onBack) {
   // (is_shared/is_active) — SIN inventar el "compartido 40 %" del artboard: ese % no existe en la
   // regla (solo en el periodo abierto), así que se muestra el texto sin porcentaje.
   function ruleSubtitle(r) {
-    const freqLabel = FREQ_LABEL[r.frequency] ?? r.frequency;
+    const freqKey = FREQ_KEY[r.frequency];
+    const freqLabel = freqKey ? t(freqKey).toLowerCase() : r.frequency;
     // día SIEMPRE visible (antes se omitía en trimestral/anual a favor de "próximo: {mes}",
     // como el artboard — pero el artboard no lleva "día" porque agrupa por frecuencia; sin esa
     // agrupación aquí, omitirlo perdía info real que la regla sí tiene, contra el criterio de la
     // tarea 7: "no se quita info real sin que el brief lo pida").
-    const parts = [freqLabel, `día ${r.due_day}`];
-    if (needsMonth(r.frequency) && r.due_month) parts.push(`próximo: ${MONTH_NAMES[r.due_month - 1]}`);
+    const parts = [freqLabel, t("recurrentes.subtitle.day", { n: r.due_day })];
+    if (needsMonth(r.frequency) && r.due_month) {
+      parts.push(t("recurrentes.subtitle.next", { month: t("recurrentes.month." + (r.due_month - 1)) }));
+    }
     if (r.type === "transfer") {
       const from = accountsAll.find((a) => a.id === r.account_id)?.name;
       const to = accountsAll.find((a) => a.id === r.counter_account_id)?.name;
-      if (from && to) parts.push(`${from} → ${to}`);
+      if (from && to) parts.push(t("recurrentes.subtitle.transferRoute", { from, to }));
     } else if (r.is_shared) {
-      parts.push("compartido");
+      parts.push(t("recurrentes.subtitle.shared"));
     }
-    if (!r.is_active) parts.push("pausada");
+    if (!r.is_active) parts.push(t("recurrentes.subtitle.paused"));
     return parts.join(" · ");
   }
 
@@ -149,17 +150,17 @@ export async function renderRecurrentes(container, onBack) {
 
   function validationError() {
     const f = state.form;
-    if (!f.name.trim()) return "Ponle un nombre a la regla.";
-    if (f.cents <= 0) return "Introduce un importe.";
-    if (needsCategory(f.type) && !f.categoryId) return "Elige una categoría.";
+    if (!f.name.trim()) return t("recurrentes.validation.name");
+    if (f.cents <= 0) return t("common.enterAmount");
+    if (needsCategory(f.type) && !f.categoryId) return t("common.pickCategory");
     if (f.type === "transfer" && (!f.counterAccountId || f.counterAccountId === f.accountId)) {
-      return "Elige dos cuentas distintas (origen y destino).";
+      return t("common.pickTwoAccounts");
     }
     const day = parseInt(f.dueDay, 10);
-    if (!day || day < 1 || day > 31) return "El día debe estar entre 1 y 31.";
+    if (!day || day < 1 || day > 31) return t("recurrentes.validation.day");
     if (needsMonth(f.frequency)) {
       const month = parseInt(f.dueMonth, 10);
-      if (!month || month < 1 || month > 12) return "El mes debe estar entre 1 y 12.";
+      if (!month || month < 1 || month > 12) return t("recurrentes.validation.month");
     }
     return "";
   }
@@ -168,13 +169,13 @@ export async function renderRecurrentes(container, onBack) {
     if (f.type === "transfer") {
       return `
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">Desde</div>
+        <div class="section-title">${t("common.from")}</div>
         <div class="chips">
           ${accounts.map((a) => `<button type="button" class="chip${f.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
         </div>
       </div>
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">Hacia</div>
+        <div class="section-title">${t("common.to")}</div>
         <div class="chips">
           ${accountsAll.filter((a) => a.id !== f.accountId).map((a) => `<button type="button" class="chip${f.counterAccountId === a.id ? " active" : ""}" data-counter-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
         </div>
@@ -182,7 +183,7 @@ export async function renderRecurrentes(container, onBack) {
     }
     return `
     <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-      <div class="section-title">Cuenta</div>
+      <div class="section-title">${t("common.account")}</div>
       <div class="chips">
         ${accounts.map((a) => `<button type="button" class="chip${f.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
       </div>
@@ -192,18 +193,18 @@ export async function renderRecurrentes(container, onBack) {
   function renderList() {
     container.innerHTML = `
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="rec-back" aria-label="Volver"
+        <button type="button" class="icon-btn" id="rec-back" aria-label="${t("common.goBack")}"
           style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>
-        <h1 style="flex:1; font-size:20px; font-weight:700; letter-spacing:-0.015em;">Recurrentes</h1>
+        <h1 style="flex:1; font-size:20px; font-weight:700; letter-spacing:-0.015em;">${t("recurrentes.title")}</h1>
         <button type="button" id="rec-new"
           style="height:44px;padding:0 18px;border-radius:999px;background:var(--text);color:var(--bg);border:0;
-          font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">+ Nueva</button>
+          font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">${t("common.addNew")}</button>
       </div>
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
       ${state.rules.length === 0
-        ? `<div class="card" style="text-align:center;color:var(--text-3)"><p>Todavía no hay ninguna regla recurrente.</p></div>`
+        ? `<div class="card" style="text-align:center;color:var(--text-3)"><p>${t("recurrentes.empty")}</p></div>`
         : `<div class="card" style="padding:4px 16px; display:flex; flex-direction:column;">
             ${state.rules.map((r, i) => ruleRowHtml(r, i > 0)).join("")}
           </div>`}
@@ -231,23 +232,23 @@ export async function renderRecurrentes(container, onBack) {
 
     container.innerHTML = `
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="rec-form-back" aria-label="Volver"
+        <button type="button" class="icon-btn" id="rec-form-back" aria-label="${t("common.goBack")}"
           style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>
-        <h1 style="flex:1; font-size:20px; font-weight:700; letter-spacing:-0.015em;">${state.editId ? "Editar regla" : "Nueva regla"}</h1>
+        <h1 style="flex:1; font-size:20px; font-weight:700; letter-spacing:-0.015em;">${state.editId ? t("recurrentes.form.title.edit") : t("recurrentes.form.title.new")}</h1>
         <span style="width:44px;"></span>
       </div>
 
       <label class="field field-stack" style="margin-bottom:18px;">
-        <span class="field-label">Nombre</span>
-        <input type="text" id="rec-name" value="${escAttr(f.name)}" placeholder="p. ej. Alquiler">
+        <span class="field-label">${t("common.name")}</span>
+        <input type="text" id="rec-name" value="${escAttr(f.name)}" placeholder="${t("common.egPlaceholder", { example: t("recurrentes.form.namePlaceholderExample") })}">
       </label>
 
       <div class="segmented" style="margin-bottom:18px;">
-        ${TIPOS_RULE.map((t) => `<button type="button" data-tipo="${t.id}" class="${f.type === t.id ? "active" : ""}">${t.label}</button>`).join("")}
+        ${TIPOS_RULE.map((tr) => `<button type="button" data-tipo="${tr.id}" class="${f.type === tr.id ? "active" : ""}">${t(tr.labelKey)}</button>`).join("")}
       </div>
 
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
-        <div class="section-title">Importe</div>
+        <div class="section-title">${t("common.amount")}</div>
         <div class="amount-display" style="align-items:center;">
           <input type="text" inputmode="decimal" id="rec-raw" value="${escAttr(f.raw)}" placeholder="0"
             style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
@@ -258,7 +259,7 @@ export async function renderRecurrentes(container, onBack) {
 
       ${cats.length ? `
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">Categoría</div>
+        <div class="section-title">${t("common.category")}</div>
         <div class="chips-scroll">
           ${cats.map((c) => {
             const color = colorForCategory(c.id, byId);
@@ -274,20 +275,20 @@ export async function renderRecurrentes(container, onBack) {
       ${renderAccountsSection(f)}
 
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">Frecuencia</div>
+        <div class="section-title">${t("recurrentes.form.frequency")}</div>
         <div class="chips">
-          ${FREQ_CHIPS.map((fr) => `<button type="button" class="chip${f.frequency === fr.id ? " active" : ""}" data-freq="${fr.id}">${fr.label}</button>`).join("")}
+          ${FREQ_CHIPS.map((fr) => `<button type="button" class="chip${f.frequency === fr.id ? " active" : ""}" data-freq="${fr.id}">${t(fr.labelKey)}</button>`).join("")}
         </div>
       </div>
 
       <div style="display:flex; gap:8px; margin-bottom:18px;">
         <label class="field field-stack" style="flex:1;">
-          <span class="field-label">Día</span>
+          <span class="field-label">${t("recurrentes.form.dayLabel")}</span>
           <input type="number" min="1" max="31" id="rec-day" value="${escAttr(f.dueDay)}">
         </label>
         ${needsMonth(f.frequency) ? `
         <label class="field field-stack" style="flex:1;">
-          <span class="field-label">Mes</span>
+          <span class="field-label">${t("recurrentes.form.monthLabel")}</span>
           <input type="number" min="1" max="12" id="rec-month" value="${escAttr(f.dueMonth)}">
         </label>` : ""}
       </div>
@@ -295,7 +296,7 @@ export async function renderRecurrentes(container, onBack) {
       ${withCategory && (f.isShared || partnerName) ? `
       <div class="card" style="padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
-          <span style="font-size:15px; font-weight:600;">Compartida con ${escHtml(partnerName) || "la contraparte"}</span>
+          <span style="font-size:15px; font-weight:600;">${t("recurrentes.form.sharedWith", { name: escHtml(partnerName) || t("recurrentes.shared.fallbackName") })}</span>
           <span class="toggle">
             <input type="checkbox" id="rec-shared" ${f.isShared ? "checked" : ""}>
             <span class="toggle-track"><span class="toggle-knob"></span></span>
@@ -305,7 +306,7 @@ export async function renderRecurrentes(container, onBack) {
 
       <div class="card" style="padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
-          <span style="font-size:15px; font-weight:600;">Activa</span>
+          <span style="font-size:15px; font-weight:600;">${t("recurrentes.form.activeLabel")}</span>
           <span class="toggle">
             <input type="checkbox" id="rec-active" ${f.isActive ? "checked" : ""}>
             <span class="toggle-track"><span class="toggle-knob"></span></span>
@@ -316,13 +317,13 @@ export async function renderRecurrentes(container, onBack) {
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
       <button type="button" class="btn-primary" id="rec-save" style="margin-bottom:${state.editId ? "10px" : "0"};">
-        ${state.editId ? "Guardar cambios" : "Crear regla"}
+        ${state.editId ? t("common.saveChanges") : t("recurrentes.form.create")}
       </button>
       ${state.editId ? `
       <button type="button" id="rec-delete"
         style="width:100%;background:${state.deleteConfirm ? "var(--red)" : "transparent"};color:${state.deleteConfirm ? "#fff" : "var(--red)"};
           border:1px solid var(--red);border-radius:var(--radius-sm);padding:16px;font:600 16px var(--font-ui);cursor:pointer;">
-        ${state.deleteConfirm ? "Sí, borrar" : "Borrar regla"}
+        ${state.deleteConfirm ? t("common.confirmDelete") : t("recurrentes.form.delete")}
       </button>` : ""}
     `;
 
@@ -421,7 +422,7 @@ export async function renderRecurrentes(container, onBack) {
         backToList();
       } catch (e) {
         btn.disabled = false;
-        errorMsg = "No se pudo guardar: " + e.message;
+        errorMsg = t("common.saveFailed", { error: e.message });
         render();
       }
     };
@@ -441,7 +442,7 @@ export async function renderRecurrentes(container, onBack) {
         backToList();
       } catch (e) {
         btn.disabled = false;
-        errorMsg = "No se pudo borrar: " + e.message;
+        errorMsg = t("common.deleteFailed", { error: e.message });
         state.deleteConfirm = false;
         render();
       }

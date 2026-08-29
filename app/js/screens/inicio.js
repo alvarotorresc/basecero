@@ -6,6 +6,7 @@ import {
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtNum2, fmtPct, currencyCode } from "../format.js";
 import { dayIndexOfPeriod, expectedPeriodDays, paceDeltaCents } from "../prevision.js";
+import { t } from "../i18n/index.js";
 import { budgetStatus } from "./presupuesto.js";
 import { barChartSvg, donutSvg } from "../charts.js";
 import { renderLiquidar } from "./liquidar.js";
@@ -54,7 +55,7 @@ function txRowHtml(r, byId) {
   const color = colorForCategory(r.category_id, byId);
   const icon = iconForCategory(r.category_id, byId);
   const title = r.merchant || catName;
-  const sub = catName + (r.is_shared ? ` · tu parte ${fmtMoney(r.my_amount_cents)}` : "");
+  const sub = catName + (r.is_shared ? t("common.myPartSuffix", { amount: fmtMoney(r.my_amount_cents) }) : "");
   const isExpense = r.type === "expense";
   const amountClass = isExpense ? "negative" : "positive";
   const sign = isExpense ? "-" : "+";
@@ -83,22 +84,22 @@ function sharedBlockHtml(period, sharedRows, sharedTotal, partnerName) {
   return `
     <div class="card" style="display:flex;flex-direction:column;gap:14px;margin-bottom:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="font-size:15px;font-weight:700;">Con ${escHtml(partnerName)}</div>
+        <div style="font-size:15px;font-weight:700;">${t("inicio.shared.withPartner", { name: escHtml(partnerName) })}</div>
         <div style="font-size:11px;font-weight:600;color:var(--text-2);background:var(--card2);border-radius:999px;padding:5px 10px;">
-          Este periodo: ${miPct} / ${100 - miPct}
+          ${t("inicio.shared.periodSplit", { mine: miPct, theirs: 100 - miPct })}
         </div>
       </div>
       <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;">
         <div style="display:flex;flex-direction:column;gap:5px;">
-          <div style="font-size:11px;color:var(--text-3);">Pendiente de que te devuelva</div>
+          <div style="font-size:11px;color:var(--text-3);">${t("inicio.shared.pendingLabel")}</div>
           <div class="num text-red" style="font-size:30px;font-weight:600;letter-spacing:-0.02em;">${fmtMoney(sharedTotal)}</div>
         </div>
         <button type="button" id="shared-liquidar" style="height:44px;padding:0 18px;border-radius:999px;
           background:var(--card2);color:var(--text);border:0;font-size:12px;font-weight:700;cursor:pointer;
-          -webkit-tap-highlight-color:transparent;">Liquidar</button>
+          -webkit-tap-highlight-color:transparent;">${t("common.settle")}</button>
       </div>
       ${n > 0 ? `<div style="font-size:11px;color:var(--text-3);">
-        ${n} gasto${n === 1 ? "" : "s"} sin liquidar · el más antiguo del ${fmtDiaCorto(masAntiguo)}
+        ${t("inicio.shared.oldest", { n, date: fmtDiaCorto(masAntiguo) })}
       </div>` : ""}
     </div>`;
 }
@@ -111,11 +112,11 @@ function sharedBlockHtml(period, sharedRows, sharedTotal, partnerName) {
 function partnerBannerHtml() {
   return `
   <div class="card" style="margin-bottom:16px; display:flex; flex-direction:column; gap:10px;">
-    <div style="font-size:15px; font-weight:700;">¿Con quién compartes gastos?</div>
-    <div style="font-size:12px; color:var(--text-2);">Tienes gastos compartidos registrados. Di su nombre para recuperar el bloque de pendientes y «Liquidar».</div>
+    <div style="font-size:15px; font-weight:700;">${t("inicio.partnerBanner.title")}</div>
+    <div style="font-size:12px; color:var(--text-2);">${t("inicio.partnerBanner.body")}</div>
     <div style="display:flex; gap:8px;">
-      <input type="text" id="partner-banner-input" placeholder="Su nombre" style="flex:1; min-width:0;">
-      <button type="button" id="partner-banner-save" class="btn-primary" style="width:auto; padding:0 18px;">Guardar</button>
+      <input type="text" id="partner-banner-input" placeholder="${t("inicio.partnerBanner.namePlaceholder")}" style="flex:1; min-width:0;">
+      <button type="button" id="partner-banner-save" class="btn-primary" style="width:auto; padding:0 18px;">${t("common.save")}</button>
     </div>
     <div id="partner-banner-error" class="banner-aviso red" style="display:none;"></div>
   </div>`;
@@ -132,7 +133,7 @@ function previsionRowHtml(item, byId) {
       <div class="dotico" style="--cat:${color};">${icon}</div>
       <div class="tx-body">
         <div class="tx-title">${escHtml(rule.name)}</div>
-        <div class="tx-sub">${paid ? "Pagado" : "Pendiente"}</div>
+        <div class="tx-sub">${paid ? t("inicio.prevision.paid") : t("inicio.prevision.pending")}</div>
       </div>
       <div class="num" style="${amountStyle}">${fmtMoney(myCents)}</div>`;
   // Pagada: fila estática (nada que hacer). Pendiente: <button> real (no un <div> con onclick),
@@ -151,10 +152,10 @@ function previsionHtml(prevision, byId) {
   return `
     <div class="card" style="display:flex;flex-direction:column;gap:14px;margin-bottom:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div class="section-title">Previsión</div>
+        <div class="section-title">${t("inicio.prevision.title")}</div>
         <button type="button" id="prevision-gestionar" style="all:unset;cursor:pointer;
           font-size:12px;font-weight:600;color:var(--text-2);white-space:nowrap;
-          -webkit-tap-highlight-color:transparent;">Gestionar recurrentes →</button>
+          -webkit-tap-highlight-color:transparent;">${t("inicio.prevision.manage")}</button>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;">
         ${prevision.items.map((it) => previsionRowHtml(it, byId)).join("")}
@@ -162,11 +163,11 @@ function previsionHtml(prevision, byId) {
       <hr class="divider">
       <div style="display:flex;flex-direction:column;gap:8px;">
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
-          <div style="font-size:12px;color:var(--text-2);">Comprometido restante</div>
+          <div style="font-size:12px;color:var(--text-2);">${t("inicio.prevision.committed")}</div>
           <div class="num" style="font-size:14px;font-weight:600;">${fmtMoney(prevision.comprometidoCents)}</div>
         </div>
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
-          <div style="font-size:13px;font-weight:700;">Disponible real</div>
+          <div style="font-size:13px;font-weight:700;">${t("inicio.prevision.available")}</div>
           <div class="num ${prevision.disponibleCents >= 0 ? "text-green" : "text-red"}"
             style="font-size:20px;font-weight:700;letter-spacing:-0.02em;">${fmtMoney(prevision.disponibleCents)}</div>
         </div>
@@ -184,8 +185,8 @@ function flujoDeGastoHtml(days7) {
   return `
     <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
-        <div style="font-size:15px;font-weight:700;">Flujo de gasto</div>
-        <div style="font-size:11px;color:var(--text-3);">Últimos 7 días · ${fmtMoney(total7)}</div>
+        <div style="font-size:15px;font-weight:700;">${t("inicio.flow.title")}</div>
+        <div style="font-size:11px;color:var(--text-3);">${t("inicio.flow.last7", { total: fmtMoney(total7) })}</div>
       </div>
       ${barChartSvg(days)}
     </div>`;
@@ -219,7 +220,7 @@ function categoriaDonutRowHtml(name, color, spentCents, limitCents) {
             <div style="width:9px;height:9px;border-radius:3px;background:${color};flex-shrink:0;"></div>
             <div style="font-size:12.5px;font-weight:600;color:var(--text-2);">${escHtml(name)}</div>
           </div>
-          <div class="num" style="font-size:12.5px;font-weight:700;color:${numColor};white-space:nowrap;">${fmtMoney(spentCents)} <span style="font-weight:500;color:var(--text-3);">de ${fmtMoney(limitCents)}</span></div>
+          <div class="num" style="font-size:12.5px;font-weight:700;color:${numColor};white-space:nowrap;">${fmtMoney(spentCents)} <span style="font-weight:500;color:var(--text-3);">${t("inicio.categorySpend.of", { limit: fmtMoney(limitCents) })}</span></div>
         </div>
         <div style="height:5px;background:var(--card2);border-radius:999px;overflow:hidden;">
           <div style="width:${barPct}%;height:5px;background:${barColor};border-radius:999px;"></div>
@@ -232,7 +233,7 @@ function categoriaDonutRowHtml(name, color, spentCents, limitCents) {
         <div style="width:9px;height:9px;border-radius:3px;background:${color};flex-shrink:0;"></div>
         <div style="font-size:12.5px;font-weight:600;color:var(--text-2);">${escHtml(name)}</div>
       </div>
-      <div class="num" style="font-size:12.5px;font-weight:700;white-space:nowrap;">${fmtMoney(spentCents)} <span style="font-weight:500;color:var(--text-3);">sin límite</span></div>
+      <div class="num" style="font-size:12.5px;font-weight:700;white-space:nowrap;">${fmtMoney(spentCents)} <span style="font-weight:500;color:var(--text-3);">${t("inicio.categorySpend.noLimit")}</span></div>
     </div>`;
 }
 
@@ -257,13 +258,13 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupue
   const verPresupuestoBtn = showVerPresupuesto
     ? `<button type="button" id="inicio-ver-presupuesto" style="all:unset;cursor:pointer;
         font-size:12px;font-weight:600;color:var(--text-2);white-space:nowrap;
-        -webkit-tap-highlight-color:transparent;">Ver presupuesto →</button>`
+        -webkit-tap-highlight-color:transparent;">${t("inicio.budget.viewLink")}</button>`
     : "";
   const headerHtml = `
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
       <div style="display:flex;flex-direction:column;gap:3px;">
-        <div style="font-size:15px;font-weight:700;">Gasto por categoría</div>
-        <div style="font-size:11px;color:var(--text-3);">Solo tu parte de lo compartido</div>
+        <div style="font-size:15px;font-weight:700;">${t("inicio.categorySpend.title")}</div>
+        <div style="font-size:11px;color:var(--text-3);">${t("inicio.categorySpend.subtitle")}</div>
       </div>
       ${verPresupuestoBtn}
     </div>`;
@@ -274,7 +275,7 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupue
     return `
       <div class="card" style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">
         ${headerHtml}
-        <div style="font-size:12px;color:var(--text-3);">Aún no hay gasto categorizado este periodo.</div>
+        <div style="font-size:12px;color:var(--text-3);">${t("inicio.categorySpend.empty")}</div>
       </div>`;
   }
 
@@ -289,13 +290,13 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupue
   const rowsHtml = top
     .map((r) => categoriaDonutRowHtml(r.name, colorForCategory(r.root_id, byId), r.spent_cents, budgetByCategory[r.root_id] ?? 0))
     .join("");
-  const otrasRowHtml = rest.length > 0 ? categoriaDonutRowHtml(`Otras ${rest.length}`, DONUT_OTHERS_COLOR, restTotal, 0) : "";
+  const otrasRowHtml = rest.length > 0 ? categoriaDonutRowHtml(t("inicio.categorySpend.others", { n: rest.length }), DONUT_OTHERS_COLOR, restTotal, 0) : "";
 
   return `
     <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
       ${headerHtml}
       <div style="display:flex;justify-content:center;">
-        ${donutSvg(slices, centsToStr(categorizedTotal), `${currencyCode()} gastados`)}
+        ${donutSvg(slices, centsToStr(categorizedTotal), t("inicio.categorySpend.spent", { currency: currencyCode() }))}
       </div>
       <div style="display:flex;flex-direction:column;gap:12px;">
         ${rowsHtml}${otrasRowHtml}
@@ -314,15 +315,15 @@ function disponibleCardHtml(budgets, spent, period, sharedTotal, partnerName) {
   const disp = budgetTotal - spent;
   const delta = paceDeltaCents(budgetTotal, spent, period.start_date, hoyISO());
   const over = delta > 0;
-  const badge = `<span class="num" style="font-size:11px;font-weight:700;border-radius:999px;padding:4px 10px;color:${over ? "var(--amber)" : "var(--green)"};background:${over ? "rgba(255,190,77,0.14)" : "rgba(79,217,154,0.14)"};">${over ? "▲" : "▼"} ${escHtml(fmtMoney(Math.abs(delta)))} ${over ? "sobre" : "bajo"} el ritmo del plan</span>`;
+  const badge = `<span class="num" style="font-size:11px;font-weight:700;border-radius:999px;padding:4px 10px;color:${over ? "var(--amber)" : "var(--green)"};background:${over ? "rgba(255,190,77,0.14)" : "rgba(79,217,154,0.14)"};">${t(over ? "inicio.available.paceOver" : "inicio.available.paceUnder", { amount: escHtml(fmtMoney(Math.abs(delta))) })}</span>`;
   const liquidar = partnerName && sharedTotal > 0
-    ? `<button type="button" id="disp-liquidar" class="num" style="height:44px;padding:0 18px;border-radius:999px;border:0;background:var(--card2);color:var(--text);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">Liquidar · ${escHtml(fmtMoney(sharedTotal))}</button>`
+    ? `<button type="button" id="disp-liquidar" class="num" style="height:44px;padding:0 18px;border-radius:999px;border:0;background:var(--card2);color:var(--text);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">${t("inicio.available.settleWithAmount", { amount: escHtml(fmtMoney(sharedTotal)) })}</button>`
     : "";
   return `
   <section class="card" style="margin-bottom:16px;">
-    <div class="section-title">Disponible del periodo</div>
+    <div class="section-title">${t("inicio.available.title")}</div>
     <div class="amount-hero num">${moneyPartsHtml(disp)}</div>
-    <div class="num" style="font-size:12px;color:var(--text-2);">de ${escHtml(fmtMoney(budgetTotal))} presupuestados</div>
+    <div class="num" style="font-size:12px;color:var(--text-2);">${t("inicio.available.ofBudgeted", { amount: escHtml(fmtMoney(budgetTotal)) })}</div>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;">${badge}${liquidar}</div>
   </section>`;
 }
@@ -336,7 +337,7 @@ export async function renderInicio(container) {
   try {
     period = await getOpenPeriod();
     if (!period) {
-      container.innerHTML = `<div class="banner-aviso red">No hay ningún periodo abierto.</div>`;
+      container.innerHTML = `<div class="banner-aviso red">${t("common.noOpenPeriod")}</div>`;
       return;
     }
     [spent, income, rows, byId, sharedRows, sharedTotal, budgets, prevision, rootRows, days7, meta] = await Promise.all([
@@ -357,7 +358,7 @@ export async function renderInicio(container) {
     // no hace falta esta query extra — sharedBlockHtml decide solo con sharedRows/sharedTotal.
     showPartnerBanner = !partnerName && await hasSharedData();
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">No se pudo cargar Inicio: ${escHtml(e.message)}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("inicio.error.load", { error: escHtml(e.message) })}</div>`;
     return;
   }
 
@@ -369,16 +370,16 @@ export async function renderInicio(container) {
   // Saludo por hora local (PR polish): sustituye la "Desde el ..." fija de la cabecera —
   // la fecha de inicio del periodo ya se ve en la línea pequeña vía "día N de M".
   const h = new Date().getHours();
-  const saludo = h < 7 ? "Buenas noches" : h < 14 ? "Buenos días" : h < 21 ? "Buenas tardes" : "Buenas noches";
+  const saludo = h < 7 ? t("inicio.greeting.evening") : h < 14 ? t("inicio.greeting.morning") : h < 21 ? t("inicio.greeting.afternoon") : t("inicio.greeting.evening");
 
   const movimientosHtml = rows.length === 0
     ? `<div class="card" style="text-align:center;color:var(--text-3)">
-        <p>Registra tu primer gasto con el botón ＋</p></div>`
+        <p>${t("inicio.movements.empty")}</p></div>`
     : `<div class="card" style="display:flex;flex-direction:column;gap:16px;">
-        <div class="section-title">Movimientos</div>
+        <div class="section-title">${t("common.movements")}</div>
         <div style="display:flex;flex-direction:column;gap:12px;">
           ${groupByDay(rows).map((g) => `
-            <div class="day-label">${g.date === hoy ? "Hoy" : fmtDiaLargo(g.date)}</div>
+            <div class="day-label">${g.date === hoy ? t("common.today") : fmtDiaLargo(g.date)}</div>
             ${g.rows.map((r) => txRowHtml(r, byId)).join("")}
           `).join("")}
         </div>
@@ -388,29 +389,29 @@ export async function renderInicio(container) {
     ${showPartnerBanner ? partnerBannerHtml() : ""}
 
     <button type="button" id="inicio-periodo-header" style="all:unset;cursor:pointer;display:flex;flex-direction:column;gap:2px;margin-bottom:14px;-webkit-tap-highlight-color:transparent;">
-      <div style="font-size:12px;font-weight:500;color:var(--text-2);">${escHtml(period.name)} · día ${dayIndexOfPeriod(period.start_date, hoy)} de ${expectedPeriodDays(period.start_date)}</div>
+      <div style="font-size:12px;font-weight:500;color:var(--text-2);">${t("inicio.header.dayOf", { period: escHtml(period.name), day: dayIndexOfPeriod(period.start_date, hoy), total: expectedPeriodDays(period.start_date) })}</div>
       <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;">${saludo}</div>
     </button>
 
     ${disponibleCardHtml(budgets, spent, period, sharedTotal, partnerName)}
 
     <div class="card" style="display:flex;flex-direction:column;gap:4px;margin-bottom:16px;">
-      <div class="section-title">Gastado</div>
+      <div class="section-title">${t("inicio.spent.title")}</div>
       <div class="amount-hero num">${moneyPartsHtml(spent)}</div>
 
       <hr class="divider" style="margin-top:8px;">
 
       <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:8px;">
         <div style="display:flex;flex-direction:column;gap:5px;">
-          <div style="font-size:11px;color:var(--text-3);">Ingresos</div>
+          <div style="font-size:11px;color:var(--text-3);">${t("inicio.spent.income")}</div>
           <div class="num text-green" style="font-size:15px;font-weight:600;">${fmtMoney(income)}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px;">
-          <div style="font-size:11px;color:var(--text-3);">Ahorrado</div>
+          <div style="font-size:11px;color:var(--text-3);">${t("inicio.spent.saved")}</div>
           <div class="num ${ahorrado >= 0 ? "text-green" : "text-red"}" style="font-size:15px;font-weight:600;">${fmtMoney(ahorrado)}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px;">
-          <div style="font-size:11px;color:var(--text-3);">Tasa</div>
+          <div style="font-size:11px;color:var(--text-3);">${t("inicio.spent.rate")}</div>
           <div class="num" style="font-size:15px;font-weight:600;">${tasa}</div>
         </div>
       </div>
@@ -449,7 +450,7 @@ export async function renderInicio(container) {
       partnerBannerSaveBtn.classList.add("shake");
       setTimeout(() => partnerBannerSaveBtn.classList.remove("shake"), 400);
       if (errEl) {
-        errEl.innerHTML = `No se pudo guardar: ${escHtml(e.message)}`;
+        errEl.innerHTML = t("common.saveFailed", { error: escHtml(e.message) });
         errEl.style.display = "";
       }
     }

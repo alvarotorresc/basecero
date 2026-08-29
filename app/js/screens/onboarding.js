@@ -6,21 +6,39 @@
 // se guardan al salir del paso 3 — si se cierra la pestaña a mitad, el gate (0 periodos)
 // reabre el onboarding con lo ya guardado.
 import { fmtMoney, initFormat, hoyISO } from "../format.js";
-import { getMetaAll, setMetaMany, balancesAt, createAccount, replaceAll } from "../repo.js";
+import { getMetaAll, setMeta, setMetaMany, balancesAt, createAccount, replaceAll, retranslateSeedNames } from "../repo.js";
 import { POOL } from "../category-colors.js";
 import { canLeaveAccounts, accountDraft } from "../onboarding-steps.js";
 import { currencyOptionsHtml, localeOptionsHtml } from "./ajustes.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 import { isEncryptedBackup, decryptBackup, WrongPassphraseError } from "../backup-crypto.js";
 import { workbookToRows, validateImport } from "../xlsx.js";
+import { t, LANGS, activeLang, initI18n } from "../i18n/index.js";
+import { loadXlsx } from "../xlsx-loader.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
-const TYPE_LABELS = { checking: "Corriente", savings: "Ahorro", liability: "Pasivo" };
+// Mandatory ledger pattern (waves 1-2, ver patrimonio.js ACCOUNT_TYPES/GOAL_TYPES): se guarda la
+// CLAVE del diccionario, no el texto — se resuelve con t() en cada render.
+const ACCOUNT_TYPES = [
+  { id: "checking", labelKey: "onboarding.account.type.checking" },
+  { id: "savings", labelKey: "onboarding.account.type.savings" },
+  { id: "liability", labelKey: "onboarding.account.type.liability" },
+];
+const ACCOUNT_TYPE_LABEL_KEY = Object.fromEntries(ACCOUNT_TYPES.map((at) => [at.id, at.labelKey]));
 // Preview del paso 3: un emoji por color del POOL (decorativo, mismos pares que el artboard).
 const PREVIEW_ICONS = ["🛒", "🎉", "🧾", "📺", "💶", "🚗", "❤️‍🩹", "🍽️", "🚌", "🎁", "🏠", "👕"];
 const BOX = `background:var(--card);border-radius:16px;padding:12px 16px;`;
+// Feature cards del paso 1 (bienvenida): color + path SVG (decorativos) + claves de texto.
+const WELCOME_FEATURES = [
+  ["var(--green)", `<rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 018 0v3"></path>`,
+    "onboarding.welcome.feature1.title", "onboarding.welcome.feature1.subtitle"],
+  ["#4F94E9", `<path d="M13 3H6.5A1.5 1.5 0 005 4.5v15A1.5 1.5 0 006.5 21h11a1.5 1.5 0 001.5-1.5V9z"></path><path d="M13 3v6h6"></path>`,
+    "onboarding.welcome.feature2.title", "onboarding.welcome.feature2.subtitle"],
+  ["var(--amber)", `<rect x="3.5" y="5" width="17" height="16" rx="2.5"></rect><path d="M3.5 9.5h17M8 3v4M16 3v4"></path>`,
+    "onboarding.welcome.feature3.title", "onboarding.welcome.feature3.subtitle"],
+];
 
 export async function renderOnboarding(container, { onDone }) {
   const meta = await getMetaAll();
@@ -45,7 +63,7 @@ export async function renderOnboarding(container, { onDone }) {
     // ← + CTA. En el paso 0 no hay atrás (lo pinta paso1Html con su propio pie).
     return `
     <div style="display:flex;gap:10px;margin-top:24px;">
-      <button type="button" class="icon-btn" id="onb-back" aria-label="Atrás"
+      <button type="button" class="icon-btn" id="onb-back" aria-label="${escAttr(t("common.back"))}"
         style="width:52px;height:52px;border-radius:999px;background:var(--card);color:var(--text);font-size:18px;flex-shrink:0;">←</button>
       <button type="button" class="btn-primary" id="${ctaId}" style="flex:1;">${ctaLabel}</button>
     </div>`;
@@ -57,30 +75,23 @@ export async function renderOnboarding(container, { onDone }) {
       <div style="width:64px;height:64px;border-radius:20px;background:var(--card);display:flex;align-items:center;justify-content:center;">
         <div style="font-size:26px;font-weight:800;letter-spacing:-0.04em;">B0</div>
       </div>
-      <div style="font-size:32px;font-weight:800;letter-spacing:-0.02em;line-height:1.12;">Tu dinero,<br>desde cero.</div>
-      <div style="font-size:14px;color:var(--text-2);line-height:1.5;">BaseCero es tu cuaderno de gastos: vive en este dispositivo, sin cuentas, sin nube, sin nadie mirando.</div>
+      <div style="font-size:32px;font-weight:800;letter-spacing:-0.02em;line-height:1.12;">${t("onboarding.welcome.titleLine1")}<br>${t("onboarding.welcome.titleLine2")}</div>
+      <div style="font-size:14px;color:var(--text-2);line-height:1.5;">${t("onboarding.welcome.subtitle")}</div>
     </div>
     <div style="margin-top:36px;display:flex;flex-direction:column;gap:20px;">
-      ${[
-        ["var(--green)", `<rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 018 0v3"></path>`,
-          "Todo se queda aquí", "Sin servidor y sin registro. Funciona hasta sin conexión."],
-        ["#4F94E9", `<path d="M13 3H6.5A1.5 1.5 0 005 4.5v15A1.5 1.5 0 006.5 21h11a1.5 1.5 0 001.5-1.5V9z"></path><path d="M13 3v6h6"></path>`,
-          "Tu dato es una hoja de cálculo", "Exporta e importa tus datos cuando quieras: nunca están atrapados."],
-        ["var(--amber)", `<rect x="3.5" y="5" width="17" height="16" rx="2.5"></rect><path d="M3.5 9.5h17M8 3v4M16 3v4"></path>`,
-          "Tu mes empieza cuando cobras", "Los periodos van de nómina a nómina, no del 1 al 30."],
-      ].map(([color, path, t, s]) => `
+      ${WELCOME_FEATURES.map(([color, path, titleKey, subtitleKey]) => `
       <div style="display:flex;align-items:flex-start;gap:12px;">
         <div style="width:36px;height:36px;border-radius:12px;background:var(--card);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${path}</svg>
         </div>
-        <div><div style="font-size:14px;font-weight:700;">${t}</div>
-        <div style="font-size:12px;color:var(--text-2);line-height:1.45;">${s}</div></div>
+        <div><div style="font-size:14px;font-weight:700;">${t(titleKey)}</div>
+        <div style="font-size:12px;color:var(--text-2);line-height:1.45;">${t(subtitleKey)}</div></div>
       </div>`).join("")}
     </div>
     <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px;padding-top:32px;">
-      <button type="button" class="btn-primary" id="onb-start" style="width:100%;">Empezar · 2 minutos</button>
-      <div style="text-align:center;font-size:11.5px;color:var(--text-2);">¿Vienes de otra copia?
-        <button type="button" id="onb-import-link" style="background:none;border:0;padding:0;color:var(--text);font-weight:600;font-size:11.5px;cursor:pointer;font-family:inherit;">Importar una hoja o backup</button>
+      <button type="button" class="btn-primary" id="onb-start" style="width:100%;">${t("onboarding.welcome.startBtn")}</button>
+      <div style="text-align:center;font-size:11.5px;color:var(--text-2);">${t("onboarding.welcome.importPrompt")}
+        <button type="button" id="onb-import-link" style="background:none;border:0;padding:0;color:var(--text);font-weight:600;font-size:11.5px;cursor:pointer;font-family:inherit;">${t("onboarding.welcome.importLink")}</button>
       </div>
     </div>`;
   }
@@ -95,87 +106,95 @@ export async function renderOnboarding(container, { onDone }) {
         </div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(a.name)}</div>
-          <div style="font-size:11px;color:var(--text-2);">${escHtml(TYPE_LABELS[a.type] ?? a.type)}${a.id === firstCheckingId ? " · será la cuenta de tus imports" : ""}</div>
+          <div style="font-size:11px;color:var(--text-2);">${escHtml(ACCOUNT_TYPE_LABEL_KEY[a.type] ? t(ACCOUNT_TYPE_LABEL_KEY[a.type]) : a.type)}${a.id === firstCheckingId ? t("onboarding.account.importDefaultSuffix") : ""}</div>
         </div>
         <div class="num" style="font-size:13.5px;font-weight:700;">${escHtml(fmtMoney(a.balance_cents))}</div>
       </div>`).join("");
     return `
     <div style="margin-top:8px;">
-      <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;">Tus cuentas</div>
-      <div style="font-size:13px;color:var(--text-2);margin-top:6px;line-height:1.5;">Las de verdad: tu banco del día a día, tu hucha, tu préstamo. Con al menos una basta para empezar.</div>
+      <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;">${t("onboarding.account.title")}</div>
+      <div style="font-size:13px;color:var(--text-2);margin-top:6px;line-height:1.5;">${t("onboarding.account.subtitle")}</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px;">${rows}</div>
     <div style="background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:12px;margin-top:14px;">
-      <div class="section-title">${state.accounts.length ? "Añadir otra" : "Tu primera cuenta"}</div>
-      <input type="text" id="onb-acc-name" value="${escAttr(f.name)}" placeholder="Nombre · p. ej. Hucha del banco" autocomplete="off"
+      <div class="section-title">${state.accounts.length ? t("onboarding.account.addAnotherTitle") : t("onboarding.account.firstTitle")}</div>
+      <input type="text" id="onb-acc-name" value="${escAttr(f.name)}" placeholder="${escAttr(t("onboarding.account.namePlaceholder"))}" autocomplete="off"
         style="border:0;border-radius:14px;background:var(--card2);padding:12px 14px;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;outline:none;">
       <div class="segmented" style="border-radius:999px;">
-        ${Object.entries(TYPE_LABELS).map(([id, label]) => `
-        <button type="button" data-onb-tipo="${id}" class="${f.type === id ? "active" : ""}"
-          style="border-radius:999px;${f.type === id ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${label}</button>`).join("")}
+        ${ACCOUNT_TYPES.map((at) => `
+        <button type="button" data-onb-tipo="${at.id}" class="${f.type === at.id ? "active" : ""}"
+          style="border-radius:999px;${f.type === at.id ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t(at.labelKey)}</button>`).join("")}
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
         <div style="flex:1;">
-          <div class="section-title" style="margin-bottom:4px;">Saldo de hoy</div>
+          <div class="section-title" style="margin-bottom:4px;">${t("onboarding.account.balanceTitle")}</div>
           <input type="text" id="onb-acc-raw" inputmode="decimal" value="${escAttr(f.raw)}" placeholder="0,00" autocomplete="off"
             style="border:0;background:none;color:var(--text);font-family:inherit;font-size:22px;font-weight:700;outline:none;width:100%;font-variant-numeric:tabular-nums;">
         </div>
-        <button type="button" id="onb-acc-add" class="btn-secondary" style="height:44px;padding:0 20px;border-radius:999px;flex-shrink:0;">Añadir</button>
+        <button type="button" id="onb-acc-add" class="btn-secondary" style="height:44px;padding:0 20px;border-radius:999px;flex-shrink:0;">${t("onboarding.account.addBtn")}</button>
       </div>
-      ${f.type === "liability" ? `<div style="font-size:11px;color:var(--text-2);">El saldo de un pasivo es lo que debes: se guarda en negativo.</div>` : ""}
+      ${f.type === "liability" ? `<div style="font-size:11px;color:var(--text-2);">${t("onboarding.account.liabilityNote")}</div>` : ""}
       ${state.errorMsg ? `<div style="font-size:11.5px;color:var(--red);">${escHtml(state.errorMsg)}</div>` : ""}
     </div>
     <div style="${BOX}display:flex;align-items:center;gap:10px;margin-top:14px;">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.01"></path></svg>
-      <div style="font-size:11.5px;color:var(--text-2);">Aquí no se conecta ningún banco: tú apuntas o importas su CSV. Podrás añadir y renombrar cuentas cuando quieras en Patrimonio.</div>
+      <div style="font-size:11.5px;color:var(--text-2);">${t("onboarding.account.infoNote")}</div>
     </div>
-    ${footHtml("Seguir", "onb-next-2")}`;
+    ${footHtml(t("onboarding.cta.next"), "onb-next-2")}`;
   }
 
   function paso3Html() {
     const p = state.prefs;
     return `
     <div style="margin-top:8px;">
-      <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;">A tu manera</div>
-      <div style="font-size:13px;color:var(--text-2);margin-top:6px;">Tres cosas rápidas. Todas se cambian luego en Ajustes.</div>
+      <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;">${t("onboarding.prefs.title")}</div>
+      <div style="font-size:13px;color:var(--text-2);margin-top:6px;">${t("onboarding.prefs.subtitle")}</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:13px;margin-top:14px;">
       <div style="background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;">
-        <div class="section-title">Moneda y formato</div>
+        <div class="section-title">${t("onboarding.prefs.language")}</div>
+        <div class="segmented" style="border-radius:999px;">
+          ${LANGS.map(([v, label]) => `
+          <button type="button" data-onb-lang="${v}" class="${activeLang() === v ? "active" : ""}"
+            style="border-radius:999px;${activeLang() === v ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${escHtml(label)}</button>`).join("")}
+        </div>
+      </div>
+      <div style="background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;">
+        <div class="section-title">${t("onboarding.prefs.currencyTitle")}</div>
         <div style="display:flex;gap:8px;">
-          <label class="field field-stack" style="flex:1;"><span>Moneda</span>
+          <label class="field field-stack" style="flex:1;"><span>${t("onboarding.prefs.currencyLabel")}</span>
             <select id="onb-currency">${currencyOptionsHtml(p.currency)}</select></label>
-          <label class="field field-stack" style="flex:1;"><span>Formato</span>
+          <label class="field field-stack" style="flex:1;"><span>${t("onboarding.prefs.formatLabel")}</span>
             <select id="onb-locale">${localeOptionsHtml(p.locale)}</select></label>
         </div>
       </div>
       <div style="background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;">
-        <div class="section-title">¿Compartes gastos con alguien?</div>
+        <div class="section-title">${t("onboarding.prefs.partnerTitle")}</div>
         <input type="text" id="onb-partner" value="${escAttr(p.partner)}" autocomplete="off"
-          placeholder="Su nombre — o déjalo vacío si vas por libre"
+          placeholder="${escAttr(t("onboarding.prefs.partnerPlaceholder"))}"
           style="border:0;border-radius:14px;background:var(--card2);padding:12px 14px;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;outline:none;">
-        <div style="font-size:11px;color:var(--text-2);line-height:1.45;">Con nombre, cada gasto puede marcarse como compartido y la app lleva las cuentas de quién debe qué. Vacío = ni rastro de esa parte de la app.</div>
+        <div style="font-size:11px;color:var(--text-2);line-height:1.45;">${t("onboarding.prefs.partnerNote")}</div>
       </div>
       <div style="background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;">
-        <div class="section-title">Tus categorías</div>
+        <div class="section-title">${t("onboarding.prefs.categoriesTitle")}</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;">
           ${POOL.map((color, i) => `<span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;font-size:12px;background:${color};">${PREVIEW_ICONS[i]}</span>`).join("")}
         </div>
-        <div style="font-size:11.5px;color:var(--text-2);line-height:1.45;">Empiezas con un pack de 41 (Casa, Alimentación, Transporte…). Crea, renombra, recolorea o archiva las que quieras en Ajustes → Categorías.</div>
+        <div style="font-size:11.5px;color:var(--text-2);line-height:1.45;">${t("onboarding.prefs.categoriesNote")}</div>
       </div>
       ${state.errorMsg ? `<div style="font-size:11.5px;color:var(--red);">${escHtml(state.errorMsg)}</div>` : ""}
     </div>
-    ${footHtml("Seguir", "onb-next-3")}`;
+    ${footHtml(t("onboarding.cta.next"), "onb-next-3")}`;
   }
 
   function paso4Html() {
     return `
     <div style="margin-top:8px;">
-      <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;line-height:1.15;">Tu mes no empieza<br>el día 1</div>
-      <div style="font-size:13px;color:var(--text-2);margin-top:8px;line-height:1.5;">Empieza el día que cobras. BaseCero organiza tu dinero en <b style="color:var(--text);">periodos</b>: abres uno cuando entra la nómina y lo cierras cuando llega la siguiente.</div>
+      <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;line-height:1.15;">${t("onboarding.period.titleLine1")}<br>${t("onboarding.period.titleLine2")}</div>
+      <div style="font-size:13px;color:var(--text-2);margin-top:8px;line-height:1.5;">${t("onboarding.period.bodyPre")}<b style="color:var(--text);">${t("onboarding.period.bodyBold")}</b>${t("onboarding.period.bodyPost")}</div>
     </div>
     <div style="background:var(--card);border-radius:22px;padding:16px;margin-top:14px;">
-      <div style="display:flex;justify-content:space-between;font-size:10px;font-weight:700;letter-spacing:0.09em;color:var(--text-2);padding:0 2px 8px;"><span>SEPTIEMBRE</span><span>OCTUBRE</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;font-weight:700;letter-spacing:0.09em;color:var(--text-2);padding:0 2px 8px;"><span>${t("onboarding.period.illustMonth1")}</span><span>${t("onboarding.period.illustMonth2")}</span></div>
       <div style="display:flex;gap:4px;">
         ${["25", "26", "27g", "28s", "…s", "25s", "26s", "27g"].map((d) => {
           const g = d.endsWith("g"), s = d.endsWith("s");
@@ -186,23 +205,23 @@ export async function renderOnboarding(container, { onDone }) {
       </div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:10px;">
         <span style="width:9px;height:9px;border-radius:3px;background:#15AC7D;flex-shrink:0;"></span>
-        <span style="font-size:11.5px;color:var(--text-2);">día de cobro = un periodo se cierra y nace el siguiente</span>
+        <span style="font-size:11.5px;color:var(--text-2);">${t("onboarding.period.legend")}</span>
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px;">
       <div style="display:flex;align-items:flex-start;gap:12px;${BOX}">
         <span style="font-size:15px;flex-shrink:0;">✅</span>
-        <div style="font-size:12px;color:var(--text-2);line-height:1.45;"><b style="color:var(--text);">Ves lo que de verdad te queda</b> entre nómina y nómina — no un mes de calendario partido por la mitad.</div>
+        <div style="font-size:12px;color:var(--text-2);line-height:1.45;"><b style="color:var(--text);">${t("onboarding.period.point1Bold")}</b>${t("onboarding.period.point1After")}</div>
       </div>
       <div style="display:flex;align-items:flex-start;gap:12px;${BOX}">
         <span style="font-size:15px;flex-shrink:0;">📅</span>
-        <div style="font-size:12px;color:var(--text-2);line-height:1.45;"><b style="color:var(--text);">¿Cobras el día 1?</b> Perfecto también: tu periodo irá del 1 al 31. La regla es tuya.</div>
+        <div style="font-size:12px;color:var(--text-2);line-height:1.45;"><b style="color:var(--text);">${t("onboarding.period.point2Bold")}</b>${t("onboarding.period.point2After")}</div>
       </div>
     </div>
     <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px;padding-top:24px;">
-      <button type="button" class="btn-primary" id="onb-open-period" style="width:100%;">Abrir mi primer periodo</button>
-      <div style="text-align:center;font-size:11.5px;color:var(--text-2);">Te preguntamos el nombre, la fecha y el presupuesto — 30 segundos.</div>
-      <button type="button" class="icon-btn" id="onb-back" aria-label="Atrás"
+      <button type="button" class="btn-primary" id="onb-open-period" style="width:100%;">${t("onboarding.period.openBtn")}</button>
+      <div style="text-align:center;font-size:11.5px;color:var(--text-2);">${t("onboarding.period.openHint")}</div>
+      <button type="button" class="icon-btn" id="onb-back" aria-label="${escAttr(t("common.back"))}"
         style="width:44px;height:44px;border-radius:999px;background:var(--card);color:var(--text);font-size:16px;">←</button>
     </div>`;
   }
@@ -243,16 +262,34 @@ export async function renderOnboarding(container, { onDone }) {
           state.accounts = await balancesAt(hoyISO());
           state.form = { name: "", type: "checking", raw: "" };
           state.errorMsg = "";
-        } catch (e) { state.errorMsg = "No se pudo crear la cuenta: " + e.message; }
+        } catch (e) { state.errorMsg = t("onboarding.account.createFailed", { error: e.message }); }
         state.busy = false;
         render();
       };
       q("#onb-next-2").onclick = () => {
-        if (!canLeaveAccounts(state.accounts.length)) { state.errorMsg = "Crea al menos una cuenta para seguir."; render(); return; }
+        if (!canLeaveAccounts(state.accounts.length)) { state.errorMsg = t("onboarding.account.needOne"); render(); return; }
         state.step = 2; state.errorMsg = ""; render();
       };
     }
     if (state.step === 2) {
+      // Card «Idioma» (Task 4, Part B): en caliente — sin location.reload() (reiniciaría el
+      // onboarding). initI18n()/documentElement.lang se re-evalúan y render() repinta todo el
+      // paso ya traducido; state.prefs no se toca (currency/locale son un ajuste aparte).
+      container.querySelectorAll("[data-onb-lang]").forEach((b) => (b.onclick = async () => {
+        if (state.busy) return;
+        state.busy = true;
+        const v = b.dataset.onbLang;
+        try {
+          await setMeta("lang", v);
+          // SIEMPRE (fix round 1): retranslateSeedNames es idempotente y basada en el nombre real
+          // de cada fila (ver repo.js), no en si `v` "cambió" — mismo criterio que ajustes.js.
+          await retranslateSeedNames(v);
+          initI18n({ lang: v });
+          document.documentElement.lang = v;
+        } catch (e) { state.errorMsg = t("common.saveFailed", { error: e.message }); }
+        state.busy = false;
+        render();
+      }));
       q("#onb-currency").onchange = (e) => { state.prefs.currency = e.target.value; };
       q("#onb-locale").onchange = (e) => { state.prefs.locale = e.target.value; };
       q("#onb-partner").oninput = (e) => { state.prefs.partner = e.target.value; state.errorMsg = ""; };
@@ -269,9 +306,13 @@ export async function renderOnboarding(container, { onDone }) {
           // Sin location.reload() (reiniciaría el onboarding): se re-inicializan los
           // formateadores en caliente, igual que hace boot() al arrancar.
           initFormat({ currency, locale });
-          document.documentElement.lang = locale.split("-")[0];
+          // documentElement.lang refleja el IDIOMA de la UI (activeLang(), elegido en la card de
+          // arriba), no el locale de formato de números/fechas — antes de la card de idioma este
+          // valor se derivaba del locale porque era la única señal disponible; con el picker
+          // dedicado, derivarlo de locale pisaría el idioma elegido (p.ej. lang=en + locale=es-ES).
+          document.documentElement.lang = activeLang();
           state.step = 3;
-        } catch (e) { state.errorMsg = "No se pudo guardar: " + e.message; }
+        } catch (e) { state.errorMsg = t("common.saveFailed", { error: e.message }); }
         state.busy = false;
         render();
       };
@@ -290,33 +331,33 @@ export async function renderOnboarding(container, { onDone }) {
     container.innerHTML = `
       <div style="display:flex;flex-direction:column;min-height:calc(100vh - 48px);padding-top:8px;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-          <button type="button" class="icon-btn" id="onb-imp-back" aria-label="Volver"
+          <button type="button" class="icon-btn" id="onb-imp-back" aria-label="${escAttr(t("common.goBack"))}"
             style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>
-          <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">Traer tu copia</div>
+          <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">${t("onboarding.import.title")}</div>
         </div>
-        <div style="font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:14px;">Una hoja <b style="color:var(--text);">.xlsx</b> exportada desde BaseCero o un backup cifrado <b style="color:var(--text);">.bce</b>. Se carga entera en este dispositivo.</div>
+        <div style="font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:14px;">${t("onboarding.import.introPre")}<b style="color:var(--text);">.xlsx</b>${t("onboarding.import.introMid")}<b style="color:var(--text);">.bce</b>${t("onboarding.import.introPost")}</div>
         ${!imp.fileName ? `
-        <label class="btn-primary" style="width:100%;text-align:center;cursor:pointer;">Elegir fichero
+        <label class="btn-primary" style="width:100%;text-align:center;cursor:pointer;">${t("onboarding.import.chooseFileBtn")}
           <input type="file" id="onb-imp-file" accept=".xlsx,.bce" style="display:none;">
         </label>` : `
         <div style="${BOX}display:flex;align-items:center;gap:12px;">
           <div style="flex:1;min-width:0;font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(imp.fileName)}</div>
-          <button type="button" id="onb-imp-clear" class="btn-secondary" style="height:36px;padding:0 14px;border-radius:999px;flex-shrink:0;">Cambiar</button>
+          <button type="button" id="onb-imp-clear" class="btn-secondary" style="height:36px;padding:0 14px;border-radius:999px;flex-shrink:0;">${t("onboarding.import.changeBtn")}</button>
         </div>`}
         ${imp.needsPass ? `
         <div style="background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;margin-top:14px;">
-          <div class="section-title">Backup cifrado</div>
-          <input type="password" id="onb-imp-pass" placeholder="Contraseña del backup" autocomplete="off"
+          <div class="section-title">${t("onboarding.import.encryptedTitle")}</div>
+          <input type="password" id="onb-imp-pass" placeholder="${escAttr(t("onboarding.import.passPlaceholder"))}" autocomplete="off"
             style="border:0;border-radius:14px;background:var(--card2);padding:12px 14px;color:var(--text);font-family:inherit;font-size:14px;outline:none;">
-          <button type="button" class="btn-primary" id="onb-imp-decrypt" style="width:100%;" ${imp.busy ? "disabled" : ""}>${imp.busy ? "Descifrando…" : "Descifrar"}</button>
+          <button type="button" class="btn-primary" id="onb-imp-decrypt" style="width:100%;" ${imp.busy ? "disabled" : ""}>${imp.busy ? t("onboarding.import.decrypting") : t("onboarding.import.decryptBtn")}</button>
         </div>` : ""}
         ${imp.errors.length ? `
         <div class="banner-aviso red" style="display:block;margin-top:14px;"><p>${imp.errors.map(escHtml).join("<br>")}</p></div>` : ""}
         ${imp.pending ? `
         <div style="background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;margin-top:14px;">
-          <div class="section-title">Listo para cargar</div>
+          <div class="section-title">${t("onboarding.import.readyTitle")}</div>
           <div style="font-size:13px;color:var(--text-2);">${escHtml(imp.summary)}</div>
-          <button type="button" class="btn-primary" id="onb-imp-go" style="width:100%;" ${imp.busy ? "disabled" : ""}>${imp.busy ? "Cargando…" : "Cargar mi copia"}</button>
+          <button type="button" class="btn-primary" id="onb-imp-go" style="width:100%;" ${imp.busy ? "disabled" : ""}>${imp.busy ? t("onboarding.import.loading") : t("onboarding.import.loadBtn")}</button>
         </div>` : ""}
       </div>`;
     wireImportView(imp);
@@ -335,7 +376,7 @@ export async function renderOnboarding(container, { onDone }) {
         const buf = new Uint8Array(await f.arrayBuffer());
         if (isEncryptedBackup(buf)) { imp.buffer = buf; imp.needsPass = true; render(); return; }
         await parseAndOffer(imp, buf);
-      } catch (err) { imp.errors = ["No se pudo leer el fichero: " + err.message]; render(); }
+      } catch (err) { imp.errors = [t("onboarding.import.readFailed", { error: err.message })]; render(); }
     };
     const clear = q("#onb-imp-clear");
     if (clear) clear.onclick = () => { state.imp = null; render(); };
@@ -351,7 +392,7 @@ export async function renderOnboarding(container, { onDone }) {
         await parseAndOffer(imp, plain);
       } catch (e) {
         imp.busy = false;
-        imp.errors = [e instanceof WrongPassphraseError ? "La contraseña no es correcta." : "No se pudo descifrar el backup: " + e.message];
+        imp.errors = [e instanceof WrongPassphraseError ? t("onboarding.import.wrongPass") : t("onboarding.import.decryptFailed", { error: e.message })];
         render();
       }
     };
@@ -363,19 +404,24 @@ export async function renderOnboarding(container, { onDone }) {
         // Sin backup previo (a diferencia de Ajustes): la BD todavía está virgen.
         await replaceAll(imp.pending);
         location.reload(); // boot() reevalúa el gate: con periodos en la copia, el onboarding no vuelve.
-      } catch (e) { imp.busy = false; imp.errors = ["No se pudo cargar la copia: " + e.message]; imp.pending = null; render(); }
+      } catch (e) { imp.busy = false; imp.errors = [t("onboarding.import.loadFailed", { error: e.message })]; imp.pending = null; render(); }
     };
   }
 
   async function parseAndOffer(imp, plainBuf) {
     try {
-      const wb = window.XLSX.read(plainBuf, { type: "array" });
-      const { data, errors: parseErrors } = workbookToRows(window.XLSX, wb);
+      const XLSX = await loadXlsx();
+      const wb = XLSX.read(plainBuf, { type: "array" });
+      const { data, errors: parseErrors } = workbookToRows(XLSX, wb);
       const errors = [...parseErrors, ...validateImport(data)];
       if (errors.length) { imp.errors = errors.slice(0, 5); render(); return; }
       imp.pending = data;
-      imp.summary = `${data.accounts.length} cuenta${data.accounts.length === 1 ? "" : "s"} · ${data.periods.length} periodo${data.periods.length === 1 ? "" : "s"} · ${data.transactions.length} movimiento${data.transactions.length === 1 ? "" : "s"}`;
+      imp.summary = [
+        t("onboarding.import.summaryAccounts", { n: data.accounts.length }),
+        t("onboarding.import.summaryPeriods", { n: data.periods.length }),
+        t("onboarding.import.summaryMovements", { n: data.transactions.length }),
+      ].join(" · ");
       render();
-    } catch (e) { imp.errors = ["No se pudo leer el fichero: " + e.message]; render(); }
+    } catch (e) { imp.errors = [t("onboarding.import.readFailed", { error: e.message })]; render(); }
   }
 }

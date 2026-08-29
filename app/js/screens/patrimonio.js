@@ -6,6 +6,7 @@ import {
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, hoyISO, fmtDec1, currencySymbol, currencyCode, parseCentsRaw, centsToRaw } from "../format.js";
 import { netWorthBarsHtml } from "../charts.js";
+import { t } from "../i18n/index.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -44,11 +45,11 @@ function netWorthCardHtml(netWorthCents, series) {
   const badgeHtml = variation === null ? "" : `
     <div style="display:flex;align-items:center;gap:5px;background:color-mix(in srgb, ${up ? "var(--green)" : "var(--red)"} 16%, var(--card));border-radius:999px;padding:6px 10px;flex-shrink:0;">
       ${ICON_ARROW(up)}
-      <div class="num" style="font-size:11px;font-weight:700;color:${up ? "var(--green)" : "var(--red)"};">${fmtMoney(Math.abs(variation))} este periodo</div>
+      <div class="num" style="font-size:11px;font-weight:700;color:${up ? "var(--green)" : "var(--red)"};">${t("patrimonio.netWorth.deltaThisPeriod", { amount: fmtMoney(Math.abs(variation)) })}</div>
     </div>`;
   const prev = n >= 2 ? series[n - 2] : null;
   const contextLineHtml = prev
-    ? `<span style="font-size:11px;color:var(--text-2);">cierre de ${escHtml(prev.label)}: ${escHtml(fmtMoney(prev.cents))}</span>`
+    ? `<span style="font-size:11px;color:var(--text-2);">${t("patrimonio.netWorth.closeContext", { label: escHtml(prev.label), amount: escHtml(fmtMoney(prev.cents)) })}</span>`
     : "";
   // Envuelto en un único div: el badge y la línea de contexto son hijos flex del propio `.card`
   // (gap:16px) — sin este wrapper, un `prev` nulo (0 periodos cerrados) dejaría un hijo vacío
@@ -67,7 +68,7 @@ function netWorthCardHtml(netWorthCents, series) {
     <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
         <div style="display:flex;flex-direction:column;gap:6px;">
-          <div class="section-title">Patrimonio neto</div>
+          <div class="section-title">${t("patrimonio.netWorth.title")}</div>
           <div class="amount-hero num">${moneyPartsHtml(netWorthCents)}</div>
         </div>
         ${sideHtml}
@@ -91,9 +92,9 @@ const ACCOUNT_ICON = {
 };
 
 const ACCOUNT_TYPES = [
-  { id: "checking", label: "Corriente" },
-  { id: "savings", label: "Ahorro" },
-  { id: "liability", label: "Pasivo" },
+  { id: "checking", labelKey: "patrimonio.accountType.checking" },
+  { id: "savings", labelKey: "patrimonio.accountType.savings" },
+  { id: "liability", labelKey: "patrimonio.accountType.liability" },
 ];
 
 /** Subtítulo por tipo — "Cuenta corriente · por defecto" es el único texto literal que pide el
@@ -101,9 +102,9 @@ const ACCOUNT_TYPES = [
  *  ningún campo del que derivar "2 huchas con objetivo" o "cuota 189 €/mes" del mockup sin
  *  inventar datos, así que no se replican aquí. */
 function accountSubtitle(type, isDefault) {
-  if (type === "checking") return `Cuenta corriente${isDefault ? " · por defecto" : ""}`;
-  if (type === "savings") return "Ahorro";
-  return "Pasivo";
+  if (type === "checking") return isDefault ? t("patrimonio.accountSubtitle.checkingDefault") : t("patrimonio.accountSubtitle.checking");
+  if (type === "savings") return t("patrimonio.accountType.savings");
+  return t("patrimonio.accountType.liability");
 }
 
 function cuentaRowHtml(a, isDefault) {
@@ -121,7 +122,7 @@ function cuentaRowHtml(a, isDefault) {
       </div>
       <div style="text-align:right;">
         <div class="num" style="font-size:15px;font-weight:600;${isLiability ? "color:var(--red);" : ""}">${fmtMoney(a.balance_cents)}</div>
-        <div style="font-size:10.5px;color:var(--text-3);">hoy</div>
+        <div style="font-size:10.5px;color:var(--text-3);">${t("patrimonio.accounts.today")}</div>
       </div>
     </button>`;
 }
@@ -137,10 +138,10 @@ function cuentasCardHtml(accounts) {
   const n = accounts.length;
   const header = `
     <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:15px;font-weight:700;">Cuentas</div>
+      <div style="font-size:15px;font-weight:700;">${t("patrimonio.accounts.title")}</div>
       <div style="display:flex;align-items:center;gap:10px;">
-        <div style="font-size:11px;color:var(--text-3);">${n} activa${n === 1 ? "" : "s"} · solo ${currencyCode()}</div>
-        <button type="button" class="icon-btn" id="btn-nueva-cuenta" aria-label="Nueva cuenta" style="width:28px;height:28px;border-radius:9px;font-size:16px;">+</button>
+        <div style="font-size:11px;color:var(--text-3);">${t("patrimonio.accounts.countActive", { n, currency: currencyCode() })}</div>
+        <button type="button" class="icon-btn" id="btn-nueva-cuenta" aria-label="${t("patrimonio.accounts.new")}" style="width:28px;height:28px;border-radius:9px;font-size:16px;">+</button>
       </div>
     </div>`;
 
@@ -148,7 +149,7 @@ function cuentasCardHtml(accounts) {
     return `
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
         ${header}
-        <div class="card" style="text-align:center;color:var(--text-3);">Todavía no tienes ninguna cuenta.</div>
+        <div class="card" style="text-align:center;color:var(--text-3);">${t("patrimonio.accounts.empty")}</div>
       </div>`;
   }
 
@@ -169,13 +170,13 @@ function cuentasCardHtml(accounts) {
 const LEVEL_COLOR = { ok: "var(--green)", warn: "var(--amber)", over: "var(--red)" };
 
 const GOAL_TYPES = [
-  { id: "emergency_fund", label: "Fondo de emergencia" },
-  { id: "savings_target", label: "Ahorro con objetivo" },
-  { id: "provision", label: "Provisión" },
-  { id: "spending_cap", label: "Techo de gasto" },
-  { id: "savings_rate", label: "Tasa de ahorro" },
+  { id: "emergency_fund", labelKey: "patrimonio.goalType.emergency_fund" },
+  { id: "savings_target", labelKey: "patrimonio.goalType.savings_target" },
+  { id: "provision", labelKey: "patrimonio.goalType.provision" },
+  { id: "spending_cap", labelKey: "patrimonio.goalType.spending_cap" },
+  { id: "savings_rate", labelKey: "patrimonio.goalType.savings_rate" },
 ];
-const GOAL_TYPE_LABEL = Object.fromEntries(GOAL_TYPES.map((t) => [t.id, t.label]));
+const GOAL_TYPE_KEY = Object.fromEntries(GOAL_TYPES.map((gt) => [gt.id, gt.labelKey]));
 
 // Tipos con hucha propia (mismo criterio que repo.js#HUCHA_GOAL_TYPES): al crearlos sin cuenta
 // se les crea una savings dedicada — la UI usa este set para saber cuándo mostrar la nota y el
@@ -250,7 +251,7 @@ function goalRingRowHtml(g, color) {
       <div style="flex:1;min-width:0;">
         <div style="font-size:13.5px;font-weight:600;">${escHtml(goal.name)}</div>
         <div style="font-size:11px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-          ${escHtml(fmtGoalAmount(goal, currentCents))} de ${escHtml(fmtGoalAmount(goal, targetCents))} · ${escHtml(subtitle)}
+          ${t("patrimonio.goals.ringSub", { current: escHtml(fmtGoalAmount(goal, currentCents)), target: escHtml(fmtGoalAmount(goal, targetCents)), subtitle: escHtml(subtitle) })}
         </div>
       </div>
     </button>`;
@@ -263,10 +264,10 @@ function objetivosCardHtml(goals) {
   const n = goals.length;
   const header = `
     <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:15px;font-weight:700;">Objetivos</div>
+      <div style="font-size:15px;font-weight:700;">${t("patrimonio.goals.title")}</div>
       <div style="display:flex;align-items:center;gap:10px;">
-        <div style="font-size:11px;color:var(--text-3);">${n} activo${n === 1 ? "" : "s"}</div>
-        <button type="button" class="icon-btn" id="btn-nuevo-objetivo" aria-label="Nuevo objetivo" style="width:28px;height:28px;border-radius:9px;font-size:16px;">+</button>
+        <div style="font-size:11px;color:var(--text-3);">${t("patrimonio.goals.countActive", { n })}</div>
+        <button type="button" class="icon-btn" id="btn-nuevo-objetivo" aria-label="${t("patrimonio.goals.new")}" style="width:28px;height:28px;border-radius:9px;font-size:16px;">+</button>
       </div>
     </div>`;
 
@@ -274,7 +275,7 @@ function objetivosCardHtml(goals) {
     return `
       <div style="display:flex;flex-direction:column;gap:10px;">
         ${header}
-        <div class="card" style="text-align:center;color:var(--text-3);">Todavía no tienes ningún objetivo activo.</div>
+        <div class="card" style="text-align:center;color:var(--text-3);">${t("patrimonio.goals.empty")}</div>
       </div>`;
   }
 
@@ -306,7 +307,7 @@ export async function renderPatrimonio(container) {
   try {
     await loadData();
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">No se pudo cargar Patrimonio: ${escHtml(e.message)}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("patrimonio.error.load", { error: escHtml(e.message) })}</div>`;
     return;
   }
 
@@ -344,7 +345,7 @@ export async function renderPatrimonio(container) {
     try {
       row = await getAccount(id);
     } catch (e) {
-      errorMsg = "No se pudo abrir la cuenta: " + e.message;
+      errorMsg = t("patrimonio.error.openAccount", { error: e.message });
       render();
       return;
     }
@@ -367,24 +368,24 @@ export async function renderPatrimonio(container) {
 
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="acc-back" aria-label="Volver">←</button>
-        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${editing ? "Editar cuenta" : "Nueva cuenta"}</h1>
+        <button type="button" class="icon-btn" id="acc-back" aria-label="${t("common.goBack")}">←</button>
+        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${editing ? t("patrimonio.account.title.edit") : t("patrimonio.accounts.new")}</h1>
         <span style="width:36px;"></span>
       </div>
 
       <label class="field field-stack" style="margin-bottom:18px;">
-        <span class="field-label">Nombre</span>
-        <input type="text" id="acc-name" value="${escAttr(f.name)}" placeholder="p. ej. Revolut">
+        <span class="field-label">${t("common.name")}</span>
+        <input type="text" id="acc-name" value="${escAttr(f.name)}" placeholder="${t("common.egPlaceholder", { example: "Revolut" })}">
       </label>
 
       <div class="segmented" style="margin-bottom:18px;">
-        ${ACCOUNT_TYPES.map((t) => `<button type="button" data-acc-tipo="${t.id}" class="${f.type === t.id ? "active" : ""}">${t.label}</button>`).join("")}
+        ${ACCOUNT_TYPES.map((at) => `<button type="button" data-acc-tipo="${at.id}" class="${f.type === at.id ? "active" : ""}">${t(at.labelKey)}</button>`).join("")}
       </div>
 
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px;">
-        <div class="section-title">Saldo inicial</div>
+        <div class="section-title">${t("patrimonio.account.openingBalance")}</div>
         <div class="amount-display" style="align-items:center;">
-          <button type="button" class="icon-btn" id="acc-sign" aria-label="Cambiar signo" style="font-size:18px; font-weight:700;">${f.sign}</button>
+          <button type="button" class="icon-btn" id="acc-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;">${f.sign}</button>
           <input type="text" inputmode="decimal" id="acc-raw" value="${escAttr(f.raw)}" placeholder="0"
             style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
           <span class="amount-currency">${currencySymbol()}</span>
@@ -393,13 +394,13 @@ export async function renderPatrimonio(container) {
       </div>
       <div style="font-size:11px;color:var(--text-3);margin-bottom:18px;">
         ${f.type === "liability"
-          ? "El saldo de un pasivo es lo que debes: normalmente negativo."
-          : "El saldo con el que arrancó la cuenta, antes del primer movimiento registrado."}
+          ? t("patrimonio.account.note.liability")
+          : t("patrimonio.account.note.default")}
       </div>
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
-      <button type="button" class="btn-primary" id="acc-save">${editing ? "Guardar cambios" : "Crear cuenta"}</button>
+      <button type="button" class="btn-primary" id="acc-save">${editing ? t("common.saveChanges") : t("patrimonio.account.create")}</button>
     `;
 
     wireAccountForm();
@@ -432,7 +433,7 @@ export async function renderPatrimonio(container) {
     container.querySelector("#acc-save").onclick = async () => {
       const btn = container.querySelector("#acc-save");
       if (!f.name.trim()) {
-        errorMsg = "Ponle un nombre a la cuenta.";
+        errorMsg = t("patrimonio.account.validation.name");
         render();
         const savedBtn = container.querySelector("#acc-save");
         savedBtn.classList.add("shake");
@@ -451,7 +452,7 @@ export async function renderPatrimonio(container) {
         backToMain();
       } catch (e) {
         btn.disabled = false;
-        errorMsg = "No se pudo guardar: " + e.message;
+        errorMsg = t("common.saveFailed", { error: e.message });
         render();
       }
     };
@@ -492,18 +493,18 @@ export async function renderPatrimonio(container) {
 
   function validationGoal() {
     const f = state.goalForm;
-    if (!f.name.trim()) return "Ponle un nombre al objetivo.";
+    if (!f.name.trim()) return t("patrimonio.goal.validation.name");
     if (f.type === "emergency_fund") {
       const m = parseInt(f.months, 10);
-      if (!m || m < 1) return "Indica cuántos meses de gasto quieres cubrir.";
+      if (!m || m < 1) return t("patrimonio.goal.validation.months");
     } else if (f.type === "savings_target" || f.type === "provision") {
-      if (f.cents <= 0) return "Introduce un importe objetivo.";
+      if (f.cents <= 0) return t("patrimonio.goal.validation.amount");
     } else if (f.type === "spending_cap") {
-      if (f.cents <= 0) return "Introduce un importe objetivo.";
-      if (!f.categoryId) return "Elige una categoría.";
+      if (f.cents <= 0) return t("patrimonio.goal.validation.amount");
+      if (!f.categoryId) return t("common.pickCategory");
     } else if (f.type === "savings_rate") {
       const p = parseFloat((f.pct || "0").replace(",", "."));
-      if (!p || p <= 0) return "Introduce un objetivo de ahorro (%).";
+      if (!p || p <= 0) return t("patrimonio.goal.validation.savingsRate");
     }
     return "";
   }
@@ -533,19 +534,19 @@ export async function renderPatrimonio(container) {
     if (f.type === "emergency_fund") {
       return `
       <label class="field field-stack" style="margin-bottom:18px;">
-        <span class="field-label">Meses de gasto a cubrir</span>
-        <input type="number" min="1" id="goal-months" value="${escAttr(f.months)}" placeholder="p. ej. 3">
+        <span class="field-label">${t("patrimonio.goal.monthsLabel")}</span>
+        <input type="number" min="1" id="goal-months" value="${escAttr(f.months)}" placeholder="${t("common.egPlaceholder", { example: "3" })}">
       </label>`;
     }
     if (f.type === "savings_rate") {
       return `
       <label class="field field-stack" style="margin-bottom:18px;">
-        <span class="field-label">Objetivo de ahorro (%)</span>
-        <input type="text" inputmode="decimal" id="goal-pct" value="${escAttr(f.pct)}" placeholder="p. ej. 20">
+        <span class="field-label">${t("patrimonio.goal.pctLabel")}</span>
+        <input type="text" inputmode="decimal" id="goal-pct" value="${escAttr(f.pct)}" placeholder="${t("common.egPlaceholder", { example: "20" })}">
       </label>`;
     }
     // savings_target / provision / spending_cap: los 3 llevan un importe objetivo.
-    const amountLabel = f.type === "provision" ? "Objetivo anual" : "Importe objetivo";
+    const amountLabel = f.type === "provision" ? t("patrimonio.goal.amountLabel.annual") : t("patrimonio.goal.amountLabel.default");
     const amountHtml = `
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
         <div class="section-title">${amountLabel}</div>
@@ -560,7 +561,7 @@ export async function renderPatrimonio(container) {
     if (f.type === "savings_target") {
       return `${amountHtml}
       <label class="field field-stack" style="margin-bottom:18px;">
-        <span class="field-label">Fecha objetivo (opcional)</span>
+        <span class="field-label">${t("patrimonio.goal.dateLabel")}</span>
         <input type="date" id="goal-date" value="${escAttr(f.targetDate)}">
       </label>`;
     }
@@ -568,7 +569,7 @@ export async function renderPatrimonio(container) {
     if (f.type === "spending_cap") {
       return `${amountHtml}
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">Categoría</div>
+        <div class="section-title">${t("common.category")}</div>
         <div class="chips-scroll">
           ${expenseRootCats.map((c) => {
             const color = colorForCategory(c.id, byId);
@@ -594,24 +595,24 @@ export async function renderPatrimonio(container) {
 
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="goal-back" aria-label="Volver">←</button>
-        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${editing ? "Editar objetivo" : "Nuevo objetivo"}</h1>
+        <button type="button" class="icon-btn" id="goal-back" aria-label="${t("common.goBack")}">←</button>
+        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${editing ? t("patrimonio.goal.title.edit") : t("patrimonio.goals.new")}</h1>
         <span style="width:36px;"></span>
       </div>
 
       <label class="field field-stack" style="margin-bottom:18px;">
-        <span class="field-label">Nombre</span>
-        <input type="text" id="goal-name" value="${escAttr(f.name)}" placeholder="p. ej. ${escAttr(GOAL_TYPE_LABEL[f.type])}">
+        <span class="field-label">${t("common.name")}</span>
+        <input type="text" id="goal-name" value="${escAttr(f.name)}" placeholder="${t("common.egPlaceholder", { example: t(GOAL_TYPE_KEY[f.type]) })}">
       </label>
 
       ${editing ? `
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
-        <span class="field-label">Tipo</span>
-        <div style="padding:14px 16px;font-size:15px;font-weight:600;background:var(--card2);border-radius:var(--radius-sm);">${escHtml(GOAL_TYPE_LABEL[f.type])}</div>
-        <div style="font-size:11px;color:var(--text-3);">El tipo no se puede cambiar una vez creado el objetivo. Para cambiarlo, bórralo y crea uno nuevo.</div>
+        <span class="field-label">${t("common.typeLabel")}</span>
+        <div style="padding:14px 16px;font-size:15px;font-weight:600;background:var(--card2);border-radius:var(--radius-sm);">${t(GOAL_TYPE_KEY[f.type])}</div>
+        <div style="font-size:11px;color:var(--text-3);">${t("patrimonio.goal.typeLockedNote")}</div>
       </div>` : `
       <div class="segmented" style="margin-bottom:18px;">
-        ${GOAL_TYPES.map((t) => `<button type="button" data-goal-tipo="${t.id}" class="${f.type === t.id ? "active" : ""}">${t.label}</button>`).join("")}
+        ${GOAL_TYPES.map((gt) => `<button type="button" data-goal-tipo="${gt.id}" class="${f.type === gt.id ? "active" : ""}">${t(gt.labelKey)}</button>`).join("")}
       </div>`}
 
       ${renderGoalConditionalFields(f)}
@@ -619,14 +620,14 @@ export async function renderPatrimonio(container) {
       ${isHucha ? `
       <div class="card" style="padding:12px 14px; margin-bottom:18px;">
         ${editing ? `
-        <div style="font-size:10px; color:var(--text-3);">Hucha vinculada</div>
+        <div style="font-size:10px; color:var(--text-3);">${t("patrimonio.goal.linkedSavings")}</div>
         <div style="font-size:14px; font-weight:600;">${escHtml(f.accountName || "—")}</div>`
-          : `<div style="font-size:12px;color:var(--text-2);">Se creará su hucha automáticamente</div>`}
+          : `<div style="font-size:12px;color:var(--text-2);">${t("patrimonio.goal.autoSavingsNote")}</div>`}
       </div>` : ""}
 
       <div class="card" style="padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
-          <span style="font-size:15px; font-weight:600;">Activo</span>
+          <span style="font-size:15px; font-weight:600;">${t("patrimonio.goal.activeLabel")}</span>
           <span class="toggle">
             <input type="checkbox" id="goal-active" ${f.isActive ? "checked" : ""}>
             <span class="toggle-track"><span class="toggle-knob"></span></span>
@@ -637,13 +638,13 @@ export async function renderPatrimonio(container) {
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
       <button type="button" class="btn-primary" id="goal-save" style="margin-bottom:${editing ? "10px" : "0"};">
-        ${editing ? "Guardar cambios" : "Crear objetivo"}
+        ${editing ? t("common.saveChanges") : t("patrimonio.goal.create")}
       </button>
       ${editing ? `
       <button type="button" id="goal-delete"
         style="width:100%;background:${state.deleteConfirm ? "var(--red)" : "transparent"};color:${state.deleteConfirm ? "#fff" : "var(--red)"};
           border:1px solid var(--red);border-radius:var(--radius-sm);padding:16px;font:600 16px var(--font-ui);cursor:pointer;">
-        ${state.deleteConfirm ? "Sí, borrar" : "Borrar objetivo"}
+        ${state.deleteConfirm ? t("common.confirmDelete") : t("patrimonio.goal.delete")}
       </button>` : ""}
     `;
 
@@ -712,7 +713,7 @@ export async function renderPatrimonio(container) {
         backToMain();
       } catch (e) {
         btn.disabled = false;
-        errorMsg = "No se pudo guardar: " + e.message;
+        errorMsg = t("common.saveFailed", { error: e.message });
         render();
       }
     };
@@ -732,7 +733,7 @@ export async function renderPatrimonio(container) {
         backToMain();
       } catch (e) {
         btn.disabled = false;
-        errorMsg = "No se pudo borrar: " + e.message;
+        errorMsg = t("common.deleteFailed", { error: e.message });
         state.deleteConfirm = false;
         render();
       }
@@ -744,8 +745,8 @@ export async function renderPatrimonio(container) {
   function renderMain() {
     container.innerHTML = `
       <header class="screen-header">
-        <h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">Patrimonio</h1>
-        <p>Calculado con todos tus movimientos · hoy</p>
+        <h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">${t("patrimonio.title")}</h1>
+        <p>${t("patrimonio.subtitle")}</p>
       </header>
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}

@@ -3,6 +3,7 @@
 // useGrouping:"always" — el "auto" por defecto usa la estrategia CLDR "min2" y NO agrupa
 // miles en importes de 4 cifras (p.ej. 1800 -> "1800,00 €" en vez de "1.800,00 €").
 // OJO: los "sv-SE" de más abajo NO son locale de presentación (truco YYYY-MM-DD): no dependen de esto.
+import { weekdayInitial } from "./i18n/index.js";
 let locale = "es-ES";
 let currency = "EUR";
 let money = buildMoney();
@@ -111,10 +112,9 @@ export function classifyStorageFailure(e) {
 export const fmtDiaCorto = (iso) =>
   new Date(iso + "T12:00:00").toLocaleDateString(locale, { day: "numeric", month: "short" });
 
-// Inicial del día de la semana en español (L M X J V S D) — tarjeta "Flujo de gasto" de Inicio
-// (Task 12). getDay(): 0=domingo..6=sábado, de ahí el array empezando en D.
-const WEEKDAY_INITIALS = ["D", "L", "M", "X", "J", "V", "S"];
-export const fmtDiaIni = (iso) => WEEKDAY_INITIALS[new Date(iso + "T12:00:00").getDay()];
+// Inicial del día de la semana (tarjeta "Flujo de gasto" de Inicio, Task 12), vía i18n —
+// getDay(): 0=domingo..6=sábado, de ahí que i18n.weekdays empiece en D/S (es/en).
+export const fmtDiaIni = (iso) => weekdayInitial(new Date(iso + "T12:00:00").getDay());
 
 // Día anterior a un ISO (YYYY-MM-DD), cruzando mes/año si hace falta. T12:00:00 evita líos de DST.
 export function prevDayIso(iso) {

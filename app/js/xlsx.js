@@ -1,4 +1,5 @@
 import { CONTRACT, ENUMS, BOOL_COLS, NULLABLE_NUM, FKS, eurToCents, centsToEur, xlsxHeader, toIsoDate } from "./contract.js";
+import { t } from "./i18n/index.js";
 
 // dump: { tabla: [{col: valor SQLite}] } → workbook con una pestaña por tabla.
 // Sin dashboards y sin columnas "_": el dump ya solo trae columnas del contrato.
@@ -27,7 +28,7 @@ export function workbookToRows(X, wb) {
   const data = {}, errors = [];
   for (const table of Object.keys(CONTRACT)) {
     const ws = wb.Sheets[table];
-    if (!ws) { errors.push(`falta la pestaña «${table}»`); continue; }
+    if (!ws) { errors.push(t("errors.xlsx.missingSheet", { table })); continue; }
     const cols = CONTRACT[table].cols, bools = new Set(BOOL_COLS[table] ?? []);
     const byHeader = Object.fromEntries(cols.map((c) => [xlsxHeader(c), c]));
     const raw = X.utils.sheet_to_json(ws, { defval: "" });
@@ -60,9 +61,9 @@ export function workbookToRows(X, wb) {
 export function validateImport(data) {
   const errs = [];
   const meta = Object.fromEntries((data.meta ?? []).map((m) => [m.key, String(m.value)]));
-  if (meta.schema_version !== "1") errs.push(`meta: schema_version debe ser 1 (es «${meta.schema_version}»)`);
+  if (meta.schema_version !== "1") errs.push(t("errors.xlsx.schemaVersion", { value: meta.schema_version }));
   if (!["basecero-sheets-mvp", "basecero-pwa"].includes(meta.created_with))
-    errs.push(`meta: created_with no reconocido («${meta.created_with}»)`);
+    errs.push(t("errors.xlsx.createdWith", { value: meta.created_with }));
 
   // PK vacía o duplicada dentro de la propia pestaña (meta usa "key", el resto "id"): sin este
   // check, una fila con PK vacía se cuela en el Set de ids de abajo indistinguible de "sin FK", y
@@ -80,37 +81,37 @@ export function validateImport(data) {
     const seen = new Set();
     (data[table] ?? []).forEach((row, i) => {
       const pk = row[pkCol];
-      if (pk === "" || pk == null) { errs.push(`pestaña «${table}» fila ${i + 2}: id vacío`); return; }
-      if (seen.has(pk)) errs.push(`pestaña «${table}» fila ${i + 2}: id duplicado («${pk}»)`);
+      if (pk === "" || pk == null) { errs.push(t("errors.xlsx.pkEmpty", { table, row: i + 2 })); return; }
+      if (seen.has(pk)) errs.push(t("errors.xlsx.pkDuplicate", { table, row: i + 2, pk }));
       else seen.add(pk);
-      if (!ID_CHARS_RE.test(String(pk))) errs.push(`pestaña «${table}» fila ${i + 2}: id con caracteres no válidos («${pk}»)`);
+      if (!ID_CHARS_RE.test(String(pk))) errs.push(t("errors.xlsx.pkInvalidChars", { table, row: i + 2, pk }));
     });
   }
 
   const ids = {};   // tabla → Set de ids (para FKs)
-  for (const t of Object.keys(CONTRACT))
-    ids[t] = new Set((data[t] ?? []).map((r) => r.id ?? r.key));
+  for (const tbl of Object.keys(CONTRACT))
+    ids[tbl] = new Set((data[tbl] ?? []).map((r) => r.id ?? r.key));
 
   for (const [table, spec] of Object.entries(ENUMS))
     (data[table] ?? []).forEach((row, i) => {
       for (const [col, allowed] of Object.entries(spec))
         if (!allowed.includes(String(row[col] ?? "")))
-          errs.push(`pestaña «${table}» fila ${i + 2}: ${col} inválido («${row[col]}»)`);
+          errs.push(t("errors.xlsx.enumInvalid", { table, row: i + 2, col, value: row[col] }));
     });
 
   for (const fk of FKS)
     (data[fk.table] ?? []).forEach((row, i) => {
       const v = row[fk.col];
-      if (v === "" || v == null) { if (!fk.optional) errs.push(`pestaña «${fk.table}» fila ${i + 2}: ${fk.col} vacío`); return; }
-      if (!ids[fk.ref].has(v)) errs.push(`pestaña «${fk.table}» fila ${i + 2}: ${fk.col} apunta a «${v}» que no existe en ${fk.ref}`);
+      if (v === "" || v == null) { if (!fk.optional) errs.push(t("errors.xlsx.fkEmpty", { table: fk.table, row: i + 2, col: fk.col })); return; }
+      if (!ids[fk.ref].has(v)) errs.push(t("errors.xlsx.fkMissing", { table: fk.table, row: i + 2, col: fk.col, value: v, ref: fk.ref }));
     });
 
   const open = (data.periods ?? []).filter((p) => p.status === "open" && p.deleted !== 1);
-  if (open.length > 1) errs.push(`periods: hay ${open.length} periodos open (máximo 1)`);
+  if (open.length > 1) errs.push(t("errors.xlsx.multipleOpen", { n: open.length }));
 
   (data.transactions ?? []).forEach((row, i) => {
     if (row.type !== "adjustment" && !(row.amount_cents > 0))
-      errs.push(`pestaña «transactions» fila ${i + 2}: amount debe ser > 0`);
+      errs.push(t("errors.xlsx.amountNotPositive", { row: i + 2 }));
   });
   return errs;
 }

@@ -13,10 +13,14 @@ import {
 
 const DEFAULT_COLOR = "#9A99A6";
 
+// Pool de texto tras Task 2 (P2): 5 de los 12 aclarados para pasar 4.5:1 (WCAG AA) en las
+// superficies reales donde se usan — tinte al 18% sobre --bg en registro.js chipStyle
+// (4.62–4.71:1) y texto sólido sobre --card en presupuesto.js categoryRowHtml (≥5.33:1); ver
+// category-colors.js TEXT_COLORS/POOL_TEXT y el report de Task 2 para la tabla de ratios.
 const POOL_TEXT = {
-  "#629D3B": "#7FB554", "#6B61C2": "#8A82D6", "#A09600": "#BDB32A", "#9153AB": "#AB74C4",
-  "#15AC7D": "#3DC299", "#986603": "#B2802A", "#12A7A7": "#3FBDBD", "#B45018": "#D97742",
-  "#00A1CB": "#3FB7DC", "#AA4985": "#C4699F", "#4F94E9": "#6FA8F0", "#B64656": "#CD6472",
+  "#629D3B": "#7FB554", "#6B61C2": "#9088DD", "#A09600": "#BDB32A", "#9153AB": "#B37CCD",
+  "#15AC7D": "#3DC299", "#986603": "#BB8934", "#12A7A7": "#3FBDBD", "#B45018": "#D97742",
+  "#00A1CB": "#3FB7DC", "#AA4985": "#CF73A9", "#4F94E9": "#6FA8F0", "#B64656": "#DA707D",
 };
 
 // Reset del estado module-level entre tests para que no se filtren overrides.
@@ -66,12 +70,12 @@ test("category-colors: paridad de seeds — sin overrides, las 14 raíces + icon
     "cat-alimentacion": "#7FB554",
     "cat-restauracion": "#D97742",
     "cat-transporte": "#3FB7DC",
-    "cat-coche": "#B2802A",
+    "cat-coche": "#BB8934",
     "cat-salud": "#3FBDBD",
-    "cat-suscripciones": "#AB74C4",
-    "cat-ocio": "#8A82D6",
-    "cat-ropa": "#CD6472",
-    "cat-regalos": "#C4699F",
+    "cat-suscripciones": "#B37CCD",
+    "cat-ocio": "#9088DD",
+    "cat-ropa": "#DA707D",
+    "cat-regalos": "#CF73A9",
     "cat-impuestos": "#BDB32A",
     "cat-nomina": "#3DC299",
     "cat-puntuales": "#3DC299",
