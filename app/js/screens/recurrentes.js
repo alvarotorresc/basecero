@@ -3,11 +3,10 @@ import {
   createRule, updateRule, softDeleteRule, getMetaAll,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, currencySymbol, parseCentsRaw } from "../format.js";
+import { fmtMoney, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const centsToRaw = (cents) => (cents ? (Math.abs(cents) / 100).toFixed(2).replace(".", ",") : "");
 
 const TIPOS_RULE = [
   { id: "expense", label: "Gasto" },
