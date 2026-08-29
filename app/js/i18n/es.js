@@ -202,7 +202,10 @@ export const ES = {
     empty: "No queda nada pendiente de liquidar.",
     row: {
       sub: "{date} · {amount} · su {pct} %",
-      confirm: "Sí, liquidar",
+    },
+    footer: {
+      settle: "Liquidar {total}",
+      confirm: "Sí, liquidar {total}",
     },
   },
   presupuesto: {

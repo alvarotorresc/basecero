@@ -202,7 +202,10 @@ export const EN = {
     empty: "Nothing left to settle.",
     row: {
       sub: "{date} · {amount} · their {pct}%",
-      confirm: "Yes, settle",
+    },
+    footer: {
+      settle: "Settle up {total}",
+      confirm: "Yes, settle up {total}",
     },
   },
   presupuesto: {

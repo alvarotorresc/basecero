@@ -1,4 +1,4 @@
-import { pendingShared, listAccounts, allCategoriesById, settleShared, getMetaAll } from "../repo.js";
+import { pendingShared, listAccounts, allCategoriesById, settleAllShared, getMetaAll } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
@@ -14,26 +14,14 @@ const moneyPartsHtml = (cents) => {
   return `${escHtml(main)}<small>${escHtml(c)}</small>${escHtml(suffix)}`;
 };
 
-// Botón "Liquidar"/"Sí, liquidar" por fila: píldora, invertida en el estado de confirmación —
-// mismo criterio "tinta invertida" que .chip.active/.btn-primary del sistema (fondo var(--text),
-// texto var(--bg)). El artboard (Liquidar.dc.html) solo muestra un botón "Liquidar {total}" al
-// pie, pero settleShared(txId, accountId) liquida UN gasto a la vez (repo.js:164-182) — no existe
-// ninguna operación en bloque que liquide los N pendientes de golpe, así que fabricar ese botón
-// sería inventar lógica (bucle + estado de fallo parcial) que el brief prohíbe explícitamente.
-// "el flujo two-tap confirm EXACTAMENTE igual: mismo id, mismos estados, solo estilos" ata el
-// "botón liquidar píldora invertida" de esta tarea a estos dos botones por fila, no a uno nuevo:
-// se re-visten sus 2 estados, mismo id/handler/texto que antes.
-const BTN_SETTLE = "height:34px;padding:0 14px;border-radius:999px;background:var(--card2);"
-  + "color:var(--text-2);border:0;font:600 12px var(--font-ui);cursor:pointer;"
-  + "-webkit-tap-highlight-color:transparent;white-space:nowrap;";
-const BTN_SETTLE_CONFIRM = "height:34px;padding:0 14px;border-radius:999px;background:var(--text);"
-  + "color:var(--bg);border:0;font:700 12px var(--font-ui);cursor:pointer;"
-  + "-webkit-tap-highlight-color:transparent;white-space:nowrap;";
-
 /** Fila de gasto pendiente: .dotico + nombre + sub (fecha · importe original · % de la contraparte)
  *  — réplica de docs/design/material-expresivo/Liquidar.dc.html:38-57 (clase `.tx`, sin envoltorio de tarjeta propio: la
  *  lista completa comparte una única `.card` con `<hr class="divider">` entre filas, mismo criterio
- *  que presupuesto.js/patrimonio.js#cuentasCardHtml).
+ *  que presupuesto.js/patrimonio.js#cuentasCardHtml). Task 5 (backlog, liquidar en bloque): la fila
+ *  ya NO lleva botón propio — el artboard solo tiene el botón «Liquidar {total}» al pie (armado
+ *  inline en render(), más abajo), y con settleAllShared liquidando TODOS los pendientes visibles
+ *  de una vez, un botón por fila liquidaría solo esa fila, un camino distinto al del artboard que
+ *  ya no hace falta mantener.
  *
  *  El % es DERIVADO de r.partner_amount_cents/r.amount_cents (ambos ya vienen en la fila de
  *  pendingShared, sql.js:73-78) — no un campo nuevo. Se deriva aquí en vez de leer el pct del
@@ -43,7 +31,7 @@ const BTN_SETTLE_CONFIRM = "height:34px;padding:0 14px;border-radius:999px;backg
  *  fuente disponible. Sustituye al sub anterior (categoría · fecha): el nombre de categoría ya no
  *  se repite aquí porque el título ya lo usa como fallback (`r.merchant || catName`) y el artboard
  *  no lo lleva en el sub de ninguna fila. */
-function rowHtml(r, byId, confirmId) {
+function rowHtml(r, byId) {
   const cat = byId[r.category_id];
   const catName = cat?.name ?? "";
   const color = colorForCategory(r.category_id, byId);
@@ -51,7 +39,6 @@ function rowHtml(r, byId, confirmId) {
   const title = r.merchant || catName || t("common.type.expense");
   const pct = r.amount_cents ? Math.round((r.partner_amount_cents / r.amount_cents) * 100) : 0;
   const sub = t("liquidar.row.sub", { date: fmtDiaCorto(r.date), amount: fmtMoney(r.amount_cents), pct });
-  const confirming = confirmId === r.id;
   return `
     <div class="tx-row" style="padding:10px 0;">
       <div class="dotico" style="--cat:${color};">${icon}</div>
@@ -59,27 +46,31 @@ function rowHtml(r, byId, confirmId) {
         <div class="tx-title">${escHtml(title)}</div>
         <div class="tx-sub">${escHtml(sub)}</div>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">
-        <div class="num" style="font-size:14px;font-weight:700;">${fmtMoney(r.partner_amount_cents)}</div>
-        <button type="button" data-settle="${r.id}" style="${confirming ? BTN_SETTLE_CONFIRM : BTN_SETTLE}">
-          ${confirming ? t("liquidar.row.confirm") : t("common.settle")}
-        </button>
-      </div>
+      <div class="num" style="font-size:14px;font-weight:700;flex-shrink:0;">${fmtMoney(r.partner_amount_cents)}</div>
     </div>`;
 }
 
 /** Pantalla "Liquidar": lista de gastos compartidos pendientes (de todos los periodos) con
- *  selector de cuenta de destino arriba y confirmación en dos toques por fila. onBack vuelve
- *  a Inicio (que se re-renderiza entero, igual que renderRegistro/onDone en main.js).
+ *  selector de cuenta de destino arriba y confirmación en dos toques del botón «Liquidar {total}»
+ *  del pie. onBack vuelve a Inicio (que se re-renderiza entero, igual que renderRegistro/onDone en
+ *  main.js).
  *
- *  El selector de cuenta va ANTES de la lista (no al pie, como en el artboard): settleShared exige
- *  accountId en cada toque (ver wire() más abajo), así que el usuario necesita poder elegir cuenta
- *  antes de poder liquidar ninguna fila — el artboard es una foto fija sin ese flujo interactivo.
+ *  El selector de cuenta va ANTES de la lista (no al pie, como en el artboard): settleAllShared
+ *  exige accountId al liquidar (ver wire() más abajo), así que el usuario necesita poder elegirla
+ *  antes de poder tocar el botón «Liquidar {total}» — el artboard es una foto fija sin ese flujo
+ *  interactivo.
  *
  *  NO se replica la nota "Se crea una devolución enlazada..." de docs/design/material-expresivo/Liquidar.dc.html:68-71: es
  *  copy nuevo, no hay ningún texto equivalente ya en esta pantalla (grep `devoluci|refund|enlazad`
  *  sobre app/js/screens/*.js y repo.js: solo comentarios internos, ningún string de UI) — brecha
- *  documentada, no fabricada (regla explícita del brief). */
+ *  documentada, no fabricada (regla explícita del brief).
+ *
+ *  Task 5 (backlog, liquidar en bloque): UN solo botón «Liquidar {total}» al pie liquida TODOS los
+ *  pendientes actualmente listados (state.rows, ya filtrados/cargados arriba) con la cuenta
+ *  seleccionada — repo.settleAllShared hace el execMany atómico (o se liquidan todos, o ninguno).
+ *  Los botones por fila se retiran (ver rowHtml): el artboard solo tiene el botón del pie, y con la
+ *  operación en bloque disponible, un botón que liquidara una única fila sería un segundo camino
+ *  que el artboard no contempla — más simple mantener solo el que el diseño pide. */
 export async function renderLiquidar(container, onBack) {
   let rows, accountsAll, byId, meta;
   try {
@@ -96,7 +87,7 @@ export async function renderLiquidar(container, onBack) {
   const state = {
     rows,
     accountId: resolveAccountId(meta.default_account_id, accounts) ?? "",
-    confirmId: null,
+    confirm: false,
     busy: false,
   };
   let errorMsg = "";
@@ -128,12 +119,17 @@ export async function renderLiquidar(container, onBack) {
 
       ${state.rows.length === 0
         ? `<div class="card" style="text-align:center;color:var(--text-3)"><p>${t("liquidar.empty")}</p></div>`
-        : `<div style="display:flex;flex-direction:column;gap:8px;">
+        : `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">
             <div class="section-title">${t("liquidar.pending.title")}</div>
             <div class="card" style="padding:6px 16px;display:flex;flex-direction:column;">
-              ${state.rows.map((r) => rowHtml(r, byId, state.confirmId)).join('<hr class="divider">')}
+              ${state.rows.map((r) => rowHtml(r, byId)).join('<hr class="divider">')}
             </div>
-          </div>`}
+          </div>
+          <button type="button" class="btn-primary" id="liq-settle-all" ${state.busy ? "disabled" : ""}>
+            ${state.confirm
+              ? t("liquidar.footer.confirm", { total: fmtMoney(total) })
+              : t("liquidar.footer.settle", { total: fmtMoney(total) })}
+          </button>`}
     `;
     wire();
   }
@@ -142,41 +138,42 @@ export async function renderLiquidar(container, onBack) {
     container.querySelector("#liq-back").onclick = () => onBack();
 
     container.querySelectorAll("[data-acc]").forEach((b) => {
-      b.onclick = () => { state.accountId = b.dataset.acc; render(); };
+      b.onclick = () => { state.accountId = b.dataset.acc; state.confirm = false; render(); };
     });
 
-    container.querySelectorAll("[data-settle]").forEach((b) => {
-      b.onclick = async () => {
-        const id = b.dataset.settle;
+    const settleBtn = container.querySelector("#liq-settle-all");
+    if (settleBtn) {
+      settleBtn.onclick = async () => {
         if (!state.accountId) {
           errorMsg = t("common.needAccount");
-          state.confirmId = null;
+          state.confirm = false;
           render();
           return;
         }
-        if (state.confirmId !== id) {
-          state.confirmId = id;
+        if (!state.confirm) {
+          state.confirm = true;
           errorMsg = "";
           render();
           return;
         }
         if (state.busy) return;
         state.busy = true;
-        b.disabled = true;
+        settleBtn.disabled = true;
         try {
-          await settleShared(id, state.accountId);
+          await settleAllShared(state.rows.map((r) => r.id), state.accountId);
           state.rows = await pendingShared();
-          state.confirmId = null;
+          state.confirm = false;
           errorMsg = "";
         } catch (e) {
           errorMsg = t("liquidar.error.settle", { error: e.message });
-          state.confirmId = null;
+          state.confirm = false;
+          state.rows = await pendingShared();
         } finally {
           state.busy = false;
           render();
         }
       };
-    });
+    }
   }
 
   render();

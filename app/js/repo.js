@@ -209,6 +209,64 @@ export async function settleShared(txId, accountId) {
   });
 }
 
+/** Task 5 (backlog, liquidar en bloque): construye los DOS statements (insert del refund +
+ *  update de settled=1) de CADA fila de `rows` — misma pareja que addTransaction({refId}) arma
+ *  para UNA liquidación (ver settleShared arriba), pero aquí NO se llama a addTransaction (eso
+ *  abriría un execMany por fila, con getOpenPeriod() repetido y sin atomicidad conjunta): se monta
+ *  el array completo a mano para que settleAllShared pueda mandarlo TODO a un único execMany.
+ *
+ *  PURA a propósito (mismo criterio que replaceAllStmts más abajo): recibe `rows` YA resueltas
+ *  (de pendingShared, filtradas por los ids pedidos), `periodId`/`date`/`now` ya calculados por el
+ *  caller — así es testeable en Node sin Worker, con datos a mano, y el test que comprueba el
+ *  ORDEN EXACTO del bind de insertTransaction llama a esta función real (no una reproducción a
+ *  mano que podría divergir en silencio si el bind order cambia aquí).
+ *
+ *  bcUlid/bcSanitizeCell son globales (cargados por <script src="vendor/pure.js">, igual que en
+ *  addTransaction/createAccount/createRule de este mismo archivo — ver n26.js:5 sobre el mismo
+ *  patrón). merchant pasa por bcSanitizeCell aunque ya viene sanitizado de la fila original: es
+ *  idempotente (bcSanitizeCell("'=X") no vuelve a anteponer otra comilla) y mantiene el mismo
+ *  tratamiento que settleShared→addTransaction, que sí lo sanitiza. */
+export function settleAllSharedStmts(rows, accountId, periodId, date, now) {
+  const stmts = [];
+  for (const row of rows) {
+    stmts.push({
+      sql: SQL.insertTransaction,
+      bind: [
+        bcUlid(), date, periodId, "refund", row.partner_amount_cents, accountId, "",
+        row.category_id, bcSanitizeCell(row.merchant ?? ""), "Liquidación", 0, null, 0,
+        row.id, "", "", "pending", now, now,
+      ],
+    });
+    stmts.push({ sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [now, row.id] });
+  }
+  return stmts;
+}
+
+/** Liquida VARIOS gastos compartidos pendientes DE GOLPE (botón «Liquidar {total}» al pie de
+ *  Liquidar.dc.html): un único getOpenPeriod() + una única pendingShared() (no una consulta por
+ *  fila) + settleAllSharedStmts (arriba) + UN SOLO execMany — o quedan liquidados TODOS los `ids`
+ *  pedidos, o ninguno (si algo falla a medias, la mitad de la deuda con la contraparte
+ *  desaparecería mientras la otra mitad sigue pendiente, un estado que ninguna pantalla sabría
+ *  explicar). `ids` vacío es un no-op silencioso (nada que liquidar, no es un error).
+ *
+ *  Guard de fila: si algún id de `ids` NO aparece en pendingShared() (ya liquidado por otra
+ *  pestaña, borrado, o directamente no existe), se LANZA (no se liquida un subconjunto en
+ *  silencio) — mismo mensaje que settleShared (errors.repo.settleNotFound), reutilizado porque es
+ *  exactamente la misma condición. Se filtra `pending` por `idSet` en vez de mapear `ids` uno a
+ *  uno para que un id DUPLICADO en `ids` no cree dos refunds sobre el mismo gasto (el filtro
+ *  dedupea; el length-check contra idSet.size detecta tanto duplicados como ids inexistentes). */
+export async function settleAllShared(ids, accountId) {
+  if (!ids || ids.length === 0) return;
+  const idSet = new Set(ids);
+  const period = await getOpenPeriod();
+  if (!period) throw new Error(t("errors.common.noOpenPeriod"));
+  const pending = await pendingShared();
+  const rows = pending.filter((r) => idSet.has(r.id));
+  if (rows.length !== idSet.size) throw new Error(t("errors.repo.settleNotFound"));
+  const now = nowIso();
+  await execMany(settleAllSharedStmts(rows, accountId, period.id, hoyISO(), now));
+}
+
 /** Actualiza los campos editables de un movimiento (mismas claves camelCase que addTransaction).
  *  Los campos ausentes conservan el valor actual (no se pisan con defaults): p.ej. si el formulario
  *  no expone `status`, la fila mantiene su status ('pending'/'reconciled') tal cual estaba. */
