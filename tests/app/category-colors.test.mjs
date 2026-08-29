@@ -13,8 +13,10 @@ import {
 
 const DEFAULT_COLOR = "#9A99A6";
 
-// Pool de texto tras Task 2 (P2): 5 de los 12 aclarados para pasar 4.5:1 sobre su tinte al 18%
-// (ver category-colors.js TEXT_COLORS/POOL_TEXT y el report de Task 2 para la tabla de ratios).
+// Pool de texto tras Task 2 (P2): 5 de los 12 aclarados para pasar 4.5:1 (WCAG AA) en las
+// superficies reales donde se usan — tinte al 18% sobre --bg en registro.js chipStyle
+// (4.62–4.71:1) y texto sólido sobre --card en presupuesto.js categoryRowHtml (≥5.33:1); ver
+// category-colors.js TEXT_COLORS/POOL_TEXT y el report de Task 2 para la tabla de ratios.
 const POOL_TEXT = {
   "#629D3B": "#7FB554", "#6B61C2": "#9088DD", "#A09600": "#BDB32A", "#9153AB": "#B37CCD",
   "#15AC7D": "#3DC299", "#986603": "#BB8934", "#12A7A7": "#3FBDBD", "#B45018": "#D97742",

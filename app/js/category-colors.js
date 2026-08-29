@@ -6,18 +6,22 @@ const ROOT_COLORS = {
   "cat-nomina": "#15AC7D", "cat-puntuales": "#15AC7D", "cat-intereses": "#15AC7D",
 };
 const DEFAULT_COLOR = "#9A99A6";
-// Contraste texto/tinte (Task 2 P2, WCAG 1.4.3 AA ≥4.5:1): cada TEXT_COLORS se pinta sobre su
-// propio tinte al 18% (color-mix(in srgb, <color> 18%, transparent) sobre --card #1C1C21, ver
-// registro.js chipStyle / presupuesto.js categoryRowHtml). 5 de las 12 entradas fallaban ese
-// umbral con el hex original; se subió su lightness en OKLCH manteniendo hue/chroma hasta
-// despejar 4.5:1 con margen (script ad-hoc, no versionado — ver report de Task 2 para la tabla
-// completa de ratios antes/después de los 12):
-//   cat-coche          #B2802A → #BB8934  (4.077 → 4.569)
-//   cat-ocio           #8A82D6 → #9088DD  (4.225 → 4.568)
-//   cat-suscripciones  #AB74C4 → #B37CCD  (4.107 → 4.552)
-//   cat-ropa           #CD6472 → #DA707D  (3.911 → 4.555)
-//   cat-regalos        #C4699F → #CF73A9  (4.031 → 4.587)
-// Las otras 7 (incl. restauracion, 4.586, el "casi" más próximo) ya pasaban 4.5:1 y no se tocan.
+// Contraste texto/tinte (Task 2 P2, WCAG 1.4.3 AA ≥4.5:1), verificado sobre las dos superficies
+// reales donde se usa TEXT_COLORS: en registro.js chipStyle el texto va sobre su propio tinte al
+// 18% (color-mix(in srgb, <color> 18%, transparent)) compuesto sobre --bg #121214; en
+// presupuesto.js categoryRowHtml el texto va sólido (sin tinte) sobre --card #1C1C21 igualmente
+// sólido, dando ≥5.33:1 para las 12 — la superficie exigente es el tinte sobre --bg. 5 de las 12
+// entradas fallaban 4.5:1 ahí con el hex original (aunque ya pasaban de sobra sobre --card
+// sólido); se subió su lightness en OKLCH manteniendo hue/chroma hasta despejar 4.5:1 con margen
+// sobre el tinte (script ad-hoc, no versionado — ver report de Task 2). Ratios sobre tinte 18% /
+// --bg, antes → después:
+//   cat-coche          #B2802A → #BB8934  (4.261 → 4.711)
+//   cat-ocio           #8A82D6 → #9088DD  (4.390 → 4.683)
+//   cat-suscripciones  #AB74C4 → #B37CCD  (4.250 → 4.650)
+//   cat-ropa           #CD6472 → #DA707D  (4.072 → 4.623)
+//   cat-regalos        #C4699F → #CF73A9  (4.185 → 4.678)
+// Las otras 7 (incl. restauracion, 4.676, el "casi" más próximo) ya pasaban 4.5:1 en esa misma
+// superficie y no se tocan.
 const TEXT_COLORS = {
   "cat-casa": "#6FA8F0", "cat-alimentacion": "#7FB554", "cat-restauracion": "#D97742",
   "cat-transporte": "#3FB7DC", "cat-coche": "#BB8934", "cat-ocio": "#9088DD",

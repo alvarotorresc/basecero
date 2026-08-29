@@ -395,7 +395,7 @@ export async function renderAjustes(container) {
       <div class="card">
         <p style="font-weight:600;margin-bottom:12px">${t("ajustes.about.title")}</p>
         <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
-          <a href="${escAttr(activeLang() === "en" ? "en/privacy.html" : "privacidad.html")}" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.privacy")}</a>
+          <a href="${escAttr(activeLang() === "en" ? "en/privacy.html" : "privacidad.html")}" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.privacy")}</a>
           <a href="https://github.com/alvarotorresc/basecero" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.source")}</a>
           <a href="https://github.com/alvarotorresc/basecero/blob/main/LICENSE" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.license")}</a>
         </div>
