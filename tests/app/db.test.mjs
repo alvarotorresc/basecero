@@ -5,8 +5,8 @@
 // muerto y rechaza call() de inmediato) se verifica por lectura de código — ver task-7-report.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mapWorkerError } from "../../app/js/db.js";
-import { t } from "../../app/js/i18n/index.js";
+import { mapWorkerError } from "../../app/app/js/db.js";
+import { t } from "../../app/app/js/i18n/index.js";
 
 test("mapWorkerError: unknown_op: -> mensaje localizado con el nombre de la operación", () => {
   const err = mapWorkerError("unknown_op:foo");

@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { t, initI18n, activeLang, monthShort, weekdayInitial } from "../../app/js/i18n/index.js";
-import { ES } from "../../app/js/i18n/es.js";
-import { EN } from "../../app/js/i18n/en.js";
+import { t, initI18n, activeLang, monthShort, weekdayInitial } from "../../app/app/js/i18n/index.js";
+import { ES } from "../../app/app/js/i18n/es.js";
+import { EN } from "../../app/app/js/i18n/en.js";
 
 // Node 22 expone un `navigator` sintético cuyo `language` sale de LANG/LC_ALL del SO
 // (ver p.ej. LC_ALL=es_ES.UTF-8 → "es-ES"): lo quitamos para que el fallback a

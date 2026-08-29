@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SQL } from "../../app/js/sql.js";
-import { netWorthOfBalances, shortMonthLabel, goalProgress } from "../../app/js/repo.js";
-import { sanitizeLoanMap, parseLoanMap } from "../../app/js/account-defaults.js";
+import { SQL } from "../../app/app/js/sql.js";
+import { netWorthOfBalances, shortMonthLabel, goalProgress } from "../../app/app/js/repo.js";
+import { sanitizeLoanMap, parseLoanMap } from "../../app/app/js/account-defaults.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
 const T = "2026-08-24T18:00:00Z";

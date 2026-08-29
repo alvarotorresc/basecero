@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { evalExpr, foldPending } from "../../app/js/expr.js";
+import { evalExpr, foldPending } from "../../app/app/js/expr.js";
 
 test("identidad: sin acumulador (acc=null) devuelve el operando tal cual — paridad con el estado de hoy (sin operador)", () => {
   assert.equal(evalExpr(null, null, 1250), 1250);

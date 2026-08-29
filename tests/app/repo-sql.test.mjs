@@ -2,10 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
-import { SQL } from "../../app/js/sql.js";
-import { seedStatements } from "../../app/js/seeds.js";
+import { SQL } from "../../app/app/js/sql.js";
+import { seedStatements } from "../../app/app/js/seeds.js";
 
-const schema = readFileSync(new URL("../../app/js/schema.sql", import.meta.url), "utf8");
+const schema = readFileSync(new URL("../../app/app/js/schema.sql", import.meta.url), "utf8");
 const T = "2026-08-24T18:00:00Z";
 function db() {
   const d = new DatabaseSync(":memory:");

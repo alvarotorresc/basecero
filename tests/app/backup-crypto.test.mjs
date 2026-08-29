@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   PBKDF2_ITERATIONS, MIN_PASSPHRASE, isEncryptedBackup,
   encryptBackup, decryptBackup, BackupFormatError, WrongPassphraseError,
-} from "../../app/js/backup-crypto.js";
+} from "../../app/app/js/backup-crypto.js";
 import { X } from "./helpers.mjs";
 
 const FAST = { iterations: 1000 };

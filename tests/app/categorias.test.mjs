@@ -1,14 +1,14 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { SQL } from "../../app/js/sql.js";
-import { computeReorder } from "../../app/js/category-order.js";
-import { POOL, CURATED_ICONS, CATEGORY_ICONS, parseStyle, initCategoryStyle } from "../../app/js/category-colors.js";
-import { t } from "../../app/js/i18n/index.js";
+import { SQL } from "../../app/app/js/sql.js";
+import { computeReorder } from "../../app/app/js/category-order.js";
+import { POOL, CURATED_ICONS, CATEGORY_ICONS, parseStyle, initCategoryStyle } from "../../app/app/js/category-colors.js";
+import { t } from "../../app/app/js/i18n/index.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
 const require = createRequire(import.meta.url);
-const pure = require("../../app/vendor/pure.js");
+const pure = require("../../app/app/vendor/pure.js");
 
 const T = "2026-08-24T18:00:00Z";
 const T2 = "2026-08-24T19:00:00Z";

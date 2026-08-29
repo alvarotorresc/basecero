@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { needsOnboarding, canLeaveAccounts, accountDraft } from "../../app/js/onboarding-steps.js";
+import { needsOnboarding, canLeaveAccounts, accountDraft } from "../../app/app/js/onboarding-steps.js";
 
 test("needsOnboarding: solo con cero periodos", () => {
   assert.equal(needsOnboarding([]), true);

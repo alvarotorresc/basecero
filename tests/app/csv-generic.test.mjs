@@ -2,11 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
-const { bcParseCsvLine } = require("../../app/vendor/pure.js");
+const { bcParseCsvLine } = require("../../app/app/vendor/pure.js");
 import {
   sniffCsv, isN26Headers, detectDateFormat, detectDecimal, parseAmountCents,
   parseDateIso, buildProfile, applyProfile, parseCsvProfile, profileMatches,
-} from "../../app/js/csv-generic.js";
+} from "../../app/app/js/csv-generic.js";
 
 // Cabeceras EXACTAS del CSV de N26 (tests/app/fixtures/n26_sample.csv línea 1).
 const N26_HEADERS = ["Booking Date", "Value Date", "Partner Name", "Partner Iban", "Type",

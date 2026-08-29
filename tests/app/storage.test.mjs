@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { classifyStorageFailure } from "../../app/js/format.js";
+import { classifyStorageFailure } from "../../app/app/js/format.js";
 
 // El VFS opfs-sahpool solo admite una instancia: si otra pestaña/PWA tiene la BD
 // abierta, createSyncAccessHandle lanza NoModificationAllowedError. Ese caso es

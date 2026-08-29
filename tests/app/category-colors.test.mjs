@@ -10,7 +10,7 @@ import {
   rootOf,
   POOL,
   CURATED_ICONS,
-} from "../../app/js/category-colors.js";
+} from "../../app/app/js/category-colors.js";
 
 const DEFAULT_COLOR = "#9A99A6";
 

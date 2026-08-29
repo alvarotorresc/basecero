@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CONTRACT, ENUMS, eurToCents, centsToEur, toIsoDate, xlsxHeader, insertSql } from "../../app/js/contract.js";
+import { CONTRACT, ENUMS, eurToCents, centsToEur, toIsoDate, xlsxHeader, insertSql } from "../../app/app/js/contract.js";
 
 test("columnas canónicas de transactions (orden del schema)", () => {
   assert.deepEqual(CONTRACT.transactions.cols, [

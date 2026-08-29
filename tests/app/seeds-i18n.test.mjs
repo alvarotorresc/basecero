@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SQL } from "../../app/js/sql.js";
-import { seedStatements, SEED_NAMES } from "../../app/js/seeds.js";
+import { SQL } from "../../app/app/js/sql.js";
+import { seedStatements, SEED_NAMES } from "../../app/app/js/seeds.js";
 import { openDb } from "./helpers.mjs";
 
 const T = "2026-08-24T18:00:00Z";

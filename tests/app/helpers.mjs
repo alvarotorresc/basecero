@@ -3,12 +3,12 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-export const X = require("../../app/vendor/xlsx/xlsx.full.min.js");
+export const X = require("../../app/app/vendor/xlsx/xlsx.full.min.js");
 
 const T = "2026-08-01T00:00:00Z";
 export function openDb() {
   const db = new DatabaseSync(":memory:");
-  db.exec(readFileSync(new URL("../../app/js/schema.sql", import.meta.url), "utf8"));
+  db.exec(readFileSync(new URL("../../app/app/js/schema.sql", import.meta.url), "utf8"));
   return db;
 }
 export function seedMinimal(db) {
