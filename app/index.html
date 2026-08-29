@@ -4,17 +4,30 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121214">
-<title>BaseCero</title>
+<meta name="description" content="Tu cuaderno de gastos: offline, sin cuentas, sin nube. Periodos de nómina a nómina, presupuesto por categorías y gastos compartidos.">
+<meta name="robots" content="index,follow">
+<meta name="color-scheme" content="dark">
+<link rel="canonical" href="https://alvarotorresc.github.io/basecero/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="BaseCero">
+<meta property="og:title" content="BaseCero — finanzas personales offline">
+<meta property="og:description" content="Tu cuaderno de gastos: offline, sin cuentas, sin nube.">
+<meta property="og:url" content="https://alvarotorresc.github.io/basecero/">
+<meta property="og:image" content="https://alvarotorresc.github.io/basecero/img/og.png">
+<meta property="og:locale" content="es_ES">
+<meta name="twitter:card" content="summary_large_image">
+<title>BaseCero — finanzas personales offline</title>
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="512x512" href="img/favicon-512.png">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/app.css">
-<script src="vendor/pure.js"></script>
-<script src="vendor/xlsx/xlsx.full.min.js"></script>
+<script src="vendor/pure.js" defer></script>
 </head>
 <body>
 <main id="screen" aria-live="polite"></main>
-<nav class="tabbar">
+<nav class="tabbar" aria-label="Secciones">
   <button class="tab active" data-tab="inicio">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.6L12 4.2l8 6.4V19a1.6 1.6 0 01-1.6 1.6H5.6A1.6 1.6 0 014 19z"></path></svg>
     Inicio

@@ -3,6 +3,7 @@
  *  iteraciones PBKDF2 uint32 BE(21,4) · IV GCM(25,12) · ciphertext+tag(37,resto).
  *  Las iteraciones viajan en la cabecera para poder subir el coste en el futuro sin
  *  romper la lectura de copias antiguas. La passphrase no se persiste jamás. */
+import { t } from "./i18n/index.js";
 
 const MAGIC = new Uint8Array([0x42, 0x43, 0x45, 0x31]); // "BCE1"
 const VERSION = 1;
@@ -60,14 +61,14 @@ export async function encryptBackup(plainData, passphrase, { iterations = PBKDF2
 
 export async function decryptBackup(fileData, passphrase) {
   const bytes = toBytes(fileData);
-  if (!isEncryptedBackup(bytes)) throw new BackupFormatError("No es una copia cifrada de BaseCero");
-  if (bytes.length < HEADER_LEN + TAG_LEN) throw new BackupFormatError("El archivo está truncado o dañado");
+  if (!isEncryptedBackup(bytes)) throw new BackupFormatError(t("errors.backupCrypto.notEncrypted"));
+  if (bytes.length < HEADER_LEN + TAG_LEN) throw new BackupFormatError(t("errors.backupCrypto.truncated"));
   if (bytes[4] !== VERSION)
-    throw new BackupFormatError(`Copia de una versión más nueva (formato ${bytes[4]}). Actualiza BaseCero.`);
+    throw new BackupFormatError(t("errors.backupCrypto.newerVersion", { version: bytes[4] }));
   const view = new DataView(bytes.buffer, bytes.byteOffset);
   const iterations = view.getUint32(21);
   if (iterations < 1 || iterations > MAX_ITERATIONS)
-    throw new BackupFormatError("Cabecera inválida (iteraciones fuera de rango)");
+    throw new BackupFormatError(t("errors.backupCrypto.invalidHeader"));
   const salt = bytes.slice(5, 21);
   const iv = bytes.slice(25, 37);
   const key = await deriveKey(passphrase, salt, iterations);
@@ -75,6 +76,6 @@ export async function decryptBackup(fileData, passphrase) {
     return new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, bytes.subarray(HEADER_LEN)));
   } catch {
     // El tag GCM no distingue contraseña mala de datos dañados: un solo error, a propósito.
-    throw new WrongPassphraseError("Contraseña incorrecta o archivo dañado");
+    throw new WrongPassphraseError(t("errors.backupCrypto.wrongPassphrase"));
   }
 }

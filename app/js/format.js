@@ -3,6 +3,7 @@
 // useGrouping:"always" — el "auto" por defecto usa la estrategia CLDR "min2" y NO agrupa
 // miles en importes de 4 cifras (p.ej. 1800 -> "1800,00 €" en vez de "1.800,00 €").
 // OJO: los "sv-SE" de más abajo NO son locale de presentación (truco YYYY-MM-DD): no dependen de esto.
+import { weekdayInitial } from "./i18n/index.js";
 let locale = "es-ES";
 let currency = "EUR";
 let money = buildMoney();
@@ -80,6 +81,23 @@ export const nowIso = () => new Date().toISOString().slice(0, 19) + "Z";
 export const fmtDiaLargo = (iso) =>
   new Date(iso + "T12:00:00").toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" });
 
+// Parseo de un importe tecleado a céntimos. Coma = decimal; los puntos son separador de
+// millar cuando hay coma o cuando forman grupos de 3 («1.250» → 1250,00 €); un punto
+// suelto sin coma se trata como decimal tecleado («12.5» → 12,50 €). NaN/vacío → 0
+// (contrato de los 6 llamantes); el signo del texto se respeta y el flip (pasivos,
+// ajustes) queda SIEMPRE en el llamante.
+export function parseCentsRaw(raw) {
+  let s = String(raw ?? "").trim();
+  if (!s) return 0;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  return Math.round(parseFloat(s) * 100) || 0;
+}
+
+// Inverso para precargar inputs de importe: céntimos → «1250,50» (absoluto, sin puntos
+// de millar — es un valor editable, no un formateado); 0 → cadena vacía.
+export const centsToRaw = (cents) => (cents ? (Math.abs(cents) / 100).toFixed(2).replace(".", ",") : "");
+
 // opfs-sahpool solo admite una instancia de la app: otra pestaña/PWA con la BD
 // abierta hace fallar createSyncAccessHandle con NoModificationAllowedError.
 // Ese fallo es recuperable ("locked": cierra la otra y reintenta); el resto
@@ -94,10 +112,9 @@ export function classifyStorageFailure(e) {
 export const fmtDiaCorto = (iso) =>
   new Date(iso + "T12:00:00").toLocaleDateString(locale, { day: "numeric", month: "short" });
 
-// Inicial del día de la semana en español (L M X J V S D) — tarjeta "Flujo de gasto" de Inicio
-// (Task 12). getDay(): 0=domingo..6=sábado, de ahí el array empezando en D.
-const WEEKDAY_INITIALS = ["D", "L", "M", "X", "J", "V", "S"];
-export const fmtDiaIni = (iso) => WEEKDAY_INITIALS[new Date(iso + "T12:00:00").getDay()];
+// Inicial del día de la semana (tarjeta "Flujo de gasto" de Inicio, Task 12), vía i18n —
+// getDay(): 0=domingo..6=sábado, de ahí que i18n.weekdays empiece en D/S (es/en).
+export const fmtDiaIni = (iso) => weekdayInitial(new Date(iso + "T12:00:00").getDay());
 
 // Día anterior a un ISO (YYYY-MM-DD), cruzando mes/año si hace falta. T12:00:00 evita líos de DST.
 export function prevDayIso(iso) {

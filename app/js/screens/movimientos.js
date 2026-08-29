@@ -4,15 +4,19 @@ import {
   getMetaAll,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtDiaLargo, hoyISO, currencySymbol } from "../format.js";
+import { fmtMoney, fmtDiaLargo, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { t } from "../i18n/index.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const centsToRaw = (cents) => (cents ? (Math.abs(cents) / 100).toFixed(2).replace(".", ",") : "");
 const needsCategory = (tipo) => tipo === "expense" || tipo === "income" || tipo === "refund";
 
-const TIPO_LABEL = {
-  expense: "Gasto", income: "Ingreso", transfer: "Transferencia", refund: "Devolución", adjustment: "Ajuste",
+// TIPO_KEY guarda claves, no texto resuelto: es una const de módulo evaluada al importar el
+// fichero (antes de que boot() llame a initI18n con el idioma real) — ver mismo comentario en
+// registro.js#TIPOS/SAVE_KEY.
+const TIPO_KEY = {
+  expense: "common.type.expense", income: "common.type.income", transfer: "movimientos.type.transfer",
+  refund: "common.type.refund", adjustment: "common.type.adjustment",
 };
 
 /** Agrupa las filas de listAllByDay (ya vienen ordenadas por date DESC) en bloques por día,
@@ -50,7 +54,7 @@ function movRowHtml(r, byId, accById) {
       <div class="dotico" style="--cat:var(--card2);">${ICON_TRANSFER}</div>
       <div class="tx-body">
         <div class="tx-title">${escHtml(from)} → ${escHtml(to)}</div>
-        <div class="tx-sub">${escHtml(r.merchant || r.note || "Transferencia")}</div>
+        <div class="tx-sub">${escHtml(r.merchant || r.note || t("movimientos.type.transfer"))}</div>
       </div>
       <div class="tx-amount num">${fmtMoney(r.amount_cents)}</div>
     </button>`;
@@ -61,7 +65,7 @@ function movRowHtml(r, byId, accById) {
     <button type="button" class="tx-row" data-tx="${r.id}" style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
       <div class="dotico" style="--cat:var(--card2);">⚖️</div>
       <div class="tx-body">
-        <div class="tx-title">Ajuste</div>
+        <div class="tx-title">${t("common.type.adjustment")}</div>
         <div class="tx-sub">${escHtml(r.merchant || r.note || "")}</div>
       </div>
       <div class="tx-amount num ${isNeg ? "negative" : "positive"}">${isNeg ? "-" : "+"}${fmtMoney(Math.abs(r.amount_cents))}</div>
@@ -73,9 +77,9 @@ function movRowHtml(r, byId, accById) {
   const color = uncategorized ? "var(--card2)" : colorForCategory(r.category_id, byId);
   const icon = uncategorized ? ICON_UNCAT : iconForCategory(r.category_id, byId);
   const dashedStyle = uncategorized ? "border:1.5px dashed var(--rule);" : "";
-  const title = r.merchant || catName || "Sin categorizar";
-  const subBase = uncategorized ? "toca para categorizar" : (catName || "Sin categorizar");
-  const shareSuffix = r.is_shared ? ` · tu parte ${fmtMoney(r.my_amount_cents)}` : "";
+  const title = r.merchant || catName || t("movimientos.uncategorized");
+  const subBase = uncategorized ? t("movimientos.tapToCategorize") : (catName || t("movimientos.uncategorized"));
+  const shareSuffix = r.is_shared ? t("common.myPartSuffix", { amount: fmtMoney(r.my_amount_cents) }) : "";
   const isExpense = r.type === "expense";
   const amountClass = isExpense ? "negative" : "positive";
   const sign = isExpense ? "-" : "+";
@@ -102,12 +106,12 @@ export async function renderMovimientos(container) {
       getMetaAll(),
     ]);
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">No se pudo cargar Movimientos: ${escHtml(e.message)}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("movimientos.error.load", { error: escHtml(e.message) })}</div>`;
     return;
   }
   if (periods.length === 0) {
-    container.innerHTML = `<header class="screen-header"><h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">Movimientos</h1></header>
-      <div class="banner-aviso red">No hay ningún periodo todavía.</div>`;
+    container.innerHTML = `<header class="screen-header"><h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">${t("common.movements")}</h1></header>
+      <div class="banner-aviso red">${t("movimientos.noPeriods")}</div>`;
     return;
   }
   const accById = Object.fromEntries(accountsAll.map((a) => [a.id, a]));
@@ -151,7 +155,7 @@ export async function renderMovimientos(container) {
     try {
       row = await getTransaction(id);
     } catch (e) {
-      errorMsg = "No se pudo abrir el movimiento: " + e.message;
+      errorMsg = t("movimientos.error.openDetail", { error: e.message });
       render();
       return;
     }
@@ -203,14 +207,14 @@ export async function renderMovimientos(container) {
   function validationError() {
     const d = state.detail;
     if (d.type === "transfer") {
-      if (d.cents <= 0) return "Introduce un importe.";
-      if (!d.counterAccountId || d.counterAccountId === d.accountId) return "Elige dos cuentas distintas (origen y destino).";
+      if (d.cents <= 0) return t("common.enterAmount");
+      if (!d.counterAccountId || d.counterAccountId === d.accountId) return t("common.pickTwoAccounts");
       return "";
     }
-    if (d.type === "adjustment") return d.cents <= 0 ? "Introduce un importe." : "";
-    if (d.cents <= 0 && !d.categoryId) return "Introduce un importe y elige una categoría.";
-    if (d.cents <= 0) return "Introduce un importe.";
-    if (!d.categoryId) return "Elige una categoría.";
+    if (d.type === "adjustment") return d.cents <= 0 ? t("common.enterAmount") : "";
+    if (d.cents <= 0 && !d.categoryId) return t("common.enterAmountAndCategory");
+    if (d.cents <= 0) return t("common.enterAmount");
+    if (!d.categoryId) return t("common.pickCategory");
     return "";
   }
 
@@ -219,13 +223,13 @@ export async function renderMovimientos(container) {
     if (d.type === "transfer") {
       return `
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">Desde</div>
+        <div class="section-title">${t("common.from")}</div>
         <div class="chips">
           ${accounts.map((a) => `<button type="button" class="chip${d.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
         </div>
       </div>
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">Hacia</div>
+        <div class="section-title">${t("common.to")}</div>
         <div class="chips">
           ${accountsAll.filter((a) => a.id !== d.accountId).map((a) => `<button type="button" class="chip${d.counterAccountId === a.id ? " active" : ""}" data-counter-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
         </div>
@@ -233,7 +237,7 @@ export async function renderMovimientos(container) {
     }
     return `
     <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-      <div class="section-title">${d.type === "refund" ? "Cuenta destino" : "Cuenta"}</div>
+      <div class="section-title">${d.type === "refund" ? t("common.destAccount") : t("common.account")}</div>
       <div class="chips">
         ${accounts.map((a) => `<button type="button" class="chip${d.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
       </div>
@@ -253,20 +257,20 @@ export async function renderMovimientos(container) {
 
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="mov-back" aria-label="Volver">←</button>
-        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${TIPO_LABEL[d.type]}</h1>
+        <button type="button" class="icon-btn" id="mov-back" aria-label="${t("common.goBack")}">←</button>
+        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${t(TIPO_KEY[d.type])}</h1>
         <span style="width:36px;"></span>
       </div>
 
       ${locked ? `
       <div class="banner-aviso" style="margin-bottom:18px;">
-        <p>Liquidado. Para editar el importe, borra antes su liquidación en Movimientos.</p>
+        <p>${t("movimientos.detail.lockedNote")}</p>
       </div>` : ""}
 
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
-        <div class="section-title">Importe</div>
+        <div class="section-title">${t("common.amount")}</div>
         <div class="amount-display" style="align-items:center;">
-          ${d.type === "adjustment" ? `<button type="button" class="icon-btn" id="mov-sign" aria-label="Cambiar signo" style="font-size:18px; font-weight:700;" ${locked ? "disabled" : ""}>${d.sign}</button>` : ""}
+          ${d.type === "adjustment" ? `<button type="button" class="icon-btn" id="mov-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;" ${locked ? "disabled" : ""}>${d.sign}</button>` : ""}
           <input type="text" inputmode="decimal" id="mov-raw" value="${escAttr(d.raw)}" placeholder="0" ${locked ? "disabled" : ""}
             style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;${locked ? "opacity:.5;" : ""}">
           <span class="amount-currency">${currencySymbol()}</span>
@@ -276,7 +280,7 @@ export async function renderMovimientos(container) {
 
       ${cats.length ? `
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">Categoría</div>
+        <div class="section-title">${t("common.category")}</div>
         <div class="chips-scroll">
           ${cats.map((c) => {
             const color = colorForCategory(c.id, byId);
@@ -293,31 +297,31 @@ export async function renderMovimientos(container) {
 
       ${d.type === "refund" && state.linkedRefund ? `
       <div class="card" style="padding:12px 14px; margin-bottom:18px;">
-        <div style="font-size:10px; color:var(--text-3);">Vinculado a</div>
+        <div style="font-size:10px; color:var(--text-3);">${t("common.linkedTo")}</div>
         <div style="font-size:14px; font-weight:600;">
-          ${escHtml(state.linkedRefund.merchant || byId[state.linkedRefund.category_id]?.name || "Gasto")} · ${fmtMoney(state.linkedRefund.amount_cents)}
+          ${escHtml(state.linkedRefund.merchant || byId[state.linkedRefund.category_id]?.name || t("common.type.expense"))} · ${fmtMoney(state.linkedRefund.amount_cents)}
         </div>
       </div>` : ""}
 
       <div style="display:flex; gap:8px; margin-bottom:12px;">
         <label class="field field-stack" style="flex:1;">
-          <span class="field-label">Comercio</span>
-          <input type="text" id="mov-merchant" value="${escAttr(d.merchant)}" placeholder="Opcional">
+          <span class="field-label">${t("common.merchant")}</span>
+          <input type="text" id="mov-merchant" value="${escAttr(d.merchant)}" placeholder="${t("common.optional")}">
         </label>
         <label class="field field-stack" style="flex:1;">
-          <span class="field-label">Fecha</span>
+          <span class="field-label">${t("common.date")}</span>
           <input type="date" id="mov-fecha" value="${d.fecha}">
         </label>
       </div>
       <label class="field field-stack" style="margin-bottom:18px;">
-        <span class="field-label">Nota</span>
-        <input type="text" id="mov-note" value="${escAttr(d.note)}" placeholder="Opcional">
+        <span class="field-label">${t("common.note")}</span>
+        <input type="text" id="mov-note" value="${escAttr(d.note)}" placeholder="${t("common.optional")}">
       </label>
 
       ${needsCategory(d.type) && (d.wasShared || partnerName) ? `
       <div class="card" style="padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:${locked ? "default" : "pointer"};${locked ? "opacity:.5;" : ""}">
-          <span style="font-size:15px; font-weight:600;">Compartido con ${escHtml(partnerName) || "la contraparte"}</span>
+          <span style="font-size:15px; font-weight:600;">${t("common.sharedWith", { name: escHtml(partnerName) || t("movimientos.shared.fallbackName") })}</span>
           <span class="toggle">
             <input type="checkbox" id="mov-shared" ${d.isShared ? "checked" : ""} ${locked ? "disabled" : ""}>
             <span class="toggle-track"><span class="toggle-knob"></span></span>
@@ -326,11 +330,11 @@ export async function renderMovimientos(container) {
         ${d.isShared ? `
         <div style="display:flex; gap:8px; padding:0 0 14px;">
           <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
-            <div style="font-size:10px; color:var(--text-3);">Tu parte · ${pct}%</div>
+            <div style="font-size:10px; color:var(--text-3);">${t("common.myShare", { pct })}</div>
             <div class="num" id="mov-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
           </div>
           <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
-            <div style="font-size:10px; color:var(--text-3);">${escHtml(partnerName) || "Contraparte"} · ${100 - pct}%</div>
+            <div style="font-size:10px; color:var(--text-3);">${escHtml(partnerName) || t("movimientos.shared.fallbackLabel")} · ${100 - pct}%</div>
             <div class="num" id="mov-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerCents)}</div>
           </div>
         </div>` : ""}
@@ -338,11 +342,11 @@ export async function renderMovimientos(container) {
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
-      <button type="button" class="btn-primary" id="mov-save" style="margin-bottom:10px;">Guardar</button>
+      <button type="button" class="btn-primary" id="mov-save" style="margin-bottom:10px;">${t("common.save")}</button>
       <button type="button" id="mov-delete"
         style="width:100%;background:${state.deleteConfirm ? "var(--red)" : "transparent"};color:${state.deleteConfirm ? "#fff" : "var(--red)"};
           border:1px solid var(--red);border-radius:var(--radius-sm);padding:16px;font:600 16px var(--font-ui);cursor:pointer;">
-        ${state.deleteConfirm ? "Sí, borrar" : "Borrar"}
+        ${state.deleteConfirm ? t("movimientos.delete.confirm") : t("movimientos.delete.button")}
       </button>
     `;
 
@@ -376,7 +380,7 @@ export async function renderMovimientos(container) {
 
     container.querySelector("#mov-raw").oninput = (e) => {
       d.raw = e.target.value;
-      d.cents = Math.round(parseFloat((d.raw || "0").replace(",", ".")) * 100) || 0;
+      d.cents = parseCentsRaw(d.raw);
       errorMsg = "";
       state.deleteConfirm = false;
       // No se llama a render() aquí (perdería el foco/cursor del input mientras se escribe), pero
@@ -431,7 +435,7 @@ export async function renderMovimientos(container) {
         backToList();
       } catch (e) {
         btn.disabled = false;
-        errorMsg = "No se pudo guardar: " + e.message;
+        errorMsg = t("common.saveFailed", { error: e.message });
         render();
       }
     };
@@ -450,7 +454,7 @@ export async function renderMovimientos(container) {
         backToList();
       } catch (e) {
         btn.disabled = false;
-        errorMsg = "No se pudo borrar: " + e.message;
+        errorMsg = t("movimientos.error.delete", { error: e.message });
         state.deleteConfirm = false;
         render();
       }
@@ -463,11 +467,11 @@ export async function renderMovimientos(container) {
 
     const movimientosHtml = visible.length === 0
       ? `<div class="card" style="text-align:center;color:var(--text-3)">
-          <p>${state.filterUncat ? "No hay movimientos sin categorizar." : "No hay movimientos en este periodo."}</p></div>`
+          <p>${state.filterUncat ? t("movimientos.empty.noUncategorized") : t("movimientos.empty.noPeriod")}</p></div>`
       : `<div class="card" style="display:flex;flex-direction:column;gap:16px;">
           <div style="display:flex;flex-direction:column;gap:12px;">
             ${groupByDay(visible).map((g) => `
-              <div class="day-label">${g.date === hoy ? "Hoy" : fmtDiaLargo(g.date)}</div>
+              <div class="day-label">${g.date === hoy ? t("common.today") : fmtDiaLargo(g.date)}</div>
               ${g.rows.map((r) => movRowHtml(r, byId, accById)).join("")}
             `).join("")}
           </div>
@@ -481,10 +485,10 @@ export async function renderMovimientos(container) {
       : "padding:0 14px;background:transparent;border:1px dashed var(--rule);";
 
     container.innerHTML = `
-      <header class="screen-header"><h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">Movimientos</h1></header>
+      <header class="screen-header"><h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">${t("common.movements")}</h1></header>
 
       <label class="field field-stack" style="margin-bottom:14px;">
-        <span class="field-label">Periodo</span>
+        <span class="field-label">${t("movimientos.periodLabel")}</span>
         <select id="mov-period">
           ${periods.map((p) => `<option value="${p.id}" ${p.id === state.periodId ? "selected" : ""}>${escHtml(p.name)}</option>`).join("")}
         </select>
@@ -493,7 +497,7 @@ export async function renderMovimientos(container) {
       ${state.uncategorizedCount > 0 ? `
       <div style="margin-bottom:14px;">
         <button type="button" id="mov-chip-uncat" class="chip${state.filterUncat ? " active" : ""}" style="${chipStyle}">
-          Sin categoría · ${state.uncategorizedCount}
+          ${t("movimientos.uncategorizedChip", { n: state.uncategorizedCount })}
         </button>
       </div>` : ""}
 
@@ -511,7 +515,7 @@ export async function renderMovimientos(container) {
       try {
         await loadPeriodData();
       } catch (err) {
-        errorMsg = "No se pudo cargar el periodo: " + err.message;
+        errorMsg = t("movimientos.error.loadPeriod", { error: err.message });
       }
       render();
     };
@@ -535,7 +539,7 @@ export async function renderMovimientos(container) {
   try {
     await loadPeriodData();
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">No se pudo cargar Movimientos: ${escHtml(e.message)}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("movimientos.error.load", { error: escHtml(e.message) })}</div>`;
     return;
   }
   render();

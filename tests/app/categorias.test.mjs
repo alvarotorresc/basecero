@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { SQL } from "../../app/js/sql.js";
 import { computeReorder } from "../../app/js/category-order.js";
 import { POOL, CURATED_ICONS, CATEGORY_ICONS, parseStyle, initCategoryStyle } from "../../app/js/category-colors.js";
+import { t } from "../../app/js/i18n/index.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
 const require = createRequire(import.meta.url);
@@ -273,19 +274,19 @@ const getCategoryRow = (db, id) => db.prepare(SQL.getCategory).get(id);
 function assertValidParentReproduced(db, parentId, flow) {
   const parent = getCategoryRow(db, parentId);
   if (!parent || parent.parent_id !== "" || parent.flow !== flow) {
-    throw new Error("La categoría elegida como padre no es válida: debe ser una categoría principal del mismo tipo (gasto o ingreso)");
+    throw new Error(t("errors.repo.invalidParent"));
   }
 }
 
 /** Reproduce repo.createCategory (incluido el guard de padre archivado, Item 4). */
 function createCategoryReproduced(db, { name, flow, needType, parentId }, now = T) {
   const trimmed = String(name ?? "").trim();
-  if (!trimmed) throw new Error("El nombre de la categoría no puede estar vacío");
+  if (!trimmed) throw new Error(t("errors.repo.categoryNameEmpty"));
   const pid = parentId || "";
   if (pid) {
     assertValidParentReproduced(db, pid, flow);
     const parent = getCategoryRow(db, pid);
-    if (parent.is_archived) throw new Error("No se puede crear una subcategoría dentro de una categoría archivada");
+    if (parent.is_archived) throw new Error(t("errors.repo.parentArchived"));
   }
   const id = "cat-" + Math.floor(Math.random() * 1e9);
   db.prepare(SQL.insertCategory).run(id, pure.bcSanitizeCell(trimmed), pid, flow, needType ?? "", now, now, flow, pid);
@@ -295,15 +296,15 @@ function createCategoryReproduced(db, { name, flow, needType, parentId }, now = 
 /** Reproduce repo.updateCategory (merge-on-current + guards). */
 function updateCategoryReproduced(db, id, fields, now = T2) {
   if (fields.flow !== undefined) {
-    throw new Error("El tipo de la categoría (gasto o ingreso) no se puede cambiar una vez creada");
+    throw new Error(t("errors.repo.flowImmutable"));
   }
   const cur = getCategoryRow(db, id);
-  if (!cur) throw new Error("Categoría no encontrada");
+  if (!cur) throw new Error(t("errors.repo.categoryNotFound"));
 
   let name = cur.name;
   if (fields.name !== undefined) {
     const trimmed = String(fields.name).trim();
-    if (!trimmed) throw new Error("El nombre de la categoría no puede estar vacío");
+    if (!trimmed) throw new Error(t("errors.repo.categoryNameEmpty"));
     name = pure.bcSanitizeCell(trimmed);
   }
   const needType = fields.needType !== undefined ? fields.needType : cur.need_type;
@@ -314,7 +315,7 @@ function updateCategoryReproduced(db, id, fields, now = T2) {
     // Item 3: hasChildren (activas + archivadas), no hasActiveChildren — mismo cambio que repo.js.
     const children = db.prepare(SQL.hasChildren).all(id);
     if (children.length > 0) {
-      throw new Error("Esta categoría tiene subcategorías: solo se permiten dos niveles, no puede convertirse en subcategoría de otra");
+      throw new Error(t("errors.repo.categoryHasChildren"));
     }
   }
 
@@ -344,9 +345,9 @@ function reorderCategoriesReproduced(db, orderedIds, now = T2) {
 /** Reproduce repo.setCategoryStyle: valida, read-modify-write de meta.category_style,
  *  reemplaza la entrada de rootId por completo, refresca initCategoryStyle. */
 function setCategoryStyleReproduced(db, rootId, { color, icon } = {}) {
-  if (color !== undefined && !POOL.includes(color)) throw new Error("Ese color no está disponible");
+  if (color !== undefined && !POOL.includes(color)) throw new Error(t("errors.repo.colorUnavailable"));
   const iconValid = icon === undefined || CURATED_ICONS.includes(icon) || Object.values(CATEGORY_ICONS).includes(icon);
-  if (!iconValid) throw new Error("Ese icono no está disponible");
+  if (!iconValid) throw new Error(t("errors.repo.iconUnavailable"));
 
   // getMetaAll()/setMeta() reales, no un SELECT/UPDATE ad-hoc: SQL.allMeta + SQL.upsertMeta,
   // fieles al repo (aunque aquí solo haga falta la clave category_style).

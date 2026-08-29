@@ -4,6 +4,7 @@ import {
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { eurToCents } from "../contract.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol } from "../format.js";
+import { t } from "../i18n/index.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -26,8 +27,8 @@ function renderAsistenteError(container, mode, onDone, message) {
   container.innerHTML = `
     <div class="banner-aviso red" style="margin-bottom:14px;">${escHtml(message)}</div>
     <div style="display:flex; gap:8px;">
-      <button type="button" class="btn-primary" id="pn-error-retry" style="flex:1;">Reintentar</button>
-      ${mode === "next" ? `<button type="button" id="pn-error-back" style="${BTN_SECONDARY}">Volver</button>` : ""}
+      <button type="button" class="btn-primary" id="pn-error-retry" style="flex:1;">${t("common.retry")}</button>
+      ${mode === "next" ? `<button type="button" id="pn-error-back" style="${BTN_SECONDARY}">${t("common.goBack")}</button>` : ""}
     </div>`;
   container.querySelector("#pn-error-retry").onclick = () => renderPeriodoNuevo(container, { mode, onDone });
   const back = container.querySelector("#pn-error-back");
@@ -46,7 +47,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
     if (mode === "next") {
       closingPeriod = await getOpenPeriod();
       if (!closingPeriod) {
-        renderAsistenteError(container, mode, onDone, "No hay ningún periodo abierto que cerrar.");
+        renderAsistenteError(container, mode, onDone, t("periodo.error.noOpenToClose"));
         return;
       }
       const [spent, income, all, roots, metaAll] = await Promise.all([
@@ -61,7 +62,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
       [rootRows, meta] = await Promise.all([spentByRootCategory(""), getMetaAll()]);
     }
   } catch (e) {
-    renderAsistenteError(container, mode, onDone, "No se pudo cargar el asistente: " + e.message);
+    renderAsistenteError(container, mode, onDone, t("periodo.error.load", { error: e.message }));
     return;
   }
   const partnerName = (meta.partner_name || "").trim();
@@ -93,8 +94,8 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
 
   function notaSinAsignarHtml(sinAsignar) {
     return sinAsignar >= 0
-      ? `Quedan <span style="color:var(--green); font-weight:700;">${fmtMoney(sinAsignar)}</span> sin asignar: de ahí salen la cuota del coche, las provisiones y lo que ahorres.`
-      : `Te pasas por <span style="color:var(--red); font-weight:700;">${fmtMoney(-sinAsignar)}</span> de los ingresos previstos.`;
+      ? t("periodo.total.remaining", { amount: `<span style="color:var(--green); font-weight:700;">${fmtMoney(sinAsignar)}</span>` })
+      : t("periodo.total.over", { amount: `<span style="color:var(--red); font-weight:700;">${fmtMoney(-sinAsignar)}</span>` });
   }
 
   /** Actualiza SOLO el total/barra/nota tras editar un importe, sin re-renderizar toda la
@@ -123,15 +124,15 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
   // única etiqueta que no inventa nada. El sub "Paso único..." (copy real, ya existía en ambos
   // modos) se conserva tal cual en vez del texto nuevo del artboard para esa línea.
   function bloqueHeader() {
-    const kicker = mode === "next" ? `Cierra ${escHtml(closingPeriod.name)} · abre el siguiente` : "Primer periodo";
+    const kicker = mode === "next" ? t("periodo.header.closing", { name: escHtml(closingPeriod.name) }) : t("periodo.header.first");
     return `
     <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
-      ${mode === "next" || onBack ? `<button type="button" class="icon-btn" id="pn-back" aria-label="Volver"
+      ${mode === "next" || onBack ? `<button type="button" class="icon-btn" id="pn-back" aria-label="${t("common.goBack")}"
         style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>` : ""}
       <div style="display:flex; flex-direction:column; gap:4px;">
         <div class="day-label" style="color:var(--green);">${kicker}</div>
-        <div style="font-size:24px; font-weight:800; letter-spacing:-0.02em;">Nuevo periodo</div>
-        <div style="font-size:11px; color:var(--text-3);">Paso único · se guarda al abrirlo</div>
+        <div style="font-size:24px; font-weight:800; letter-spacing:-0.02em;">${t("periodo.header.title")}</div>
+        <div style="font-size:11px; color:var(--text-3);">${t("periodo.header.subtitle")}</div>
       </div>
     </div>`;
   }
@@ -144,23 +145,23 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
     return `
     <div class="card" style="display:flex; flex-direction:column; gap:14px; margin-bottom:16px;">
       <div style="display:flex; flex-direction:column; gap:3px;">
-        <div style="font-size:15px; font-weight:700;">Cierras ${escHtml(closingPeriod.name)}</div>
+        <div style="font-size:15px; font-weight:700;">${t("periodo.closing.title", { name: escHtml(closingPeriod.name) })}</div>
         <div style="font-size:11px; color:var(--text-3);">
-          ${fmtDiaCorto(closingPeriod.start_date)} – ${fmtDiaCorto(rangeEnd)} · ${closingCount} movimiento${closingCount === 1 ? "" : "s"}
+          ${fmtDiaCorto(closingPeriod.start_date)} – ${fmtDiaCorto(rangeEnd)} · ${t("periodo.closing.movementCount", { n: closingCount })}
         </div>
       </div>
       <hr class="divider">
       <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px;">
         <div style="display:flex; flex-direction:column; gap:5px;">
-          <div style="font-size:11px; color:var(--text-3);">Gastado</div>
+          <div style="font-size:11px; color:var(--text-3);">${t("periodo.closing.spent")}</div>
           <div class="num" style="font-size:15px; font-weight:600;">${fmtMoney(closingSpent)}</div>
         </div>
         <div style="display:flex; flex-direction:column; gap:5px;">
-          <div style="font-size:11px; color:var(--text-3);">Ahorrado</div>
+          <div style="font-size:11px; color:var(--text-3);">${t("periodo.closing.saved")}</div>
           <div class="num ${ahorrado >= 0 ? "text-green" : "text-red"}" style="font-size:15px; font-weight:600;">${fmtMoney(ahorrado)}</div>
         </div>
         <div style="display:flex; flex-direction:column; gap:5px;">
-          <div style="font-size:11px; color:var(--text-3);">Tasa de ahorro</div>
+          <div style="font-size:11px; color:var(--text-3);">${t("periodo.closing.savingsRate")}</div>
           <div class="num" style="font-size:15px; font-weight:600;">${tasa}</div>
         </div>
       </div>
@@ -174,7 +175,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
   function bloqueNombre() {
     return `
     <div class="card" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
-      <div class="section-title">Nombre</div>
+      <div class="section-title">${t("common.name")}</div>
       <input type="text" id="pn-nombre" value="${escAttr(state.name)}"
         style="height:44px; padding:0 14px; background:var(--card2); border:0; border-radius:16px; color:var(--text);
         font:700 15px var(--font-ui); width:100%; outline:none;">
@@ -187,7 +188,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
   function bloqueFecha() {
     return `
     <div class="card" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
-      <div class="section-title">Empieza el</div>
+      <div class="section-title">${t("periodo.date.title")}</div>
       <div style="display:flex; align-items:center; gap:10px;">
         <input type="date" id="pn-fecha" value="${state.startDate}"
           style="flex:1; height:44px; padding:0 14px; background:var(--card2); border:0; border-radius:14px;
@@ -211,19 +212,19 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
     const restante = 100 - state.sharePct;
     return `
     <div class="card" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
-      <div class="section-title">Gastos compartidos</div>
+      <div class="section-title">${t("periodo.share.title")}</div>
       <div style="display:flex; align-items:center; gap:10px;">
         <div style="flex:1; min-width:0;">
-          <div style="font-size:14px; font-weight:600;">Pagas de lo compartido</div>
-          <div style="font-size:11px; color:var(--text-3);">${escHtml(partnerName)} pagará el ${restante} % restante</div>
+          <div style="font-size:14px; font-weight:600;">${t("periodo.share.youPay")}</div>
+          <div style="font-size:11px; color:var(--text-3);">${t("periodo.share.partnerPays", { name: escHtml(partnerName), pct: restante })}</div>
         </div>
         <button type="button" id="pn-pct-down" class="stepper-btn"
           style="width:44px; height:44px; border-radius:14px; background:var(--card2); color:var(--text); font-size:17px;"
-          aria-label="Bajar porcentaje">−</button>
+          aria-label="${t("periodo.share.decreaseAria")}">−</button>
         <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${state.sharePct} %</div>
         <button type="button" id="pn-pct-up" class="stepper-btn"
           style="width:44px; height:44px; border-radius:14px; background:var(--card2); color:var(--text); font-size:17px;"
-          aria-label="Subir porcentaje">+</button>
+          aria-label="${t("periodo.share.increaseAria")}">+</button>
       </div>
     </div>`;
   }
@@ -239,10 +240,10 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
       <div class="tx-icon" style="--cat:${color};">${icon}</div>
       <div style="display:flex; flex-direction:column; gap:3px; flex-grow:1; min-width:0;">
         <div style="font-size:14px; font-weight:600;">${escHtml(r.name)}</div>
-        ${mode === "next" ? `<div style="font-size:11px; color:var(--text-3);">Mes pasado: ${fmtMoney(r.spent_cents)}</div>` : ""}
+        ${mode === "next" ? `<div style="font-size:11px; color:var(--text-3);">${t("periodo.budget.lastMonth", { amount: fmtMoney(r.spent_cents) })}</div>` : ""}
       </div>
       <div style="position:relative; flex-shrink:0;">
-        <input type="number" min="0" step="1" inputmode="decimal" placeholder="Sin límite"
+        <input type="number" min="0" step="1" inputmode="decimal" placeholder="${t("periodo.budget.noLimitPlaceholder")}"
           data-budget="${r.root_id}" value="${escAttr(raw)}" class="budget-input${empty ? " is-empty" : ""}">
         <span class="budget-eur" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:12px;
           color:var(--text-3); pointer-events:none; display:${empty ? "none" : ""};">${currencySymbol()}</span>
@@ -256,15 +257,15 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
     if (rootRows.length === 0) {
       return `
       <div class="card" style="text-align:center; color:var(--text-3); margin-bottom:16px;">
-        <p>No hay categorías de gasto configuradas.</p>
+        <p>${t("periodo.budget.noCategories")}</p>
       </div>`;
     }
     return `
     <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
       <div style="display:flex; flex-direction:column; gap:4px;">
-        <div style="font-size:15px; font-weight:700;">¿Cuánto quieres gastar este periodo?</div>
+        <div style="font-size:15px; font-weight:700;">${t("periodo.budget.question")}</div>
         <div style="font-size:11px; color:var(--text-3); line-height:1.5;">
-          Pon un límite solo donde te sirva. Si lo dejas vacío, esa categoría irá sin presupuesto.
+          ${t("periodo.budget.hint")}
         </div>
       </div>
       <div class="card" style="padding:4px 16px; display:flex; flex-direction:column;">
@@ -277,7 +278,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
           <div class="tx-icon" style="--cat:var(--text);">
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13"></path></svg>
           </div>
-          <span style="font-size:14px; font-weight:600; color:var(--text);">Añadir límite a otra categoría</span>
+          <span style="font-size:14px; font-weight:600; color:var(--text);">${t("periodo.budget.addAnother")}</span>
         </button>
         ${state.addOpen ? `
         <div style="display:flex; flex-direction:column; padding-bottom:10px;">
@@ -311,12 +312,12 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
     <div class="card" style="display:flex; flex-direction:column; gap:14px; margin-bottom:16px;">
       <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
         <div style="display:flex; flex-direction:column; gap:5px;">
-          <div class="section-title">Presupuestado</div>
+          <div class="section-title">${t("periodo.total.budgetedTitle")}</div>
           <div class="amount-hero num" id="pn-presupuestado">${moneyPartsHtml(presupuestado)}</div>
         </div>
         ${ingresos != null ? `
         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;">
-          <div style="font-size:11px; color:var(--text-3);">Ingresos previstos</div>
+          <div style="font-size:11px; color:var(--text-3);">${t("periodo.total.expectedIncome")}</div>
           <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(ingresos)}</div>
         </div>` : ""}
       </div>
@@ -332,7 +333,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
   function bloqueCTA() {
     return `
     ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
-    <button type="button" class="btn-primary" id="pn-submit" ${state.saving ? "disabled" : ""}>${state.saving ? "Abriendo…" : "Abrir periodo"}</button>`;
+    <button type="button" class="btn-primary" id="pn-submit" ${state.saving ? "disabled" : ""}>${state.saving ? t("periodo.cta.saving") : t("periodo.cta.submit")}</button>`;
   }
 
   function render() {
@@ -411,7 +412,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
         onDone();
       } catch (e) {
         state.saving = false;
-        errorMsg = "No se pudo abrir el periodo: " + e.message;
+        errorMsg = t("periodo.error.open", { error: e.message });
         render();
       }
     };

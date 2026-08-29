@@ -1,6 +1,7 @@
 import { getOpenPeriod, spentByRootCategory, budgetsOfPeriod, allCategoriesById } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO } from "../format.js";
+import { t } from "../i18n/index.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
@@ -36,7 +37,7 @@ const fmtPctInt = (pct) => `${Math.round(pct)} %`;
  *  que en design/Presupuesto.dc.html: "Coche, Salud, Suscripciones y 1 más"). */
 function joinConMas(names, max = 3) {
   if (names.length <= max) return names.join(", ");
-  return `${names.slice(0, max).join(", ")} y ${names.length - max} más`;
+  return t("presupuesto.noLimit.andMore", { names: names.slice(0, max).join(", "), n: names.length - max });
 }
 
 /** Color del número grande y de la barra de una fila de categoría. En 'ok' van desacoplados —
@@ -79,11 +80,11 @@ function categoryRowHtml(row, budgetCents, byId) {
 
   let statusLineHtml;
   if (over) {
-    statusLineHtml = `<div style="font-size:11px;color:var(--red);">Superado por ${fmtMoney(-remaining)}</div>`;
+    statusLineHtml = `<div style="font-size:11px;color:var(--red);">${t("presupuesto.category.over", { amount: fmtMoney(-remaining) })}</div>`;
   } else if (st.level === "warn") {
-    statusLineHtml = `<div style="font-size:11px;color:var(--amber);">Casi al límite · te quedan ${fmtMoney(remaining)}</div>`;
+    statusLineHtml = `<div style="font-size:11px;color:var(--amber);">${t("presupuesto.category.warn", { amount: fmtMoney(remaining) })}</div>`;
   } else {
-    statusLineHtml = `<div style="font-size:11px;color:var(--text-3);">Te quedan ${fmtMoney(remaining)}</div>`;
+    statusLineHtml = `<div style="font-size:11px;color:var(--text-3);">${t("presupuesto.category.ok", { amount: fmtMoney(remaining) })}</div>`;
   }
 
   return `
@@ -113,8 +114,8 @@ function sinLimiteHtml(rows) {
     <div style="display:flex;align-items:center;gap:10px;background:var(--card);border-radius:var(--radius-sm);padding:12px 16px;">
       ${ICON_INFO}
       <div style="display:flex;flex-direction:column;gap:3px;flex-grow:1;min-width:0;">
-        <div style="font-size:13px;font-weight:600;color:var(--text-2);">Sin límite este periodo</div>
-        <div style="font-size:11px;color:var(--text-3);">${escHtml(nombres)} · ${fmtMoney(total)} gastados</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text-2);">${t("presupuesto.noLimit.title")}</div>
+        <div style="font-size:11px;color:var(--text-3);">${t("presupuesto.noLimit.summary", { names: escHtml(nombres), amount: fmtMoney(total) })}</div>
       </div>
     </div>`;
 }
@@ -131,7 +132,7 @@ export async function renderPresupuesto(container, onBack) {
   try {
     period = await getOpenPeriod();
     if (!period) {
-      container.innerHTML = `<div class="banner-aviso red">No hay ningún periodo abierto.</div>`;
+      container.innerHTML = `<div class="banner-aviso red">${t("common.noOpenPeriod")}</div>`;
       return;
     }
     [rootRows, budgetRows, byId] = await Promise.all([
@@ -140,7 +141,7 @@ export async function renderPresupuesto(container, onBack) {
       allCategoriesById(),
     ]);
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">No se pudo cargar Presupuesto: ${escHtml(e.message)}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("presupuesto.error.load", { error: escHtml(e.message) })}</div>`;
     return;
   }
 
@@ -163,29 +164,32 @@ export async function renderPresupuesto(container, onBack) {
   const totalRemaining = totalLimit - totalSpent;
 
   const dias = Math.floor((new Date(hoyISO() + "T12:00:00") - new Date(period.start_date + "T12:00:00")) / 86400000) + 1;
-  const diasTxt = dias >= 1 ? ` · ${dias} día${dias === 1 ? "" : "s"}` : "";
+  const diasTxt = dias >= 1 ? t("presupuesto.header.days", { n: dias }) : "";
   const n = conLimite.length;
+
+  const remainingSpan = `<span style="color:var(--green);font-weight:700;">${fmtMoney(totalRemaining)}</span>`;
+  const overSpan = `<span style="color:var(--red);font-weight:700;">${fmtMoney(-totalRemaining)}</span>`;
 
   container.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-      <button type="button" class="icon-btn" id="presu-back" aria-label="Volver" style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>
+      <button type="button" class="icon-btn" id="presu-back" aria-label="${t("common.goBack")}" style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>
       <div style="display:flex;flex-direction:column;gap:2px;">
-        <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">Presupuesto</div>
-        <div style="font-size:11px;color:var(--text-3);">${escHtml(period.name)} · abierto el ${fmtDiaCorto(period.start_date)}${diasTxt}</div>
+        <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">${t("presupuesto.title")}</div>
+        <div style="font-size:11px;color:var(--text-3);">${t("presupuesto.header.openedOn", { period: escHtml(period.name), date: fmtDiaCorto(period.start_date), days: diasTxt })}</div>
       </div>
     </div>
 
     ${n === 0 ? `
     <div class="card" style="text-align:center;color:var(--text-3);margin-bottom:16px;">
-      <p>Este periodo no tiene ninguna categoría con límite.</p>
+      <p>${t("presupuesto.empty")}</p>
     </div>` : `
     <div class="card" style="display:flex;flex-direction:column;gap:14px;margin-bottom:16px;">
       <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;">
         <div style="display:flex;flex-direction:column;gap:6px;">
-          <div class="section-title">Gastado de lo presupuestado</div>
+          <div class="section-title">${t("presupuesto.total.title")}</div>
           <div style="display:flex;align-items:baseline;gap:7px;">
             <div class="amount-hero num">${moneyPartsHtml(totalSpent)}</div>
-            <div class="num" style="font-size:13px;color:var(--text-3);">de ${fmtMoney(totalLimit)} con presupuesto</div>
+            <div class="num" style="font-size:13px;color:var(--text-3);">${t("presupuesto.total.ofBudgeted", { amount: fmtMoney(totalLimit) })}</div>
           </div>
         </div>
         <div class="num" style="font-size:24px;font-weight:700;line-height:1;">${fmtPctInt(totalSt.pct)}</div>
@@ -193,14 +197,14 @@ export async function renderPresupuesto(container, onBack) {
       <div class="bar" style="--cat:var(--text);height:10px;"><i style="width:${totalBarPct}%;"></i></div>
       <div style="font-size:11px;color:var(--text-3);">
         ${totalRemaining >= 0
-          ? `Te quedan <span style="color:var(--green);font-weight:700;">${fmtMoney(totalRemaining)}</span> en las ${n} categoría${n === 1 ? "" : "s"} con límite`
-          : `Te has pasado <span style="color:var(--red);font-weight:700;">${fmtMoney(-totalRemaining)}</span> en las ${n} categoría${n === 1 ? "" : "s"} con límite`}
+          ? t("presupuesto.total.remaining", { n, amount: remainingSpan })
+          : t("presupuesto.total.over", { n, amount: overSpan })}
       </div>
     </div>
 
     <div style="display:flex;align-items:baseline;justify-content:space-between;padding-top:2px;margin-bottom:12px;">
-      <div style="font-size:15px;font-weight:700;">Por categoría</div>
-      <div style="font-size:11px;color:var(--text-3);">${n} con límite este periodo</div>
+      <div style="font-size:15px;font-weight:700;">${t("presupuesto.byCategory.title")}</div>
+      <div style="font-size:11px;color:var(--text-3);">${t("presupuesto.byCategory.countWithLimit", { n })}</div>
     </div>
 
     <div class="card" style="padding:6px 16px;display:flex;flex-direction:column;margin-bottom:16px;">

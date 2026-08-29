@@ -1,4 +1,4 @@
-import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta, setMetaMany, allCategoriesById } from "../repo.js";
+import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta, setMetaMany, allCategoriesById, retranslateSeedNames } from "../repo.js";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
 import { hoyISO, fmtDiaCorto, fmtMoney } from "../format.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
@@ -7,6 +7,8 @@ import { renderCategorias } from "./categorias.js";
 import { importCsv, importWithProfile } from "../n26.js";
 import { buildProfile, applyProfile, detectDateFormat, detectDecimal, parseDateIso, parseAmountCents } from "../csv-generic.js";
 import { encryptBackup, decryptBackup, isEncryptedBackup, WrongPassphraseError, MIN_PASSPHRASE } from "../backup-crypto.js";
+import { t, LANGS, activeLang } from "../i18n/index.js";
+import { loadXlsx } from "../xlsx-loader.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -41,9 +43,10 @@ function download(blob, filename) {
   a.click(); URL.revokeObjectURL(a.href);
 }
 
-function downloadXlsx(dump, filename) {
-  const wb = rowsToWorkbook(window.XLSX, dump);
-  const arr = window.XLSX.write(wb, { type: "array", bookType: "xlsx" });
+async function downloadXlsx(dump, filename) {
+  const XLSX = await loadXlsx();
+  const wb = rowsToWorkbook(XLSX, dump);
+  const arr = XLSX.write(wb, { type: "array", bookType: "xlsx" });
   download(new Blob([arr], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
 }
 
@@ -90,8 +93,14 @@ function firstNonEmpty(values) {
   return (values || []).find((v) => v !== null && v !== undefined && String(v).trim() !== "");
 }
 
-const DATE_FORMAT_LABELS = {
-  iso: "año-mes-día", "dmy-slash": "día/mes/año", "dmy-dot": "día/mes/año", "dmy-dash": "día/mes/año",
+// Mandatory ledger pattern (waves 1-2): se guarda la CLAVE del diccionario, no el texto — los
+// tres formatos dmy-* comparten el mismo texto mostrado ("día/mes/año"), así que apuntan a la
+// misma clave ajustes.assist.dateFormat.dmy.
+const DATE_FORMAT_LABEL_KEY = {
+  iso: "ajustes.assist.dateFormat.iso",
+  "dmy-slash": "ajustes.assist.dateFormat.dmy",
+  "dmy-dot": "ajustes.assist.dateFormat.dmy",
+  "dmy-dash": "ajustes.assist.dateFormat.dmy",
 };
 
 /** Nota bajo el bloque Fecha: verde con la conversión de ejemplo si TODA la muestra parsea con
@@ -105,16 +114,16 @@ const DATE_FORMAT_LABELS = {
 function dateNoteFor(values) {
   if (values.length === 0) return null;
   const fmt = detectDateFormat(values);
-  if (!fmt) return { ok: false, text: "No se reconoce el formato de fecha en esta columna." };
+  if (!fmt) return { ok: false, text: t("ajustes.assist.date.unrecognized") };
   const raw = firstNonEmpty(values);
   const iso = parseDateIso(raw, fmt);
-  return { ok: true, text: `✓ ${raw} → ${iso} · formato ${DATE_FORMAT_LABELS[fmt]} detectado` };
+  return { ok: true, text: t("ajustes.assist.date.detected", { raw, iso, fmt: t(DATE_FORMAT_LABEL_KEY[fmt]) }) };
 }
 
 function amountNoteOk(raw, cents, decimal) {
-  const kind = cents < 0 ? "gasto" : "ingreso";
-  const decLabel = decimal === "," ? "coma" : "punto";
-  return { ok: true, text: `✓ ${raw} → ${kind} de ${fmtMoney(Math.abs(cents))} · decimal con ${decLabel} detectado` };
+  const kind = cents < 0 ? t("ajustes.assist.amount.kindExpense") : t("ajustes.assist.amount.kindIncome");
+  const decLabel = decimal === "," ? t("ajustes.assist.amount.decimalComma") : t("ajustes.assist.amount.decimalDot");
+  return { ok: true, text: t("ajustes.assist.amount.detected", { raw, kind, money: fmtMoney(Math.abs(cents)), dec: decLabel }) };
 }
 
 /** Nota bajo el bloque Importe: misma idea que dateNoteFor para importe+decimal.
@@ -129,9 +138,9 @@ function amountNoteFor(spec) {
     if (values.length === 0) return null;
     const decimal = detectDecimal(values);
     const raw = firstNonEmpty(values);
-    if (raw === undefined) return { ok: false, text: "La muestra no tiene ningún importe en esta columna." };
+    if (raw === undefined) return { ok: false, text: t("ajustes.assist.amount.noSampleSingle") };
     const cents = parseAmountCents(raw, decimal);
-    if (cents === null) return { ok: false, text: "No se reconoce el formato de importe en esta columna." };
+    if (cents === null) return { ok: false, text: t("ajustes.assist.amount.unrecognized") };
     return amountNoteOk(raw, cents, decimal);
   }
 
@@ -141,9 +150,9 @@ function amountNoteFor(spec) {
   const debitRaw = firstNonEmpty(debitValues);
   const isDebit = debitRaw !== undefined;
   const raw = isDebit ? debitRaw : firstNonEmpty(creditValues);
-  if (raw === undefined) return { ok: false, text: "La muestra no tiene ningún importe de cargo o abono." };
+  if (raw === undefined) return { ok: false, text: t("ajustes.assist.amount.noSampleSplit") };
   const parsed = parseAmountCents(raw, decimal);
-  if (parsed === null) return { ok: false, text: "No se reconoce el formato de importe en esta columna." };
+  if (parsed === null) return { ok: false, text: t("ajustes.assist.amount.unrecognized") };
   return amountNoteOk(raw, isDebit ? -Math.abs(parsed) : Math.abs(parsed), decimal);
 }
 
@@ -152,13 +161,13 @@ function amountNoteFor(spec) {
  *  solo puede venir en via:"profile") + la frase de Bizum SOLO con contraparte configurada Y
  *  via:"n26" — un CSV genérico no tiene forma de distinguir un Bizum de cualquier otro abono. */
 function importResultText(res, partnerName) {
-  let text = `Nuevas: ${res.created} · Conciliadas: ${res.reconciled} · Duplicadas (saltadas): ${res.skipped}`;
+  let text = t("ajustes.importResult.summary", { created: res.created, reconciled: res.reconciled, skipped: res.skipped });
   if (res.omitted) {
-    text += ` · ${res.omitted} fila${res.omitted === 1 ? "" : "s"} ilegible${res.omitted === 1 ? "" : "s"} omitida${res.omitted === 1 ? "" : "s"}`;
+    text += t("ajustes.importResult.omitted", { n: res.omitted });
   }
-  text += ". Revisa la bandeja «sin categorizar» en Movimientos.";
+  text += t("ajustes.importResult.tail");
   if (partnerName && res.via === "n26") {
-    text += ` Los Bizum de ${partnerName} se concilian solos si usas «Liquidar» en Inicio antes de importar.`;
+    text += t("ajustes.importResult.bizumHint", { name: partnerName });
   }
   return text;
 }
@@ -169,28 +178,28 @@ function periodoCardHtml(period, partnerName) {
   // empiece): en ese caso no hay "días transcurridos" que mostrar, así que se omite ese tramo
   // en vez de enseñar un número negativo.
   const dias = Math.floor((new Date(hoyISO() + "T12:00:00") - new Date(period.start_date + "T12:00:00")) / 86400000) + 1;
-  const diasTxt = dias >= 1 ? ` · ${dias} día${dias === 1 ? "" : "s"}` : "";
+  const diasTxt = dias >= 1 ? t("ajustes.period.days", { n: dias }) : "";
   return `
   <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
-    <div class="section-title">Periodo</div>
+    <div class="section-title">${t("ajustes.period.title")}</div>
     <div class="card" style="display:flex;flex-direction:column;gap:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
         <div style="display:flex;flex-direction:column;gap:3px">
           <div style="font-size:15px;font-weight:700">${escHtml(period.name)}</div>
           <div style="font-size:11px;color:var(--text-3)">
-            Abierto el ${fmtDiaCorto(period.start_date)}${diasTxt} · reparto ${period.my_share_pct} / ${100 - period.my_share_pct}
+            ${t("ajustes.period.subtitle", { date: fmtDiaCorto(period.start_date), days: diasTxt, mine: period.my_share_pct, theirs: 100 - period.my_share_pct })}
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:6px;background:var(--card2);border-radius:10px;padding:6px 9px;flex-shrink:0">
           <div style="width:7px;height:7px;border-radius:4px;background:var(--green)"></div>
-          <div style="font-size:11px;font-weight:600;color:var(--text-2)">Abierto</div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-2)">${t("ajustes.period.openLabel")}</div>
         </div>
       </div>
-      <button type="button" class="btn-secondary" id="btn-cerrar-periodo" style="width:100%">Cerrar periodo y abrir el siguiente</button>
+      <button type="button" class="btn-secondary" id="btn-cerrar-periodo" style="width:100%">${t("ajustes.period.closeBtn")}</button>
       <div style="font-size:11px;color:var(--text-3);line-height:1.5">
         ${partnerName
-          ? `Al cerrar fijarás la fecha final y elegirás el reparto con ${escHtml(partnerName)} del periodo nuevo. Ábrelo el día que entre la nómina.`
-          : "Al cerrar fijarás la fecha final. Ábrelo el día que entre la nómina."}
+          ? t("ajustes.period.closeNoteWithPartner", { name: escHtml(partnerName) })
+          : t("ajustes.period.closeNote")}
       </div>
     </div>
   </div>`;
@@ -214,7 +223,9 @@ export async function renderAjustes(container) {
   // el conteo (categoryCount null → catSubtitle omite "N categorías").
   let categoryCount = null;
   try { categoryCount = Object.keys(await allCategoriesById()).length; } catch { categoryCount = null; }
-  const catSubtitle = categoryCount != null ? `${categoryCount} categorías · colores e iconos` : "colores e iconos";
+  const catSubtitle = categoryCount != null
+    ? t("ajustes.categories.subtitleWithCount", { n: categoryCount })
+    : t("ajustes.categories.subtitleNoCount");
 
   const state = {
     errors: null, pending: null, busy: false, n26Result: null, n26Error: null,
@@ -224,8 +235,9 @@ export async function renderAjustes(container) {
 
   async function processImportBuffer(buf) {
     // buf: ArrayBuffer|Uint8Array con un .xlsx EN CLARO (ya descifrado si venía cifrado)
-    const wb = window.XLSX.read(buf, { type: "array" });
-    const { data, errors: parseErrors } = workbookToRows(window.XLSX, wb);
+    const XLSX = await loadXlsx();
+    const wb = XLSX.read(buf, { type: "array" });
+    const { data, errors: parseErrors } = workbookToRows(XLSX, wb);
     const errors = [...parseErrors, ...validateImport(data)];
     if (errors.length) {
       state.errors = errors; state.pending = null;
@@ -236,7 +248,7 @@ export async function renderAjustes(container) {
     // dumpAllTables trae TODAS las filas (incluidas las soft-deleted, necesario para el
     // backup JSON completo) — el aviso de "movimientos actuales" antes de un reemplazo
     // destructivo debe contar solo las visibles, si no infla la cifra con lo ya borrado.
-    const activeCount = currentDump.transactions.filter((t) => !t.deleted).length;
+    const activeCount = currentDump.transactions.filter((tx) => !tx.deleted).length;
     state.pending = { data, currentDump, currentCount: activeCount };
   }
 
@@ -250,57 +262,54 @@ export async function renderAjustes(container) {
 
   function renderMain() {
     container.innerHTML = `
-      <header class="screen-header"><h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">Ajustes</h1></header>
+      <header class="screen-header"><h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">${t("ajustes.title")}</h1></header>
 
       <div class="card" style="margin-bottom:12px">
-        <p style="font-weight:600;margin-bottom:4px">Tu hoja de cálculo</p>
+        <p style="font-weight:600;margin-bottom:4px">${t("ajustes.sheet.title")}</p>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
-          Exporta todos tus datos a un .xlsx editable en LibreOffice/Sheets, o importa una hoja para sustituir
-          los datos actuales. La copia cifrada (.bce) también se importa desde aquí.</p>
-        <button type="button" class="btn-primary" id="btn-xlsx-export" ${state.busy ? "disabled" : ""}>Exportar hoja (.xlsx)</button>
-        <button type="button" class="btn-secondary" id="btn-xlsx-import" style="${BTN_FULL_WIDTH}margin-top:10px" ${state.busy ? "disabled" : ""}>Importar hoja (.xlsx)</button>
+          ${t("ajustes.sheet.body")}</p>
+        <button type="button" class="btn-primary" id="btn-xlsx-export" ${state.busy ? "disabled" : ""}>${t("ajustes.sheet.exportBtn")}</button>
+        <button type="button" class="btn-secondary" id="btn-xlsx-import" style="${BTN_FULL_WIDTH}margin-top:10px" ${state.busy ? "disabled" : ""}>${t("ajustes.sheet.importBtn")}</button>
         <input type="file" id="xlsx-file-input" accept=".xlsx,.bce" style="display:none">
 
         ${state.encExport ? `
         <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px">
           <p style="color:var(--text-2);font-size:13px">
-            La copia cifrada (.bce) solo se abre desde BaseCero con esta contraseña.
-            <strong>Si la olvidas, la copia es irrecuperable</strong> — no se guarda en ningún sitio.</p>
-          <input type="password" id="enc-pass-1" style="${INPUT_STYLE}" placeholder="Contraseña (mín. ${MIN_PASSPHRASE} caracteres)">
-          <input type="password" id="enc-pass-2" style="${INPUT_STYLE}" placeholder="Repite la contraseña">
+            ${t("ajustes.sheet.encWarn.pre")}<strong>${t("ajustes.sheet.encWarn.bold")}</strong>${t("ajustes.sheet.encWarn.post")}</p>
+          <input type="password" id="enc-pass-1" style="${INPUT_STYLE}" placeholder="${escAttr(t("ajustes.sheet.passPlaceholder", { min: MIN_PASSPHRASE }))}">
+          <input type="password" id="enc-pass-2" style="${INPUT_STYLE}" placeholder="${escAttr(t("ajustes.sheet.passRepeatPlaceholder"))}">
           <div id="enc-error" class="banner-aviso red" style="display:none"></div>
           <div style="display:flex;gap:8px">
-            <button type="button" class="btn-secondary" id="btn-enc-cancel" style="flex:1" ${state.busy ? "disabled" : ""}>Cancelar</button>
-            <button type="button" class="btn-primary" id="btn-enc-confirm" style="flex:1" ${state.busy ? "disabled" : ""}>Exportar cifrada</button>
+            <button type="button" class="btn-secondary" id="btn-enc-cancel" style="flex:1" ${state.busy ? "disabled" : ""}>${t("common.cancel")}</button>
+            <button type="button" class="btn-primary" id="btn-enc-confirm" style="flex:1" ${state.busy ? "disabled" : ""}>${t("ajustes.sheet.encConfirmBtn")}</button>
           </div>
         </div>` : `
-        <button type="button" class="btn-secondary" id="btn-enc-export" style="${BTN_FULL_WIDTH}margin-top:10px" ${state.busy ? "disabled" : ""}>Exportar copia cifrada (.bce)</button>`}
+        <button type="button" class="btn-secondary" id="btn-enc-export" style="${BTN_FULL_WIDTH}margin-top:10px" ${state.busy ? "disabled" : ""}>${t("ajustes.sheet.encExportBtn")}</button>`}
 
         ${state.errors ? `
         <div class="banner-aviso red" style="margin-top:12px;max-height:200px;overflow-y:auto;display:block">
           ${state.errors.slice(0, 10).map((e) => `<p>${escHtml(e)}</p>`).join("")}
-          ${state.errors.length > 10 ? `<p>y ${state.errors.length - 10} más</p>` : ""}
+          ${state.errors.length > 10 ? `<p>${t("ajustes.sheet.moreErrors", { n: state.errors.length - 10 })}</p>` : ""}
         </div>` : ""}
 
         ${state.encImport ? `
         <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
-          <p style="color:var(--text-2);font-size:13px">Esta copia está cifrada. Escribe su contraseña para continuar.</p>
-          <input type="password" id="dec-pass" style="${INPUT_STYLE}" placeholder="Contraseña de la copia">
+          <p style="color:var(--text-2);font-size:13px">${t("ajustes.sheet.decIntro")}</p>
+          <input type="password" id="dec-pass" style="${INPUT_STYLE}" placeholder="${escAttr(t("ajustes.sheet.decPassPlaceholder"))}">
           <div id="dec-error" class="banner-aviso red" style="display:none"></div>
           <div style="display:flex;gap:8px">
-            <button type="button" class="btn-secondary" id="btn-dec-cancel" style="flex:1" ${state.busy ? "disabled" : ""}>Cancelar</button>
-            <button type="button" class="btn-primary" id="btn-dec-confirm" style="flex:1" ${state.busy ? "disabled" : ""}>Descifrar</button>
+            <button type="button" class="btn-secondary" id="btn-dec-cancel" style="flex:1" ${state.busy ? "disabled" : ""}>${t("common.cancel")}</button>
+            <button type="button" class="btn-primary" id="btn-dec-confirm" style="flex:1" ${state.busy ? "disabled" : ""}>${t("ajustes.sheet.decConfirmBtn")}</button>
           </div>
         </div>` : ""}
 
         ${state.pending ? `
         <div class="banner-aviso" style="margin-top:12px;display:block">
-          <p>Esto reemplaza TODOS los datos de la app (${state.pending.currentCount} movimientos actuales).
-          Se descargará una copia antes.</p>
+          <p>${t("ajustes.sheet.replaceWarn", { n: state.pending.currentCount })}</p>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px">
-          <button type="button" class="btn-secondary" id="btn-import-cancel" style="flex:1" ${state.busy ? "disabled" : ""}>Cancelar</button>
-          <button type="button" class="btn-primary" id="btn-import-confirm" style="flex:1" ${state.busy ? "disabled" : ""}>Reemplazar</button>
+          <button type="button" class="btn-secondary" id="btn-import-cancel" style="flex:1" ${state.busy ? "disabled" : ""}>${t("common.cancel")}</button>
+          <button type="button" class="btn-primary" id="btn-import-confirm" style="flex:1" ${state.busy ? "disabled" : ""}>${t("ajustes.sheet.replaceBtn")}</button>
         </div>` : ""}
       </div>
 
@@ -315,7 +324,7 @@ export async function renderAjustes(container) {
             </svg>
           </div>
           <div class="list-row-body">
-            <div class="list-row-title">Gastos e ingresos recurrentes</div>
+            <div class="list-row-title">${t("ajustes.recurring.title")}</div>
           </div>
           <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
         </button>
@@ -330,7 +339,7 @@ export async function renderAjustes(container) {
             </svg>
           </div>
           <div class="list-row-body">
-            <div class="list-row-title">Categorías</div>
+            <div class="list-row-title">${t("ajustes.categories.title")}</div>
             <div class="list-row-sub">${escHtml(catSubtitle)}</div>
           </div>
           <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
@@ -338,13 +347,10 @@ export async function renderAjustes(container) {
       </div>
 
       <div class="card" style="margin-bottom:12px">
-        <p style="font-weight:600;margin-bottom:4px">Banco</p>
+        <p style="font-weight:600;margin-bottom:4px">${t("ajustes.bank.title")}</p>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
-          Importa el extracto CSV de tu banco: crea los movimientos que faltan y concilia los que
-          ya registraste a mano (mismo importe y sentido, ±3 días). Las duplicadas se saltan
-          solas. Los CSV de N26 se reconocen solos; los de otros bancos te los pedimos configurar
-          una vez.</p>
-        <button type="button" class="btn-secondary" id="btn-n26-import" style="${BTN_FULL_WIDTH}" ${state.busy ? "disabled" : ""}>Importar CSV</button>
+          ${t("ajustes.bank.body")}</p>
+        <button type="button" class="btn-secondary" id="btn-n26-import" style="${BTN_FULL_WIDTH}" ${state.busy ? "disabled" : ""}>${t("ajustes.bank.importBtn")}</button>
         <input type="file" id="n26-file-input" accept=".csv" style="display:none">
 
         ${state.n26Result ? `
@@ -354,32 +360,45 @@ export async function renderAjustes(container) {
       </div>
 
       <div class="card" style="margin-bottom:12px">
-        <p style="font-weight:600;margin-bottom:4px">Moneda y formato</p>
+        <p style="font-weight:600;margin-bottom:4px">${t("ajustes.prefs.title")}</p>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
-          Divisa de los importes y formato de números y fechas. Se aplican al guardar (recarga la app).</p>
+          ${t("ajustes.prefs.body")}</p>
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <div style="flex:1;background:var(--card2);border-radius:16px;padding:8px 12px;">
-            <div class="section-title" style="margin-bottom:2px;">Moneda</div>
+            <div class="section-title" style="margin-bottom:2px;">${t("ajustes.prefs.currency")}</div>
             <select id="pref-currency" style="background:none;border:0;color:var(--text);font:700 14px var(--font-ui);width:100%;padding:2px 0;outline:none;">${currencyOptionsHtml(metaCfg.currency)}</select>
           </div>
           <div style="flex:1;background:var(--card2);border-radius:16px;padding:8px 12px;">
-            <div class="section-title" style="margin-bottom:2px;">Formato</div>
+            <div class="section-title" style="margin-bottom:2px;">${t("ajustes.prefs.format")}</div>
             <select id="pref-locale" style="background:none;border:0;color:var(--text);font:700 14px var(--font-ui);width:100%;padding:2px 0;outline:none;">${localeOptionsHtml(metaCfg.locale)}</select>
           </div>
         </div>
         <label class="field field-stack" style="margin-top:12px;">
-          <span class="field-label">Compartes gastos con</span>
-          <input type="text" id="cfg-partner" value="${escAttr(metaCfg.partner_name || "")}" placeholder="Nadie — déjalo vacío si llevas tus cuentas solo">
+          <span class="field-label">${t("ajustes.prefs.language")}</span>
+          <select id="pref-lang">${LANGS.map(([v, label]) => `<option value="${escAttr(v)}" ${v === activeLang() ? "selected" : ""}>${escHtml(label)}</option>`).join("")}</select>
         </label>
-        <div style="font-size:11px;color:var(--text-3);">Con nombre, aparecen el reparto y «Liquidar». Vacío, la app es solo tuya.</div>
-        <button type="button" class="btn-secondary" id="btn-prefs-save" style="${BTN_FULL_WIDTH}margin-top:12px" ${state.busy ? "disabled" : ""}>Guardar preferencias</button>
+        <label class="field field-stack" style="margin-top:12px;">
+          <span class="field-label">${t("ajustes.prefs.partnerLabel")}</span>
+          <input type="text" id="cfg-partner" value="${escAttr(metaCfg.partner_name || "")}" placeholder="${escAttr(t("ajustes.prefs.partnerPlaceholder"))}">
+        </label>
+        <div style="font-size:11px;color:var(--text-3);">${t("ajustes.prefs.partnerNote")}</div>
+        <button type="button" class="btn-secondary" id="btn-prefs-save" style="${BTN_FULL_WIDTH}margin-top:12px" ${state.busy ? "disabled" : ""}>${t("ajustes.prefs.saveBtn")}</button>
+      </div>
+
+      <div class="card" style="margin-bottom:12px">
+        <p style="font-weight:600;margin-bottom:4px">${t("ajustes.backup.title")}</p>
+        <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
+          ${t("ajustes.backup.body")}</p>
+        <button type="button" class="btn-secondary" id="btn-json-export" style="${BTN_FULL_WIDTH}">${t("ajustes.backup.exportBtn")}</button>
       </div>
 
       <div class="card">
-        <p style="font-weight:600;margin-bottom:4px">Copia de emergencia</p>
-        <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
-          🔒 Tus datos viven solo en este dispositivo. Sin cuentas, sin nube.</p>
-        <button type="button" class="btn-secondary" id="btn-json-export" style="${BTN_FULL_WIDTH}">Exportar copia de seguridad (JSON)</button>
+        <p style="font-weight:600;margin-bottom:12px">${t("ajustes.about.title")}</p>
+        <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
+          <a href="${escAttr(activeLang() === "en" ? "en/privacy.html" : "privacidad.html")}" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.privacy")}</a>
+          <a href="https://github.com/alvarotorresc/basecero" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.source")}</a>
+          <a href="https://github.com/alvarotorresc/basecero/blob/main/LICENSE" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.license")}</a>
+        </div>
       </div>
     `;
     wireMain();
@@ -389,9 +408,9 @@ export async function renderAjustes(container) {
     container.querySelector("#btn-xlsx-export").onclick = async () => {
       state.busy = true; render();
       try {
-        downloadXlsx(await dumpAllTables(), `basecero-${hoyISO()}.xlsx`);
+        await downloadXlsx(await dumpAllTables(), `basecero-${hoyISO()}.xlsx`);
       } catch (e) {
-        state.errors = [`No se pudo exportar: ${e.message}`];
+        state.errors = [t("ajustes.sheet.exportFailed", { error: e.message })];
       } finally {
         state.busy = false; render();
       }
@@ -457,17 +476,18 @@ export async function renderAjustes(container) {
       const p2 = container.querySelector("#enc-pass-2").value;
       const errBox = container.querySelector("#enc-error");
       const fail = (msg) => { errBox.textContent = msg; errBox.style.display = "block"; };
-      if (p1.length < MIN_PASSPHRASE) return fail(`Mínimo ${MIN_PASSPHRASE} caracteres.`);
-      if (p1 !== p2) return fail("Las contraseñas no coinciden.");
+      if (p1.length < MIN_PASSPHRASE) return fail(t("ajustes.sheet.passTooShort", { min: MIN_PASSPHRASE }));
+      if (p1 !== p2) return fail(t("ajustes.sheet.passMismatch"));
       state.busy = true; render();
       try {
-        const wb = rowsToWorkbook(window.XLSX, await dumpAllTables());
-        const arr = window.XLSX.write(wb, { type: "array", bookType: "xlsx" });
+        const XLSX = await loadXlsx();
+        const wb = rowsToWorkbook(XLSX, await dumpAllTables());
+        const arr = XLSX.write(wb, { type: "array", bookType: "xlsx" });
         const enc = await encryptBackup(arr, p1);
         download(new Blob([enc], { type: "application/octet-stream" }), `basecero-cifrado-${hoyISO()}.bce`);
         state.encExport = false;
       } catch (e) {
-        state.errors = [`No se pudo exportar: ${e.message}`];
+        state.errors = [t("ajustes.sheet.exportFailed", { error: e.message })];
       } finally {
         state.busy = false; render();
       }
@@ -499,7 +519,7 @@ export async function renderAjustes(container) {
           await processImportBuffer(buf);
         }
       } catch (err) {
-        state.errors = [`No se pudo leer el archivo: ${err.message}`]; state.pending = null;
+        state.errors = [t("ajustes.sheet.readFailed", { error: err.message })]; state.pending = null;
       } finally {
         state.busy = false; render();
       }
@@ -514,7 +534,7 @@ export async function renderAjustes(container) {
       const errBox = container.querySelector("#dec-error");
       if (!pass) {
         const box = container.querySelector("#dec-error");
-        box.textContent = "Escribe la contraseña de la copia.";
+        box.textContent = t("ajustes.sheet.decPassRequired");
         box.style.display = "block";
         return;
       }
@@ -529,7 +549,7 @@ export async function renderAjustes(container) {
           // (un render() vaciaría el input).
           state.busy = false; render();
           const box = container.querySelector("#dec-error");
-          box.textContent = "Contraseña incorrecta o archivo dañado.";
+          box.textContent = t("ajustes.sheet.decWrongPass");
           box.style.display = "block";
           return;
         }
@@ -547,12 +567,12 @@ export async function renderAjustes(container) {
       container.querySelector("#btn-import-confirm").onclick = async () => {
         state.busy = true; render();
         try {
-          downloadXlsx(state.pending.currentDump, `basecero-backup-${hoyISO()}.xlsx`);
+          await downloadXlsx(state.pending.currentDump, `basecero-backup-${hoyISO()}.xlsx`);
           await replaceAll(state.pending.data);
           location.reload();
         } catch (err) {
           state.busy = false;
-          state.errors = [`No se pudo reemplazar: ${err.message}`]; state.pending = null;
+          state.errors = [t("ajustes.sheet.replaceFailed", { error: err.message })]; state.pending = null;
           render();
         }
       };
@@ -563,18 +583,24 @@ export async function renderAjustes(container) {
       // guardado), así que leerlos después devolvería el valor antiguo, no el elegido.
       const currency = container.querySelector("#pref-currency").value;
       const locale = container.querySelector("#pref-locale").value;
+      const lang = container.querySelector("#pref-lang").value;
       const partner = container.querySelector("#cfg-partner").value.trim();
       state.busy = true; render();
       try {
-        // Los tres campos de la tarjeta en UN execMany (vía setMetaMany): o quedan las tres
-        // claves guardadas o ninguna, así currency/locale/partner_name nunca quedan a medias.
+        // Los cuatro campos de la tarjeta en UN execMany (vía setMetaMany): o quedan las cuatro
+        // claves guardadas o ninguna, así currency/locale/lang/partner_name nunca quedan a medias.
         // partner_name va sin bcSanitizeCell a propósito: SheetJS exporta la celda como string (sin riesgo
         // de fórmula) y sanitizar ensuciaría el nombre en toda la UI («+Ana» → «'+Ana»).
-        await setMetaMany([["currency", currency], ["locale", locale], ["partner_name", partner]]);
+        await setMetaMany([["currency", currency], ["locale", locale], ["lang", lang], ["partner_name", partner]]);
+        // SIEMPRE (fix round 1): retranslateSeedNames es idempotente y basada en el nombre real de
+        // cada fila (ver repo.js), no en si `lang` "cambió" — barato (41 UPDATE condicionales) y
+        // cubre el caso de una BD sembrada en un idioma cuyo activeLang() previo ya coincidía con
+        // `lang` sin que las filas lo reflejaran.
+        await retranslateSeedNames(lang);
         location.reload();
       } catch (err) {
         state.busy = false;
-        state.errors = [`No se pudieron guardar las preferencias: ${err.message}`];
+        state.errors = [t("ajustes.prefs.saveFailed", { error: err.message })];
         render();
       }
     };
@@ -639,17 +665,17 @@ export async function renderAjustes(container) {
       // parcial — el CTA de abajo ya bloquea el caso rojo, pero el color tiene que reflejarlo.
       const counterColor = counterOk ? "var(--green)" : (rows.length === 0 ? "var(--red)" : "var(--amber)");
       const counterText = counterOk
-        ? `✓ ${rows.length} de ${total} filas se leen bien`
-        : `⚠ ${rows.length} de ${total} filas se leen bien · fila ${errors[0].line}: ${errors[0].reason}`;
+        ? t("ajustes.assist.counterOk", { readable: rows.length, total })
+        : t("ajustes.assist.counterWarn", { readable: rows.length, total, line: errors[0].line, reason: errors[0].reason });
 
       previewHtml = `
       <div style="${ASSIST_BOX_STYLE}">
-        <div class="section-title" style="margin-bottom:6px;">Así se leerán tus movimientos</div>
+        <div class="section-title" style="margin-bottom:6px;">${t("ajustes.assist.previewTitle")}</div>
         ${previewRows.map((r, i) => {
           // merchant||note, mismo criterio que movimientos.js (líneas 53/65/76): la contraparte
           // manda como etiqueta reconocible; si no hay columna de contraparte asignada, cae al
           // concepto — ningún campo mapeado queda sin sitio donde mostrarse.
-          const label = r.partnerName || r.paymentReference || "(sin concepto)";
+          const label = r.partnerName || r.paymentReference || t("ajustes.assist.noConcept");
           const income = r.amountCents >= 0;
           const rowStyle = `display:flex;align-items:center;gap:10px;padding:8px 0;`
             + (i < previewRows.length - 1 ? "border-bottom:1px solid var(--rule);" : "");
@@ -674,8 +700,8 @@ export async function renderAjustes(container) {
 
     container.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-        <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">Configura tu banco</div>
-        <button type="button" id="assist-close" aria-label="Cerrar" ${a.saveBusy ? "disabled" : ""}
+        <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">${t("ajustes.assist.title")}</div>
+        <button type="button" id="assist-close" aria-label="${escAttr(t("ajustes.assist.closeAria"))}" ${a.saveBusy ? "disabled" : ""}
           style="width:44px;height:44px;border-radius:50%;background:var(--card2);border:0;color:var(--text);
           display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -692,38 +718,38 @@ export async function renderAjustes(container) {
           </div>
           <div style="flex:1;min-width:0;">
             <div style="font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(a.fileName)}</div>
-            <div style="font-size:11.5px;color:var(--text-2);">${a.totalRows} fila${a.totalRows === 1 ? "" : "s"} · formato no reconocido — dinos qué es cada columna, solo esta vez</div>
+            <div style="font-size:11.5px;color:var(--text-2);">${t("ajustes.assist.rows", { n: a.totalRows })}</div>
           </div>
         </div>
 
         <div>
-          <div class="section-title" style="margin-bottom:7px;">Fecha</div>
+          <div class="section-title" style="margin-bottom:7px;">${t("ajustes.assist.dateTitle")}</div>
           ${chipsRowHtml("date", headerOptions, a.date)}
           ${dateNote ? `<div class="num" style="font-size:11px;color:${dateNote.ok ? "var(--green)" : "var(--red)"};margin-top:5px;">${escHtml(dateNote.text)}</div>` : ""}
         </div>
 
         <div>
-          <div class="section-title" style="margin-bottom:7px;">Concepto</div>
+          <div class="section-title" style="margin-bottom:7px;">${t("ajustes.assist.conceptTitle")}</div>
           ${chipsRowHtml("concept", headerOptions, a.concept)}
         </div>
 
         <div>
-          <div class="section-title" style="margin-bottom:7px;">Contraparte · opcional</div>
-          ${chipsRowHtml("counterparty", [...headerOptions, { value: null, label: "— sin columna" }], a.counterparty)}
+          <div class="section-title" style="margin-bottom:7px;">${t("ajustes.assist.counterpartyTitle")}</div>
+          ${chipsRowHtml("counterparty", [...headerOptions, { value: null, label: t("ajustes.assist.noColumn") }], a.counterparty)}
         </div>
 
         <div>
-          <div class="section-title" style="margin-bottom:7px;">Importe</div>
+          <div class="section-title" style="margin-bottom:7px;">${t("ajustes.assist.amountTitle")}</div>
           <div class="segmented" style="border-radius:999px;margin-bottom:8px;">
             <button type="button" data-assist-kind="single" class="${a.amountKind === "single" ? "active" : ""}"
-              style="border-radius:999px;${a.amountKind === "single" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">Una columna con signo</button>
+              style="border-radius:999px;${a.amountKind === "single" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("ajustes.assist.amountSingleBtn")}</button>
             <button type="button" data-assist-kind="split" class="${a.amountKind === "split" ? "active" : ""}"
-              style="border-radius:999px;${a.amountKind === "split" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">Cargo y abono</button>
+              style="border-radius:999px;${a.amountKind === "split" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("ajustes.assist.amountSplitBtn")}</button>
           </div>
           ${a.amountKind === "single" ? chipsRowHtml("amountCol", headerOptions, a.amountCol) : `
-          <div class="section-title" style="margin:0 0 6px;">Cargo</div>
+          <div class="section-title" style="margin:0 0 6px;">${t("ajustes.assist.debitTitle")}</div>
           ${chipsRowHtml("debitCol", headerOptions, a.debitCol)}
-          <div class="section-title" style="margin:10px 0 6px;">Abono</div>
+          <div class="section-title" style="margin:10px 0 6px;">${t("ajustes.assist.creditTitle")}</div>
           ${chipsRowHtml("creditCol", headerOptions, a.creditCol)}`}
           ${amountNote ? `<div class="num" style="font-size:11px;color:${amountNote.ok ? "var(--green)" : "var(--red)"};margin-top:5px;">${escHtml(amountNote.text)}</div>` : ""}
         </div>
@@ -732,11 +758,11 @@ export async function renderAjustes(container) {
 
         ${a.saveError ? `<div class="banner-aviso red" style="display:block"><p>${escHtml(a.saveError)}</p></div>` : ""}
 
-        <button type="button" class="btn-primary" id="assist-save" style="width:100%;${ctaDisabled ? "opacity:0.45;" : ""}" ${ctaDisabled ? "disabled" : ""}>Guardar perfil e importar</button>
+        <button type="button" class="btn-primary" id="assist-save" style="width:100%;${ctaDisabled ? "opacity:0.45;" : ""}" ${ctaDisabled ? "disabled" : ""}>${t("ajustes.assist.saveBtn")}</button>
 
         <div style="${ASSIST_BOX_STYLE}display:flex;align-items:center;gap:10px;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.01"></path></svg>
-          <div style="font-size:11.5px;color:var(--text-2);">El perfil se guarda en tu dispositivo: la próxima vez este banco se importa directo. Los CSV de N26 se reconocen solos, sin configurar nada.</div>
+          <div style="font-size:11.5px;color:var(--text-2);">${t("ajustes.assist.footNote")}</div>
         </div>
       </div>
     `;

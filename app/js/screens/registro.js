@@ -3,28 +3,31 @@ import {
   listAccounts, allCategoriesById, recentForRefund, getMetaAll,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
-import { fmtMoney, hoyISO, currencySymbol } from "../format.js";
+import { fmtMoney, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
+import { t } from "../i18n/index.js";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "back"];
 const ICON_BACK = `<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 5.5H9.2L3.5 12l5.7 6.5H20a1 1 0 001-1v-11a1 1 0 00-1-1z"></path><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"></path></svg>`;
 
+// labelKey/SAVE_KEY en vez de texto resuelto: son consts de módulo, evaluadas al importar el
+// fichero (antes de que boot() llame a initI18n con el idioma real) — si guardaran el string ya
+// traducido, quedarían congeladas en español para siempre. Se resuelven con t() en cada render.
 const TIPOS = [
-  { id: "expense", label: "Gasto" },
-  { id: "income", label: "Ingreso" },
-  { id: "transfer", label: "Transfer." },
-  { id: "refund", label: "Devolución" },
-  { id: "adjustment", label: "Ajuste" },
+  { id: "expense", labelKey: "common.type.expense" },
+  { id: "income", labelKey: "common.type.income" },
+  { id: "transfer", labelKey: "registro.type.transfer" },
+  { id: "refund", labelKey: "common.type.refund" },
+  { id: "adjustment", labelKey: "common.type.adjustment" },
 ];
-const SAVE_LABEL = {
-  expense: "Guardar gasto", income: "Guardar ingreso", transfer: "Guardar transferencia",
-  refund: "Guardar devolución", adjustment: "Guardar ajuste",
+const SAVE_KEY = {
+  expense: "registro.save.expense", income: "registro.save.income", transfer: "registro.save.transfer",
+  refund: "registro.save.refund", adjustment: "registro.save.adjustment",
 };
 const needsCategory = (tipo) => tipo === "expense" || tipo === "income" || tipo === "refund";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const centsToRaw = (cents) => (cents ? (Math.abs(cents) / 100).toFixed(2).replace(".", ",") : "");
 
 /** Monta la pantalla completa de registro rápido de un movimiento (5 tipos).
  *  onDone() se llama tanto al cerrar (✕) como tras guardar con éxito.
@@ -41,7 +44,7 @@ export async function renderRegistro(container, onDone, prefill) {
       getMetaAll(),
     ]);
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">No se pudo cargar la pantalla de registro: ${escHtml(e.message)}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("registro.error.load", { error: escHtml(e.message) })}</div>`;
     return;
   }
 
@@ -80,7 +83,7 @@ export async function renderRegistro(container, onDone, prefill) {
 
   function setRaw(next) {
     state.raw = next;
-    state.cents = Math.round(parseFloat((state.raw || "0").replace(",", ".")) * 100) || 0;
+    state.cents = parseCentsRaw(state.raw);
     errorMsg = "";
     render();
   }
@@ -125,47 +128,47 @@ export async function renderRegistro(container, onDone, prefill) {
   }
 
   function validationError() {
-    if (!state.accountId) return "Crea primero una cuenta en Patrimonio.";
+    if (!state.accountId) return t("common.needAccount");
     if (state.tipo === "transfer") {
-      if (state.cents <= 0) return "Introduce un importe.";
+      if (state.cents <= 0) return t("common.enterAmount");
       if (!state.counterAccountId || state.counterAccountId === state.accountId)
-        return "Elige dos cuentas distintas (origen y destino).";
+        return t("common.pickTwoAccounts");
       return "";
     }
-    if (state.tipo === "adjustment") return state.cents <= 0 ? "Introduce un importe." : "";
+    if (state.tipo === "adjustment") return state.cents <= 0 ? t("common.enterAmount") : "";
     // expense / income / refund
-    if (state.cents <= 0 && !state.categoryId) return "Introduce un importe y elige una categoría.";
-    if (state.cents <= 0) return "Introduce un importe.";
-    if (!state.categoryId) return "Elige una categoría.";
+    if (state.cents <= 0 && !state.categoryId) return t("common.enterAmountAndCategory");
+    if (state.cents <= 0) return t("common.enterAmount");
+    if (!state.categoryId) return t("common.pickCategory");
     return "";
   }
 
   function renderRefundPicker() {
     const linked = state.refId ? refundCandidates.find((r) => r.id === state.refId) : null;
     if (linked) {
-      const label = linked.merchant || byId[linked.category_id]?.name || "Gasto";
+      const label = linked.merchant || byId[linked.category_id]?.name || t("common.type.expense");
       return `
       <div class="card" style="padding:12px 14px; margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
         <div style="min-width:0;">
-          <div style="font-size:10px; color:var(--text-3);">Vinculado a</div>
+          <div style="font-size:10px; color:var(--text-3);">${t("common.linkedTo")}</div>
           <div style="font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
             ${escHtml(label)} · ${fmtMoney(linked.amount_cents)}
           </div>
         </div>
-        <button type="button" id="reg-refund-unlink" class="icon-btn" aria-label="Quitar vínculo">✕</button>
+        <button type="button" id="reg-refund-unlink" class="icon-btn" aria-label="${t("registro.refund.unlink")}">✕</button>
       </div>`;
     }
     return `
     <div style="margin-bottom:18px;">
-      <button type="button" id="reg-refund-toggle" class="refund-toggle">¿Devuelve un gasto? ${state.refundPickerOpen ? "▲" : "▼"}</button>
+      <button type="button" id="reg-refund-toggle" class="refund-toggle">${t("registro.refund.toggle", { arrow: state.refundPickerOpen ? "▲" : "▼" })}</button>
       ${state.refundPickerOpen ? `
       <div class="card refund-list" style="padding:4px 14px; margin-top:8px;">
         ${refundCandidates.length === 0
-          ? `<div style="padding:14px 0; font-size:13px; color:var(--text-3);">No hay gastos recientes.</div>`
+          ? `<div style="padding:14px 0; font-size:13px; color:var(--text-3);">${t("registro.refund.empty")}</div>`
           : refundCandidates.map((r) => `
             <button type="button" class="refund-row" data-refund-row="${escAttr(r.id)}">
               <span style="flex:1; min-width:0; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                ${escHtml(r.merchant || byId[r.category_id]?.name || "Gasto")}${r.is_shared ? " · compartido" : ""}
+                ${escHtml(r.merchant || byId[r.category_id]?.name || t("common.type.expense"))}${r.is_shared ? t("registro.refund.sharedSuffix") : ""}
               </span>
               <span class="num">${fmtMoney(r.amount_cents)}</span>
             </button>`).join("")}
@@ -177,13 +180,13 @@ export async function renderRegistro(container, onDone, prefill) {
     if (state.tipo === "transfer") {
       return `
       <div class="card" style="border-radius:16px; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">Desde</div>
+        <div class="section-title">${t("common.from")}</div>
         <div class="chips">
           ${accounts.map((a) => `<button type="button" class="chip${state.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
         </div>
       </div>
       <div class="card" style="border-radius:16px; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">Hacia</div>
+        <div class="section-title">${t("common.to")}</div>
         <div class="chips">
           ${accountsAll.filter((a) => a.id !== state.accountId).map((a) => `<button type="button" class="chip${state.counterAccountId === a.id ? " active" : ""}" data-counter-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
         </div>
@@ -191,7 +194,7 @@ export async function renderRegistro(container, onDone, prefill) {
     }
     return `
     <div class="card" style="border-radius:16px; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-      <div class="section-title">${state.tipo === "refund" ? "Cuenta destino" : "Cuenta"}</div>
+      <div class="section-title">${state.tipo === "refund" ? t("common.destAccount") : t("common.account")}</div>
       <div class="chips">
         ${accounts.map((a) => `<button type="button" class="chip${state.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
       </div>
@@ -213,24 +216,24 @@ export async function renderRegistro(container, onDone, prefill) {
 
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">Registrar</h1>
-        <button type="button" class="icon-btn" id="reg-close" aria-label="Cerrar">✕</button>
+        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${t("registro.title")}</h1>
+        <button type="button" class="icon-btn" id="reg-close" aria-label="${t("registro.close")}">✕</button>
       </div>
 
       <div class="segmented" style="margin-bottom:18px;border-radius:999px;">
-        ${TIPOS.map((t) => {
-          const active = state.tipo === t.id;
+        ${TIPOS.map((tp) => {
+          const active = state.tipo === tp.id;
           const segStyle = active
             ? "border-radius:999px;background:var(--card2);color:var(--text);font-weight:700;"
             : "border-radius:999px;";
-          return `<button type="button" data-tipo="${t.id}" class="${active ? "active" : ""}" style="${segStyle}">${t.label}</button>`;
+          return `<button type="button" data-tipo="${tp.id}" class="${active ? "active" : ""}" style="${segStyle}">${t(tp.labelKey)}</button>`;
         }).join("")}
       </div>
 
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
-        <div class="section-title">Importe</div>
+        <div class="section-title">${t("common.amount")}</div>
         <div class="amount-display" style="align-items:baseline; justify-content:flex-end;">
-          ${state.tipo === "adjustment" ? `<button type="button" class="icon-btn" id="reg-sign" aria-label="Cambiar signo" style="font-size:18px; font-weight:700;">${state.adjustmentSign}</button>` : ""}
+          ${state.tipo === "adjustment" ? `<button type="button" class="icon-btn" id="reg-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;">${state.adjustmentSign}</button>` : ""}
           <span class="num" style="font-size:52px; font-weight:700; letter-spacing:-0.01em; color:${amountColor};">${state.tipo === "adjustment" && state.adjustmentSign === "-" ? "−" : ""}${escHtml(state.raw || "0")}</span>
           <span class="amount-currency" style="color:${amountColor};">${currencySymbol()}</span>
         </div>
@@ -239,7 +242,7 @@ export async function renderRegistro(container, onDone, prefill) {
 
       ${cats.length ? `
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">Categoría</div>
+        <div class="section-title">${t("common.category")}</div>
         <div class="chips-scroll">
           ${cats.map((c) => {
             const color = colorForCategory(c.id, byId);
@@ -262,23 +265,23 @@ export async function renderRegistro(container, onDone, prefill) {
 
       <div style="display:flex; gap:8px; margin-bottom:12px;">
         <label class="field field-stack" style="flex:1;">
-          <span class="field-label">Comercio</span>
-          <input type="text" id="reg-merchant" value="${escAttr(state.merchant)}" placeholder="Opcional">
+          <span class="field-label">${t("common.merchant")}</span>
+          <input type="text" id="reg-merchant" value="${escAttr(state.merchant)}" placeholder="${t("common.optional")}">
         </label>
         <label class="field field-stack" style="flex:1;">
-          <span class="field-label">Fecha</span>
+          <span class="field-label">${t("common.date")}</span>
           <input type="date" id="reg-fecha" value="${state.fecha}">
         </label>
       </div>
       <label class="field field-stack" style="margin-bottom:18px;">
-        <span class="field-label">Nota</span>
-        <input type="text" id="reg-note" value="${escAttr(state.note)}" placeholder="Opcional">
+        <span class="field-label">${t("common.note")}</span>
+        <input type="text" id="reg-note" value="${escAttr(state.note)}" placeholder="${t("common.optional")}">
       </label>
 
       ${needsCategory(state.tipo) && partnerName ? `
       <div class="card" style="border-radius:16px; padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
-          <span style="font-size:15px; font-weight:600;">Compartido con ${escHtml(partnerName)}</span>
+          <span style="font-size:15px; font-weight:600;">${t("common.sharedWith", { name: escHtml(partnerName) })}</span>
           <span class="toggle">
             <input type="checkbox" id="reg-shared" ${state.isShared ? "checked" : ""}>
             <span class="toggle-track"><span class="toggle-knob"></span></span>
@@ -287,7 +290,7 @@ export async function renderRegistro(container, onDone, prefill) {
         ${state.isShared ? `
         <div style="display:flex; gap:8px; padding:0 0 14px;">
           <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
-            <div style="font-size:10px; color:var(--text-3);">Tu parte · ${pct}%</div>
+            <div style="font-size:10px; color:var(--text-3);">${t("common.myShare", { pct })}</div>
             <div class="num" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
           </div>
           <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
@@ -299,14 +302,14 @@ export async function renderRegistro(container, onDone, prefill) {
 
       <div class="keypad" style="margin-bottom:18px;">
         ${KEYS.map((k) => k === "back"
-          ? `<button type="button" class="key key-back" data-key="back" aria-label="Borrar">${ICON_BACK}</button>`
+          ? `<button type="button" class="key key-back" data-key="back" aria-label="${t("registro.keypad.delete")}">${ICON_BACK}</button>`
           : `<button type="button" class="key${k === "," ? " key-comma" : ""}" data-key="${k}">${k}</button>`
         ).join("")}
       </div>
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
-      <button type="button" class="btn-primary" id="reg-save" style="${saveStyle}">${SAVE_LABEL[state.tipo]}</button>
+      <button type="button" class="btn-primary" id="reg-save" style="${saveStyle}">${t(SAVE_KEY[state.tipo])}</button>
     `;
 
     if (prevChipsScroll != null) {
@@ -421,7 +424,7 @@ export async function renderRegistro(container, onDone, prefill) {
         onDone();
       } catch (e) {
         btn.disabled = false;
-        errorMsg = "No se pudo guardar: " + e.message;
+        errorMsg = t("common.saveFailed", { error: e.message });
         render();
       }
     };
