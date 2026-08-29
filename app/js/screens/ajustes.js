@@ -8,6 +8,7 @@ import { importCsv, importWithProfile } from "../n26.js";
 import { buildProfile, applyProfile, detectDateFormat, detectDecimal, parseDateIso, parseAmountCents } from "../csv-generic.js";
 import { encryptBackup, decryptBackup, isEncryptedBackup, WrongPassphraseError, MIN_PASSPHRASE } from "../backup-crypto.js";
 import { t, LANGS, activeLang } from "../i18n/index.js";
+import { loadXlsx } from "../xlsx-loader.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -42,9 +43,10 @@ function download(blob, filename) {
   a.click(); URL.revokeObjectURL(a.href);
 }
 
-function downloadXlsx(dump, filename) {
-  const wb = rowsToWorkbook(window.XLSX, dump);
-  const arr = window.XLSX.write(wb, { type: "array", bookType: "xlsx" });
+async function downloadXlsx(dump, filename) {
+  const XLSX = await loadXlsx();
+  const wb = rowsToWorkbook(XLSX, dump);
+  const arr = XLSX.write(wb, { type: "array", bookType: "xlsx" });
   download(new Blob([arr], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
 }
 
@@ -233,8 +235,9 @@ export async function renderAjustes(container) {
 
   async function processImportBuffer(buf) {
     // buf: ArrayBuffer|Uint8Array con un .xlsx EN CLARO (ya descifrado si venía cifrado)
-    const wb = window.XLSX.read(buf, { type: "array" });
-    const { data, errors: parseErrors } = workbookToRows(window.XLSX, wb);
+    const XLSX = await loadXlsx();
+    const wb = XLSX.read(buf, { type: "array" });
+    const { data, errors: parseErrors } = workbookToRows(XLSX, wb);
     const errors = [...parseErrors, ...validateImport(data)];
     if (errors.length) {
       state.errors = errors; state.pending = null;
@@ -396,7 +399,7 @@ export async function renderAjustes(container) {
     container.querySelector("#btn-xlsx-export").onclick = async () => {
       state.busy = true; render();
       try {
-        downloadXlsx(await dumpAllTables(), `basecero-${hoyISO()}.xlsx`);
+        await downloadXlsx(await dumpAllTables(), `basecero-${hoyISO()}.xlsx`);
       } catch (e) {
         state.errors = [t("ajustes.sheet.exportFailed", { error: e.message })];
       } finally {
@@ -468,8 +471,9 @@ export async function renderAjustes(container) {
       if (p1 !== p2) return fail(t("ajustes.sheet.passMismatch"));
       state.busy = true; render();
       try {
-        const wb = rowsToWorkbook(window.XLSX, await dumpAllTables());
-        const arr = window.XLSX.write(wb, { type: "array", bookType: "xlsx" });
+        const XLSX = await loadXlsx();
+        const wb = rowsToWorkbook(XLSX, await dumpAllTables());
+        const arr = XLSX.write(wb, { type: "array", bookType: "xlsx" });
         const enc = await encryptBackup(arr, p1);
         download(new Blob([enc], { type: "application/octet-stream" }), `basecero-cifrado-${hoyISO()}.bce`);
         state.encExport = false;
@@ -554,7 +558,7 @@ export async function renderAjustes(container) {
       container.querySelector("#btn-import-confirm").onclick = async () => {
         state.busy = true; render();
         try {
-          downloadXlsx(state.pending.currentDump, `basecero-backup-${hoyISO()}.xlsx`);
+          await downloadXlsx(state.pending.currentDump, `basecero-backup-${hoyISO()}.xlsx`);
           await replaceAll(state.pending.data);
           location.reload();
         } catch (err) {
