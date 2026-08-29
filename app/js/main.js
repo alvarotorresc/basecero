@@ -1,8 +1,9 @@
 import { initDb } from "./db.js";
-import { getOpenPeriod, getMetaAll } from "./repo.js";
+import { getOpenPeriod, getMetaAll, listPeriods } from "./repo.js";
 import { initFormat } from "./format.js";
 import { initCategoryStyle, parseStyle } from "./category-colors.js";
-import { showOnboarding } from "./onboarding.js";
+import { showOnboarding, showFirstPeriod } from "./onboarding.js";
+import { needsOnboarding } from "./onboarding-steps.js";
 import { renderInicio } from "./screens/inicio.js";
 import { renderRegistro } from "./screens/registro.js";
 import { renderMovimientos } from "./screens/movimientos.js";
@@ -53,7 +54,8 @@ async function boot() {
       initCategoryStyle(parseStyle(meta.category_style));
       document.documentElement.lang = (meta.locale || "es-ES").split("-")[0];
     } catch {} // si meta no se puede leer, la app arranca con es-ES/EUR
-    if (!(await getOpenPeriod())) await showOnboarding(screen);
+    if (needsOnboarding(await listPeriods())) await showOnboarding(screen);
+    else if (!(await getOpenPeriod())) await showFirstPeriod(screen);
     nav("inicio");
   } catch (err) {
     console.error(err);
