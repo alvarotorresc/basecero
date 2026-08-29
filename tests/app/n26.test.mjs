@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 import { SQL } from "../../app/js/sql.js";
 import { seedStatements } from "../../app/js/seeds.js";
-import { sha256Hex, externalIdFor } from "../../app/js/n26.js";
+import { sha256Hex, externalIdFor, signedAmountCents } from "../../app/js/n26.js";
 import { sniffCsv, isN26Headers, applyProfile, parseCsvProfile, profileMatches } from "../../app/js/csv-generic.js";
 
 const require = createRequire(import.meta.url);
@@ -60,36 +60,55 @@ const CSV_2ROWS = [CSV_HEADER, csvRow(), csvRow({ date: "2026-08-21", partner: "
  *  así que — mismo patrón que el resto de tests/app/*.test.mjs (repo-sql, recurrentes...) — se
  *  compone la SQL a mano en vez de invocar repo.js/n26.js directamente. `rows` ya viene parseado
  *  (misma forma que produce pure.bcParseN26Csv o csv-generic.applyProfile). Usa las MISMAS
- *  funciones puras que la implementación real: pure.bcDecideImportAction (app/vendor/pure.js) y
- *  el externalIdFor REAL de n26.js (adaptador de captura incluido). */
+ *  funciones puras que la implementación real: pure.bcDecideImportAction (app/vendor/pure.js), el
+ *  signedAmountCents/externalIdFor REALES de n26.js (adaptador de captura incluido).
+ *  M4 (Task 5, PR fix-security): las sentencias se acumulan y se ejecutan en un ÚNICO
+ *  BEGIN/COMMIT/ROLLBACK al final — mismo patrón que db-worker.js execMany (app/js/db-worker.js) —
+ *  en vez de un `.run()` inmediato por fila. Antes de este cambio el harness NO reproducía el
+ *  bug real (una fila que violase el CHECK solo tiraba ESA fila, las anteriores ya habían
+ *  quedado commiteadas); con el batching, una fila que lanza en medio del bucle revierte TODO el
+ *  import, igual que en producción — condición necesaria para poder testear el fix de M4 (saltar
+ *  la fila mala en vez de dejar que reviente el execMany). No cambia el resultado de NINGÚN test
+ *  preexistente: ninguno provoca hoy un throw a mitad de bucle, y el estado final tras un import
+ *  con éxito es idéntico (todo commiteado de una vez o fila a fila da el mismo resultado si nada
+ *  falla). */
 async function runPipeline(d, rows, hashFn = sha256hex) {
   const existing = d.prepare(SQL.n26Existing).all("acc-n26").map((t) => ({
     id: t.id, dateIso: t.date, type: t.type,
-    amountCents: Math.abs(t.amount_cents) * (t.type === "expense" ? -1 : 1),
+    amountCents: signedAmountCents(t.type, t.amount_cents),
     externalId: t.external_id, status: t.status,
   }));
-  const res = { created: 0, reconciled: 0, skipped: 0 };
+  const res = { created: 0, reconciled: 0, skipped: 0, omitted: 0 };
+  const stmts = [];
   for (const r of rows) {
+    // M4: fila de 0,00 (verificación de tarjeta) o importe no numérico (CSV corrupto) — se
+    // salta ANTES de decide/externalIdFor, se cuenta en omitted, no bloquea el resto.
+    if (r.amountCents === 0 || !Number.isFinite(r.amountCents)) { res.omitted++; continue; }
     r.externalId = await externalIdFor(r, hashFn);
     const decision = pure.bcDecideImportAction(r, existing);
     if (decision.action === "skip") {
       res.skipped++;
     } else if (decision.action === "reconcile") {
       const match = existing.find((t) => t.id === decision.matchId);
-      d.prepare(SQL.reconcileTx).run(r.externalId, NOW, match.id);
+      stmts.push({ sql: SQL.reconcileTx, bind: [r.externalId, NOW, match.id] });
       match.externalId = r.externalId;
       res.reconciled++;
     } else {
       const id = "tx" + Math.floor(Math.random() * 1e9);
       const type = r.amountCents < 0 ? "expense" : "income";
-      d.prepare(SQL.insertTransaction).run(id, r.bookingDate, "p1", type, Math.abs(r.amountCents),
+      stmts.push({ sql: SQL.insertTransaction, bind: [id, r.bookingDate, "p1", type, Math.abs(r.amountCents),
         "acc-n26", "", "", pure.bcSanitizeCell(r.partnerName), pure.bcSanitizeCell(r.paymentReference),
-        0, null, 0, "", "", r.externalId, "reconciled", NOW, NOW);
+        0, null, 0, "", "", r.externalId, "reconciled", NOW, NOW] });
       existing.push({ id, dateIso: r.bookingDate, type, amountCents: r.amountCents,
         externalId: r.externalId, status: "reconciled" });
       res.created++;
     }
   }
+  d.exec("BEGIN");
+  try {
+    for (const s of stmts) d.prepare(s.sql).run(...s.bind);
+    d.exec("COMMIT");
+  } catch (e) { d.exec("ROLLBACK"); throw e; }
   return res;
 }
 
@@ -120,7 +139,10 @@ async function runImportRouter(d, text, hashFn = sha256hex) {
   if (profile && profileMatches(profile, headers)) {
     const { rows, errors } = applyProfile(text, profile, pure.bcParseCsvLine);
     const res = await runPipeline(d, rows, hashFn);
-    return { ...res, via: "profile", omitted: errors.length };
+    // M4: res.omitted (filas de 0,00/no numéricas descartadas DENTRO del pipeline) se SUMA a
+    // errors.length (fecha/importe irreconocibles por applyProfile), nunca se pisa — mismo fix
+    // que importWithProfile en n26.js.
+    return { ...res, via: "profile", omitted: res.omitted + errors.length };
   }
 
   return { needsMapping: { headers, sample } };
@@ -132,7 +154,7 @@ const txCount = (d) => d.prepare(`SELECT COUNT(*) c FROM transactions`).get().c;
 test("import CSV de 2 filas sobre base vacía: 2 creadas reconciled sin categoría, signo/tipo correctos", async () => {
   const d = db();
   const res = await runImport(d, CSV_2ROWS);
-  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0 });
+  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, omitted: 0 });
 
   const rows = n26Rows(d);
   assert.equal(rows.length, 2);
@@ -157,7 +179,7 @@ test("re-import del mismo CSV: 2 duplicadas (saltadas), sin filas nuevas", async
   const d = db();
   await runImport(d, CSV_2ROWS);
   const res = await runImport(d, CSV_2ROWS);
-  assert.deepEqual(res, { created: 0, reconciled: 0, skipped: 2 });
+  assert.deepEqual(res, { created: 0, reconciled: 0, skipped: 2, omitted: 0 });
   assert.equal(n26Rows(d).length, 2);
 });
 
@@ -171,7 +193,7 @@ test("fila que casa con un pending manual ≤3 días: reconciled, conserva categ
   const res = await runImport(d, CSV_2ROWS);
   // Fila 1 (MERCADONA, -45.20, 2026-08-20) casa con manual1 (mismo importe, expense, 1 día de
   // diferencia); fila 2 (MARTA G., +360.00) no tiene con qué casar -> create.
-  assert.deepEqual(res, { created: 1, reconciled: 1, skipped: 0 });
+  assert.deepEqual(res, { created: 1, reconciled: 1, skipped: 0, omitted: 0 });
   assert.equal(n26Rows(d).length, 2);
 
   const manual = d.prepare(`SELECT * FROM transactions WHERE id='manual1'`).get();
@@ -182,6 +204,79 @@ test("fila que casa con un pending manual ≤3 días: reconciled, conserva categ
   assert.equal(manual.date, "2026-08-19");
   assert.match(manual.external_id, /^[0-9a-f]{16}$/);
   assert.equal(manual.updated_at, NOW);
+});
+
+test("A2: transferencia pendiente NO se traga un abono ajeno, y su propio cargo bancario tampoco reconcilia contra ella", async () => {
+  const d = db();
+  const T2 = "2026-08-19T10:00:00Z";
+  // Transferencia manual pendiente de 500€ (dinero saliente de acc-n26 hacia otra cuenta).
+  d.prepare(SQL.insertTransaction).run(
+    "transfer1", "2026-08-19", "p1", "transfer", 50000, "acc-n26", "acc-ahorro",
+    "", "", "Transferencia a ahorro", 0, null, 0, "", "", "", "pending", T2, T2);
+
+  const text = [CSV_HEADER,
+    // Fila 1: abono AJENO de 500€ (p.ej. nómina) a 1 día de la transferencia — hoy (bug A2-a)
+    // reconcilia contra transfer1 y el ingreso se pierde en silencio.
+    csvRow({ date: "2026-08-20", partner: "EMPRESA SA", ref: "Nomina", amount: "500.00" }),
+    // Fila 2: el cargo bancario REAL de la transferencia (-500€) a 2 días — hoy (bug A2-b), como
+    // transfer1 ya quedó marcada por la fila 1, esta fila no encuentra candidato y se crea como
+    // gasto duplicado sin categoría (la cuenta queda debitada dos veces: transfer1 + este gasto).
+    csvRow({ date: "2026-08-21", partner: "N26", type: "MoneyBeam", ref: "Transferencia a ahorro", amount: "-500.00" }),
+  ].join("\n");
+
+  const res = await runImport(d, text);
+  // Con el fix: NINGUNA fila reconcilia contra transfer1 (excluida de candidatura por tipo) —
+  // ambas se crean como filas nuevas independientes.
+  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, omitted: 0 });
+
+  const transfer = d.prepare(`SELECT * FROM transactions WHERE id='transfer1'`).get();
+  assert.equal(transfer.status, "pending"); // intacta: ninguna fila del CSV la ha tocado
+  assert.equal(transfer.external_id, "");
+
+  const rows = n26Rows(d);
+  assert.equal(rows.length, 3); // transfer1 (preexistente) + las 2 filas nuevas creadas por el import
+  const ingreso = rows.find((r) => r.type === "income");
+  assert.equal(ingreso.amount_cents, 50000);
+  assert.equal(ingreso.merchant, "EMPRESA SA"); // el abono NO se pierde: se crea con su propio dato
+  const gasto = rows.find((r) => r.type === "expense");
+  assert.equal(gasto.amount_cents, 50000);
+  // Residual aceptado (ver report/concerns): el cargo bancario de la transferencia (fila 2) se
+  // crea como gasto NUEVO sin categoría — sigue sin auto-reconciliar contra transfer1, que
+  // permanece pendiente para siempre vía este pipeline (excluir transfers de la conciliación es
+  // el fix elegido por el hallazgo, no "casarlos con el signo correcto"). Requiere limpieza
+  // manual del usuario (borrar/ajustar transfer1 o el gasto nuevo). Lo que el fix SÍ elimina es
+  // la pérdida silenciosa de dinero (bug A2-a) y la contaminación cruzada de external_id — el
+  // bug real que motivó el hallazgo.
+});
+
+test("signedAmountCents: transfer es dinero saliente (signo negativo), igual que expense; income mantiene signo positivo", () => {
+  assert.equal(signedAmountCents("expense", 50000), -50000);
+  assert.equal(signedAmountCents("transfer", 50000), -50000);
+  assert.equal(signedAmountCents("income", 50000), 50000);
+});
+
+test("import CSV con una fila de 0,00 (verificación de tarjeta, M4): se omite y se cuenta en omitted, el resto se importa", async () => {
+  const d = db();
+  const text = [CSV_HEADER, csvRow(),
+    csvRow({ date: "2026-08-20", partner: "N26", ref: "Comprobación de tarjeta", amount: "0.00" }),
+    csvRow({ date: "2026-08-21", partner: "MARTA G.", iban: "ES9121000000000000000000",
+      type: "MoneyBeam", ref: "Bizum alquiler", amount: "360.00" }),
+  ].join("\n");
+  const res = await runImport(d, text);
+  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, omitted: 1 });
+  assert.equal(n26Rows(d).length, 2); // las 2 filas válidas SÍ entran — antes revertía el import entero
+});
+
+test("import CSV con una fila de importe no numérico (M4, ruta N26): se omite y se cuenta en omitted, el resto se importa", async () => {
+  const d = db();
+  const text = [CSV_HEADER, csvRow(),
+    csvRow({ date: "2026-08-20", partner: "BANCO", ref: "Importe corrupto", amount: "no-es-un-importe" }),
+    csvRow({ date: "2026-08-21", partner: "MARTA G.", iban: "ES9121000000000000000000",
+      type: "MoneyBeam", ref: "Bizum alquiler", amount: "360.00" }),
+  ].join("\n");
+  const res = await runImport(d, text);
+  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, omitted: 1 });
+  assert.equal(n26Rows(d).length, 2);
 });
 
 test("externalIdFor reproduce el payload de pure.js (mismo hashFn síncrono directo)", async () => {
@@ -223,7 +318,7 @@ const GENERIC_2ROWS = [GENERIC_HEADER, genericRow(),
 test("importCsv (router): cabeceras N26 -> mismo resultado que importN26Csv, via:'n26'", async () => {
   const d = db();
   const res = await runImportRouter(d, CSV_2ROWS);
-  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, via: "n26" });
+  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, omitted: 0, via: "n26" });
   assert.equal(n26Rows(d).length, 2);
 });
 

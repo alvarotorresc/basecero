@@ -91,7 +91,14 @@ function bcDecideImportAction(row, existing) {
   var quiereGasto = row.amountCents < 0;
   for (var j = 0; j < existing.length; j++) {
     var t = existing[j];
+    // A2 (review-seguridad-2026-08-29.md): solo expense/income son candidatos reales de
+    // conciliación. Sin este filtro, una transferencia pendiente (siempre dinero saliente de la
+    // cuenta importada, ver n26.js signedAmountCents) puede casar con un abono cualquiera del
+    // mismo importe ±3 días — el abono se pierde en silencio y la transferencia queda marcada
+    // con un external_id ajeno. Excluye también 'refund' (no mencionado en el hallazgo, pero
+    // igual de improcedente como candidato) y 'adjustment'.
     if (t.status === "pending" && !t.externalId &&
+        (t.type === "expense" || t.type === "income") &&
         Math.abs(t.amountCents) === Math.abs(row.amountCents) &&
         (t.type === "expense") === quiereGasto &&
         bcDaysBetween(t.dateIso, row.bookingDate) <= 3) {
