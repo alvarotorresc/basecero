@@ -217,6 +217,10 @@ export async function renderMovimientos(container) {
     // tocar el refund deja la deuda con la contraparte mal calculada y sin nada pendiente que lo delate.
     state.detail.settledLocked = row.type === "expense" && !!row.settled
       && (await hasActiveLinkedRefund(id).catch(() => false));
+    // Task 7 (5d): espejo en UI del guard refundAmountLocked (repo.js) — el lado del REFUND. Si el
+    // gasto enlazado ya está settled, bajar aquí el importe del refund descuadra la deuda liquidada
+    // en silencio (el guard de repo lo rechazaría en save, pero mejor prevenirlo en el input).
+    state.detail.refundLocked = row.type === "refund" && !!state.linkedRefund?.settled;
     state.view = "detail";
     errorMsg = "";
     render();
@@ -280,6 +284,9 @@ export async function renderMovimientos(container) {
     const myCents = d.isShared ? Math.round((d.cents * pct) / 100) : d.cents;
     const partnerCents = d.isShared ? d.cents - myCents : 0;
     const locked = !!d.settledLocked;
+    // Task 7 (5d): además de `locked` (lado del gasto), el importe del refund se bloquea si su
+    // gasto enlazado ya está settled — ver refundLocked en openDetail.
+    const amountLocked = locked || !!d.refundLocked;
 
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
 
@@ -299,8 +306,8 @@ export async function renderMovimientos(container) {
         <div class="section-title">${t("common.amount")}</div>
         <div class="amount-display" style="align-items:center;">
           ${d.type === "adjustment" ? `<button type="button" class="icon-btn" id="mov-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;" ${locked ? "disabled" : ""}>${d.sign}</button>` : ""}
-          <input type="text" inputmode="decimal" id="mov-raw" value="${escAttr(d.raw)}" placeholder="0" ${locked ? "disabled" : ""}
-            style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;${locked ? "opacity:.5;" : ""}">
+          <input type="text" inputmode="decimal" id="mov-raw" value="${escAttr(d.raw)}" placeholder="0" ${amountLocked ? "disabled" : ""}
+            style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;${amountLocked ? "opacity:.5;" : ""}">
           <span class="amount-currency">${currencySymbol()}</span>
         </div>
         <hr class="divider" style="margin-top:6px;">

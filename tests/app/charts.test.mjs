@@ -114,6 +114,25 @@ test("netWorthBarsHtml: oculto con menos de 2 puntos", () => {
   assert.equal(netWorthBarsHtml([]), "");
 });
 
+// Task 7 (5a): un patrimonio negativo se tiñe de rojo, prioridad sobre el verde de "última barra".
+test("netWorthBarsHtml: un punto con cents negativo pinta esa barra en rojo (aunque sea la última)", () => {
+  const series = [
+    { label: "jul", cents: 50000 },
+    { label: "ago", cents: -20000 },
+  ];
+  const html = netWorthBarsHtml(series);
+  assert.ok(html.includes("var(--red)"), "la barra negativa debe usar var(--red)");
+});
+
+test("netWorthBarsHtml: serie toda positiva no pinta ninguna barra en rojo", () => {
+  const series = [
+    { label: "jul", cents: 50000 },
+    { label: "ago", cents: 70000 },
+  ];
+  const html = netWorthBarsHtml(series);
+  assert.ok(!html.includes("var(--red)"), "sin puntos negativos no debe aparecer var(--red)");
+});
+
 // ---- SQL.spentByDay / fillLast7Days (datos de spentLast7Days) -----------
 
 function tx(d, over = {}) {

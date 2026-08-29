@@ -141,7 +141,10 @@ export function netWorthBarsHtml(series) {
   const bars = pts.map((p, i) => {
     const h = Math.max(6, Math.round((Math.abs(p.cents) / max) * 100));
     const last = i === pts.length - 1;
-    return `<div style="flex:1;height:${h}%;border-radius:5px 5px 2px 2px;background:${last ? "var(--green)" : "var(--card2)"};"></div>`;
+    // Task 7 (5a): un cierre negativo se tiñe de rojo con prioridad sobre el verde de "última
+    // barra" — un patrimonio negativo es la señal más urgente, aunque sea el punto más reciente.
+    const fill = p.cents < 0 ? "var(--red)" : (last ? "var(--green)" : "var(--card2)");
+    return `<div style="flex:1;height:${h}%;border-radius:5px 5px 2px 2px;background:${fill};"></div>`;
   }).join("");
   const labels = pts.map((p, i) =>
     `<span style="${i === pts.length - 1 ? "color:var(--text);font-weight:700;" : ""}">${String(p.label).toUpperCase()}</span>`).join("");
