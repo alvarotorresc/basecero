@@ -510,6 +510,12 @@ export const EN = {
       body: "🔒 Your data lives only on this device. No accounts, no cloud.",
       exportBtn: "Export backup copy (JSON)",
     },
+    about: {
+      title: "About BaseCero",
+      privacy: "Privacy policy",
+      source: "Source code",
+      license: "MIT license",
+    },
     importResult: {
       summary: "New: {created} · Reconciled: {reconciled} · Duplicates (skipped): {skipped}",
       omitted: { one: " · 1 unreadable row skipped", other: " · {n} unreadable rows skipped" },

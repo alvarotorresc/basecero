@@ -385,11 +385,20 @@ export async function renderAjustes(container) {
         <button type="button" class="btn-secondary" id="btn-prefs-save" style="${BTN_FULL_WIDTH}margin-top:12px" ${state.busy ? "disabled" : ""}>${t("ajustes.prefs.saveBtn")}</button>
       </div>
 
-      <div class="card">
+      <div class="card" style="margin-bottom:12px">
         <p style="font-weight:600;margin-bottom:4px">${t("ajustes.backup.title")}</p>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
           ${t("ajustes.backup.body")}</p>
         <button type="button" class="btn-secondary" id="btn-json-export" style="${BTN_FULL_WIDTH}">${t("ajustes.backup.exportBtn")}</button>
+      </div>
+
+      <div class="card">
+        <p style="font-weight:600;margin-bottom:12px">${t("ajustes.about.title")}</p>
+        <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
+          <a href="${escAttr(activeLang() === "en" ? "en/privacy.html" : "privacidad.html")}" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.privacy")}</a>
+          <a href="https://github.com/alvarotorresc/basecero" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.source")}</a>
+          <a href="https://github.com/alvarotorresc/basecero/blob/main/LICENSE" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.license")}</a>
+        </div>
       </div>
     `;
     wireMain();

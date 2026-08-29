@@ -508,6 +508,12 @@ export const ES = {
       body: "🔒 Tus datos viven solo en este dispositivo. Sin cuentas, sin nube.",
       exportBtn: "Exportar copia de seguridad (JSON)",
     },
+    about: {
+      title: "Acerca de BaseCero",
+      privacy: "Política de privacidad",
+      source: "Código fuente",
+      license: "Licencia MIT",
+    },
     importResult: {
       summary: "Nuevas: {created} · Conciliadas: {reconciled} · Duplicadas (saltadas): {skipped}",
       omitted: { one: " · 1 fila ilegible omitida", other: " · {n} filas ilegibles omitidas" },
