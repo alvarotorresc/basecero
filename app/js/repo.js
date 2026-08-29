@@ -699,21 +699,29 @@ export async function archiveCategory(id) {
  *  quizá había archivado ella sola antes de archivar la raíz. */
 export const unarchiveCategory = (id) => exec(SQL.setCategoryArchived, [0, nowIso(), id]);
 
-/** i18n (PR i18n, Task 6): retraduce las categorías SEMILLA (SEED_NAMES, seeds.js) al cambiar el
- *  idioma de la app — un SQL.retranslateCategory por id semilla, TODOS en el MISMO execMany (o
- *  quedan todas retraducidas, o ninguna). Cada UPDATE lleva su propio guard `AND name = ?`
- *  (nombre semilla del idioma ANTERIOR): una categoría que el usuario ya renombró no coincide y
- *  esa fila concreta no se toca, aunque el resto del lote sí se aplique. No-op si fromLang ===
- *  toLang (nada que retraducir) o si alguno de los dos no es un idioma soportado (evita escribir
- *  name=NULL con un lang desconocido — SEED_NAMES solo tiene claves es/en). */
-export async function retranslateSeedNames(fromLang, toLang) {
-  if (fromLang === toLang) return;
+/** i18n (PR i18n, Task 6, fix round 1): retraduce las categorías SEMILLA (SEED_NAMES, seeds.js)
+ *  a `toLang`. IDEMPOTENTE y basada en el ESTADO de cada fila, no en si el idioma "cambió": cada
+ *  UPDATE matchea una fila solo si su nombre actual es EXACTAMENTE el nombre semilla del OTRO
+ *  idioma soportado (con solo es/en, "el otro" es inequívoco) —
+ *   - una fila que YA está en `toLang` no matchea nada (llamar dos veces seguidas con el mismo
+ *     toLang deja la BD intacta la segunda vez: sin efecto, sin tocar updated_at),
+ *   - una fila renombrada por el usuario ("Mi casa") tampoco matchea ningún nombre semilla y
+ *     queda intacta,
+ *   - y da igual qué devolviera activeLang() ANTES de llamar: arregla el caso de una BD sembrada
+ *     en es cuyo activeLang() ya resolvía a en (con el guard viejo basado en fromLang!==toLang,
+ *     elegir "English" en Ajustes era ahí un no-op — la UI ya "creía" estar en inglés aunque las
+ *     filas siguieran en español).
+ *  Los 41 UPDATE (uno por id de SEED_NAMES) van en el MISMO execMany (o quedan todos aplicados, o
+ *  ninguno). No-op si `toLang` no es un idioma soportado (evita escribir name=NULL — SEED_NAMES
+ *  solo tiene claves es/en). */
+export async function retranslateSeedNames(toLang) {
   const supported = ["es", "en"];
-  if (!supported.includes(fromLang) || !supported.includes(toLang)) return;
+  if (!supported.includes(toLang)) return;
+  const otherLang = toLang === "es" ? "en" : "es";
   const t = nowIso();
   const stmts = Object.entries(SEED_NAMES).map(([id, names]) => ({
     sql: SQL.retranslateCategory,
-    bind: [names[toLang], t, id, names[fromLang]],
+    bind: [names[toLang], t, id, names[otherLang]],
   }));
   await execMany(stmts);
 }

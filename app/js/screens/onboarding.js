@@ -278,14 +278,11 @@ export async function renderOnboarding(container, { onDone }) {
         if (state.busy) return;
         state.busy = true;
         const v = b.dataset.onbLang;
-        // Antes de guardar: activeLang() es el idioma con el que las categorías semilla se
-        // sembraron al arrancar (o el último retraducido) — mismo criterio que ajustes.js.
-        const prev = activeLang();
         try {
           await setMeta("lang", v);
-          // Solo si cambió de verdad: retraduce las categorías semilla ANTES de repintar con el
-          // nuevo idioma (retranslateSeedNames es su propio execMany atómico — ver repo.js).
-          if (v !== prev) await retranslateSeedNames(prev, v);
+          // SIEMPRE (fix round 1): retranslateSeedNames es idempotente y basada en el nombre real
+          // de cada fila (ver repo.js), no en si `v` "cambió" — mismo criterio que ajustes.js.
+          await retranslateSeedNames(v);
           initI18n({ lang: v });
           document.documentElement.lang = v;
         } catch (e) { state.errorMsg = t("common.saveFailed", { error: e.message }); }

@@ -572,10 +572,6 @@ export async function renderAjustes(container) {
       const locale = container.querySelector("#pref-locale").value;
       const lang = container.querySelector("#pref-lang").value;
       const partner = container.querySelector("#cfg-partner").value.trim();
-      // Antes de guardar: activeLang() todavía refleja el idioma CON el que se sembraron las
-      // categorías (o el último retraducido) — hace falta capturarlo aquí porque tras
-      // setMetaMany() ya no hay forma de recuperar "el idioma de antes".
-      const prevLang = activeLang();
       state.busy = true; render();
       try {
         // Los cuatro campos de la tarjeta en UN execMany (vía setMetaMany): o quedan las cuatro
@@ -583,9 +579,11 @@ export async function renderAjustes(container) {
         // partner_name va sin bcSanitizeCell a propósito: SheetJS exporta la celda como string (sin riesgo
         // de fórmula) y sanitizar ensuciaría el nombre en toda la UI («+Ana» → «'+Ana»).
         await setMetaMany([["currency", currency], ["locale", locale], ["lang", lang], ["partner_name", partner]]);
-        // Solo si el idioma cambió de verdad: retraduce las categorías semilla ANTES del reload
-        // (retranslateSeedNames es su propio execMany atómico — ver repo.js).
-        if (lang !== prevLang) await retranslateSeedNames(prevLang, lang);
+        // SIEMPRE (fix round 1): retranslateSeedNames es idempotente y basada en el nombre real de
+        // cada fila (ver repo.js), no en si `lang` "cambió" — barato (41 UPDATE condicionales) y
+        // cubre el caso de una BD sembrada en un idioma cuyo activeLang() previo ya coincidía con
+        // `lang` sin que las filas lo reflejaran.
+        await retranslateSeedNames(lang);
         location.reload();
       } catch (err) {
         state.busy = false;
