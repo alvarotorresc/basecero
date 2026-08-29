@@ -6,11 +6,11 @@ import { renderPeriodoNuevo } from "./screens/periodo-nuevo.js";
 /** Onboarding de primera ejecución (PR F): 4 pasos que desembocan en el primer periodo.
  *  Solo para BDs sin ningún periodo (gate en main.js con needsOnboarding). */
 export function showOnboarding(container) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     document.body.classList.add("onboarding");
     renderOnboarding(container, {
       onDone: () => { document.body.classList.remove("onboarding"); resolve(); },
-    });
+    }).catch((err) => { document.body.classList.remove("onboarding"); reject(err); });
   });
 }
 

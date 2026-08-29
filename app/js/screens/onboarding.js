@@ -95,7 +95,7 @@ export async function renderOnboarding(container, { onDone }) {
         </div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(a.name)}</div>
-          <div style="font-size:11px;color:var(--text-2);">${TYPE_LABELS[a.type] ?? a.type}${a.id === firstCheckingId ? " · será la cuenta de tus imports" : ""}</div>
+          <div style="font-size:11px;color:var(--text-2);">${escHtml(TYPE_LABELS[a.type] ?? a.type)}${a.id === firstCheckingId ? " · será la cuenta de tus imports" : ""}</div>
         </div>
         <div class="num" style="font-size:13.5px;font-weight:700;">${escHtml(fmtMoney(a.balance_cents))}</div>
       </div>`).join("");
@@ -225,7 +225,7 @@ export async function renderOnboarding(container, { onDone }) {
       q("#onb-import-link").onclick = () => { state.view = "import"; state.imp = null; render(); };
       return;
     }
-    q("#onb-back").onclick = () => { state.step -= 1; state.errorMsg = ""; render(); };
+    q("#onb-back").onclick = () => { if (state.busy) return; state.step -= 1; state.errorMsg = ""; render(); };
     if (state.step === 1) {
       const f = state.form;
       q("#onb-acc-name").oninput = (e) => { f.name = e.target.value; state.errorMsg = ""; };
@@ -328,11 +328,14 @@ export async function renderOnboarding(container, { onDone }) {
     const file = q("#onb-imp-file");
     if (file) file.onchange = async (e) => {
       const f = e.target.files[0];
+      e.target.value = ""; // permite re-seleccionar el MISMO fichero (p.ej. tras corregirlo y reintentar)
       if (!f) return;
       imp.fileName = f.name; imp.errors = []; imp.pending = null; imp.needsPass = false;
-      const buf = new Uint8Array(await f.arrayBuffer());
-      if (isEncryptedBackup(buf)) { imp.buffer = buf; imp.needsPass = true; render(); return; }
-      await parseAndOffer(imp, buf);
+      try {
+        const buf = new Uint8Array(await f.arrayBuffer());
+        if (isEncryptedBackup(buf)) { imp.buffer = buf; imp.needsPass = true; render(); return; }
+        await parseAndOffer(imp, buf);
+      } catch (err) { imp.errors = ["No se pudo leer el fichero: " + err.message]; render(); }
     };
     const clear = q("#onb-imp-clear");
     if (clear) clear.onclick = () => { state.imp = null; render(); };
