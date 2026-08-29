@@ -5,6 +5,7 @@ import {
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtNum2, fmtPct, currencyCode } from "../format.js";
+import { dayIndexOfPeriod, expectedPeriodDays, paceDeltaCents } from "../prevision.js";
 import { budgetStatus } from "./presupuesto.js";
 import { barChartSvg, donutSvg } from "../charts.js";
 import { renderLiquidar } from "./liquidar.js";
@@ -302,6 +303,30 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupue
     </div>`;
 }
 
+/** Tarjeta "Disponible del periodo" (PR polish): presupuesto total del periodo menos lo
+ *  gastado, con el ritmo del plan (paceDeltaCents, prevision.js: cuánto por encima o por debajo
+ *  del gasto prorrateado a hoy) y el botón «Liquidar» — mismo id/handler que
+ *  #shared-liquidar en sharedBlockHtml, mismo gate literal que el spec (contraparte + pendiente
+ *  > 0). Se oculta entera si no hay presupuestos definidos este periodo (budgetTotal === 0). */
+function disponibleCardHtml(budgets, spent, period, sharedTotal, partnerName) {
+  const budgetTotal = budgets.reduce((s, b) => s + b.amount_cents, 0);
+  if (!budgetTotal) return "";
+  const disp = budgetTotal - spent;
+  const delta = paceDeltaCents(budgetTotal, spent, period.start_date, hoyISO());
+  const over = delta > 0;
+  const badge = `<span class="num" style="font-size:11px;font-weight:700;border-radius:999px;padding:4px 10px;color:${over ? "var(--amber)" : "var(--green)"};background:${over ? "rgba(255,190,77,0.14)" : "rgba(79,217,154,0.14)"};">${over ? "▲" : "▼"} ${escHtml(fmtMoney(Math.abs(delta)))} ${over ? "sobre" : "bajo"} el ritmo del plan</span>`;
+  const liquidar = partnerName && sharedTotal > 0
+    ? `<button type="button" id="disp-liquidar" class="num" style="height:44px;padding:0 18px;border-radius:999px;border:0;background:var(--card2);color:var(--text);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Liquidar · ${escHtml(fmtMoney(sharedTotal))}</button>`
+    : "";
+  return `
+  <section class="card" style="margin-bottom:16px;">
+    <div class="section-title">Disponible del periodo</div>
+    <div class="amount-hero num">${moneyPartsHtml(disp)}</div>
+    <div class="num" style="font-size:12px;color:var(--text-2);">de ${escHtml(fmtMoney(budgetTotal))} presupuestados</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;">${badge}${liquidar}</div>
+  </section>`;
+}
+
 /** Pantalla Inicio: cabecera del periodo abierto (gastado, ingresos, ahorrado, tasa),
  *  tarjetas "Flujo de gasto" y "Gasto por categoría", bloque de compartidos (pendiente/liquidar),
  *  bloque "Previsión" (reglas recurrentes del mes) y sus movimientos agrupados por día. */
@@ -341,6 +366,10 @@ export async function renderInicio(container) {
   const ahorrado = income - spent;
   const tasa = income > 0 ? fmtPct(ahorrado / income) : "—";
   const hoy = hoyISO();
+  // Saludo por hora local (PR polish): sustituye la "Desde el ..." fija de la cabecera —
+  // la fecha de inicio del periodo ya se ve en la línea pequeña vía "día N de M".
+  const h = new Date().getHours();
+  const saludo = h < 7 ? "Buenas noches" : h < 14 ? "Buenos días" : h < 21 ? "Buenas tardes" : "Buenas noches";
 
   const movimientosHtml = rows.length === 0
     ? `<div class="card" style="text-align:center;color:var(--text-3)">
@@ -359,9 +388,11 @@ export async function renderInicio(container) {
     ${showPartnerBanner ? partnerBannerHtml() : ""}
 
     <button type="button" id="inicio-periodo-header" style="all:unset;cursor:pointer;display:flex;flex-direction:column;gap:2px;margin-bottom:14px;-webkit-tap-highlight-color:transparent;">
-      <div style="font-size:12px;font-weight:500;color:var(--text-2);">Desde el ${fmtDiaLargo(period.start_date)}</div>
-      <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;">${escHtml(period.name)}</div>
+      <div style="font-size:12px;font-weight:500;color:var(--text-2);">${escHtml(period.name)} · día ${dayIndexOfPeriod(period.start_date, hoy)} de ${expectedPeriodDays(period.start_date)}</div>
+      <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;">${saludo}</div>
     </button>
+
+    ${disponibleCardHtml(budgets, spent, period, sharedTotal, partnerName)}
 
     <div class="card" style="display:flex;flex-direction:column;gap:4px;margin-bottom:16px;">
       <div class="section-title">Gastado</div>
@@ -426,6 +457,9 @@ export async function renderInicio(container) {
 
   const liquidarBtn = container.querySelector("#shared-liquidar");
   if (liquidarBtn) liquidarBtn.onclick = () => renderLiquidar(container, () => renderInicio(container));
+
+  const dispLiquidarBtn = container.querySelector("#disp-liquidar");
+  if (dispLiquidarBtn) dispLiquidarBtn.onclick = () => renderLiquidar(container, () => renderInicio(container));
 
   const presuBtn = container.querySelector("#inicio-ver-presupuesto");
   if (presuBtn) presuBtn.onclick = () => renderPresupuesto(container, () => renderInicio(container));
