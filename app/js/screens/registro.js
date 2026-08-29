@@ -145,13 +145,16 @@ export async function renderRegistro(container, onDone, prefill) {
   function pressKey(k) {
     if (OPS.has(k)) { pressOp(k); return; }
     if (k === "back") {
-      if (state.raw === "" && state.op != null) {
-        // Borrar justo tras pulsar un operador, sin haber tecleado nada del siguiente operando:
-        // este teclado no tiene tecla C/AC (ver Registro.dc.html), así que sin este caso el
-        // operador quedaría atascado sin más forma de deshacerlo que cerrar la pantalla. Se
-        // deshace el operador pendiente y se recupera como operando editable el importe de
-        // antes — centsToRaw/parseCentsRaw ya hacen ese viaje de ida y vuelta en toda la app
-        // (mismo patrón que selectRefundRow y el prefill de arriba).
+      // Borrar justo tras pulsar un operador, sin haber tecleado nada del siguiente operando:
+      // este teclado no tiene tecla C/AC (ver Registro.dc.html), así que sin este caso el
+      // operador quedaría atascado sin más forma de deshacerlo que cerrar la pantalla. Se
+      // deshace el operador pendiente y se recupera como operando editable el importe de antes
+      // — SOLO cuando ese importe es representable en la gramática de tecleo (acc >= 0): este
+      // teclado no tiene tecla de signo, así que centsToRaw(acc) es Math.abs por contrato
+      // (format.js) — con acc NEGATIVO (p.ej. "5 − 10 +", acc=-500) reconstruir raw así
+      // BLANQUEARÍA el signo y, al re-parsear, convertiría un importe -500 (no guardable) en
+      // +500 guardable: bug real de dinero, corregido en el "fix round 1" de Task 3.
+      if (state.raw === "" && state.op != null && state.acc >= 0) {
         state.raw = centsToRaw(state.acc);
         state.acc = null;
         state.op = null;
@@ -160,6 +163,12 @@ export async function renderRegistro(container, onDone, prefill) {
         render();
         return;
       }
+      // acc < 0 (o no hay operador pendiente): NO se hace el round-trip que blanquea el signo.
+      // Con raw==="" esto es, en la práctica, un no-op — pero uno CORRECTO: setRaw("")
+      // recalcula state.cents vía computeRunning(acc, op, ""), que con raw vacío devuelve acc
+      // TAL CUAL (con su signo intacto), en vez de "lanzarlo por parseCentsRaw" y perderlo. El
+      // usuario puede seguir corrigiendo pulsando otro operador (pressOp ya tiene su propia
+      // guardia raw==="") o tecleando el siguiente operando.
       setRaw(state.raw.slice(0, -1));
       return;
     }
@@ -307,11 +316,15 @@ export async function renderRegistro(container, onDone, prefill) {
     // Renglón de expresión bajo el importe (Registro.dc.html: "12 + 12,90 — el teclado suma
     // tickets"), solo cuando hay una operación en curso. state.raw se ecoa tal cual se está
     // tecleando (mismo criterio "ver lo que escribo" que tenía el importe grande antes de Task 3,
-    // ahora reubicado aquí); state.acc se muestra vía centsToRaw (con acc===0 —operador como
-    // primera tecla— centsToRaw da "" y se sustituye por "0" para no dejar la línea coja).
+    // ahora reubicado aquí); state.acc se muestra a mano con signo — centsToRaw es Math.abs por
+    // contrato (format.js), así que hay que anteponer el "−" si acc es negativo (resta) para que
+    // este renglón cuadre con el importe grande (fmtMoneyParts(state.cents) SÍ es sensible al
+    // signo). Con acc===0 —operador como primera tecla— centsToRaw da "" y se sustituye por "0"
+    // para no dejar la línea coja.
+    const accText = (state.acc < 0 ? "−" : "") + (centsToRaw(state.acc) || "0");
     const exprLine = state.op == null ? "" : `
       <div style="text-align:right; font-size:12px; color:var(--text-3); margin-top:2px;">
-        ${escHtml(centsToRaw(state.acc) || "0")} ${escHtml(state.op)} ${escHtml(state.raw)} — ${escHtml(t("registro.keypad.helper"))}
+        ${escHtml(accText)} ${escHtml(state.op)} ${escHtml(state.raw)} — ${escHtml(t("registro.keypad.helper"))}
       </div>`;
 
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
@@ -406,8 +419,10 @@ export async function renderRegistro(container, onDone, prefill) {
         ${KEYS.map((k) => {
           if (k === "back") return `<button type="button" class="key key-back" data-key="back" aria-label="${t("registro.keypad.delete")}">${ICON_BACK}</button>`;
           // back/coma se quedan con su tratamiento de siempre (key-back/key-comma) aunque el
-          // artboard agrupe visualmente "back" con los operadores (.op) — decisión explícita de
-          // Task 3, no un descuido: solo +/−/×/÷ llevan la clase .op nueva.
+          // artboard SÍ pone class="key op" en "back" (Registro.dc.html) — es una decisión MÍA
+          // para esta entrega, no algo que pida el brief/plan (que no mencionan esta distinción):
+          // solo +/−/×/÷ llevan la clase .op nueva. Si se prefiere fidelidad pixel-perfect al
+          // artboard, añadir .op también a "back" es un cambio de una línea (aquí y en app.css).
           if (OPS.has(k)) return `<button type="button" class="key op" data-key="${k}">${k}</button>`;
           return `<button type="button" class="key${k === "," ? " key-comma" : ""}" data-key="${k}">${k}</button>`;
         }).join("")}
