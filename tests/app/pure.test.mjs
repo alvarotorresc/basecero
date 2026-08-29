@@ -69,6 +69,19 @@ test("decide: expense/income pendientes SIGUEN siendo candidatos de conciliació
     { action: "reconcile", matchId: "i1" });
 });
 
+test("decide: reembolso pendiente SIGUE siendo candidato de conciliación (fix round 1 — refund NO se excluye)", () => {
+  // Un reembolso corresponde 1:1 a una única línea bancaria (un abono de un partner), igual que
+  // un ingreso — NO es ambiguo/sintético como transfer/adjustment. Excluirlo de la conciliación
+  // (como hacía el filtro `{expense, income}` original de este task) double-cuenta dinero: el
+  // abono bancario entraría como income NUEVO mientras el reembolso pendiente sigue sumando en
+  // accountBalance (type IN ('income','refund')).
+  const existing = [
+    { id: "r1", dateIso: "2026-08-19", type: "refund", amountCents: 36000, externalId: "", status: "pending" },
+  ];
+  const abono = { bookingDate: "2026-08-20", amountCents: 36000, externalId: "hash-reembolso-nuevo" };
+  assert.deepEqual(p.bcDecideImportAction(abono, existing), { action: "reconcile", matchId: "r1" });
+});
+
 test("picker → id", () => {
   const cats = [
     { id: "cat-casa", name: "Casa", parentId: "" },
