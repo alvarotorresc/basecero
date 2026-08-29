@@ -5,7 +5,7 @@ import {
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, hoyISO, fmtDec1, currencySymbol, currencyCode, parseCentsRaw, centsToRaw } from "../format.js";
-import { sparklineSvg } from "../charts.js";
+import { netWorthBarsHtml } from "../charts.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -28,28 +28,13 @@ const moneyPartsHtml = (cents) => {
   return `${escHtml(main)}<small>${escHtml(c)}</small>${escHtml(suffix)}`;
 };
 
-/** Sparkline + fila de etiquetas de mes debajo — sparklineSvg (Task 12) NO pinta las etiquetas
- *  (ver su comentario en charts.js), así que esta pantalla arma la fila propia, con el mes actual
- *  en negrita (réplica de design/Patrimonio.dc.html:50-58). Se oculta con <2 puntos: con 0
- *  periodos cerrados netWorthSeries solo trae el punto de hoy, y una línea de un único punto no
- *  cuenta ninguna evolución. */
-function netWorthSparkHtml(series) {
-  if (series.length < 2) return "";
-  const svg = sparklineSvg(series.map((p) => p.cents), series.map((p) => p.label));
-  const labelsHtml = series.map((p, i) => `
-    <div style="font-size:10px;text-align:center;${i === series.length - 1 ? "font-weight:700;color:var(--text);" : "color:var(--text-3);"}">${escHtml(p.label)}</div>`).join("");
-  return `
-    <div style="display:flex;flex-direction:column;gap:8px;">
-      ${svg}
-      <div style="display:grid;grid-template-columns:repeat(${series.length},minmax(0,1fr));gap:4px;">${labelsHtml}</div>
-    </div>`;
-}
-
 /** Tarjeta "Patrimonio neto": importe héroe (.amount-hero, 34/700) + badge de variación ABSOLUTA
- *  vs el último periodo CERRADO + sparkline — réplica de design/Patrimonio.dc.html:32-59. La variación es el propio
- *  penúltimo vs último punto de `series` (el último es siempre "hoy"; el penúltimo, si existe, es
- *  el del último cerrado — mismos puntos que ya trae netWorthSeries, sin repetir la query). Sin
- *  ningún cerrado (series.length<2) no hay nada con qué comparar: se oculta el badge entero. */
+ *  vs el último periodo CERRADO + evolución en barras (netWorthBarsHtml, charts.js) — réplica de
+ *  design/Patrimonio.dc.html:32-59. La variación es el propio penúltimo vs último punto de
+ *  `series` (el último es siempre "hoy"; el penúltimo, si existe, es el del último cerrado —
+ *  mismos puntos que ya trae netWorthSeries, sin repetir la query, y que pinta netWorthBarsHtml).
+ *  Sin ningún cerrado (series.length<2) no hay nada con qué comparar: se ocultan el badge y la
+ *  línea de contexto («cierre de X: Y», el saldo de ese último cerrado). */
 function netWorthCardHtml(netWorthCents, series) {
   const n = series.length;
   const variation = n >= 2 ? series[n - 1].cents - series[n - 2].cents : null;
@@ -59,8 +44,24 @@ function netWorthCardHtml(netWorthCents, series) {
   const badgeHtml = variation === null ? "" : `
     <div style="display:flex;align-items:center;gap:5px;background:color-mix(in srgb, ${up ? "var(--green)" : "var(--red)"} 16%, var(--card));border-radius:999px;padding:6px 10px;flex-shrink:0;">
       ${ICON_ARROW(up)}
-      <div class="num" style="font-size:11px;font-weight:700;color:${up ? "var(--green)" : "var(--red)"};">${fmtMoney(Math.abs(variation))}</div>
+      <div class="num" style="font-size:11px;font-weight:700;color:${up ? "var(--green)" : "var(--red)"};">${fmtMoney(Math.abs(variation))} este periodo</div>
     </div>`;
+  const prev = n >= 2 ? series[n - 2] : null;
+  const contextLineHtml = prev
+    ? `<span style="font-size:11px;color:var(--text-2);">cierre de ${escHtml(prev.label)}: ${escHtml(fmtMoney(prev.cents))}</span>`
+    : "";
+  // Envuelto en un único div: el badge y la línea de contexto son hijos flex del propio `.card`
+  // (gap:16px) — sin este wrapper, un `prev` nulo (0 periodos cerrados) dejaría un hijo vacío
+  // ocupando igualmente el gap del padre.
+  const sideHtml = prev
+    ? `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">${badgeHtml}${contextLineHtml}</div>`
+    : "";
+  // netWorthBarsHtml devuelve dos filas hermanas (barras + etiquetas) pensadas para flujo de
+  // bloque, no para ser hijas directas de un flex column con gap — sin este wrapper el gap:16px
+  // del `.card` se cuela entre ambas filas y las separa del resto del texto que ya traen sus
+  // propios margin-top. Condicionado a que haya contenido: con <2 puntos, netWorthBarsHtml
+  // devuelve "" y no debe generar un hijo fantasma que igualmente ocupe el gap del padre.
+  const barsHtml = netWorthBarsHtml(series);
 
   return `
     <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
@@ -69,9 +70,9 @@ function netWorthCardHtml(netWorthCents, series) {
           <div class="section-title">Patrimonio neto</div>
           <div class="amount-hero num">${moneyPartsHtml(netWorthCents)}</div>
         </div>
-        ${badgeHtml}
+        ${sideHtml}
       </div>
-      ${netWorthSparkHtml(series)}
+      ${barsHtml ? `<div>${barsHtml}</div>` : ""}
     </div>`;
 }
 
