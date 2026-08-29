@@ -528,9 +528,11 @@ export const ES = {
     },
     about: {
       title: "Acerca de BaseCero",
+      feedback: "¿No funciona?",
       privacy: "Política de privacidad",
       source: "Código fuente",
       license: "Licencia MIT",
+      feedbackNote: "El formulario se abre en Tally, fuera de la app: solo viaja lo que escribas ahí.",
     },
     importResult: {
       summary: "Nuevas: {created} · Conciliadas: {reconciled} · Duplicadas (saltadas): {skipped}",
