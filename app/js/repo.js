@@ -5,6 +5,7 @@ import { CONTRACT, insertSql } from "./contract.js";
 import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
 import { resolveAccountId } from "./account-defaults.js";
 import { POOL, CURATED_ICONS, CATEGORY_ICONS, parseStyle, initCategoryStyle } from "./category-colors.js";
+import { SEED_NAMES } from "./seeds.js";
 import { t } from "./i18n/index.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
@@ -697,6 +698,25 @@ export async function archiveCategory(id) {
  *  hija se reactiva a mano, una por una): evita reactivar en bloque subcategorías que el usuario
  *  quizá había archivado ella sola antes de archivar la raíz. */
 export const unarchiveCategory = (id) => exec(SQL.setCategoryArchived, [0, nowIso(), id]);
+
+/** i18n (PR i18n, Task 6): retraduce las categorías SEMILLA (SEED_NAMES, seeds.js) al cambiar el
+ *  idioma de la app — un SQL.retranslateCategory por id semilla, TODOS en el MISMO execMany (o
+ *  quedan todas retraducidas, o ninguna). Cada UPDATE lleva su propio guard `AND name = ?`
+ *  (nombre semilla del idioma ANTERIOR): una categoría que el usuario ya renombró no coincide y
+ *  esa fila concreta no se toca, aunque el resto del lote sí se aplique. No-op si fromLang ===
+ *  toLang (nada que retraducir) o si alguno de los dos no es un idioma soportado (evita escribir
+ *  name=NULL con un lang desconocido — SEED_NAMES solo tiene claves es/en). */
+export async function retranslateSeedNames(fromLang, toLang) {
+  if (fromLang === toLang) return;
+  const supported = ["es", "en"];
+  if (!supported.includes(fromLang) || !supported.includes(toLang)) return;
+  const t = nowIso();
+  const stmts = Object.entries(SEED_NAMES).map(([id, names]) => ({
+    sql: SQL.retranslateCategory,
+    bind: [names[toLang], t, id, names[fromLang]],
+  }));
+  await execMany(stmts);
+}
 
 /** Persiste el orden de un grupo (raíces de un flow, o hijas de una raíz) tras un arrastre: deja
  *  display_order en 1..n según la posición de cada id en `orderedIds`, en un único execMany (o

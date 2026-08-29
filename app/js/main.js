@@ -1,7 +1,7 @@
 import { initDb } from "./db.js";
 import { getOpenPeriod, getMetaAll, listPeriods } from "./repo.js";
 import { initFormat } from "./format.js";
-import { initI18nFromNavigator, initI18n, t } from "./i18n/index.js";
+import { initI18nFromNavigator, initI18n, activeLang, t } from "./i18n/index.js";
 import { initCategoryStyle, parseStyle } from "./category-colors.js";
 import { showOnboarding, showFirstPeriod } from "./onboarding.js";
 import { needsOnboarding } from "./onboarding-steps.js";
@@ -30,7 +30,11 @@ export function nav(tab) {
 async function boot() {
   initI18nFromNavigator();
   try {
-    const { storage } = await initDb();
+    // seedLang: en una BD virgen meta.lang aún no existe (se lee más abajo, tras getMetaAll), así
+    // que la mejor señal disponible para sembrar las categorías en el idioma correcto es la del
+    // navegador — initI18nFromNavigator() ya la resolvió justo arriba, así que activeLang() aquí
+    // SIEMPRE devuelve esa resolución (nunca meta.lang, que en una BD nueva no existe todavía).
+    const { storage } = await initDb({ seedLang: activeLang() });
     if (storage === "locked") {
       // Otra pestaña o la PWA instalada ya tienen la base abierta (opfs-sahpool
       // es de instancia única): recuperable cerrando la otra y reintentando.

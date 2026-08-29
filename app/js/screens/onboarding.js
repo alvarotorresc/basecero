@@ -6,7 +6,7 @@
 // se guardan al salir del paso 3 — si se cierra la pestaña a mitad, el gate (0 periodos)
 // reabre el onboarding con lo ya guardado.
 import { fmtMoney, initFormat, hoyISO } from "../format.js";
-import { getMetaAll, setMeta, setMetaMany, balancesAt, createAccount, replaceAll } from "../repo.js";
+import { getMetaAll, setMeta, setMetaMany, balancesAt, createAccount, replaceAll, retranslateSeedNames } from "../repo.js";
 import { POOL } from "../category-colors.js";
 import { canLeaveAccounts, accountDraft } from "../onboarding-steps.js";
 import { currencyOptionsHtml, localeOptionsHtml } from "./ajustes.js";
@@ -278,8 +278,14 @@ export async function renderOnboarding(container, { onDone }) {
         if (state.busy) return;
         state.busy = true;
         const v = b.dataset.onbLang;
+        // Antes de guardar: activeLang() es el idioma con el que las categorías semilla se
+        // sembraron al arrancar (o el último retraducido) — mismo criterio que ajustes.js.
+        const prev = activeLang();
         try {
           await setMeta("lang", v);
+          // Solo si cambió de verdad: retraduce las categorías semilla ANTES de repintar con el
+          // nuevo idioma (retranslateSeedNames es su propio execMany atómico — ver repo.js).
+          if (v !== prev) await retranslateSeedNames(prev, v);
           initI18n({ lang: v });
           document.documentElement.lang = v;
         } catch (e) { state.errorMsg = t("common.saveFailed", { error: e.message }); }

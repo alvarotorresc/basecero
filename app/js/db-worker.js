@@ -4,7 +4,7 @@ import { classifyStorageFailure } from "./format.js";
 
 let db = null, storage = "opfs";
 
-async function init() {
+async function init(seedLang = "es") {
   const sqlite3 = await sqlite3InitModule({ print: () => {}, printErr: console.error });
   try {
     const pool = await sqlite3.installOpfsSAHPoolVfs({ name: "basecero" });
@@ -22,7 +22,7 @@ async function init() {
     const now = new Date().toISOString().slice(0, 19) + "Z";
     db.exec("BEGIN");
     try {
-      for (const { sql, rows } of seedStatements(now)) for (const r of rows) db.exec({ sql, bind: r });
+      for (const { sql, rows } of seedStatements(now, seedLang)) for (const r of rows) db.exec({ sql, bind: r });
       db.exec("COMMIT");
     } catch (e) {
       db.exec("ROLLBACK");
@@ -33,9 +33,9 @@ async function init() {
 }
 
 self.onmessage = async (e) => {
-  const { id, op, sql, params, stmts } = e.data;
+  const { id, op, sql, params, stmts, seedLang } = e.data;
   try {
-    if (op === "init") { const r = await init(); postMessage({ id, ...r }); return; }
+    if (op === "init") { const r = await init(seedLang); postMessage({ id, ...r }); return; }
     if (op === "query") {
       const rows = [];
       db.exec({ sql, bind: params ?? [], rowMode: "object", resultRows: rows });

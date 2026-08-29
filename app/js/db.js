@@ -11,7 +11,7 @@ function call(op, extra = {}) {
   });
 }
 
-export function initDb() {
+export function initDb({ seedLang } = {}) {
   worker = new Worker(new URL("./db-worker.js", import.meta.url), { type: "module" });
   worker.onmessage = (e) => {
     const { id, error, ...rest } = e.data;
@@ -29,7 +29,7 @@ export function initDb() {
     const err = new Error(t("errors.worker.failed") + (e.message || "desconocido"));
     for (const [id, p] of pending) { pending.delete(id); p.reject(err); }
   };
-  return call("init");
+  return call("init", { seedLang });
 }
 export const query = (sql, params = []) => call("query", { sql, params }).then((r) => r.rows);
 export const exec = (sql, params = []) => call("exec", { sql, params }).then(() => {});

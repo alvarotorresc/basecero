@@ -1,4 +1,4 @@
-import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta, setMetaMany, allCategoriesById } from "../repo.js";
+import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta, setMetaMany, allCategoriesById, retranslateSeedNames } from "../repo.js";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
 import { hoyISO, fmtDiaCorto, fmtMoney } from "../format.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
@@ -572,14 +572,20 @@ export async function renderAjustes(container) {
       const locale = container.querySelector("#pref-locale").value;
       const lang = container.querySelector("#pref-lang").value;
       const partner = container.querySelector("#cfg-partner").value.trim();
+      // Antes de guardar: activeLang() todavía refleja el idioma CON el que se sembraron las
+      // categorías (o el último retraducido) — hace falta capturarlo aquí porque tras
+      // setMetaMany() ya no hay forma de recuperar "el idioma de antes".
+      const prevLang = activeLang();
       state.busy = true; render();
       try {
         // Los cuatro campos de la tarjeta en UN execMany (vía setMetaMany): o quedan las cuatro
         // claves guardadas o ninguna, así currency/locale/lang/partner_name nunca quedan a medias.
         // partner_name va sin bcSanitizeCell a propósito: SheetJS exporta la celda como string (sin riesgo
         // de fórmula) y sanitizar ensuciaría el nombre en toda la UI («+Ana» → «'+Ana»).
-        // NOTA: sin retranslateSeedNames aquí — esa llamada la añade la Task 6 (aún no existe).
         await setMetaMany([["currency", currency], ["locale", locale], ["lang", lang], ["partner_name", partner]]);
+        // Solo si el idioma cambió de verdad: retraduce las categorías semilla ANTES del reload
+        // (retranslateSeedNames es su propio execMany atómico — ver repo.js).
+        if (lang !== prevLang) await retranslateSeedNames(prevLang, lang);
         location.reload();
       } catch (err) {
         state.busy = false;

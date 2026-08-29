@@ -245,5 +245,12 @@ export const SQL = {
   // parent_id, a una categoría que dejaba de ser raíz, dejando un árbol de 3 niveles (huérfana en
   // los hechos, aunque nunca se borra la fila). Sin filtro is_archived: cuenta cualquier hija.
   hasChildren: `SELECT 1 FROM categories WHERE parent_id=? AND deleted=0 LIMIT 1`,
+
+  // i18n (PR i18n, Task 6): retraduce el nombre de UNA categoría semilla al cambiar el idioma de
+  // la app. `AND name = ?` (bind: nombre semilla del idioma ANTERIOR) es el guard: solo toca la
+  // fila si su nombre sigue siendo EXACTAMENTE ese — una categoría que el usuario ya renombró
+  // ("Mi casa") no coincide con ningún nombre semilla y la sentencia no la afecta (0 filas). Bind:
+  // [nombreNuevo, now, id, nombreSemillaAnterior].
+  retranslateCategory: `UPDATE categories SET name = ?, updated_at = ? WHERE id = ? AND name = ? AND deleted = 0`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"];
