@@ -113,9 +113,18 @@ export function parseStyle(raw) {
   }
 }
 
+// A1 (review de seguridad): un category_id cuyo parent_id apunta a sí mismo (o un ciclo A↔B) puede
+// entrar en la DB vía un xlsx importado a mano (validateImport hoy solo comprueba que el padre
+// exista — Task 3 cierra esa vía de entrada). rootOf corre en CADA render de Inicio/Movimientos, así
+// que sin guard un ciclo ya presente en la DB cuelga la pestaña en cada carga: este Set de
+// visitados es la única vía de recuperación una vez el ciclo ya está guardado.
 export function rootOf(catId, byId) {
   let c = byId[catId];
-  while (c && c.parent_id) c = byId[c.parent_id];
+  const seen = new Set();
+  while (c && c.parent_id && !seen.has(c.id)) {
+    seen.add(c.id);
+    c = byId[c.parent_id];
+  }
   return c ? c.id : catId;
 }
 
