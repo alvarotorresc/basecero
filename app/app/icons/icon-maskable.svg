@@ -1,7 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <rect width="512" height="512" fill="#1C1C21"/>
-  <g transform="translate(256,256) scale(0.7) translate(-256,-256)">
-    <text x="256" y="272" text-anchor="middle" dominant-baseline="central"
-          font-family="system-ui, sans-serif" font-weight="800" font-size="210" letter-spacing="-12" fill="#F0EFF4">B0</text>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><rect width="512" height="512" fill="#4FD99A"/><g transform="translate(256,280) scale(0.84) translate(-256,-280)"><path d="M193.43 112.79A41 42 0 1 0 166 186A41 42 0 1 1 138.57 259.21" fill="none" stroke="#121214" stroke-width="40" stroke-linecap="round"/><rect x="149" y="78" width="34" height="216" rx="17" fill="#121214"/><path d="M373.43 112.79A41 42 0 1 0 346 186A41 42 0 1 1 318.57 259.21" fill="none" stroke="#121214" stroke-width="40" stroke-linecap="round"/><rect x="329" y="78" width="34" height="216" rx="17" fill="#121214"/><rect x="138" y="349" width="236" height="50" rx="25" fill="#121214"/></g></svg>
