@@ -27,13 +27,13 @@ export async function openNextPeriod({ name, startDate, sharePct, budgets = [] }
   const current = await getOpenPeriod();
   if (periodStartTooEarly(current, startDate))
     throw new Error(t("errors.repo.periodStartTooEarly"));
-  const t = nowIso();
+  const now = nowIso();
   const newId = bcUlid();
   const stmts = [];
-  if (current) stmts.push({ sql: SQL.closePeriod, bind: [prevDayIso(startDate), t, current.id] });
-  stmts.push({ sql: SQL.insertPeriod, bind: [newId, name, startDate, sharePct, t, t] });
+  if (current) stmts.push({ sql: SQL.closePeriod, bind: [prevDayIso(startDate), now, current.id] });
+  stmts.push({ sql: SQL.insertPeriod, bind: [newId, name, startDate, sharePct, now, now] });
   for (const b of budgets) {
-    stmts.push({ sql: SQL.insertBudget, bind: [bcUlid(), newId, b.categoryId, b.amountCents, t, t] });
+    stmts.push({ sql: SQL.insertBudget, bind: [bcUlid(), newId, b.categoryId, b.amountCents, now, now] });
   }
   await execMany(stmts);
   return newId;
@@ -45,15 +45,15 @@ export async function addTransaction({
 }) {
   const p = await getOpenPeriod();
   if (!p) throw new Error(t("errors.common.noOpenPeriod"));
-  const t = nowIso();
+  const now = nowIso();
   const insertStmt = {
     sql: SQL.insertTransaction,
     bind: [bcUlid(), date, p.id, type, amountCents, accountId, counterAccountId,
       categoryId ?? "", bcSanitizeCell(merchant ?? ""), bcSanitizeCell(note ?? ""),
-      isShared ? 1 : 0, sharePctOverride, 0, refId, ruleId, externalId, status, t, t],
+      isShared ? 1 : 0, sharePctOverride, 0, refId, ruleId, externalId, status, now, now],
   };
   if (refId) {
-    await execMany([insertStmt, { sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [t, refId] }]);
+    await execMany([insertStmt, { sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [now, refId] }]);
   } else {
     await exec(insertStmt.sql, insertStmt.bind);
   }
@@ -90,8 +90,8 @@ export async function setMetaMany(pairs) {
  *  trae compartidos de antes de que la contraparte fuera configurable (partner_name vacío pero
  *  ya hay is_shared=1 en la BD). */
 export async function hasSharedData() {
-  const [t, r] = await Promise.all([query(SQL.hasSharedTx), query(SQL.hasSharedRule)]);
-  return t.length > 0 || r.length > 0;
+  const [tx, rules] = await Promise.all([query(SQL.hasSharedTx), query(SQL.hasSharedRule)]);
+  return tx.length > 0 || rules.length > 0;
 }
 
 /** Cuenta destino del import CSV / cuenta por defecto de formularios, resueltas desde meta
@@ -213,11 +213,11 @@ export async function updateTransaction(id, fields) {
   if (sharedFieldsLocked(cur, f) && (await hasActiveLinkedRefund(id))) {
     throw new Error(t("errors.repo.txLockedSettled"));
   }
-  const t = nowIso();
+  const now = nowIso();
   await exec(SQL.updateTransaction, [
     f.type, f.amountCents, f.date, f.categoryId ?? "", f.accountId, f.counterAccountId ?? "",
     bcSanitizeCell(f.merchant ?? ""), bcSanitizeCell(f.note ?? ""), f.isShared ? 1 : 0,
-    f.sharePctOverride, f.refId ?? "", f.ruleId ?? "", f.status, t, id,
+    f.sharePctOverride, f.refId ?? "", f.ruleId ?? "", f.status, now, id,
   ]);
 }
 
@@ -226,14 +226,14 @@ export async function updateTransaction(id, fields) {
  *  apuntándole (p.ej. si alguna vez se permiten varios refunds parciales sobre el mismo gasto). */
 export async function softDeleteTransaction(id) {
   const cur = await getTransaction(id);
-  const t = nowIso();
+  const now = nowIso();
   if (cur && cur.type === "refund" && cur.ref_id) {
     await execMany([
-      { sql: SQL.softDeleteTransaction, bind: [t, id] },
-      { sql: SQL.unsettleIfNoActiveRefunds, bind: [cur.ref_id, id, t, cur.ref_id] },
+      { sql: SQL.softDeleteTransaction, bind: [now, id] },
+      { sql: SQL.unsettleIfNoActiveRefunds, bind: [cur.ref_id, id, now, cur.ref_id] },
     ]);
   } else {
-    await exec(SQL.softDeleteTransaction, [t, id]);
+    await exec(SQL.softDeleteTransaction, [now, id]);
   }
 }
 
@@ -245,13 +245,13 @@ export const getRule = async (id) => (await query(SQL.getRule, [id]))[0] ?? null
  *  bcSanitizeCell como merchant/note de addTransaction: es texto libre tecleado por el usuario
  *  que via exportAllJson acaba en una celda .xlsx (mismo riesgo de inyección de fórmula). */
 export async function createRule(fields) {
-  const t = nowIso();
+  const now = nowIso();
   await exec(SQL.insertRule, [
     bcUlid(), bcSanitizeCell(fields.name), fields.type, fields.amountCents,
     fields.categoryId ?? "", fields.accountId, fields.counterAccountId ?? "",
     fields.frequency, fields.dueDay ?? null, fields.dueMonth ?? null,
     fields.isShared ? 1 : 0, fields.isActive === false ? 0 : 1,
-    t, t,
+    now, now,
   ]);
 }
 
@@ -273,10 +273,10 @@ export async function updateRule(id, fields) {
     isShared: fields.isShared ?? !!cur.is_shared,
     isActive: fields.isActive ?? !!cur.is_active,
   };
-  const t = nowIso();
+  const now = nowIso();
   await exec(SQL.updateRule, [
     bcSanitizeCell(f.name), f.type, f.amountCents, f.categoryId ?? "", f.accountId, f.counterAccountId ?? "",
-    f.frequency, f.dueDay, f.dueMonth, f.isShared ? 1 : 0, f.isActive ? 1 : 0, t, id,
+    f.frequency, f.dueDay, f.dueMonth, f.isShared ? 1 : 0, f.isActive ? 1 : 0, now, id,
   ]);
 }
 
@@ -503,8 +503,8 @@ export const getAccount = async (id) => (await query(SQL.getAccount, [id]))[0] ?
  *  MISMO execMany. */
 export async function createAccount({ name, type, openingBalanceCents }) {
   const id = bcUlid();
-  const t = nowIso();
-  await exec(SQL.insertAccount, [id, bcSanitizeCell(name), type, openingBalanceCents, t, t]);
+  const now = nowIso();
+  await exec(SQL.insertAccount, [id, bcSanitizeCell(name), type, openingBalanceCents, now, now]);
   return id;
 }
 
@@ -518,8 +518,8 @@ export async function updateAccount(id, fields) {
   const name = fields.name ?? cur.name;
   const type = fields.type ?? cur.type;
   const openingBalanceCents = fields.openingBalanceCents ?? cur.opening_balance_cents;
-  const t = nowIso();
-  await exec(SQL.updateAccount, [bcSanitizeCell(name), type, openingBalanceCents, t, id]);
+  const now = nowIso();
+  await exec(SQL.updateAccount, [bcSanitizeCell(name), type, openingBalanceCents, now, id]);
 }
 
 export const getGoal = async (id) => (await query(SQL.getGoal, [id]))[0] ?? null;
@@ -537,7 +537,7 @@ const HUCHA_GOAL_TYPES = new Set(["emergency_fund", "savings_target", "provision
  *  respeta lo recibido (por defecto 1 si no se indica) — antes se hardcodeaba a 1, ignorando el
  *  toggle "Activo" del formulario si el usuario lo apagaba al crear (ver fix report). */
 export async function createGoal(fields) {
-  const t = nowIso();
+  const now = nowIso();
   const goalId = bcUlid();
   const stmts = [];
   let accountId = fields.accountId || "";
@@ -545,7 +545,7 @@ export async function createGoal(fields) {
     accountId = bcUlid();
     stmts.push({
       sql: SQL.insertAccount,
-      bind: [accountId, bcSanitizeCell(`Hucha · ${fields.name}`), "savings", 0, t, t],
+      bind: [accountId, bcSanitizeCell(`Hucha · ${fields.name}`), "savings", 0, now, now],
     });
   }
   const isActive = fields.isActive !== undefined ? (fields.isActive ? 1 : 0) : 1;
@@ -554,7 +554,7 @@ export async function createGoal(fields) {
     bind: [
       goalId, bcSanitizeCell(fields.name), fields.type,
       fields.targetAmountCents ?? null, fields.targetMonths ?? null, fields.targetPct ?? null,
-      fields.targetDate ?? "", accountId, fields.categoryId ?? "", isActive, t, t,
+      fields.targetDate ?? "", accountId, fields.categoryId ?? "", isActive, now, now,
     ],
   });
   await execMany(stmts);
@@ -582,10 +582,10 @@ export async function updateGoal(id, fields) {
     categoryId: fields.categoryId !== undefined ? fields.categoryId : cur.category_id,
     isActive: fields.isActive ?? !!cur.is_active,
   };
-  const t = nowIso();
+  const now = nowIso();
   await exec(SQL.updateGoal, [
     bcSanitizeCell(f.name), f.type, f.targetAmountCents, f.targetMonths, f.targetPct,
-    f.targetDate ?? "", f.accountId ?? "", f.categoryId ?? "", f.isActive ? 1 : 0, t, id,
+    f.targetDate ?? "", f.accountId ?? "", f.categoryId ?? "", f.isActive ? 1 : 0, now, id,
   ]);
 }
 
@@ -628,8 +628,8 @@ export async function createCategory({ name, flow, needType, parentId }) {
     if (parent.is_archived) throw new Error(t("errors.repo.parentArchived"));
   }
   const id = bcUlid();
-  const t = nowIso();
-  await exec(SQL.insertCategory, [id, bcSanitizeCell(trimmed), pid, flow, needType ?? "", t, t, flow, pid]);
+  const now = nowIso();
+  await exec(SQL.insertCategory, [id, bcSanitizeCell(trimmed), pid, flow, needType ?? "", now, now, flow, pid]);
   return id;
 }
 
@@ -674,8 +674,8 @@ export async function updateCategory(id, fields) {
     }
   }
 
-  const t = nowIso();
-  await exec(SQL.updateCategory, [name, needType, parentId, t, id]);
+  const now = nowIso();
+  await exec(SQL.updateCategory, [name, needType, parentId, now, id]);
 }
 
 /** Archiva una categoría. Si es una raíz con hijas ACTIVAS, las archiva en cascada EN EL MISMO
@@ -685,10 +685,10 @@ export async function updateCategory(id, fields) {
  *  encuentra ninguna en childrenOf y archiva solo su propia fila. */
 export async function archiveCategory(id) {
   const kids = await query(SQL.childrenOf, [id]);
-  const t = nowIso();
+  const now = nowIso();
   const stmts = [
-    { sql: SQL.setCategoryArchived, bind: [1, t, id] },
-    ...kids.map((k) => ({ sql: SQL.setCategoryArchived, bind: [1, t, k.id] })),
+    { sql: SQL.setCategoryArchived, bind: [1, now, id] },
+    ...kids.map((k) => ({ sql: SQL.setCategoryArchived, bind: [1, now, k.id] })),
   ];
   await execMany(stmts);
 }
@@ -717,10 +717,10 @@ export async function retranslateSeedNames(toLang) {
   const supported = ["es", "en"];
   if (!supported.includes(toLang)) return;
   const otherLang = toLang === "es" ? "en" : "es";
-  const t = nowIso();
+  const now = nowIso();
   const stmts = Object.entries(SEED_NAMES).map(([id, names]) => ({
     sql: SQL.retranslateCategory,
-    bind: [names[toLang], t, id, names[otherLang]],
+    bind: [names[toLang], now, id, names[otherLang]],
   }));
   await execMany(stmts);
 }
@@ -730,8 +730,8 @@ export async function retranslateSeedNames(toLang) {
  *  se guarda el orden completo, o no se guarda nada). `orderedIds` ya viene calculado por
  *  computeReorder (pura, reexportada abajo) — esta función solo persiste. */
 export async function reorderCategories(orderedIds) {
-  const t = nowIso();
-  await execMany(orderedIds.map((catId, i) => ({ sql: SQL.updateCategoryOrder, bind: [i + 1, t, catId] })));
+  const now = nowIso();
+  await execMany(orderedIds.map((catId, i) => ({ sql: SQL.updateCategoryOrder, bind: [i + 1, now, catId] })));
 }
 
 // Pura, sin DB: vive en category-order.js (no en este archivo, que importa db.js → Worker del
