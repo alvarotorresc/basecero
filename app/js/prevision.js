@@ -55,3 +55,28 @@ export function ruleApplies(rule, month) {
 export function myAmountOfRule(rule, sharePct) {
   return rule.is_shared ? Math.round((rule.amount_cents * sharePct) / 100) : rule.amount_cents;
 }
+
+// --- Ritmo del plan (PR polish) ---
+
+// Día 1-based dentro del periodo (mediodía local para esquivar DST). Hoy < inicio → 1.
+export function dayIndexOfPeriod(startDateIso, todayIso) {
+  const ms = new Date(todayIso + "T12:00:00") - new Date(startDateIso + "T12:00:00");
+  return Math.max(1, Math.floor(ms / 86400000) + 1);
+}
+
+// Duración esperada del periodo abierto: un mes nominal desde start_date (misma fecha del
+// mes siguiente, ajustada a fin de mes: 31 ene → 28/29 feb). El periodo REAL cierra cuando
+// llega la nómina; esto solo alimenta el «día N de M» y el ritmo del plan.
+export function expectedPeriodDays(startDateIso) {
+  const start = new Date(startDateIso + "T12:00:00");
+  const next = new Date(start);
+  next.setMonth(next.getMonth() + 1);
+  if (next.getDate() !== start.getDate()) next.setDate(0);
+  return Math.round((next - start) / 86400000);
+}
+
+// Desviación del gasto frente al presupuesto prorrateado a hoy: >0 = sobre el ritmo.
+export function paceDeltaCents(budgetTotalCents, spentCents, startDateIso, todayIso) {
+  const frac = Math.min(1, dayIndexOfPeriod(startDateIso, todayIso) / expectedPeriodDays(startDateIso));
+  return spentCents - Math.round(budgetTotalCents * frac);
+}
