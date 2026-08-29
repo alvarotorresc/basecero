@@ -47,31 +47,15 @@ La hoja de cálculo en sí **no se versiona** en el repositorio: se genera a
 partir del código en `generator/` con un script Python, y ese `.xlsx`
 generado es lo que se importa en Google Sheets.
 
-## Cómo regenerar el `.xlsx`
+## El generador histórico de la hoja (retirado)
 
-Si aún no existe el entorno virtual de `generator/`, se crea una sola vez
-desde la raíz del repositorio:
-
-```bash
-python3 -m venv generator/.venv
-generator/.venv/bin/pip install -r generator/requirements.txt
-```
-
-Para generar (o regenerar) el fichero, el módulo del generador se ejecuta
-desde dentro de `generator/` (es un paquete local, no está instalado en el
-`site-packages` del entorno virtual):
-
-```bash
-cd generator
-.venv/bin/python -m basecero_generator.cli ../dist/BaseCero.xlsx
-```
-
-Esto escribe `dist/BaseCero.xlsx` (en la raíz del repositorio) con las 8
-pestañas de datos (cabeceras, validaciones, filas semilla, plantillas
-prerrellenadas hasta 2000 filas en `transactions`) y las 3 pestañas de
-dashboards con sus fórmulas. Cada vez que cambie el diseño del contrato hay
-que regenerar el fichero y volver a importarlo en Google Sheets (ver
-siguiente sección).
+La plantilla original de Google Sheets (pestañas de datos, validaciones y
+dashboards con fórmulas) se construía con un generador en Python que vivía
+en `generator/`. La app ya exporta y consume su propia hoja (Ajustes →
+«Descargar hoja (.xlsx)»), así que el generador quedó sin mantenimiento y
+fue retirado del repositorio; se recupera del historial con
+`git show dae6b77^:generator/basecero_generator/cli.py` (y análogos), donde
+`dae6b77` es el commit del borrado.
 
 ## Puesta en marcha en Google Sheets
 

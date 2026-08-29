@@ -733,3 +733,8 @@ body.onboarding .fab { display: none; }
   40%, 60% { transform: translateX(4px); }
 }
 .shake { animation: bc-shake 0.4s; }
+
+/* ---- Onboarding (PR F): indicador de progreso de 4 pasos ---- */
+.onb-dots { display: flex; gap: 6px; justify-content: center; }
+.onb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--card2); }
+.onb-dot.on { background: var(--text); width: 20px; border-radius: 999px; }

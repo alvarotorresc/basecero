@@ -40,7 +40,7 @@ function renderAsistenteError(container, mode, onDone, message) {
  *  spentByRootCategory('' ) en modo 'first' no matchea ningún period_id → devuelve todas las
  *  raíces con spent_cents=0 (mismo LEFT JOIN, sin fila cerrada de la que tirar "mes pasado").
  *  onDone() se llama tanto al abrir con éxito como al cancelar con la flecha atrás (modo 'next'). */
-export async function renderPeriodoNuevo(container, { mode, onDone }) {
+export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
   let closingPeriod = null, closingSpent = 0, closingIncome = 0, closingCount = 0, rootRows = [], meta = {};
   try {
     if (mode === "next") {
@@ -126,7 +126,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
     const kicker = mode === "next" ? `Cierra ${escHtml(closingPeriod.name)} · abre el siguiente` : "Primer periodo";
     return `
     <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
-      ${mode === "next" ? `<button type="button" class="icon-btn" id="pn-back" aria-label="Volver"
+      ${mode === "next" || onBack ? `<button type="button" class="icon-btn" id="pn-back" aria-label="Volver"
         style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>` : ""}
       <div style="display:flex; flex-direction:column; gap:4px;">
         <div class="day-label" style="color:var(--green);">${kicker}</div>
@@ -351,7 +351,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone }) {
 
   function wire() {
     const back = container.querySelector("#pn-back");
-    if (back) back.onclick = () => onDone();
+    if (back) back.onclick = () => (onBack ?? onDone)();
 
     container.querySelector("#pn-fecha").onchange = (e) => {
       state.startDate = e.target.value || hoyISO();

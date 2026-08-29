@@ -28,10 +28,10 @@ const LOCALES = [
   ["fr-FR", "Français"], ["it-IT", "Italiano"], ["pt-BR", "Português (Brasil)"],
 ];
 
-const currencyOptionsHtml = (cur) =>
+export const currencyOptionsHtml = (cur) =>
   [...new Set([cur, ...CURRENCIES])]
     .map((c) => `<option value="${escAttr(c)}" ${c === cur ? "selected" : ""}>${escHtml(c)}</option>`).join("");
-const localeOptionsHtml = (loc) => {
+export const localeOptionsHtml = (loc) => {
   const known = LOCALES.some(([v]) => v === loc) ? LOCALES : [[loc, loc], ...LOCALES];
   return known.map(([v, label]) => `<option value="${escAttr(v)}" ${v === loc ? "selected" : ""}>${escHtml(label)}</option>`).join("");
 };
