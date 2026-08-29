@@ -30,7 +30,11 @@ export function budgetStatus(spent, limit) {
 // no depende de que el motor resuelva custom properties dentro de un atributo SVG.
 const ICON_INFO = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="stroke:var(--text-2);flex-shrink:0;" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.01"></path></svg>`;
 
-const fmtPctInt = (pct) => `${Math.round(pct)} %`;
+// Espacio DURO (U+00A0) antes del %: en español el espacio previo al símbolo es lo correcto,
+// pero con espacio normal el porcentaje se partía en dos líneas al estrecharse el contenedor
+// («84» arriba, «%» debajo — visible en las capturas de la landing). Intl ya emite U+00A0 en
+// fmtPct, así que esto solo alinea el formateo hecho a mano con el del resto de la app.
+const fmtPctInt = (pct) => `${Math.round(pct)}\u00A0%`;
 
 /** Une nombres para el recuadro "Sin límite este periodo": hasta `max` nombres tal cual,
  *  y si sobran se corta con "y N más" (sin "y" antes del último del grupo visible, igual
