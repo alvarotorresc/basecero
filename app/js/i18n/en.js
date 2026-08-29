@@ -558,7 +558,7 @@ export const EN = {
     cta: { next: "Next" },
     welcome: {
       titleLine1: "Your money,",
-      titleLine2: "from scratch.",
+      titleLine2: "from zero.",
       subtitle: "BaseCero is your expense notebook: it lives on this device — no accounts, no cloud, no one watching.",
       feature1: { title: "Everything stays here", subtitle: "No server, no sign-up. Works even offline." },
       feature2: { title: "Your data is a spreadsheet", subtitle: "Export and import your data whenever you want: it’s never locked in." },

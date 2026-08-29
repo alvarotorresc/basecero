@@ -371,7 +371,7 @@ export async function renderAjustes(container) {
           </div>
         </div>
         <label class="field field-stack" style="margin-top:12px;">
-          <span>${t("ajustes.prefs.language")}</span>
+          <span class="field-label">${t("ajustes.prefs.language")}</span>
           <select id="pref-lang">${LANGS.map(([v, label]) => `<option value="${escAttr(v)}" ${v === activeLang() ? "selected" : ""}>${escHtml(label)}</option>`).join("")}</select>
         </label>
         <label class="field field-stack" style="margin-top:12px;">

@@ -275,12 +275,15 @@ export async function renderOnboarding(container, { onDone }) {
       // onboarding). initI18n()/documentElement.lang se re-evalúan y render() repinta todo el
       // paso ya traducido; state.prefs no se toca (currency/locale son un ajuste aparte).
       container.querySelectorAll("[data-onb-lang]").forEach((b) => (b.onclick = async () => {
+        if (state.busy) return;
+        state.busy = true;
         const v = b.dataset.onbLang;
         try {
           await setMeta("lang", v);
           initI18n({ lang: v });
           document.documentElement.lang = v;
         } catch (e) { state.errorMsg = t("common.saveFailed", { error: e.message }); }
+        state.busy = false;
         render();
       }));
       q("#onb-currency").onchange = (e) => { state.prefs.currency = e.target.value; };
