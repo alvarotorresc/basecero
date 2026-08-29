@@ -293,7 +293,7 @@ export async function renderRecurrentes(container, onBack) {
         </label>` : ""}
       </div>
 
-      ${withCategory && (f.isShared || partnerName) ? `
+      ${withCategory && f.type !== "income" && (f.isShared || partnerName) ? `
       <div class="card" style="padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
           <span style="font-size:15px; font-weight:600;">${t("recurrentes.form.sharedWith", { name: escHtml(partnerName) || t("recurrentes.shared.fallbackName") })}</span>
@@ -413,7 +413,7 @@ export async function renderRecurrentes(container, onBack) {
           frequency: f.frequency,
           dueDay: parseInt(f.dueDay, 10),
           dueMonth: needsMonth(f.frequency) ? parseInt(f.dueMonth, 10) : null,
-          isShared: withCategory ? f.isShared : false,
+          isShared: withCategory && f.type !== "income" ? f.isShared : false,
           isActive: f.isActive,
         };
         if (state.editId) await updateRule(state.editId, fields);

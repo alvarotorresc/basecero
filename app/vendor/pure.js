@@ -91,7 +91,19 @@ function bcDecideImportAction(row, existing) {
   var quiereGasto = row.amountCents < 0;
   for (var j = 0; j < existing.length; j++) {
     var t = existing[j];
+    // A2 (review-seguridad-2026-08-29.md): expense/income/refund son candidatos reales de
+    // conciliación — cada uno corresponde 1:1 a una única línea bancaria (un reembolso de un
+    // partner es un abono normal, igual que un ingreso). Solo transfer/adjustment quedan
+    // excluidos: son el defecto real de A2 — dirección ambigua/sintética frente a la cuenta
+    // importada, no una única línea bancaria identificable. Sin este filtro, una transferencia
+    // pendiente (siempre dinero saliente de la cuenta importada, ver n26.js signedAmountCents)
+    // puede casar con un abono cualquiera del mismo importe ±3 días — el abono se pierde en
+    // silencio y la transferencia queda marcada con un external_id ajeno. (Fix round 1: excluir
+    // también 'refund' aquí double-counteaba dinero — un reembolso pendiente dejaba de conciliar
+    // contra su abono bancario, así que el abono entraba como income NUEVO mientras el reembolso
+    // seguía contando en el saldo vía accountBalance, que suma type IN ('income','refund').)
     if (t.status === "pending" && !t.externalId &&
+        (t.type === "expense" || t.type === "income" || t.type === "refund") &&
         Math.abs(t.amountCents) === Math.abs(row.amountCents) &&
         (t.type === "expense") === quiereGasto &&
         bcDaysBetween(t.dateIso, row.bookingDate) <= 3) {

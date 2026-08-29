@@ -25,7 +25,10 @@ async function init(seedLang = "es") {
       for (const { sql, rows } of seedStatements(now, seedLang)) for (const r of rows) db.exec({ sql, bind: r });
       db.exec("COMMIT");
     } catch (e) {
-      db.exec("ROLLBACK");
+      // B5: si el fallo original ya provocó un auto-rollback de SQLite (p.ej. error I/O), este
+      // ROLLBACK explícito lanza "no transaction is active" y sustituye el mensaje real — se
+      // ignora su propio error y se relanza SIEMPRE el original.
+      try { db.exec("ROLLBACK"); } catch {}
       throw e;
     }
   }
@@ -35,6 +38,10 @@ async function init(seedLang = "es") {
 self.onmessage = async (e) => {
   const { id, op, sql, params, stmts, seedLang } = e.data;
   try {
+    // B3: una consulta que llega durante el init async (aún no asignó `db`) o tras un init
+    // fallido daba un TypeError crudo ("Cannot read properties of null"); ahora responde un
+    // código que db.js traduce como los demás (unknown_op:, ver mapWorkerError).
+    if (op !== "init" && db === null) { postMessage({ id, error: "not_initialized" }); return; }
     if (op === "init") { const r = await init(seedLang); postMessage({ id, ...r }); return; }
     if (op === "query") {
       const rows = [];
@@ -47,7 +54,12 @@ self.onmessage = async (e) => {
       try {
         for (const s of stmts) db.exec({ sql: s.sql, bind: s.bind ?? [] });
         db.exec("COMMIT");
-      } catch (e) { db.exec("ROLLBACK"); throw e; }
+      } catch (e) {
+        // B5: mismo guard que en init() — no dejar que un ROLLBACK sin transacción activa
+        // enmascare el error real del statement que falló.
+        try { db.exec("ROLLBACK"); } catch {}
+        throw e;
+      }
       postMessage({ id, rows: [] }); return;
     }
     postMessage({ id, error: "unknown_op:" + op });

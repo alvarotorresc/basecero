@@ -31,6 +31,21 @@ export async function externalIdFor(row, hashFn = sha256Hex) {
   return bcBuildExternalId(row.bookingDate, row.amountCents, row.partnerName, row.paymentReference, () => hex);
 }
 
+/** Firma |amount_cents| según el type (M4/A2, review-seguridad-2026-08-29.md), para construir el
+ *  `existing` que consume bcDecideImportAction (que compara SIGNOS, no valores absolutos, para
+ *  decidir expense-vs-income — ver quiereGasto en pure.js). expense Y transfer son SIEMPRE
+ *  dinero saliente de la cuenta importada (n26.js:56 original solo firmaba expense; una
+ *  transferencia quedaba con signo +, como si fuera un ingreso). Exportada para poder testear el
+ *  signo de forma aislada — bcDecideImportAction ya excluye 'transfer' de la conciliación (fix de
+ *  arriba en pure.js), así que este signo no cambia NINGÚN resultado de decide hoy; solo importa
+ *  por coherencia si `existing` se lee en otro sitio en el futuro.
+ *  NO válida para 'adjustment': esa fila puede almacenarse ya con signo negativo (comentario
+ *  original más abajo) y el Math.abs() se lo comería — pero adjustment tampoco es nunca candidato
+ *  de conciliación, así que queda fuera del alcance de esta función a propósito. */
+export function signedAmountCents(type, amountCentsAbs) {
+  return Math.abs(amountCentsAbs) * ((type === "expense" || type === "transfer") ? -1 : 1);
+}
+
 /** Cuerpo compartido de todo import de movimientos (N26 o CSV genérico vía perfil, Task 5 PR E):
  *  dedupe por external_id, concilia pendientes manuales que casen en importe/sentido/±3 días,
  *  crea el resto sin categorizar. `rows` ya viene parseado — misma forma exacta que produce
@@ -38,31 +53,32 @@ export async function externalIdFor(row, hashFn = sha256Hex) {
  *  paymentReference, amountCents}. Devuelve los contadores para el banner de Ajustes. Un único
  *  execMany al final (todo o nada). Extraído literal de importN26Csv (antes de Task 5 era todo
  *  el cuerpo de esa función) — CERO cambio de comportamiento, solo se movió el parseo del CSV
- *  (bcParseN26Csv) fuera, al llamador. */
+ *  (bcParseN26Csv) fuera, al llamador.
+ *  M4 (review-seguridad-2026-08-29.md): una fila de 0,00 (verificación de tarjeta) o con importe
+ *  no numérico (CSV corrupto) se salta ANTES de entrar al pipeline — se cuenta en `omitted` en
+ *  vez de dejar que insertTransaction viole el CHECK amount_cents>0 y tire abajo el execMany
+ *  entero (todo el resto de filas del import se perdía con un error SQL crudo). */
 async function runImportPipeline(rows) {
   const period = await getOpenPeriod();
   if (!period) throw new Error(t("errors.common.noOpenPeriod"));
   const accountId = await importAccountId();
   if (!accountId) throw new Error(t("errors.n26.noAccount"));
 
-  // Re-firma en memoria (puerto literal del brief: |amount_cents| × signo por type). El CHECK de
-  // la tabla exige amount_cents>0 SOLO para type<>'adjustment' — la cuenta de import podría en
-  // teoría tener algún adjustment con signo negativo, de ahí el Math.abs explícito en vez de
-  // asumir positivo.
   const existing = (await n26Existing(accountId)).map((t) => ({
     id: t.id,
     dateIso: t.date,
     type: t.type,
-    amountCents: Math.abs(t.amount_cents) * (t.type === "expense" ? -1 : 1),
+    amountCents: signedAmountCents(t.type, t.amount_cents),
     externalId: t.external_id,
     status: t.status,
   }));
 
-  const res = { created: 0, reconciled: 0, skipped: 0 };
+  const res = { created: 0, reconciled: 0, skipped: 0, omitted: 0 };
   const now = nowIso();
   const stmts = [];
 
   for (const r of rows) {
+    if (r.amountCents === 0 || !Number.isFinite(r.amountCents)) { res.omitted++; continue; }
     r.externalId = await externalIdFor(r);
     const decision = bcDecideImportAction(r, existing);
 
@@ -103,11 +119,13 @@ export async function importN26Csv(text) {
 
 /** Aplica un perfil de CSV genérico (csv-generic.js) y mete las filas válidas por el MISMO
  *  pipeline de dedupe/conciliación que N26. Las filas con error de applyProfile (fecha/importe
- *  inválidos) NO entran al pipeline: se cuentan aparte como `omitted` y no bloquean el resto. */
+ *  inválidos) NO entran al pipeline: se cuentan aparte como `omitted` y no bloquean el resto.
+ *  `res.omitted` ya trae su propio conteo (M4: filas de 0,00 o no numéricas descartadas DENTRO
+ *  del pipeline) — se SUMA a errors.length, nunca se pisa. */
 export async function importWithProfile(text, profile) {
   const { rows, errors } = applyProfile(text, profile, bcParseCsvLine);
   const res = await runImportPipeline(rows);
-  return { ...res, omitted: errors.length };
+  return { ...res, omitted: res.omitted + errors.length };
 }
 
 /** Router de import (Task 5, PR E): detecta el formato del CSV y elige camino sin que la UI

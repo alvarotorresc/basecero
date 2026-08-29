@@ -278,7 +278,7 @@ export async function renderRegistro(container, onDone, prefill) {
         <input type="text" id="reg-note" value="${escAttr(state.note)}" placeholder="${t("common.optional")}">
       </label>
 
-      ${needsCategory(state.tipo) && partnerName ? `
+      ${needsCategory(state.tipo) && state.tipo !== "income" && partnerName ? `
       <div class="card" style="border-radius:16px; padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
           <span style="font-size:15px; font-weight:600;">${t("common.sharedWith", { name: escHtml(partnerName) })}</span>
@@ -417,7 +417,11 @@ export async function renderRegistro(container, onDone, prefill) {
           counterAccountId: state.tipo === "transfer" ? state.counterAccountId : "",
           merchant: state.merchant,
           note: state.note,
-          isShared: withCategory ? state.isShared : false,
+          // B4 ruling: el reparto ya no se OFRECE para ingresos (incomeOfPeriod sigue contando
+          // al 100%, ver sql.js) — este guard evita que un isShared heredado (p.ej. prefill de
+          // una regla recurrente marcada compartida, inicio.js) se cuele en el guardado aunque
+          // el toggle esté oculto para tipo=income.
+          isShared: withCategory && state.tipo !== "income" ? state.isShared : false,
           refId: state.tipo === "refund" ? state.refId : "",
           ruleId: state.ruleId,
         });

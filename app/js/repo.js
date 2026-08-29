@@ -27,13 +27,13 @@ export async function openNextPeriod({ name, startDate, sharePct, budgets = [] }
   const current = await getOpenPeriod();
   if (periodStartTooEarly(current, startDate))
     throw new Error(t("errors.repo.periodStartTooEarly"));
-  const t = nowIso();
+  const now = nowIso();
   const newId = bcUlid();
   const stmts = [];
-  if (current) stmts.push({ sql: SQL.closePeriod, bind: [prevDayIso(startDate), t, current.id] });
-  stmts.push({ sql: SQL.insertPeriod, bind: [newId, name, startDate, sharePct, t, t] });
+  if (current) stmts.push({ sql: SQL.closePeriod, bind: [prevDayIso(startDate), now, current.id] });
+  stmts.push({ sql: SQL.insertPeriod, bind: [newId, name, startDate, sharePct, now, now] });
   for (const b of budgets) {
-    stmts.push({ sql: SQL.insertBudget, bind: [bcUlid(), newId, b.categoryId, b.amountCents, t, t] });
+    stmts.push({ sql: SQL.insertBudget, bind: [bcUlid(), newId, b.categoryId, b.amountCents, now, now] });
   }
   await execMany(stmts);
   return newId;
@@ -45,15 +45,15 @@ export async function addTransaction({
 }) {
   const p = await getOpenPeriod();
   if (!p) throw new Error(t("errors.common.noOpenPeriod"));
-  const t = nowIso();
+  const now = nowIso();
   const insertStmt = {
     sql: SQL.insertTransaction,
     bind: [bcUlid(), date, p.id, type, amountCents, accountId, counterAccountId,
       categoryId ?? "", bcSanitizeCell(merchant ?? ""), bcSanitizeCell(note ?? ""),
-      isShared ? 1 : 0, sharePctOverride, 0, refId, ruleId, externalId, status, t, t],
+      isShared ? 1 : 0, sharePctOverride, 0, refId, ruleId, externalId, status, now, now],
   };
   if (refId) {
-    await execMany([insertStmt, { sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [t, refId] }]);
+    await execMany([insertStmt, { sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [now, refId] }]);
   } else {
     await exec(insertStmt.sql, insertStmt.bind);
   }
@@ -90,8 +90,8 @@ export async function setMetaMany(pairs) {
  *  trae compartidos de antes de que la contraparte fuera configurable (partner_name vacío pero
  *  ya hay is_shared=1 en la BD). */
 export async function hasSharedData() {
-  const [t, r] = await Promise.all([query(SQL.hasSharedTx), query(SQL.hasSharedRule)]);
-  return t.length > 0 || r.length > 0;
+  const [tx, rules] = await Promise.all([query(SQL.hasSharedTx), query(SQL.hasSharedRule)]);
+  return tx.length > 0 || rules.length > 0;
 }
 
 /** Cuenta destino del import CSV / cuenta por defecto de formularios, resueltas desde meta
@@ -125,6 +125,31 @@ export function sharedFieldsLocked(cur, f) {
     || !!f.isShared !== !!cur.is_shared
     || f.sharePctOverride !== cur.share_pct_override;
 }
+
+/** M5 (Task 6, review de seguridad): el guard de arriba solo mira el LADO DEL GASTO. Si en vez
+ *  de tocar el gasto se toca el REFUND enlazado (bajar su importe de 50€ a 5€), sharedFieldsLocked
+ *  nunca se evalúa — cur.type sería 'refund', no 'expense' — y la deuda de 45€ desaparece de
+ *  Liquidar en silencio mientras el gasto original sigue settled=1. Pura (mismo patrón que
+ *  sharedFieldsLocked): `linked` es la fila YA CARGADA del gasto que apunta cur.ref_id (o null si
+ *  no existe/está borrado — getTransaction filtra deleted=0, así que un refund que ya apunta a un
+ *  gasto huérfano de ANTES de este fix queda fuera del guard a propósito, ver nota en el report). */
+export function refundAmountLocked(cur, f, linked) {
+  return cur.type === "refund" && !!cur.ref_id
+    && f.amountCents !== cur.amount_cents
+    && !!linked?.settled;
+}
+
+/** M5 (Task 6): ¿debe bloquearse el borrado de `cur` porque es un gasto con al menos un refund
+ *  ACTIVO enlazado por ref_id? Deliberadamente NO mira cur.settled — un import a mano puede dejar
+ *  settled=1 sin ningún refund vivo (fila ya borrada a mano, o backup viejo), y bloquear por ese
+ *  campo dejaría el gasto sin ninguna vía para borrarse nunca. Se ancla solo en `hasActiveRefund`
+ *  (ya resuelto por el caller vía hasActiveLinkedRefund): así SIEMPRE hay una salida — borrar
+ *  primero el refund (rama existente de softDeleteTransaction: unsettle + borra) deja el gasto
+ *  como uno normal, no liquidado, borrable por la vía de siempre. */
+export function expenseDeleteLocked(cur, hasActiveRefund) {
+  return !!cur && cur.type === "expense" && !!hasActiveRefund;
+}
+
 export const countUncategorized = async (pid) => (await query(SQL.countUncategorized, [pid]))[0].n;
 export const pendingShared = () => query(SQL.pendingShared);
 export const pendingSharedTotalCents = async () => (await query(SQL.pendingSharedTotal))[0].total_cents;
@@ -213,27 +238,49 @@ export async function updateTransaction(id, fields) {
   if (sharedFieldsLocked(cur, f) && (await hasActiveLinkedRefund(id))) {
     throw new Error(t("errors.repo.txLockedSettled"));
   }
-  const t = nowIso();
+  // Task 6 (M5): lado del refund del mismo guard — ver refundAmountLocked. cur.ref_id, si existe,
+  // apunta siempre a un gasto (nunca a otro refund), así que reutilizar getTransaction aquí es
+  // correcto y evita duplicar el SELECT.
+  const linkedExpense = cur.type === "refund" && cur.ref_id ? await getTransaction(cur.ref_id) : null;
+  if (refundAmountLocked(cur, f, linkedExpense)) {
+    throw new Error(t("errors.repo.refundLockedSettled"));
+  }
+  const now = nowIso();
   await exec(SQL.updateTransaction, [
     f.type, f.amountCents, f.date, f.categoryId ?? "", f.accountId, f.counterAccountId ?? "",
     bcSanitizeCell(f.merchant ?? ""), bcSanitizeCell(f.note ?? ""), f.isShared ? 1 : 0,
-    f.sharePctOverride, f.refId ?? "", f.ruleId ?? "", f.status, t, id,
+    f.sharePctOverride, f.refId ?? "", f.ruleId ?? "", f.status, now, id,
   ]);
 }
 
 /** Borra (soft) un movimiento. Si es un refund enlazado a un gasto (ref_id), revierte el
  *  settled=1 de ese gasto EN LA MISMA operación — salvo que quede algún otro refund activo
- *  apuntándole (p.ej. si alguna vez se permiten varios refunds parciales sobre el mismo gasto). */
+ *  apuntándole (p.ej. si alguna vez se permiten varios refunds parciales sobre el mismo gasto).
+ *
+ *  Task 6 (M5): si en cambio se intenta borrar el GASTO original y tiene algún refund activo
+ *  enlazado, se BLOQUEA (no se hace cascada) — ver expenseDeleteLocked. Elegido sobre des-liquidar
+ *  y borrar el refund en cascada porque bloquear NUNCA deja al usuario sin salida: la rama de
+ *  arriba (borrar el refund primero) ya des-liquida el gasto ella sola, así que borrar el refund y
+ *  LUEGO el gasto es un camino de dos pasos que ya funciona hoy sin tocar nada más. Una cascada
+ *  automática, en cambio, borraría en silencio una fila que representa dinero que ya se movió a
+ *  una cuenta real (el refund cuenta en accountBalance) como efecto secundario de borrar OTRA
+ *  fila — pérdida de datos silenciosa que el usuario no pidió. */
 export async function softDeleteTransaction(id) {
   const cur = await getTransaction(id);
-  const t = nowIso();
+  // hasActiveLinkedRefund solo se consulta cuando cur.type==='expense': para el resto de tipos
+  // expenseDeleteLocked ya descarta por type sin necesidad del SELECT extra.
+  const hasActiveRefund = cur?.type === "expense" && (await hasActiveLinkedRefund(id));
+  if (expenseDeleteLocked(cur, hasActiveRefund)) {
+    throw new Error(t("errors.repo.expenseLockedHasRefund"));
+  }
+  const now = nowIso();
   if (cur && cur.type === "refund" && cur.ref_id) {
     await execMany([
-      { sql: SQL.softDeleteTransaction, bind: [t, id] },
-      { sql: SQL.unsettleIfNoActiveRefunds, bind: [cur.ref_id, id, t, cur.ref_id] },
+      { sql: SQL.softDeleteTransaction, bind: [now, id] },
+      { sql: SQL.unsettleIfNoActiveRefunds, bind: [cur.ref_id, id, now, cur.ref_id] },
     ]);
   } else {
-    await exec(SQL.softDeleteTransaction, [t, id]);
+    await exec(SQL.softDeleteTransaction, [now, id]);
   }
 }
 
@@ -245,13 +292,13 @@ export const getRule = async (id) => (await query(SQL.getRule, [id]))[0] ?? null
  *  bcSanitizeCell como merchant/note de addTransaction: es texto libre tecleado por el usuario
  *  que via exportAllJson acaba en una celda .xlsx (mismo riesgo de inyección de fórmula). */
 export async function createRule(fields) {
-  const t = nowIso();
+  const now = nowIso();
   await exec(SQL.insertRule, [
     bcUlid(), bcSanitizeCell(fields.name), fields.type, fields.amountCents,
     fields.categoryId ?? "", fields.accountId, fields.counterAccountId ?? "",
     fields.frequency, fields.dueDay ?? null, fields.dueMonth ?? null,
     fields.isShared ? 1 : 0, fields.isActive === false ? 0 : 1,
-    t, t,
+    now, now,
   ]);
 }
 
@@ -273,10 +320,10 @@ export async function updateRule(id, fields) {
     isShared: fields.isShared ?? !!cur.is_shared,
     isActive: fields.isActive ?? !!cur.is_active,
   };
-  const t = nowIso();
+  const now = nowIso();
   await exec(SQL.updateRule, [
     bcSanitizeCell(f.name), f.type, f.amountCents, f.categoryId ?? "", f.accountId, f.counterAccountId ?? "",
-    f.frequency, f.dueDay, f.dueMonth, f.isShared ? 1 : 0, f.isActive ? 1 : 0, t, id,
+    f.frequency, f.dueDay, f.dueMonth, f.isShared ? 1 : 0, f.isActive ? 1 : 0, now, id,
   ]);
 }
 
@@ -503,8 +550,8 @@ export const getAccount = async (id) => (await query(SQL.getAccount, [id]))[0] ?
  *  MISMO execMany. */
 export async function createAccount({ name, type, openingBalanceCents }) {
   const id = bcUlid();
-  const t = nowIso();
-  await exec(SQL.insertAccount, [id, bcSanitizeCell(name), type, openingBalanceCents, t, t]);
+  const now = nowIso();
+  await exec(SQL.insertAccount, [id, bcSanitizeCell(name), type, openingBalanceCents, now, now]);
   return id;
 }
 
@@ -518,8 +565,8 @@ export async function updateAccount(id, fields) {
   const name = fields.name ?? cur.name;
   const type = fields.type ?? cur.type;
   const openingBalanceCents = fields.openingBalanceCents ?? cur.opening_balance_cents;
-  const t = nowIso();
-  await exec(SQL.updateAccount, [bcSanitizeCell(name), type, openingBalanceCents, t, id]);
+  const now = nowIso();
+  await exec(SQL.updateAccount, [bcSanitizeCell(name), type, openingBalanceCents, now, id]);
 }
 
 export const getGoal = async (id) => (await query(SQL.getGoal, [id]))[0] ?? null;
@@ -537,7 +584,7 @@ const HUCHA_GOAL_TYPES = new Set(["emergency_fund", "savings_target", "provision
  *  respeta lo recibido (por defecto 1 si no se indica) — antes se hardcodeaba a 1, ignorando el
  *  toggle "Activo" del formulario si el usuario lo apagaba al crear (ver fix report). */
 export async function createGoal(fields) {
-  const t = nowIso();
+  const now = nowIso();
   const goalId = bcUlid();
   const stmts = [];
   let accountId = fields.accountId || "";
@@ -545,7 +592,7 @@ export async function createGoal(fields) {
     accountId = bcUlid();
     stmts.push({
       sql: SQL.insertAccount,
-      bind: [accountId, bcSanitizeCell(`Hucha · ${fields.name}`), "savings", 0, t, t],
+      bind: [accountId, bcSanitizeCell(`Hucha · ${fields.name}`), "savings", 0, now, now],
     });
   }
   const isActive = fields.isActive !== undefined ? (fields.isActive ? 1 : 0) : 1;
@@ -554,7 +601,7 @@ export async function createGoal(fields) {
     bind: [
       goalId, bcSanitizeCell(fields.name), fields.type,
       fields.targetAmountCents ?? null, fields.targetMonths ?? null, fields.targetPct ?? null,
-      fields.targetDate ?? "", accountId, fields.categoryId ?? "", isActive, t, t,
+      fields.targetDate ?? "", accountId, fields.categoryId ?? "", isActive, now, now,
     ],
   });
   await execMany(stmts);
@@ -582,10 +629,10 @@ export async function updateGoal(id, fields) {
     categoryId: fields.categoryId !== undefined ? fields.categoryId : cur.category_id,
     isActive: fields.isActive ?? !!cur.is_active,
   };
-  const t = nowIso();
+  const now = nowIso();
   await exec(SQL.updateGoal, [
     bcSanitizeCell(f.name), f.type, f.targetAmountCents, f.targetMonths, f.targetPct,
-    f.targetDate ?? "", f.accountId ?? "", f.categoryId ?? "", f.isActive ? 1 : 0, t, id,
+    f.targetDate ?? "", f.accountId ?? "", f.categoryId ?? "", f.isActive ? 1 : 0, now, id,
   ]);
 }
 
@@ -628,8 +675,8 @@ export async function createCategory({ name, flow, needType, parentId }) {
     if (parent.is_archived) throw new Error(t("errors.repo.parentArchived"));
   }
   const id = bcUlid();
-  const t = nowIso();
-  await exec(SQL.insertCategory, [id, bcSanitizeCell(trimmed), pid, flow, needType ?? "", t, t, flow, pid]);
+  const now = nowIso();
+  await exec(SQL.insertCategory, [id, bcSanitizeCell(trimmed), pid, flow, needType ?? "", now, now, flow, pid]);
   return id;
 }
 
@@ -674,8 +721,8 @@ export async function updateCategory(id, fields) {
     }
   }
 
-  const t = nowIso();
-  await exec(SQL.updateCategory, [name, needType, parentId, t, id]);
+  const now = nowIso();
+  await exec(SQL.updateCategory, [name, needType, parentId, now, id]);
 }
 
 /** Archiva una categoría. Si es una raíz con hijas ACTIVAS, las archiva en cascada EN EL MISMO
@@ -685,10 +732,10 @@ export async function updateCategory(id, fields) {
  *  encuentra ninguna en childrenOf y archiva solo su propia fila. */
 export async function archiveCategory(id) {
   const kids = await query(SQL.childrenOf, [id]);
-  const t = nowIso();
+  const now = nowIso();
   const stmts = [
-    { sql: SQL.setCategoryArchived, bind: [1, t, id] },
-    ...kids.map((k) => ({ sql: SQL.setCategoryArchived, bind: [1, t, k.id] })),
+    { sql: SQL.setCategoryArchived, bind: [1, now, id] },
+    ...kids.map((k) => ({ sql: SQL.setCategoryArchived, bind: [1, now, k.id] })),
   ];
   await execMany(stmts);
 }
@@ -717,10 +764,10 @@ export async function retranslateSeedNames(toLang) {
   const supported = ["es", "en"];
   if (!supported.includes(toLang)) return;
   const otherLang = toLang === "es" ? "en" : "es";
-  const t = nowIso();
+  const now = nowIso();
   const stmts = Object.entries(SEED_NAMES).map(([id, names]) => ({
     sql: SQL.retranslateCategory,
-    bind: [names[toLang], t, id, names[otherLang]],
+    bind: [names[toLang], now, id, names[otherLang]],
   }));
   await execMany(stmts);
 }
@@ -730,8 +777,8 @@ export async function retranslateSeedNames(toLang) {
  *  se guarda el orden completo, o no se guarda nada). `orderedIds` ya viene calculado por
  *  computeReorder (pura, reexportada abajo) — esta función solo persiste. */
 export async function reorderCategories(orderedIds) {
-  const t = nowIso();
-  await execMany(orderedIds.map((catId, i) => ({ sql: SQL.updateCategoryOrder, bind: [i + 1, t, catId] })));
+  const now = nowIso();
+  await execMany(orderedIds.map((catId, i) => ({ sql: SQL.updateCategoryOrder, bind: [i + 1, now, catId] })));
 }
 
 // Pura, sin DB: vive en category-order.js (no en este archivo, que importa db.js → Worker del

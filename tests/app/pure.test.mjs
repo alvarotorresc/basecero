@@ -43,6 +43,45 @@ test("decide: skip por externalId, reconcile por pending, create el resto", () =
   assert.deepEqual(p.bcDecideImportAction(rows[2], existing), { action: "create" });
 });
 
+test("decide: transferencia pendiente NO es candidata de conciliación (A2) — un abono se crea, no se traga la transferencia", () => {
+  // Escenario del hallazgo: transferencia manual pendiente de 500€ (dinero saliente de la
+  // cuenta, signo negativo — ver n26.js signedAmountCents) + import de un abono de 500€ a 1 día
+  // de diferencia. Antes del fix esto reconciliaba contra la transferencia (mismo importe en
+  // valor absoluto y `(t.type === "expense") === quiereGasto` daba true para type≠'expense'
+  // cuando el abono es un ingreso). Ahora debe crearse como fila nueva.
+  const existing = [
+    { id: "tr1", dateIso: "2026-08-19", type: "transfer", amountCents: -50000, externalId: "", status: "pending" },
+  ];
+  const abono = { bookingDate: "2026-08-20", amountCents: 50000, externalId: "hash-abono-nuevo" };
+  assert.deepEqual(p.bcDecideImportAction(abono, existing), { action: "create" });
+});
+
+test("decide: expense/income pendientes SIGUEN siendo candidatos de conciliación (pin, sin cambios)", () => {
+  const existing = [
+    { id: "e1", dateIso: "2026-08-19", type: "expense", amountCents: -4520, externalId: "", status: "pending" },
+    { id: "i1", dateIso: "2026-08-19", type: "income", amountCents: 36000, externalId: "", status: "pending" },
+  ];
+  assert.deepEqual(
+    p.bcDecideImportAction({ bookingDate: "2026-08-20", amountCents: -4520, externalId: "x" }, existing),
+    { action: "reconcile", matchId: "e1" });
+  assert.deepEqual(
+    p.bcDecideImportAction({ bookingDate: "2026-08-20", amountCents: 36000, externalId: "y" }, existing),
+    { action: "reconcile", matchId: "i1" });
+});
+
+test("decide: reembolso pendiente SIGUE siendo candidato de conciliación (fix round 1 — refund NO se excluye)", () => {
+  // Un reembolso corresponde 1:1 a una única línea bancaria (un abono de un partner), igual que
+  // un ingreso — NO es ambiguo/sintético como transfer/adjustment. Excluirlo de la conciliación
+  // (como hacía el filtro `{expense, income}` original de este task) double-cuenta dinero: el
+  // abono bancario entraría como income NUEVO mientras el reembolso pendiente sigue sumando en
+  // accountBalance (type IN ('income','refund')).
+  const existing = [
+    { id: "r1", dateIso: "2026-08-19", type: "refund", amountCents: 36000, externalId: "", status: "pending" },
+  ];
+  const abono = { bookingDate: "2026-08-20", amountCents: 36000, externalId: "hash-reembolso-nuevo" };
+  assert.deepEqual(p.bcDecideImportAction(abono, existing), { action: "reconcile", matchId: "r1" });
+});
+
 test("picker → id", () => {
   const cats = [
     { id: "cat-casa", name: "Casa", parentId: "" },

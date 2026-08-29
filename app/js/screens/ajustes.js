@@ -157,8 +157,9 @@ function amountNoteFor(spec) {
 }
 
 /** Banner de resultado tras CUALQUIER import (directo por el router o vía el asistente): el
- *  texto de siempre + «· N filas ilegibles omitidas» si applyProfile descartó alguna (omitted,
- *  solo puede venir en via:"profile") + la frase de Bizum SOLO con contraparte configurada Y
+ *  texto de siempre + «· N filas ilegibles omitidas» si se descartó alguna fila — applyProfile
+ *  (fecha/importe irreconocibles, solo via:"profile") o el propio pipeline (M4: fila de 0,00 o
+ *  importe no numérico, cualquier via) + la frase de Bizum SOLO con contraparte configurada Y
  *  via:"n26" — un CSV genérico no tiene forma de distinguir un Bizum de cualquier otro abono. */
 function importResultText(res, partnerName) {
   let text = t("ajustes.importResult.summary", { created: res.created, reconciled: res.reconciled, skipped: res.skipped });

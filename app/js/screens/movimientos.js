@@ -247,7 +247,9 @@ export async function renderMovimientos(container) {
   function renderDetail() {
     const d = state.detail;
     const period = periods.find((p) => p.id === state.periodId);
-    const pct = period?.my_share_pct ?? 100;
+    // B4: mismo COALESCE que MY_AMOUNT en sql.js (t.share_pct_override, p.my_share_pct, 100) —
+    // antes ignoraba el override por transacción y la lista/detalle mostraban importes distintos.
+    const pct = d.sharePctOverride ?? period?.my_share_pct ?? 100;
     const cats = categoriesFor(d.type);
     const myCents = d.isShared ? Math.round((d.cents * pct) / 100) : d.cents;
     const partnerCents = d.isShared ? d.cents - myCents : 0;
@@ -310,7 +312,7 @@ export async function renderMovimientos(container) {
         </label>
         <label class="field field-stack" style="flex:1;">
           <span class="field-label">${t("common.date")}</span>
-          <input type="date" id="mov-fecha" value="${d.fecha}">
+          <input type="date" id="mov-fecha" value="${escAttr(d.fecha)}">
         </label>
       </div>
       <label class="field field-stack" style="margin-bottom:18px;">
@@ -318,7 +320,7 @@ export async function renderMovimientos(container) {
         <input type="text" id="mov-note" value="${escAttr(d.note)}" placeholder="${t("common.optional")}">
       </label>
 
-      ${needsCategory(d.type) && (d.wasShared || partnerName) ? `
+      ${needsCategory(d.type) && d.type !== "income" && (d.wasShared || partnerName) ? `
       <div class="card" style="padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:${locked ? "default" : "pointer"};${locked ? "opacity:.5;" : ""}">
           <span style="font-size:15px; font-weight:600;">${t("common.sharedWith", { name: escHtml(partnerName) || t("movimientos.shared.fallbackName") })}</span>
@@ -390,7 +392,7 @@ export async function renderMovimientos(container) {
       const partnerEl = container.querySelector("#mov-split-partner");
       if (d.isShared && mineEl && partnerEl) {
         const period = periods.find((p) => p.id === state.periodId);
-        const pct = period?.my_share_pct ?? 100;
+        const pct = d.sharePctOverride ?? period?.my_share_pct ?? 100;
         const myCents = Math.round((d.cents * pct) / 100);
         mineEl.textContent = fmtMoney(myCents);
         partnerEl.textContent = fmtMoney(d.cents - myCents);
@@ -426,7 +428,7 @@ export async function renderMovimientos(container) {
           counterAccountId: d.type === "transfer" ? d.counterAccountId : "",
           merchant: d.merchant,
           note: d.note,
-          isShared: withCategory ? d.isShared : false,
+          isShared: withCategory && d.type !== "income" ? d.isShared : false,
           sharePctOverride: d.sharePctOverride,
           refId: d.refId,
           ruleId: d.ruleId,

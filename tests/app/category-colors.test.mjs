@@ -7,6 +7,7 @@ import {
   initCategoryStyle,
   parseStyle,
   hashIndex,
+  rootOf,
   POOL,
   CURATED_ICONS,
 } from "../../app/js/category-colors.js";
@@ -26,6 +27,43 @@ const POOL_TEXT = {
 // Reset del estado module-level entre tests para que no se filtren overrides.
 beforeEach(() => {
   initCategoryStyle({});
+});
+
+// byId envuelto en un Proxy que cuenta lecturas y lanza tras un umbral: un rootOf sin guard de
+// ciclo entra en bucle infinito sobre un byId cíclico (parent_id se muerde la cola) y colgaría el
+// runner de node --test sin límite de tiempo propio; este wrapper convierte ese cuelgue en un
+// throw determinista y rápido, así el test falla (red) en vez de colgarse. Sobre rootOf ya
+// arreglado (con Set de visitados) el bucle termina mucho antes del umbral y el throw nunca salta.
+function withLookupLimit(byId, limit = 10000) {
+  let gets = 0;
+  return new Proxy(byId, {
+    get(target, prop) {
+      gets++;
+      if (gets > limit) {
+        throw new Error(`rootOf: más de ${limit} lecturas de byId — posible bucle infinito sin guard de ciclo`);
+      }
+      return target[prop];
+    },
+  });
+}
+
+// A1 (review de seguridad): un category_id cuyo parent_id apunta a sí mismo (o un ciclo A↔B) puede
+// entrar en la DB vía un xlsx importado a mano (Task 3 cierra la vía de entrada; este test cubre la
+// recuperación en runtime para una DB YA cíclica). rootOf corre en cada render de Inicio/Movimientos,
+// así que sin guard un ciclo cuelga la pestaña en cada carga — este guard es la única vía de
+// recuperación posible una vez el ciclo ya está en la DB.
+test("category-colors: rootOf termina sobre un auto-ciclo (parent_id === id propio) sin colgarse", () => {
+  const byId = withLookupLimit({ a: { id: "a", parent_id: "a" } });
+  assert.equal(rootOf("a", byId), "a", "un nodo auto-referenciado debe resolver a su propio id, no colgarse");
+});
+
+test("category-colors: rootOf termina sobre un ciclo A↔B (a.parent_id=b, b.parent_id=a) sin colgarse", () => {
+  const byId = withLookupLimit({
+    a: { id: "a", parent_id: "b" },
+    b: { id: "b", parent_id: "a" },
+  });
+  const result = rootOf("a", byId);
+  assert.ok(result === "a" || result === "b", "debe devolver uno de los dos ids del ciclo, no colgarse");
 });
 
 test("category-colors: paridad de seeds — sin overrides, las 14 raíces + iconos rinden los valores actuales", () => {
