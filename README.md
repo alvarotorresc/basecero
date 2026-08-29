@@ -7,8 +7,9 @@ offline**.
 
 **https://alvarotorresc.github.io/basecero/**
 
-- Onboarding guiado en 4 pasos: cuentas, categorías, primer periodo y (si
-  quieres) import inicial de movimientos.
+- Onboarding guiado en 4 pasos: bienvenida, cuentas, preferencias (idioma,
+  moneda, reparto de gastos compartidos) y primer periodo; puedes importar
+  una copia ya desde la primera pantalla.
 - Import de CSV: perfil directo para N26 (con deduplicación y conciliación
   de movimientos ya registrados a mano) y un asistente genérico para
   mapear el CSV de cualquier otro banco.
@@ -16,7 +17,8 @@ offline**.
   categoría y periodo.
 - Gastos compartidos con liquidación entre dos personas.
 - Movimientos recurrentes con previsión y «disponible real» del periodo.
-- Patrimonio con evolución por cuenta y objetivos.
+- Patrimonio: evolución del patrimonio neto por periodo, saldo actual por
+  cuenta y objetivos.
 - Copias de seguridad: exporta un `.xlsx` (contrato de datos completo,
   round-trip sin pérdidas) o una copia cifrada `.bce`.
 - Bilingüe, español e inglés.
@@ -61,8 +63,8 @@ dispositivo.
 - Estructura: `app/js/` (lógica y pantallas), `app/js/screens/` (una
   pantalla por fichero), `app/js/i18n/` (es/en), `app/css/`, `app/vendor/`
   (SheetJS, SQLite WASM, fuente Outfit).
-- Tests: `node --test` (287 tests, sin dependencias externas). El
-  contrato de import/export `.xlsx` tiene su propio round-trip test
+- Tests con `node --test`, sin dependencias externas. El contrato de
+  import/export `.xlsx` tiene su propio round-trip test
   ([`tests/app/contract.test.mjs`](tests/app/contract.test.mjs)): exporta,
   reimporta y compara que los datos y relaciones queden intactos.
 - CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) corre la
