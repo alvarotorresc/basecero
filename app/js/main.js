@@ -27,6 +27,14 @@ export function nav(tab) {
   RUTAS[tab]();
 }
 
+// Se llama en boot y de nuevo tras el onboarding, donde el usuario puede haber cambiado el idioma:
+// el tabbar y el FAB están ocultos durante el asistente, así que sin este segundo rotulado
+// quedarían con el idioma del arranque durante toda la sesión.
+function relabelChrome() {
+  document.querySelectorAll(".tab").forEach((b) => { b.lastChild.textContent = " " + t("main.tabs." + b.dataset.tab); });
+  document.getElementById("btn-registro").setAttribute("aria-label", t("main.fab"));
+}
+
 async function boot() {
   initI18nFromNavigator();
   try {
@@ -60,10 +68,9 @@ async function boot() {
       initFormat(meta);
       initCategoryStyle(parseStyle(meta.category_style));
       document.documentElement.lang = uiLang;
-      document.querySelectorAll(".tab").forEach((b) => { b.lastChild.textContent = " " + t("main.tabs." + b.dataset.tab); });
-      document.getElementById("btn-registro").setAttribute("aria-label", t("main.fab"));
+      relabelChrome();
     } catch {} // si meta no se puede leer, la app arranca con es-ES/EUR
-    if (needsOnboarding(await listPeriods())) await showOnboarding(screen);
+    if (needsOnboarding(await listPeriods())) { await showOnboarding(screen); relabelChrome(); }
     else if (!(await getOpenPeriod())) await showFirstPeriod(screen);
     nav("inicio");
   } catch (err) {

@@ -559,7 +559,7 @@ export const EN = {
     welcome: {
       titleLine1: "Your money,",
       titleLine2: "from zero.",
-      subtitle: "BaseCero is your expense notebook: it lives on this device — no accounts, no cloud, no one watching.",
+      subtitle: "BaseCero is your expense notebook: it lives on this device — no sign-ups, no cloud, no one watching.",
       feature1: { title: "Everything stays here", subtitle: "No server, no sign-up. Works even offline." },
       feature2: { title: "Your data is a spreadsheet", subtitle: "Export and import your data whenever you want: it’s never locked in." },
       feature3: { title: "Your month starts on payday", subtitle: "Periods run from payday to payday, not the 1st to the 30th." },
@@ -594,7 +594,7 @@ export const EN = {
       partnerPlaceholder: "Their name — or leave it empty if you’re going solo",
       partnerNote: "With a name, any expense can be marked as shared and the app keeps track of who owes what. Empty = no trace of that part of the app.",
       categoriesTitle: "Your categories",
-      categoriesNote: "You start with a pack of 41 (Home, Food, Transport…). Create, rename, recolor, or archive any of them in Settings → Categories.",
+      categoriesNote: "You start with a pack of 41 (Home, Groceries, Transport…). Create, rename, recolor, or archive any of them in Settings → Categories.",
     },
     period: {
       titleLine1: "Your month doesn’t start",
@@ -667,17 +667,17 @@ export const EN = {
       wrongPassphrase: "Incorrect password or corrupted file",
     },
     xlsx: {
-      missingSheet: "missing sheet «{table}»",
-      schemaVersion: "meta: schema_version must be 1 (got «{value}»)",
-      createdWith: "meta: created_with not recognized («{value}»)",
-      pkEmpty: "sheet «{table}» row {row}: empty id",
-      pkDuplicate: "sheet «{table}» row {row}: duplicate id («{pk}»)",
-      pkInvalidChars: "sheet «{table}» row {row}: id with invalid characters («{pk}»)",
-      enumInvalid: "sheet «{table}» row {row}: invalid {col} («{value}»)",
-      fkEmpty: "sheet «{table}» row {row}: empty {col}",
-      fkMissing: "sheet «{table}» row {row}: {col} points to «{value}», which doesn’t exist in {ref}",
+      missingSheet: "missing sheet “{table}”",
+      schemaVersion: "meta: schema_version must be 1 (got “{value}”)",
+      createdWith: "meta: created_with not recognized (“{value}”)",
+      pkEmpty: "sheet “{table}” row {row}: empty id",
+      pkDuplicate: "sheet “{table}” row {row}: duplicate id (“{pk}”)",
+      pkInvalidChars: "sheet “{table}” row {row}: id with invalid characters (“{pk}”)",
+      enumInvalid: "sheet “{table}” row {row}: invalid {col} (“{value}”)",
+      fkEmpty: "sheet “{table}” row {row}: empty {col}",
+      fkMissing: "sheet “{table}” row {row}: {col} points to “{value}”, which doesn’t exist in {ref}",
       multipleOpen: "periods: {n} open periods (maximum 1)",
-      amountNotPositive: "sheet «transactions» row {row}: amount must be > 0",
+      amountNotPositive: "sheet “transactions” row {row}: amount must be > 0",
     },
     csvGeneric: {
       invalidHeaders: "invalid headers",
@@ -690,6 +690,7 @@ export const EN = {
     worker: {
       unknownOp: "Unknown operation: {op}",
       failed: "Database worker error: ",
+      unknownDetail: "unknown",
     },
   },
   goals: {

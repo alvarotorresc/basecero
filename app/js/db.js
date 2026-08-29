@@ -26,7 +26,7 @@ export function initDb({ seedLang } = {}) {
   // Sin esto, un fallo al cargar/ejecutar db-worker.js (p.ej. 404) deja las
   // promesas pendientes (incluida la de init) colgadas para siempre.
   worker.onerror = (e) => {
-    const err = new Error(t("errors.worker.failed") + (e.message || "desconocido"));
+    const err = new Error(t("errors.worker.failed") + (e.message || t("errors.worker.unknownDetail")));
     for (const [id, p] of pending) { pending.delete(id); p.reject(err); }
   };
   return call("init", { seedLang });
