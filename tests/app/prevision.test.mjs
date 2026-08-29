@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { periodMonth, ruleApplies, myAmountOfRule } from "../../app/js/prevision.js";
+import { periodMonth, ruleApplies, myAmountOfRule, dayIndexOfPeriod, expectedPeriodDays, paceDeltaCents } from "../../app/js/prevision.js";
 import { SQL } from "../../app/js/sql.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
@@ -191,4 +191,30 @@ test("previsión del periodo (composición SQL + prevision.js): pagado por rule_
 
   const disponibleCents = saldoCuentaCents - comprometidoCents + pendientePartnerCents;
   assert.equal(disponibleCents, -7000 - 1500 + 2000);
+});
+
+test("dayIndexOfPeriod: 1-based y nunca menor que 1", () => {
+  assert.equal(dayIndexOfPeriod("2026-08-27", "2026-08-27"), 1);
+  assert.equal(dayIndexOfPeriod("2026-08-27", "2026-09-07"), 12);
+  assert.equal(dayIndexOfPeriod("2026-08-27", "2026-08-20"), 1);
+});
+
+test("dayIndexOfPeriod: regresión DST primavera (última madrugada de marzo)", () => {
+  // Regresión: el periodo cruza el cambio de hora de primavera.
+  assert.equal(dayIndexOfPeriod("2026-03-15", "2026-03-30"), 16);
+});
+
+test("expectedPeriodDays: mes nominal con ajuste de fin de mes", () => {
+  assert.equal(expectedPeriodDays("2026-08-27"), 31); // 27 ago → 27 sep
+  assert.equal(expectedPeriodDays("2026-01-31"), 28); // 31 ene → 28 feb (2026 no bisiesto)
+  assert.equal(expectedPeriodDays("2026-02-01"), 28); // 1 feb → 1 mar
+});
+
+test("paceDeltaCents: desviación sobre el plan prorrateado", () => {
+  // presupuesto 3100 €, día 12 de 31 → plan a hoy = 1200 €; gastado 1264 € → +64 €
+  assert.equal(paceDeltaCents(310000, 126400, "2026-08-27", "2026-09-07"), 6400);
+  // gastado por debajo → negativo
+  assert.equal(paceDeltaCents(310000, 100000, "2026-08-27", "2026-09-07"), -20000);
+  // pasado el mes nominal, el plan se satura en el total
+  assert.equal(paceDeltaCents(310000, 310000, "2026-08-27", "2026-10-15"), 0);
 });

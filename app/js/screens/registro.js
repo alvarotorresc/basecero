@@ -3,7 +3,7 @@ import {
   listAccounts, allCategoriesById, recentForRefund, getMetaAll,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
-import { fmtMoney, hoyISO, currencySymbol } from "../format.js";
+import { fmtMoney, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "back"];
@@ -24,7 +24,6 @@ const needsCategory = (tipo) => tipo === "expense" || tipo === "income" || tipo 
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const centsToRaw = (cents) => (cents ? (Math.abs(cents) / 100).toFixed(2).replace(".", ",") : "");
 
 /** Monta la pantalla completa de registro rápido de un movimiento (5 tipos).
  *  onDone() se llama tanto al cerrar (✕) como tras guardar con éxito.
@@ -80,7 +79,7 @@ export async function renderRegistro(container, onDone, prefill) {
 
   function setRaw(next) {
     state.raw = next;
-    state.cents = Math.round(parseFloat((state.raw || "0").replace(",", ".")) * 100) || 0;
+    state.cents = parseCentsRaw(state.raw);
     errorMsg = "";
     render();
   }

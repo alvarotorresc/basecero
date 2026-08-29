@@ -4,12 +4,11 @@ import {
   createGoal, updateGoal, softDeleteGoal,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtMoneyParts, hoyISO, fmtDec1, currencySymbol, currencyCode } from "../format.js";
-import { sparklineSvg } from "../charts.js";
+import { fmtMoney, fmtMoneyParts, hoyISO, fmtDec1, currencySymbol, currencyCode, parseCentsRaw, centsToRaw } from "../format.js";
+import { netWorthBarsHtml } from "../charts.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-const centsToRaw = (cents) => (cents ? (Math.abs(cents) / 100).toFixed(2).replace(".", ",") : "");
 
 // ---- tarjeta "Patrimonio neto" --------------------------------------------
 
@@ -29,28 +28,13 @@ const moneyPartsHtml = (cents) => {
   return `${escHtml(main)}<small>${escHtml(c)}</small>${escHtml(suffix)}`;
 };
 
-/** Sparkline + fila de etiquetas de mes debajo — sparklineSvg (Task 12) NO pinta las etiquetas
- *  (ver su comentario en charts.js), así que esta pantalla arma la fila propia, con el mes actual
- *  en negrita (réplica de design/Patrimonio.dc.html:50-58). Se oculta con <2 puntos: con 0
- *  periodos cerrados netWorthSeries solo trae el punto de hoy, y una línea de un único punto no
- *  cuenta ninguna evolución. */
-function netWorthSparkHtml(series) {
-  if (series.length < 2) return "";
-  const svg = sparklineSvg(series.map((p) => p.cents), series.map((p) => p.label));
-  const labelsHtml = series.map((p, i) => `
-    <div style="font-size:10px;text-align:center;${i === series.length - 1 ? "font-weight:700;color:var(--text);" : "color:var(--text-3);"}">${escHtml(p.label)}</div>`).join("");
-  return `
-    <div style="display:flex;flex-direction:column;gap:8px;">
-      ${svg}
-      <div style="display:grid;grid-template-columns:repeat(${series.length},minmax(0,1fr));gap:4px;">${labelsHtml}</div>
-    </div>`;
-}
-
 /** Tarjeta "Patrimonio neto": importe héroe (.amount-hero, 34/700) + badge de variación ABSOLUTA
- *  vs el último periodo CERRADO + sparkline — réplica de design/Patrimonio.dc.html:32-59. La variación es el propio
- *  penúltimo vs último punto de `series` (el último es siempre "hoy"; el penúltimo, si existe, es
- *  el del último cerrado — mismos puntos que ya trae netWorthSeries, sin repetir la query). Sin
- *  ningún cerrado (series.length<2) no hay nada con qué comparar: se oculta el badge entero. */
+ *  vs el último periodo CERRADO + evolución en barras (netWorthBarsHtml, charts.js) — réplica de
+ *  docs/design/material-expresivo/Patrimonio.dc.html:32-59. La variación es el propio penúltimo vs último punto de
+ *  `series` (el último es siempre "hoy"; el penúltimo, si existe, es el del último cerrado —
+ *  mismos puntos que ya trae netWorthSeries, sin repetir la query, y que pinta netWorthBarsHtml).
+ *  Sin ningún cerrado (series.length<2) no hay nada con qué comparar: se ocultan el badge y la
+ *  línea de contexto («cierre de X: Y», el saldo de ese último cerrado). */
 function netWorthCardHtml(netWorthCents, series) {
   const n = series.length;
   const variation = n >= 2 ? series[n - 1].cents - series[n - 2].cents : null;
@@ -60,8 +44,24 @@ function netWorthCardHtml(netWorthCents, series) {
   const badgeHtml = variation === null ? "" : `
     <div style="display:flex;align-items:center;gap:5px;background:color-mix(in srgb, ${up ? "var(--green)" : "var(--red)"} 16%, var(--card));border-radius:999px;padding:6px 10px;flex-shrink:0;">
       ${ICON_ARROW(up)}
-      <div class="num" style="font-size:11px;font-weight:700;color:${up ? "var(--green)" : "var(--red)"};">${fmtMoney(Math.abs(variation))}</div>
+      <div class="num" style="font-size:11px;font-weight:700;color:${up ? "var(--green)" : "var(--red)"};">${fmtMoney(Math.abs(variation))} este periodo</div>
     </div>`;
+  const prev = n >= 2 ? series[n - 2] : null;
+  const contextLineHtml = prev
+    ? `<span style="font-size:11px;color:var(--text-2);">cierre de ${escHtml(prev.label)}: ${escHtml(fmtMoney(prev.cents))}</span>`
+    : "";
+  // Envuelto en un único div: el badge y la línea de contexto son hijos flex del propio `.card`
+  // (gap:16px) — sin este wrapper, un `prev` nulo (0 periodos cerrados) dejaría un hijo vacío
+  // ocupando igualmente el gap del padre.
+  const sideHtml = prev
+    ? `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">${badgeHtml}${contextLineHtml}</div>`
+    : "";
+  // netWorthBarsHtml devuelve dos filas hermanas (barras + etiquetas) pensadas para flujo de
+  // bloque, no para ser hijas directas de un flex column con gap — sin este wrapper el gap:16px
+  // del `.card` se cuela entre ambas filas y las separa del resto del texto que ya traen sus
+  // propios margin-top. Condicionado a que haya contenido: con <2 puntos, netWorthBarsHtml
+  // devuelve "" y no debe generar un hijo fantasma que igualmente ocupe el gap del padre.
+  const barsHtml = netWorthBarsHtml(series);
 
   return `
     <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
@@ -70,15 +70,15 @@ function netWorthCardHtml(netWorthCents, series) {
           <div class="section-title">Patrimonio neto</div>
           <div class="amount-hero num">${moneyPartsHtml(netWorthCents)}</div>
         </div>
-        ${badgeHtml}
+        ${sideHtml}
       </div>
-      ${netWorthSparkHtml(series)}
+      ${barsHtml ? `<div>${barsHtml}</div>` : ""}
     </div>`;
 }
 
 // ---- tarjeta "Cuentas" -----------------------------------------------------
 
-// Trazos de los iconos SVG de design/Patrimonio.dc.html:71-118 (uno por tipo de cuenta, no por
+// Trazos de los iconos SVG de docs/design/material-expresivo/Patrimonio.dc.html:71-118 (uno por tipo de cuenta, no por
 // cuenta concreta: aquí solo hay 3 tipos). El color entra como --cat en .list-row-icon (mismo
 // mecanismo de tinte que .tx-icon con las categorías, ver app.css). Paleta propia de tipo de
 // cuenta, independiente de category-colors.js (checking/liability no están en la lista de hex
@@ -127,7 +127,7 @@ function cuentaRowHtml(a, isDefault) {
 }
 
 /** Tarjeta "Cuentas": una fila por cuenta activa (balancesAt ya excluye archivadas/borradas),
- *  separadas por <hr class="divider"> — réplica de design/Patrimonio.dc.html:61-121, + botón
+ *  separadas por <hr class="divider"> — réplica de docs/design/material-expresivo/Patrimonio.dc.html:61-121, + botón
  *  "Nueva cuenta" en la cabecera. Cada fila abre la subvista de edición (Task 14). El lado derecho
  *  es a dos líneas (saldo + "hoy", como el artboard) para las 3 cuentas: "hoy" es el único
  *  subtítulo que aplica siempre y sin inventar nada (balancesAt se pide con hoyISO()) — el
@@ -200,7 +200,7 @@ function fmtGoalAmount(goal, cents) {
 
 /** Fila de un goal SIN hucha (spending_cap/savings_rate): título + "actual / objetivo", barra
  *  .bar de 8px, subtítulo contextual a la izquierda + % en negrita a la derecha — réplica de
- *  design/Patrimonio.dc.html:104-112 (fila "Tope de Restauración"). El color (verde/ámbar/rojo)
+ *  docs/design/material-expresivo/Patrimonio.dc.html:104-112 (fila "Tope de Restauración"). El color (verde/ámbar/rojo)
  *  sigue el `level` de repo.goalProgress: solo se colorea texto (número grande, subtítulo, %)
  *  cuando level≠'ok' — en 'ok' se queda en los tonos neutros del resto de la pantalla, la barra
  *  es la única que lleva siempre su color de estado. La fila entera es un botón (Task 14): abre
@@ -234,7 +234,7 @@ function goalBarRowHtml(g) {
  *  (el artboard usa 52px, más grande que el .ring base de 46px — override inline por instancia,
  *  ver app.css#.ring) con el % en el centro, nombre + subtítulo real de repo.goalProgress a la
  *  derecha (con el progreso en importes delante, mismo dato que goalBarRowHtml muestra en su fila
- *  de cabecera) — réplica de design/Patrimonio.dc.html:84-103. Color = paleta[i % 12] por el
+ *  de cabecera) — réplica de docs/design/material-expresivo/Patrimonio.dc.html:84-103. Color = paleta[i % 12] por el
  *  índice del goal en el orden de listado (determinista, sin persistir nada). Fila-botón, igual
  *  criterio que goalBarRowHtml. */
 function goalRingRowHtml(g, color) {
@@ -257,7 +257,7 @@ function goalRingRowHtml(g, color) {
 }
 
 /** Tarjeta "Objetivos": una fila por goal activo, anillo (hucha) o barra (sin hucha) según
- *  HUCHA_GOAL_TYPES — réplica de design/Patrimonio.dc.html:123-189, + botón "Nuevo objetivo" en
+ *  HUCHA_GOAL_TYPES — réplica de docs/design/material-expresivo/Patrimonio.dc.html:123-189, + botón "Nuevo objetivo" en
  *  la cabecera. Cada fila abre la subvista de edición (Task 14). */
 function objetivosCardHtml(goals) {
   const n = goals.length;
@@ -425,7 +425,7 @@ export async function renderPatrimonio(container) {
 
     container.querySelector("#acc-raw").oninput = (e) => {
       f.raw = e.target.value;
-      f.cents = Math.round(parseFloat((f.raw || "0").replace(",", ".")) * 100) || 0;
+      f.cents = parseCentsRaw(f.raw);
       errorMsg = "";
     };
 
@@ -672,7 +672,7 @@ export async function renderPatrimonio(container) {
     const rawInput = container.querySelector("#goal-raw");
     if (rawInput) rawInput.oninput = (e) => {
       f.raw = e.target.value;
-      f.cents = Math.round(parseFloat((f.raw || "0").replace(",", ".")) * 100) || 0;
+      f.cents = parseCentsRaw(f.raw);
       errorMsg = "";
       state.deleteConfirm = false;
     };

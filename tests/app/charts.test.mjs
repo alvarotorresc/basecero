@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { barChartSvg, donutSvg, sparklineSvg } from "../../app/js/charts.js";
+import { barChartSvg, donutSvg, sparklineSvg, netWorthBarsHtml } from "../../app/js/charts.js";
 import { SQL } from "../../app/js/sql.js";
 import { fillLast7Days } from "../../app/js/repo.js";
 import { fmtDiaIni } from "../../app/js/format.js";
@@ -97,6 +97,21 @@ test("sparklineSvg: N puntos → polyline con N pares de coordenadas", () => {
 test("sparklineSvg: un único punto no revienta (sin división por cero)", () => {
   const svg = sparklineSvg([50], ["a"]);
   assert.ok(!svg.includes("NaN"));
+});
+
+// ---- netWorthBarsHtml -----------------------------------------------------
+
+test("netWorthBarsHtml: hasta 6 barras, la última en verde, etiquetas en mayúsculas", () => {
+  const series = ["mar", "abr", "may", "jun", "jul", "ago", "sep"].map((label, i) => ({ label, cents: (i + 1) * 100000 }));
+  const html = netWorthBarsHtml(series);
+  assert.equal((html.match(/border-radius:5px 5px 2px 2px/g) || []).length, 6); // 7 puntos → 6 barras
+  assert.ok(html.includes("var(--green)"));
+  assert.ok(html.includes("SEP") && !html.includes("MAR")); // slice(-6) descarta el más viejo
+});
+
+test("netWorthBarsHtml: oculto con menos de 2 puntos", () => {
+  assert.equal(netWorthBarsHtml([{ label: "ago", cents: 100 }]), "");
+  assert.equal(netWorthBarsHtml([]), "");
 });
 
 // ---- SQL.spentByDay / fillLast7Days (datos de spentLast7Days) -----------
