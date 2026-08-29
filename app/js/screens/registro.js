@@ -3,11 +3,18 @@ import {
   listAccounts, allCategoriesById, recentForRefund, getMetaAll,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
-import { fmtMoney, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { fmtMoney, fmtMoneyParts, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { foldPending } from "../expr.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 
-const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "back"];
+// Layout de calculadora (Task 3, ver Registro.dc.html): 4 columnas, operadores en la última
+// columna (÷ × −) más "+" al final de la fila de borrar — SIN tecla "=" (calculadora de cinta
+// izquierda-a-derecha, ver expr.js). OPS es el contrato exacto de expr.js: los símbolos Unicode
+// que renderiza el teclado son literalmente los que viajan en state.op y llegan a evalExpr/
+// foldPending, sin capa de traducción intermedia (− U+2212, × U+00D7, ÷ U+00F7, no sus alias ASCII).
+const KEYS = ["7", "8", "9", "÷", "4", "5", "6", "×", "1", "2", "3", "−", ",", "0", "back", "+"];
+const OPS = new Set(["+", "−", "×", "÷"]);
 const ICON_BACK = `<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 5.5H9.2L3.5 12l5.7 6.5H20a1 1 0 001-1v-11a1 1 0 00-1-1z"></path><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"></path></svg>`;
 
 // labelKey/SAVE_KEY en vez de texto resuelto: son consts de módulo, evaluadas al importar el
@@ -28,6 +35,16 @@ const needsCategory = (tipo) => tipo === "expense" || tipo === "income" || tipo 
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+// Compone el importe grande cuando hay un resultado CALCULADO que mostrar (state.op != null,
+// Task 3) — mismo patrón .amount-hero que inicio.js/patrimonio.js/presupuesto.js/
+// periodo-nuevo.js/liquidar.js: main + <small>céntimos</small> + sufijo (incluye el símbolo de
+// moneda ya bien colocado por locale — prefijo o sufijo, ver fmtMoneyParts en format.js), sin
+// reimplementar el locale a mano.
+const moneyPartsHtml = (cents) => {
+  const { main, cents: c, suffix } = fmtMoneyParts(cents);
+  return `${escHtml(main)}<small>${escHtml(c)}</small>${escHtml(suffix)}`;
+};
 
 /** Monta la pantalla completa de registro rápido de un movimiento (5 tipos).
  *  onDone() se llama tanto al cerrar (✕) como tras guardar con éxito.
@@ -61,6 +78,13 @@ export async function renderRegistro(container, onDone, prefill) {
     tipo: prefill?.type ?? "expense",
     raw: centsToRaw(prefill?.amountCents),
     cents: prefill?.amountCents ?? 0,
+    // Máquina incremental del teclado con operadores (Task 3): acc = lo ya confirmado (céntimos
+    // o null si aún no se ha plegado nada), op = operador pendiente. Invariante mantenida por
+    // TODO el código de esta pantalla: acc===null ⟺ op===null (se ponen a null juntos siempre:
+    // aquí, en pressOp al deshacer con "back", y en selectRefundRow/el prefill de arriba — un
+    // prefill o un refund es un importe plano, no arrastra expresión).
+    acc: null,
+    op: null,
     categoryId: prefill?.categoryId ?? null,
     accountId: prefill?.accountId ?? resolveAccountId(meta.default_account_id, accounts) ?? "",
     counterAccountId: "",
@@ -81,15 +105,64 @@ export async function renderRegistro(container, onDone, prefill) {
     return [];
   };
 
+  // Pliega state.raw (el operando que se está tecleando) dentro de state.acc según state.op —
+  // wrapper de foldPending (expr.js) con parseCentsRaw ya aplicado y `raw !== ""` como señal de
+  // "hay algo tecleado" (foldPending distingue "" de "0": ver su cabecera en expr.js). Es la
+  // MISMA regla para el recálculo en vivo tras cada tecla (setRaw) y para el pliegue al pulsar/
+  // cambiar de operador (pressOp) — así state.cents nunca diverge de lo que guardará
+  // addTransaction, ni siquiera a mitad de tecleo. Con op===null (acc también null por la
+  // invariante de arriba) esto es exactamente parseCentsRaw(raw): paridad con el comportamiento
+  // de hoy en el camino "solo dígitos, sin operador".
+  function computeRunning(acc, op, raw) {
+    return foldPending(acc, op, parseCentsRaw(raw), raw !== "");
+  }
+
   function setRaw(next) {
     state.raw = next;
-    state.cents = parseCentsRaw(state.raw);
+    state.cents = computeRunning(state.acc, state.op, state.raw);
+    errorMsg = "";
+    render();
+  }
+
+  // Pulsar un operador PLIEGA el operando pendiente en el acumulador y deja el operador nuevo a
+  // la espera del siguiente operando. Casos límite (decisión deliberada, no accidental):
+  //  - operador como PRIMERA tecla (acc=null, raw=""): computeRunning/foldPending trata el
+  //    acumulador como 0 — "+5" empieza en 0+5, nunca en NaN ni en error.
+  //  - operador dos veces seguidas sin teclear nada entre medias (raw=""): foldPending devuelve
+  //    el acc SIN TOCAR — el operador previo simplemente se REEMPLAZA por el nuevo, sin plegar
+  //    un operando fantasma de 0 (que con ‘×’/‘÷’ pondría el importe a 0 o lo dejaría intacto de
+  //    forma inconsistente según el operador — el mismo peligro que señaló el handoff de Task 2
+  //    para el guardado, aquí generalizado al tecleo en caliente).
+  function pressOp(k) {
+    state.acc = computeRunning(state.acc, state.op, state.raw);
+    state.op = k;
+    state.raw = "";
+    state.cents = state.acc;
     errorMsg = "";
     render();
   }
 
   function pressKey(k) {
-    if (k === "back") { setRaw(state.raw.slice(0, -1)); return; }
+    if (OPS.has(k)) { pressOp(k); return; }
+    if (k === "back") {
+      if (state.raw === "" && state.op != null) {
+        // Borrar justo tras pulsar un operador, sin haber tecleado nada del siguiente operando:
+        // este teclado no tiene tecla C/AC (ver Registro.dc.html), así que sin este caso el
+        // operador quedaría atascado sin más forma de deshacerlo que cerrar la pantalla. Se
+        // deshace el operador pendiente y se recupera como operando editable el importe de
+        // antes — centsToRaw/parseCentsRaw ya hacen ese viaje de ida y vuelta en toda la app
+        // (mismo patrón que selectRefundRow y el prefill de arriba).
+        state.raw = centsToRaw(state.acc);
+        state.acc = null;
+        state.op = null;
+        state.cents = computeRunning(state.acc, state.op, state.raw);
+        errorMsg = "";
+        render();
+        return;
+      }
+      setRaw(state.raw.slice(0, -1));
+      return;
+    }
     if (k === ",") {
       if (state.raw.includes(",")) return;
       setRaw((state.raw || "0") + ",");
@@ -116,6 +189,12 @@ export async function renderRegistro(container, onDone, prefill) {
       const partnerPart = row.amount_cents - myPart;
       state.raw = centsToRaw(partnerPart);
       state.cents = partnerPart;
+      // Un refund es un importe plano, no arrastra expresión (Task 3) — reset AQUÍ, junto a la
+      // asignación de raw/cents, no al principio de la función: solo entramos a esta rama
+      // cuando is_shared de verdad TOCA el importe. Enlazar una fila NO compartida no debe
+      // tirar una operación en curso (acc/op) que el usuario ya estuviera tecleando.
+      state.acc = null;
+      state.op = null;
     }
     state.refundPickerOpen = false;
     errorMsg = "";
@@ -212,6 +291,29 @@ export async function renderRegistro(container, onDone, prefill) {
       ? `background:${colorForCategory(state.categoryId, byId)};color:#FFF4EC;`
       : "";
 
+    // Signo del ajuste: puramente visual (el céntimo interno sigue positivo, el flip ocurre solo
+    // al guardar, ver #reg-save más abajo) — se mantiene igual que antes de Task 3.
+    const signPrefix = state.tipo === "adjustment" && state.adjustmentSign === "-" ? "−" : "";
+    // Importe grande: con op===null (camino "solo dígitos", el caso CRÍTICO de paridad con hoy)
+    // se sigue mostrando literalmente lo tecleado (state.raw), tal cual hacía la pantalla antes
+    // de Task 3 — así ni el valor (state.cents) ni el eco visual cambian un bit en ese camino.
+    // Con op!=null hay un resultado CALCULADO (no algo que el usuario tecleó tal cual), así que
+    // se formatea con fmtMoneyParts (mismo patrón .amount-hero que inicio.js/patrimonio.js/
+    // presupuesto.js/periodo-nuevo.js/liquidar.js) en vez de intentar "ecoar" un cálculo.
+    const amountHtml = state.op != null
+      ? `<span class="num amount-hero" style="font-size:52px; font-weight:700; letter-spacing:-0.01em; color:${amountColor};">${signPrefix}${moneyPartsHtml(state.cents)}</span>`
+      : `<span class="num" style="font-size:52px; font-weight:700; letter-spacing:-0.01em; color:${amountColor};">${signPrefix}${escHtml(state.raw || "0")}</span>
+         <span class="amount-currency" style="color:${amountColor};">${escHtml(currencySymbol())}</span>`;
+    // Renglón de expresión bajo el importe (Registro.dc.html: "12 + 12,90 — el teclado suma
+    // tickets"), solo cuando hay una operación en curso. state.raw se ecoa tal cual se está
+    // tecleando (mismo criterio "ver lo que escribo" que tenía el importe grande antes de Task 3,
+    // ahora reubicado aquí); state.acc se muestra vía centsToRaw (con acc===0 —operador como
+    // primera tecla— centsToRaw da "" y se sustituye por "0" para no dejar la línea coja).
+    const exprLine = state.op == null ? "" : `
+      <div style="text-align:right; font-size:12px; color:var(--text-3); margin-top:2px;">
+        ${escHtml(centsToRaw(state.acc) || "0")} ${escHtml(state.op)} ${escHtml(state.raw)} — ${escHtml(t("registro.keypad.helper"))}
+      </div>`;
+
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
 
     container.innerHTML = `
@@ -234,9 +336,9 @@ export async function renderRegistro(container, onDone, prefill) {
         <div class="section-title">${t("common.amount")}</div>
         <div class="amount-display" style="align-items:baseline; justify-content:flex-end;">
           ${state.tipo === "adjustment" ? `<button type="button" class="icon-btn" id="reg-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;">${state.adjustmentSign}</button>` : ""}
-          <span class="num" style="font-size:52px; font-weight:700; letter-spacing:-0.01em; color:${amountColor};">${state.tipo === "adjustment" && state.adjustmentSign === "-" ? "−" : ""}${escHtml(state.raw || "0")}</span>
-          <span class="amount-currency" style="color:${amountColor};">${currencySymbol()}</span>
+          ${amountHtml}
         </div>
+        ${exprLine}
         <hr class="divider" style="margin-top:6px;">
       </div>
 
@@ -301,10 +403,14 @@ export async function renderRegistro(container, onDone, prefill) {
       </div>` : ""}
 
       <div class="keypad" style="margin-bottom:18px;">
-        ${KEYS.map((k) => k === "back"
-          ? `<button type="button" class="key key-back" data-key="back" aria-label="${t("registro.keypad.delete")}">${ICON_BACK}</button>`
-          : `<button type="button" class="key${k === "," ? " key-comma" : ""}" data-key="${k}">${k}</button>`
-        ).join("")}
+        ${KEYS.map((k) => {
+          if (k === "back") return `<button type="button" class="key key-back" data-key="back" aria-label="${t("registro.keypad.delete")}">${ICON_BACK}</button>`;
+          // back/coma se quedan con su tratamiento de siempre (key-back/key-comma) aunque el
+          // artboard agrupe visualmente "back" con los operadores (.op) — decisión explícita de
+          // Task 3, no un descuido: solo +/−/×/÷ llevan la clase .op nueva.
+          if (OPS.has(k)) return `<button type="button" class="key op" data-key="${k}">${k}</button>`;
+          return `<button type="button" class="key${k === "," ? " key-comma" : ""}" data-key="${k}">${k}</button>`;
+        }).join("")}
       </div>
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
@@ -396,6 +502,13 @@ export async function renderRegistro(container, onDone, prefill) {
 
     container.querySelector("#reg-save").onclick = async () => {
       const btn = container.querySelector("#reg-save");
+      // Pliegue final MANDATORIO (handoff de Task 2): por invariante, state.cents ya está al día
+      // en todo momento (setRaw/pressOp llaman a computeRunning tras cada tecla), pero se
+      // recalcula explícito aquí también — a propósito, no por desconfianza en la invariante,
+      // sino porque este es el punto exacto que el handoff marcó como el que NO puede plegar un
+      // operando "" a través de un ‘×’/‘÷’ pendiente (evalExpr(acc,"×",0) daría 0, no acc). Con
+      // raw==="" computeRunning ya hace exactamente eso: devuelve acc intacto.
+      state.cents = computeRunning(state.acc, state.op, state.raw);
       const msg = validationError();
       if (msg) {
         errorMsg = msg;

@@ -81,3 +81,32 @@ export function evalExpr(accCents, op, operandCents) {
   }
   return Number.isFinite(result) ? result : acc;
 }
+
+/** Pliega el operando PENDIENTE (el que Task 3 está tecleando ahora mismo, o acaba de dejar de
+ *  teclear) dentro del acumulador. Es el mismo pliegue que hace `evalExpr`, pero con UNA
+ *  distinción extra que `evalExpr` no puede hacer por sí solo porque solo ve céntimos, nunca el
+ *  texto tecleado: `hasOperand` dice si YA se ha tecleado algo para el operando actual
+ *  (`state.raw !== ""`), no si su valor en céntimos da cero. "" (nada tecleado desde el último
+ *  operador) y "0" (un cero tecleado a propósito) deben comportarse distinto — plegar "" a
+ *  través de un ‘×’/‘÷’ pendiente NO debe poner a cero el acumulador (el mismo peligro que el
+ *  handoff de Task 2 señaló para el guardado, aquí generalizado también al pulsar/cambiar de
+ *  operador en caliente), pero plegar un "0" tecleado de verdad SÍ debe aplicar la operación con
+ *  0. Por eso esta función recibe `hasOperand` ya decidido en vez de inferirlo de
+ *  `operandCents === 0` (que no basta para distinguir ambos casos) — parsear `raw` a céntimos y
+ *  decidir `hasOperand` sigue siendo trabajo del llamador (registro.js); aquí solo llega el
+ *  booleano ya resuelto, así el módulo se queda sin imports.
+ *
+ *  - `accCents == null` (o no finito, nada plegado todavía): sin operando tecleado (`hasOperand`
+ *    false) → 0 (paridad con una pantalla en blanco); con operando tecleado → el operando tal
+ *    cual saneado (mismo camino de identidad que `evalExpr` con acc null — el caso "solo
+ *    dígitos, sin operador" de Task 3).
+ *  - `accCents` presente y SIN operando tecleado: no hay nada que aplicar todavía — se devuelve
+ *    el acumulador intacto (evita el ‘×’/‘÷’ fantasma al pulsar dos operadores seguidos).
+ *  - `accCents` presente y CON operando tecleado: `evalExpr(accCents, op, operandCents)`, el
+ *    pliegue normal. */
+export function foldPending(accCents, op, operandCents, hasOperand) {
+  const operand = safeCents(operandCents);
+  if (accCents == null || !Number.isFinite(accCents)) return hasOperand ? operand : 0;
+  if (!hasOperand) return accCents;
+  return evalExpr(accCents, op, operand);
+}
