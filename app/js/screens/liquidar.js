@@ -2,6 +2,7 @@ import { pendingShared, listAccounts, allCategoriesById, settleShared, getMetaAl
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
+import { t } from "../i18n/index.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
@@ -47,9 +48,9 @@ function rowHtml(r, byId, confirmId) {
   const catName = cat?.name ?? "";
   const color = colorForCategory(r.category_id, byId);
   const icon = iconForCategory(r.category_id, byId);
-  const title = r.merchant || catName || "Gasto";
+  const title = r.merchant || catName || t("common.type.expense");
   const pct = r.amount_cents ? Math.round((r.partner_amount_cents / r.amount_cents) * 100) : 0;
-  const sub = `${fmtDiaCorto(r.date)} · ${fmtMoney(r.amount_cents)} · su ${pct} %`;
+  const sub = t("liquidar.row.sub", { date: fmtDiaCorto(r.date), amount: fmtMoney(r.amount_cents), pct });
   const confirming = confirmId === r.id;
   return `
     <div class="tx-row" style="padding:10px 0;">
@@ -61,7 +62,7 @@ function rowHtml(r, byId, confirmId) {
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">
         <div class="num" style="font-size:14px;font-weight:700;">${fmtMoney(r.partner_amount_cents)}</div>
         <button type="button" data-settle="${r.id}" style="${confirming ? BTN_SETTLE_CONFIRM : BTN_SETTLE}">
-          ${confirming ? "Sí, liquidar" : "Liquidar"}
+          ${confirming ? t("liquidar.row.confirm") : t("common.settle")}
         </button>
       </div>
     </div>`;
@@ -86,7 +87,7 @@ export async function renderLiquidar(container, onBack) {
       pendingShared(), listAccounts(), allCategoriesById(), getMetaAll(),
     ]);
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">No se pudo cargar Liquidar: ${escHtml(e.message)}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("liquidar.error.load", { error: escHtml(e.message) })}</div>`;
     return;
   }
   const accounts = accountsAll.filter((a) => a.type !== "liability");
@@ -105,19 +106,19 @@ export async function renderLiquidar(container, onBack) {
 
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="liq-back" aria-label="Volver" style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>
-        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${partnerName ? `Liquidar con ${escHtml(partnerName)}` : "Liquidar"}</h1>
+        <button type="button" class="icon-btn" id="liq-back" aria-label="${t("common.goBack")}" style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>
+        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${partnerName ? t("liquidar.title.withPartner", { name: escHtml(partnerName) }) : t("common.settle")}</h1>
         <span style="width:44px;"></span>
       </div>
 
       <div class="card" style="display:flex;flex-direction:column;gap:4px;margin-bottom:18px;">
-        <div class="section-title">Total pendiente</div>
+        <div class="section-title">${t("liquidar.total.title")}</div>
         <div class="amount-hero num text-red">${moneyPartsHtml(total)}</div>
       </div>
 
       ${accounts.length ? `
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">Cuenta destino</div>
+        <div class="section-title">${t("common.destAccount")}</div>
         <div class="chips">
           ${accounts.map((a) => `<button type="button" class="chip${state.accountId === a.id ? " active" : ""}" style="padding:0 14px;" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
         </div>
@@ -126,9 +127,9 @@ export async function renderLiquidar(container, onBack) {
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
       ${state.rows.length === 0
-        ? `<div class="card" style="text-align:center;color:var(--text-3)"><p>No queda nada pendiente de liquidar.</p></div>`
+        ? `<div class="card" style="text-align:center;color:var(--text-3)"><p>${t("liquidar.empty")}</p></div>`
         : `<div style="display:flex;flex-direction:column;gap:8px;">
-            <div class="section-title">Gastos pendientes</div>
+            <div class="section-title">${t("liquidar.pending.title")}</div>
             <div class="card" style="padding:6px 16px;display:flex;flex-direction:column;">
               ${state.rows.map((r) => rowHtml(r, byId, state.confirmId)).join('<hr class="divider">')}
             </div>
@@ -148,7 +149,7 @@ export async function renderLiquidar(container, onBack) {
       b.onclick = async () => {
         const id = b.dataset.settle;
         if (!state.accountId) {
-          errorMsg = "Crea primero una cuenta en Patrimonio.";
+          errorMsg = t("common.needAccount");
           state.confirmId = null;
           render();
           return;
@@ -168,7 +169,7 @@ export async function renderLiquidar(container, onBack) {
           state.confirmId = null;
           errorMsg = "";
         } catch (e) {
-          errorMsg = "No se pudo liquidar: " + e.message;
+          errorMsg = t("liquidar.error.settle", { error: e.message });
           state.confirmId = null;
         } finally {
           state.busy = false;
