@@ -32,11 +32,14 @@ export const NULLABLE_NUM = new Set(["share_pct_override","due_day","due_month",
 // optional=true → '' permitido (FK vacía). ref_id/rule_id/parent_id/counter_account_id son opcionales por contrato.
 //
 // allowDeletedRef=true → xlsx.js NO exige que esta FK, en una fila viva, apunte a un referente
-// vivo. Hoy (pre-Task 6 del PR de seguridad) el repo permite estados alcanzables por USO NORMAL
-// donde una fila viva queda apuntando a una borrada:
-//  - transactions.ref_id: softDeleteTransaction borra el gasto original sin comprobar si tiene un
-//    refund activo enlazado (el propio hallazgo M5/Task 6: "borrar el gasto liquidado deja el
-//    reembolso huérfano") — el refund (vivo) se queda con ref_id → gasto (borrado).
+// vivo. El repo permite (o permitió) estados alcanzables por USO NORMAL donde una fila viva queda
+// apuntando a una borrada:
+//  - transactions.ref_id: softDeleteTransaction (Task 6, PR de seguridad, hallazgo M5) ya BLOQUEA
+//    el borrado de un gasto con refund activo enlazado, así que este estado no puede producirse de
+//    nuevo — pero sigue siendo alcanzable en BACKUPS ANTERIORES a ese fix (exportados con el bug
+//    aún presente) o en un archivo editado a mano. El fix no migra datos existentes (fuera de
+//    alcance de Task 6), así que la excepción se mantiene: sin ella, reimportar uno de esos
+//    backups reales y ya en producción se rechazaría de golpe.
 //  - transactions.rule_id: softDeleteRule no hace cascada; las transacciones ya generadas por esa
 //    regla (rule_id) siguen vivas y la regla puede borrarse después sin problema.
 // Sin este flag, exportar y reimportar una BD real que ya esté en uno de estos estados (ambos

@@ -309,6 +309,43 @@ test("expenseDeleteLocked: pura — bloquea borrar un gasto con refund activo, S
     "borrar el gasto original liquidado debe bloquearse: dejaría el refund huérfano");
 });
 
+// Fix round 1 (revisión post-commit a25da8a): los guards protegen CUALQUIER refund enlazado por
+// ref_id, sea o no de un gasto compartido — addTransaction({refId}) pone settled=1
+// INCONDICIONALMENTE (repo.js:56), y registro.js permite enlazar un refund a un gasto normal vía
+// SQL.recentForRefund (devolución de producto, no liquidación entre compartidos). El ruling del
+// coordinador es MANTENER ese alcance amplio (no acotar a is_shared=1) porque el invariante "un
+// refund enlazado protege a su gasto hasta que se borre/desvincule" es correcto en ambos casos, y
+// consistente con que sharedFieldsLocked YA exige type==='expense' && settled sin mirar is_shared.
+// Este test prueba explícitamente el caso NO compartido con datos reales de BD (no solo objetos a
+// mano), para que quede fijado como comportamiento intencional y no una laguna sin cubrir.
+test("refundAmountLocked/expenseDeleteLocked: protegen también un refund NO compartido (p.ej. devolución de producto)", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const gastoId = ins(db, { id: "gasto-zapatillas", cents: 6000, shared: 0 });
+  const refundId = ins(db, {
+    id: "devolucion-zapatillas", type: "refund", cents: 6000, shared: 0, ref: gastoId,
+  });
+  // addTransaction({refId}) marca settled=1 sin mirar is_shared — se reproduce igual aquí.
+  db.prepare("UPDATE transactions SET settled=1 WHERE id=?").run(gastoId);
+
+  const gasto = db.prepare(SQL.getTransaction).get(gastoId);
+  const refund = db.prepare(SQL.getTransaction).get(refundId);
+  assert.equal(gasto.is_shared, 0, "control: el gasto NO es compartido");
+
+  assert.equal(
+    refundAmountLocked(refund, { amountCents: 1000 }, gasto),
+    true,
+    "bajar el importe de una devolución enlazada a un gasto ya liquidado se bloquea aunque no sea un compartido",
+  );
+
+  const hasActiveRefund = !!db.prepare(SQL.hasActiveLinkedRefund).get(gastoId);
+  assert.equal(
+    expenseDeleteLocked(gasto, hasActiveRefund),
+    true,
+    "borrar el gasto original con la devolución activa también se bloquea, sea o no compartido",
+  );
+});
+
 /** Reproduce la secuencia de repo.updateTransaction (resolución de campos + los dos guards +
  *  UPDATE) usando SQL directo, IGUAL que el resto de este fichero — pero llamando a los guards
  *  REALES (sharedFieldsLocked/refundAmountLocked) importados de repo.js, no una reimplementación.
