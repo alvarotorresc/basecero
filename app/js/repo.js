@@ -6,7 +6,7 @@ import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
 import { resolveAccountId } from "./account-defaults.js";
 import { POOL, CURATED_ICONS, CATEGORY_ICONS, parseStyle, initCategoryStyle } from "./category-colors.js";
 import { SEED_NAMES } from "./seeds.js";
-import { t } from "./i18n/index.js";
+import { t, monthShort } from "./i18n/index.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -352,11 +352,10 @@ export async function netWorthAt(dateIso) {
   return netWorthOfBalances(await balancesAt(dateIso));
 }
 
-// Abreviaturas de 3 letras en español para las etiquetas de la sparkline de Patrimonio — FIJAS
-// (no Intl.DateTimeFormat) para que no dependan de la versión de ICU del entorno: comprobado que
-// en Node 22 { month:"short" } da "sept" para septiembre (4 letras), no "sep".
-const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-export const shortMonthLabel = (iso) => MESES_CORTOS[new Date(iso + "T12:00:00").getMonth()];
+// Abreviatura de 3 letras para las etiquetas de la sparkline de Patrimonio, vía i18n — arrays
+// FIJOS (no Intl.DateTimeFormat) para que no dependan de la versión de ICU del entorno:
+// comprobado que en Node 22 { month:"short" } da "sept" para septiembre (4 letras), no "sep".
+export const shortMonthLabel = (iso) => monthShort(new Date(iso + "T12:00:00").getMonth());
 
 /** Serie de patrimonio neto: un punto por periodo CERRADO (a su end_date, no su start_date) +
  *  el punto de HOY — tarjeta "Patrimonio neto" de Patrimonio. Con 0 periodos cerrados devuelve
