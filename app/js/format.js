@@ -99,7 +99,8 @@ export function parseCentsRaw(raw) {
       : s.replace(/,/g, "");
   } else if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
   else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
-  return Math.round(parseFloat(s) * 100) || 0;
+  const n = Math.round(parseFloat(s) * 100);
+  return Number.isFinite(n) ? n : 0;
 }
 
 // Inverso para precargar inputs de importe: céntimos → «1250,50» (absoluto, sin puntos
