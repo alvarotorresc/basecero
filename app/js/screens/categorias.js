@@ -3,6 +3,7 @@ import {
   archiveCategory, unarchiveCategory, setCategoryStyle, reorderCategories, computeReorder,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, POOL, CURATED_ICONS, hashIndex } from "../category-colors.js";
+import { t } from "../i18n/index.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -27,9 +28,13 @@ function slug(s) {
 // flow: una raíz de ingreso con need_type (caso raro pero el schema lo permite) también lleva
 // etiqueta; las de ingreso sembradas ('' need_type) simplemente no calzan ninguna clave y caen al
 // "solo el conteo" que pide el brief.
-const NEED_LABELS = { need: "necesario", want: "prescindible", savings: "ahorro" };
+// Guarda la CLAVE del diccionario, no el texto resuelto: es un const de módulo, evaluado antes de
+// initI18n(meta) — resolver aquí con t() congelaría el idioma en el que arrancó la app.
+// rootSubtitle() resuelve con t() en cada render, ya con el idioma real (misma ledger ruling que
+// FREQ_KEY en recurrentes.js).
+const NEED_LABEL_KEY = { need: "categorias.needLabel.need", want: "categorias.needLabel.want", savings: "categorias.needLabel.savings" };
 
-const subcatCount = (n) => `${n} subcategoría${n === 1 ? "" : "s"}`;
+const subcatCount = (n) => t("categorias.subcatCount", { n });
 
 /** Sub de una raíz: "{necesario/prescindible/ahorro} · N subcategorías", o solo "N subcategorías"
  *  si la raíz no tiene need_type (las 3 raíces de ingreso sembradas). `childCount` cuenta TODAS
@@ -38,7 +43,8 @@ const subcatCount = (n) => `${n} subcategoría${n === 1 ? "" : "s"}`;
  *  niveles" de updateCategory): el artboard muestra "Casa · necesario · 6 subcategorías" con Gas
  *  archivada incluida en el 6, así que el conteo visible aquí debe incluir archivadas. */
 function rootSubtitle(root, childCount) {
-  const label = NEED_LABELS[root.need_type];
+  const key = NEED_LABEL_KEY[root.need_type];
+  const label = key ? t(key) : null;
   return label ? `${label} · ${subcatCount(childCount)}` : subcatCount(childCount);
 }
 
@@ -84,7 +90,7 @@ export async function renderCategorias(container, onBack) {
   try {
     await loadData();
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">No se pudieron cargar las categorías: ${escHtml(e.message)}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("categorias.error.load", { error: escHtml(e.message) })}</div>`;
     return;
   }
 
@@ -172,7 +178,7 @@ export async function renderCategorias(container, onBack) {
       initialColor,
       initialIcon,
       iconOrder: buildIconOrder(initialIcon),
-      title: mode === "edit" ? "Editar categoría" : (parentId ? "Nueva subcategoría" : "Nueva categoría"),
+      titleKey: mode === "edit" ? "categorias.form.title.edit" : (parentId ? "categorias.form.title.newChild" : "categorias.form.title.new"),
     };
     state.view = "form";
     render();
@@ -194,10 +200,10 @@ export async function renderCategorias(container, onBack) {
   }
 
   function archiveButtonLabel(form, armed) {
-    if (form.isArchived) return "Desarchivar";
-    if (!armed) return "Archivar categoría";
+    if (form.isArchived) return t("categorias.archive.unarchive");
+    if (!armed) return t("categorias.archive.archive");
     const n = form.activeChildrenCount;
-    return n > 0 ? `Sí, archivar y sus ${subcatCount(n)}` : "Sí, archivar";
+    return n > 0 ? t("categorias.archive.confirmWithCount", { count: subcatCount(n) }) : t("categorias.archive.confirm");
   }
 
   function renderForm() {
@@ -211,8 +217,8 @@ export async function renderCategorias(container, onBack) {
 
     container.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-        <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">${form.title}</div>
-        <button type="button" id="cf-close" aria-label="Cerrar"
+        <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">${t(form.titleKey)}</div>
+        <button type="button" id="cf-close" aria-label="${t("categorias.form.closeAria")}"
           style="width:44px;height:44px;border-radius:50%;background:var(--card2);border:0;color:var(--text);
           display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -225,15 +231,15 @@ export async function renderCategorias(container, onBack) {
 
         <div style="background:var(--card2);border-radius:16px;padding:12px 16px;display:flex;align-items:center;gap:12px;">
           <div id="cf-preview-dot" class="dotico" style="width:40px;height:40px;font-size:18px;flex-shrink:0;--cat:${preview.color};">${preview.icon}</div>
-          <input type="text" id="cf-name" value="${escAttr(form.name)}" placeholder="Nombre de la categoría"
+          <input type="text" id="cf-name" value="${escAttr(form.name)}" placeholder="${t("categorias.form.namePlaceholder")}"
             style="flex:1;min-width:0;border:0;background:none;outline:none;color:var(--text);
             font-size:16px;font-weight:700;font-family:inherit;">
         </div>
 
         <div>
-          <div class="section-title" style="margin-bottom:8px;">Tipo</div>
+          <div class="section-title" style="margin-bottom:8px;">${t("common.typeLabel")}</div>
           <div class="segmented" style="border-radius:999px;${editing ? "opacity:0.6;" : ""}">
-            ${[["expense", "Gasto"], ["income", "Ingreso"]].map(([id, label]) => {
+            ${[["expense", t("common.type.expense")], ["income", t("common.type.income")]].map(([id, label]) => {
               const active = form.flow === id;
               const segStyle = active
                 ? "border-radius:999px;background:var(--card2);color:var(--text);font-weight:700;"
@@ -242,14 +248,14 @@ export async function renderCategorias(container, onBack) {
                 style="${segStyle}${editing ? "pointer-events:none;cursor:default;" : ""}">${label}</button>`;
             }).join("")}
           </div>
-          ${editing ? `<div style="font-size:11px;color:var(--text-3);margin-top:6px;">El tipo no se puede cambiar una vez creada la categoría.</div>` : ""}
+          ${editing ? `<div style="font-size:11px;color:var(--text-3);margin-top:6px;">${t("categorias.form.typeLockedNote")}</div>` : ""}
         </div>
 
         ${form.flow === "expense" ? `
         <div>
-          <div class="section-title" style="margin-bottom:8px;">¿Necesario o prescindible?</div>
+          <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.needSectionTitle")}</div>
           <div class="segmented" style="border-radius:999px;">
-            ${[["need", "Necesario"], ["want", "Prescindible"]].map(([id, label]) => {
+            ${[["need", t("categorias.needType.need")], ["want", t("categorias.needType.want")]].map(([id, label]) => {
               const active = form.needType === id;
               const segStyle = active
                 ? "border-radius:999px;background:var(--card2);color:var(--text);font-weight:700;"
@@ -257,64 +263,64 @@ export async function renderCategorias(container, onBack) {
               return `<button type="button" data-cf-need="${id}" class="${active ? "active" : ""}" style="${segStyle}">${label}</button>`;
             }).join("")}
           </div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:6px;">Separa lo imprescindible del capricho en los resúmenes del periodo.</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:6px;">${t("categorias.form.needHint")}</div>
         </div>` : ""}
 
         <div>
-          <div class="section-title" style="margin-bottom:8px;">Dentro de</div>
+          <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.parentSectionTitle")}</div>
           ${lockedParent ? `
-          <div style="${chipStyle(true)}width:fit-content;">Raíz</div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:6px;">Una raíz con subcategorías no puede colgarse de otra.</div>
+          <div style="${chipStyle(true)}width:fit-content;">${t("categorias.form.rootChip")}</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:6px;">${t("categorias.form.rootLockedNote")}</div>
           ` : `
           <div style="display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;">
-            <button type="button" data-cf-parent="" style="${chipStyle(!form.parentId)}">Raíz nueva</button>
+            <button type="button" data-cf-parent="" style="${chipStyle(!form.parentId)}">${t("categorias.form.newRootChip")}</button>
             ${parents.map((r) => {
               const icon = iconForCategory(r.id, byId);
               return `<button type="button" data-cf-parent="${escAttr(r.id)}" style="${chipStyle(form.parentId === r.id)}">${icon} ${escHtml(r.name)}</button>`;
             }).join("")}
           </div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:6px;">Una subcategoría hereda el color y el icono de su raíz.</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:6px;">${t("categorias.form.inheritNote")}</div>
           `}
         </div>
 
         ${isRoot ? `
         <div>
-          <div class="section-title" style="margin-bottom:8px;">Color</div>
+          <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.colorSectionTitle")}</div>
           <div style="display:grid;grid-template-columns:repeat(6, minmax(0, 1fr));gap:8px;">
             ${POOL.map((c) => {
               const active = form.color === c;
-              return `<button type="button" data-cf-color="${c}" aria-label="Elegir color"
+              return `<button type="button" data-cf-color="${c}" aria-label="${t("categorias.form.pickColorAria")}"
                 style="width:100%;aspect-ratio:1;border:0;padding:0;border-radius:12px;background:${c};cursor:pointer;
                 -webkit-tap-highlight-color:transparent;${active ? "outline:2px solid var(--text);outline-offset:3px;" : ""}"></button>`;
             }).join("")}
           </div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:8px;">El pool de 12 del sistema — legible con daltonismo. Te sugerimos uno; puedes cambiarlo.</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:8px;">${t("categorias.form.colorHint")}</div>
         </div>
 
         <div>
-          <div class="section-title" style="margin-bottom:8px;">Icono</div>
+          <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.iconSectionTitle")}</div>
           <div style="display:grid;grid-template-columns:repeat(8, minmax(0, 1fr));gap:8px;">
             ${form.iconOrder.map((ic) => {
               const active = form.icon === ic;
-              return `<button type="button" data-cf-icon="${escAttr(ic)}" aria-label="Elegir icono"
+              return `<button type="button" data-cf-icon="${escAttr(ic)}" aria-label="${t("categorias.form.pickIconAria")}"
                 style="aspect-ratio:1;border:0;padding:0;border-radius:12px;background:var(--card2);font-size:20px;cursor:pointer;
                 display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;
                 ${active ? "outline:2px solid var(--text);outline-offset:2px;" : ""}">${ic}</button>`;
             }).join("")}
           </div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:8px;">Set curado — sin picker de emojis del sistema (v1.1 si acaso).</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:8px;">${t("categorias.form.iconHint")}</div>
         </div>
         ` : `
         <div>
-          <div class="section-title" style="margin-bottom:8px;">Color e icono</div>
-          <div style="font-size:11px;color:var(--text-3);">Una subcategoría hereda el color y el icono de su raíz.</div>
+          <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.colorIconSectionTitle")}</div>
+          <div style="font-size:11px;color:var(--text-3);">${t("categorias.form.inheritNote")}</div>
         </div>
         `}
 
         ${state.formError ? `<div class="banner-aviso red">${escHtml(state.formError)}</div>` : ""}
 
         <button type="button" class="btn-primary" id="cf-save" style="${isRoot ? `background:${form.color};color:#FFF4EC;` : ""}">
-          ${editing ? "Guardar cambios" : "Crear categoría"}
+          ${editing ? t("common.saveChanges") : t("categorias.form.create")}
         </button>
 
         ${editing ? `
@@ -333,7 +339,7 @@ export async function renderCategorias(container, onBack) {
   }
 
   function validationError(form) {
-    if (!form.name.trim()) return "Ponle un nombre a la categoría.";
+    if (!form.name.trim()) return t("categorias.validation.name");
     return "";
   }
 
@@ -557,7 +563,7 @@ export async function renderCategorias(container, onBack) {
         <div class="tx-body" style="flex:1;min-width:0;">
           <div class="tx-title">${escHtml(child.name)}</div>
         </div>
-        ${child.is_archived ? `<span class="day-label" style="flex-shrink:0;">Archivada</span>` : ""}
+        ${child.is_archived ? `<span class="day-label" style="flex-shrink:0;">${t("categorias.archivedLabel")}</span>` : ""}
       </button>
     </div>`;
   }
@@ -577,7 +583,7 @@ export async function renderCategorias(container, onBack) {
       <button type="button" data-add-sub="${root.id}"
         style="height:36px;padding:0 14px;margin:6px 0 0 44px;border-radius:999px;background:var(--card2);
         color:var(--text);border:0;font-size:12px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-        + Añadir subcategoría
+        ${t("categorias.addSubcategory")}
       </button>`}
     </div>`;
   }
@@ -612,9 +618,9 @@ export async function renderCategorias(container, onBack) {
           <div class="tx-sub">${sub}</div>
         </div>
       </button>
-      ${root.is_archived ? `<span class="day-label" style="flex-shrink:0;">Archivada</span>` : ""}
+      ${root.is_archived ? `<span class="day-label" style="flex-shrink:0;">${t("categorias.archivedLabel")}</span>` : ""}
       <button type="button" data-chevron="${root.id}"
-        aria-label="${expanded ? "Colapsar subcategorías" : "Expandir subcategorías"}"
+        aria-label="${expanded ? t("categorias.chevron.collapse") : t("categorias.chevron.expand")}"
         style="flex-shrink:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;
         background:none;border:0;cursor:pointer;color:var(--text-3);-webkit-tap-highlight-color:transparent;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
@@ -630,20 +636,19 @@ export async function renderCategorias(container, onBack) {
     const flowRoots = rootsOfFlow(state.flow);
     const expenseCount = activeRootCount("expense");
     const incomeCount = activeRootCount("income");
-    const flowLabel = state.flow === "expense" ? "gasto" : "ingreso";
 
     container.innerHTML = `
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-        <button type="button" class="icon-btn" id="cat-back" aria-label="Volver"
+        <button type="button" class="icon-btn" id="cat-back" aria-label="${t("common.goBack")}"
           style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">←</button>
-        <h1 style="flex:1;font-size:20px;font-weight:700;letter-spacing:-0.015em;">Categorías</h1>
+        <h1 style="flex:1;font-size:20px;font-weight:700;letter-spacing:-0.015em;">${t("categorias.title")}</h1>
         <button type="button" id="cat-new"
           style="height:44px;padding:0 18px;border-radius:999px;background:var(--text);color:var(--bg);border:0;
-          font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">+ Nueva</button>
+          font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">${t("common.addNew")}</button>
       </div>
 
       <div class="segmented" style="margin-bottom:10px;border-radius:999px;">
-        ${[["expense", `Gastos · ${expenseCount}`], ["income", `Ingresos · ${incomeCount}`]].map(([id, label]) => {
+        ${[["expense", t("categorias.flow.expenseCount", { n: expenseCount })], ["income", t("categorias.flow.incomeCount", { n: incomeCount })]].map(([id, label]) => {
           const active = state.flow === id;
           const segStyle = active
             ? "border-radius:999px;background:var(--card2);color:var(--text);font-weight:700;"
@@ -653,12 +658,12 @@ export async function renderCategorias(container, onBack) {
       </div>
 
       <div style="font-size:11.5px;color:var(--text-3);margin-bottom:8px;">
-        Mantén pulsado ≡ para reordenar. Toca una categoría para editarla; el chevron abre sus subcategorías.
+        ${t("categorias.list.hint")}
       </div>
 
       <div style="display:flex;flex-direction:column;">
         ${flowRoots.length === 0
-          ? `<div class="card" style="text-align:center;color:var(--text-3);"><p>Todavía no hay categorías de ${flowLabel}.</p></div>`
+          ? `<div class="card" style="text-align:center;color:var(--text-3);"><p>${t(state.flow === "expense" ? "categorias.empty.expense" : "categorias.empty.income")}</p></div>`
           : flowRoots.map((r, i) => rootRowHtml(r, i === flowRoots.length - 1)).join("")}
       </div>
 
@@ -668,8 +673,7 @@ export async function renderCategorias(container, onBack) {
           <circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.01"></path>
         </svg>
         <div style="font-size:11.5px;color:var(--text-3);">
-          Archivar oculta la categoría de los selectores sin tocar tu historial: los periodos cerrados siguen sumando
-          igual. Nada se borra si algo lo usa.
+          ${t("categorias.list.archiveInfo")}
         </div>
       </div>
     `;
