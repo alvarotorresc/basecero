@@ -7,6 +7,9 @@ offline**.
 
 **https://alvarotorresc.github.io/basecero/**
 
+Landing con capturas, instalación paso a paso y preguntas frecuentes:
+**[alvarotorresc.github.io/basecero/landing.html](https://alvarotorresc.github.io/basecero/landing.html)**.
+
 - Onboarding guiado en 4 pasos: bienvenida, cuentas, preferencias (idioma,
   moneda, reparto de gastos compartidos) y primer periodo; puedes importar
   una copia ya desde la primera pantalla.
