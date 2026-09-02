@@ -44,10 +44,10 @@ niveles. Cambias nombre, color —de una paleta de 12 legible con daltonismo—,
 marcas cada una como necesaria, prescindible o ahorro; y archivas las que sobren sin tocar el
 historial.
 
-**Gastos compartidos, sin discusiones.** Dices con quién compartes y qué porcentaje pagas cada
-periodo. Marcas un gasto como compartido (con reparto propio si hace falta), la app lleva la
-cuenta de lo pendiente y la pantalla «Liquidar» cierra el saldo de golpe. Si no compartes con
-nadie, esa parte de la app ni aparece.
+**Gastos compartidos, sin discusiones.** Dices con quién compartes y el reparto por defecto del
+periodo; en cada gasto lo ajustas si hace falta, de 5 en 5. La app lleva la cuenta de lo
+pendiente y la pantalla «Liquidar» cierra el saldo de golpe. Si no compartes con nadie, esa
+parte de la app ni aparece.
 
 **Recurrentes y previsión.** Reglas semanales, mensuales, trimestrales o anuales para alquiler,
 suscripciones o la nómina. Con ellas el inicio calcula lo comprometido que queda por pagar y tu
@@ -121,9 +121,9 @@ ejecuta en el navegador.
 - **Estructura** — `app/` es la raíz publicada del sitio: landing ES/EN, legales y estáticos. La
   PWA entera vive en [`app/app/`](app/app/), con `js/screens/` (una pantalla por fichero),
   `js/i18n/` (es/en) y `vendor/`.
-- **Tests** — 403 tests con el runner nativo de Node, sin dependencias. La lógica pura (previsión,
-  gráficas, formato, parseo de CSV, cripto de backups, contrato `.xlsx`) está aislada de la base
-  de datos y del DOM precisamente para poder probarla así. Los corre
+- **Tests** — unos 400 tests con el runner nativo de Node, sin dependencias. La lógica pura
+  (previsión, gráficas, formato, parseo de CSV, cripto de backups, contrato `.xlsx`) está
+  aislada de la base de datos y del DOM precisamente para poder probarla así. Los corre
   [`.github/workflows/ci.yml`](.github/workflows/ci.yml) en cada push a `main` y en cada PR.
 
 ### Levantarlo en local
