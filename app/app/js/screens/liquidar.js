@@ -195,7 +195,12 @@ export async function renderLiquidar(container, onBack) {
         } catch (e) {
           errorMsg = t("liquidar.error.settle", { error: e.message });
           state.confirm = false;
-          state.rows = await pendingSettlements();
+          // La recarga va en su PROPIO try: si settleAllShared falló porque la base no responde,
+          // pendingSettlements() falla igual, y sin este guard el manejador de errores lanzaría
+          // desde dentro del catch — la promesa del onclick quedaría rechazada sin nadie que la
+          // escuche y el error compuesto arriba no llegaría a servir de nada. Si no se puede
+          // releer, las filas se quedan como estaban: el mensaje de arriba ya explica qué pasó.
+          try { state.rows = await pendingSettlements(); } catch { /* se conserva state.rows */ }
         } finally {
           state.busy = false;
           render();

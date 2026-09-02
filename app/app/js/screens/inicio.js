@@ -165,9 +165,7 @@ function previsionHtml(prevision, byId) {
     <div class="card" style="display:flex;flex-direction:column;gap:14px;margin-bottom:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
         <div class="section-title">${t("inicio.prevision.title")}</div>
-        <button type="button" id="prevision-gestionar" style="all:unset;cursor:pointer;
-          font-size:12px;font-weight:600;color:var(--text-2);white-space:nowrap;
-          -webkit-tap-highlight-color:transparent;">${t("inicio.prevision.manage")}</button>
+        <button type="button" id="prevision-gestionar" class="link-btn" style="white-space:nowrap;">${t("inicio.prevision.manage")}</button>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;">
         ${prevision.items.map((it) => previsionRowHtml(it, byId)).join("")}
@@ -287,9 +285,7 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory) {
   const footerHtml = `
     <hr class="divider">
     <div style="height:44px;display:flex;align-items:center;justify-content:center;">
-      <button type="button" id="inicio-categoria-ver" style="all:unset;cursor:pointer;
-        font-size:12px;font-weight:600;color:var(--text-2);white-space:nowrap;
-        -webkit-tap-highlight-color:transparent;">${t("inicio.categorySpend.viewAll")}</button>
+      <button type="button" id="inicio-categoria-ver" class="link-btn" style="white-space:nowrap;">${t("inicio.categorySpend.viewAll")}</button>
     </div>`;
   const cardAttrs = `class="card" id="inicio-categoria-card"`;
 
@@ -421,7 +417,7 @@ export async function renderInicio(container) {
   container.innerHTML = `
     ${showPartnerBanner ? partnerBannerHtml() : ""}
 
-    <button type="button" id="inicio-periodo-header" style="all:unset;cursor:pointer;display:flex;flex-direction:column;gap:2px;margin-bottom:14px;-webkit-tap-highlight-color:transparent;">
+    <button type="button" id="inicio-periodo-header" class="link-btn" style="color:inherit;display:flex;flex-direction:column;gap:2px;margin-bottom:14px;">
       <div style="font-size:12px;font-weight:500;color:var(--text-2);">${t("inicio.header.dayOf", { period: escHtml(period.name), day: dayIndexOfPeriod(period.start_date, hoy), total: expectedPeriodDays(period.start_date) })}</div>
       <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;">${saludo}</div>
     </button>
