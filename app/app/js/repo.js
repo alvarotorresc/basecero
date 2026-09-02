@@ -186,7 +186,30 @@ export const countUncategorized = async (pid) => (await query(SQL.countUncategor
 export const pendingSettlements = () => query(SQL.pendingSettlements);
 export const pendingSettlementNetCents = async () => (await query(SQL.pendingSettlementNet))[0].net_cents;
 export const spentByRootCategory = (pid) => query(SQL.spentByRootCategory, [pid]);
+
+/** Desglose del gasto de una raíz por subcategoría (bloque desplegable de «Gasto por categoría»).
+ *  Devuelve también la fila de la propia raíz (category_id === rootId): es el gasto anotado
+ *  directamente en ella. Incluye las filas a 0; quien consume las descarta. */
+export const spentByChildCategory = (periodId, rootId) => query(SQL.spentByChildCategory, [periodId, rootId, rootId]);
 export const budgetsOfPeriod = (pid) => query(SQL.budgetsOfPeriod, [pid]);
+
+/** Pone o cambia el límite de una categoría en un periodo (pantalla «Gasto por categoría»).
+ *  Guard PURO antes de tocar la BD (mismo patrón que periodStartTooEarly/updatePeriodSharePct):
+ *  un límite es SIEMPRE un entero de céntimos > 0 — «sin límite» se expresa borrando la fila con
+ *  deleteBudget, nunca guardando un 0 (budgetStatus trata el 0 como "sin estado" y una fila a 0
+ *  dejaría una categoría con límite fantasma). Si ya hay fila viva la actualiza; si no, inserta
+ *  con el mismo generador de id que openNextPeriod. */
+export async function upsertBudget(periodId, categoryId, amountCents) {
+  if (!Number.isInteger(amountCents) || amountCents <= 0) throw new Error(t("errors.repo.budgetInvalid"));
+  const now = nowIso();
+  const existing = (await query(SQL.budgetOfCategory, [periodId, categoryId]))[0];
+  if (existing) await exec(SQL.updateBudget, [amountCents, now, existing.id]);
+  else await exec(SQL.insertBudget, [bcUlid(), periodId, categoryId, amountCents, now, now]);
+}
+
+/** Quita el límite de una categoría en un periodo: borrado lógico, idempotente (sin fila viva no
+ *  hace nada). No lleva guard: quitar algo que no está es una operación válida. */
+export const deleteBudget = (periodId, categoryId) => exec(SQL.softDeleteBudget, [nowIso(), periodId, categoryId]);
 
 /** Completa los huecos de SQL.spentByDay (que solo trae los días CON movimiento) con 0, para
  *  los 7 días naturales que terminan en `todayIso` (inclusive). Pura — sin I/O — para que
@@ -543,7 +566,7 @@ export async function avgSpentOfClosedPeriods() {
   return Math.round(spents.reduce((s, c) => s + c, 0) / spents.length);
 }
 
-// den<=0 -> 0 en vez de NaN/Infinity: mismo criterio que budgetStatus (presupuesto.js), pero sin
+// den<=0 -> 0 en vez de NaN/Infinity: mismo criterio que budgetStatus (category-spend.js), pero sin
 // importarla desde repo.js (capa de datos no depende de una pantalla) — 3 líneas, se duplica aquí.
 const safeDiv = (num, den) => (den > 0 ? (num / den) * 100 : 0);
 
@@ -556,7 +579,7 @@ const fmtMesAnio = (iso) =>
  *  ya viene resuelta en `ctx` (repo.goalsWithProgress hace las queries UNA vez y arma ctx antes
  *  de llamar aquí por cada goal; ver tests/app/patrimonio.test.mjs, que la prueba tipo a tipo
  *  con ctx mínimos, sin tocar la base de datos). pct SIN capar (igual criterio que
- *  presupuesto.js#budgetStatus: el número grande muestra el % real: quien pinta la barra la capa
+ *  category-spend.js#budgetStatus: el número grande muestra el % real: quien pinta la barra la capa
  *  a 100).
  *
  *  level ('ok'/'warn'/'over'): SOLO spending_cap llega a 'over' — es el único tipo con un techo

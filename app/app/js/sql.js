@@ -142,7 +142,7 @@ export const SQL = {
   // hijas directas): child.id=root.id cubre el gasto registrado directamente en la raíz, y
   // child.parent_id=root.id el de sus hijas. Resta refunds que no sean liquidación de un
   // compartido (REFUND_REDUCES_SPEND), prorrateados, igual criterio que spentOfPeriod. La
-  // reutilizan Tasks 9 (Presupuesto) y 12 (gráficas).
+  // reutilizan inicio.js y gasto-por-categoria.js.
   spentByRootCategory: `SELECT root.id AS root_id, root.name,
     COALESCE(SUM(CASE WHEN t.type='expense' THEN ${MY_AMOUNT}
                  WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT} ELSE 0 END),0) AS spent_cents
@@ -152,9 +152,41 @@ export const SQL = {
   LEFT JOIN periods p ON p.id=t.period_id
   WHERE root.parent_id='' AND root.flow='expense' AND root.deleted=0 AND root.is_archived=0
   GROUP BY root.id ORDER BY spent_cents DESC`,
+  // Gasto por SUBcategoría dentro de una raíz (pantalla «Gasto por categoría», bloque desplegable).
+  // Una fila por la raíz misma (c.id=?) y otra por cada hija directa (c.parent_id=?) — el árbol de
+  // categorías tiene solo dos niveles, no hay que recursar. La fila con category_id = la raíz es el
+  // gasto anotado DIRECTAMENTE en ella (la pantalla la pinta como «Sin subcategoría», y solo si la
+  // raíz tiene hijas: sin hijas esa fila sería el total de la raíz repetido).
+  // Mismo criterio que spentByRootCategory (MY_AMOUNT prorrateado, REFUND_REDUCES_SPEND, periodo y
+  // t.deleted=0) para que la suma de las filas cuadre EXACTAMENTE con el spent_cents de la raíz.
+  // Por eso NO se filtra is_archived: spentByRootCategory tampoco lo hace en su join de hijas y
+  // archivar conserva el historial; si aquí se filtrara, el desglose dejaría de sumar el total de la
+  // fila de arriba justo cuando el usuario archiva una subcategoría que sí tuvo gasto. La UI ya
+  // descarta las filas a 0, así que una archivada sin usar nunca llega a pintarse.
+  // Bind: [periodId, rootId, rootId].
+  spentByChildCategory: `SELECT c.id AS category_id, c.name,
+    COALESCE(SUM(CASE WHEN t.type='expense' THEN ${MY_AMOUNT}
+                 WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT} ELSE 0 END),0) AS spent_cents
+  FROM categories c
+  LEFT JOIN transactions t ON t.category_id=c.id AND t.period_id=? AND t.deleted=0
+  LEFT JOIN periods p ON p.id=t.period_id
+  WHERE (c.id=? OR c.parent_id=?) AND c.deleted=0
+  GROUP BY c.id ORDER BY spent_cents DESC`,
   insertBudget: `INSERT INTO budgets (id,period_id,category_id,amount_cents,created_at,updated_at,deleted)
     VALUES (?,?,?,?,?,?,0)`,
   budgetsOfPeriod: `SELECT b.id, b.category_id, b.amount_cents FROM budgets b WHERE b.period_id=? AND b.deleted=0`,
+  // Límite VIVO de una categoría en un periodo (pantalla «Gasto por categoría»): lo lee upsertBudget
+  // para decidir entre UPDATE e INSERT. LIMIT 1 porque solo puede haber una fila viva por
+  // (periodo, categoría) — la app nunca crea dos; un duplicado solo puede venir de una hoja
+  // importada a mano, y softDeleteBudget las barre todas. Bind: [periodId, categoryId].
+  budgetOfCategory: `SELECT id, amount_cents FROM budgets WHERE period_id=? AND category_id=? AND deleted=0 LIMIT 1`,
+  // Bind: [amountCents, updatedAt, budgetId].
+  updateBudget: `UPDATE budgets SET amount_cents=?, updated_at=? WHERE id=? AND deleted=0`,
+  // Quitar el límite = borrado LÓGICO (la fila se conserva para el round-trip del xlsx, que ya
+  // salta las FKs de las filas con deleted=1). Por (periodo, categoría) y no por id: así es
+  // idempotente (sin fila viva no toca nada) y barre un duplicado colado por un import a mano.
+  // Bind: [updatedAt, periodId, categoryId].
+  softDeleteBudget: `UPDATE budgets SET deleted=1, updated_at=? WHERE period_id=? AND category_id=? AND deleted=0`,
 
   // Gasto por día en un rango (Task 12, tarjeta "Flujo de gasto" de Inicio). Mismo criterio que
   // spentOfPeriod (MY_AMOUNT de expenses, restan las devoluciones que no sean liquidación de un

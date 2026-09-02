@@ -7,11 +7,11 @@ import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtNum2, fmtPct, currencyCode } from "../format.js";
 import { dayIndexOfPeriod, expectedPeriodDays, paceDeltaCents } from "../prevision.js";
 import { t } from "../i18n/index.js";
-import { budgetStatus } from "./presupuesto.js";
+import { budgetStatus } from "../category-spend.js";
 import { barChartSvg, donutSvg } from "../charts.js";
 import { renderLiquidar } from "./liquidar.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
-import { renderPresupuesto } from "./presupuesto.js";
+import { renderGastoPorCategoria } from "./gasto-por-categoria.js";
 import { renderRecurrentes } from "./recurrentes.js";
 import { renderRegistro } from "./registro.js";
 import { pushBack, goBack } from "../back.js";
@@ -205,11 +205,10 @@ function flujoDeGastoHtml(days7) {
 }
 
 /** Color de la barra de estado de una fila del donut: igual criterio que
- *  presupuesto.js#statusColor (ok -> color propio de la categoría, warn/over -> ámbar/rojo). No
- *  se reutiliza directamente porque presupuesto.js no la exporta (es de detalle interno de esa
+ *  gasto-por-categoria.js#rootRowHtml (ok -> color propio de la categoría, warn/over -> ámbar/rojo). No
+ *  se reutiliza directamente porque esa pantalla no la exporta (es de detalle interno de esa
  *  pantalla) — aquí además el texto NO se colorea en warn (solo la barra), a diferencia de
- *  Presupuesto: ver docs/design/material-expresivo/Resumen.dc.html:146 (Casa, warn, texto blanco) vs :189 (Transporte,
- *  over, texto rojo). */
+ *  gasto-por-categoria.js (rootRowHtml colorea el % en ámbar en warn; esta tarjeta no). */
 function donutBarColor(level, catColor) {
   if (level === "warn") return "var(--amber)";
   if (level === "over") return "var(--red)";
@@ -250,7 +249,8 @@ function categoriaDonutRowHtml(name, color, spentCents, limitCents) {
 }
 
 /** Tarjeta "Gasto por categoría": donut + lista de categorías raíz con gasto, agrupando las que
- *  sobran más allá de DONUT_TOP_N en "Otras N" — réplica de docs/design/material-expresivo/Resumen.dc.html:109-215.
+ *  sobran más allá de DONUT_TOP_N en "Otras N" — réplica de
+ *  docs/design/gasto-por-categoria/Inicio.dc.html.
  *
  *  El centro del donut muestra la SUMA DE LAS RAÍCES (= suma de los arcos), NO spentOfPeriod():
  *  un movimiento sin categorizar (category_id='') no cae bajo ninguna raíz (spentByRootCategory
@@ -259,35 +259,47 @@ function categoriaDonutRowHtml(name, color, spentCents, limitCents) {
  *  "falta" un trozo. Mostrando la suma de lo categorizado, el número del centro SIEMPRE coincide
  *  con el 100% del anillo.
  *
- *  "Ver presupuesto →" es el ÚNICO punto de entrada a la pantalla Presupuesto: NO puede depender
- *  de que haya algo que dibujar en el donut. Si no hay gasto categorizado todavía (periodo
- *  recién abierto, todo sin categorizar, refunds que dejan las raíces a 0/negativo...) pero el
- *  periodo SÍ tiene presupuestos, se muestra una tarjeta reducida con solo la cabecera + el
- *  enlace, sin donut ni lista — mismo
- *  `id`/handler que la variante completa. Solo si tampoco hay presupuestos la tarjeta entera se
- *  oculta (nada que mostrar Y nada a lo que entrar, igual criterio que sharedBlockHtml/previsionHtml). */
-function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupuesto) {
-  const verPresupuestoBtn = showVerPresupuesto
-    ? `<button type="button" id="inicio-ver-presupuesto" style="all:unset;cursor:pointer;
-        font-size:12px;font-weight:600;color:var(--text-2);white-space:nowrap;
-        -webkit-tap-highlight-color:transparent;">${t("inicio.budget.viewLink")}</button>`
-    : "";
+ *  La tarjeta ENTERA es el punto de entrada a la pantalla «Gasto por categoría» y se muestra
+ *  SIEMPRE: antes solo había un enlace, y encima detrás de un gate (había que tener presupuestos
+ *  este periodo) que dejaba la pantalla inalcanzable justo para quien todavía no ha puesto ningún
+ *  límite — es decir, para quien más falta le hace entrar a ponerlos. Sin gasto categorizado se
+ *  pinta la versión reducida: cabecera + texto vacío + pie.
+ *
+ *  Nada de role ARIA de botón ni tabindex en el contenedor: ese role marca sus hijos como
+ *  Children Presentational en ARIA, así que Chrome/WebKit los sacan del árbol de accesibilidad —
+ *  el total del centro del donut y el "X € de Y €" de cada fila desaparecerían para lectores de
+ *  pantalla. En vez de eso, el .card entero se queda con onclick + cursor:pointer (tap en
+ *  cualquier punto sigue navegando para ratón/dedo) y el pie "Ver por categoría →" es un
+ *  <button> real: su click (de puntero o sintetizado por teclado) burbujea al onclick del
+ *  contenedor, así que un solo listener basta y el foco de teclado/lector de pantalla aterriza en
+ *  un control con nombre correcto. */
+function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory) {
   const headerHtml = `
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
       <div style="display:flex;flex-direction:column;gap:3px;">
         <div style="font-size:15px;font-weight:700;">${t("inicio.categorySpend.title")}</div>
         <div style="font-size:11px;color:var(--text-3);">${t("inicio.categorySpend.subtitle")}</div>
       </div>
-      ${verPresupuestoBtn}
+      <div style="width:24px;height:24px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--text-2);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg>
+      </div>
     </div>`;
+  const footerHtml = `
+    <hr class="divider">
+    <div style="height:44px;display:flex;align-items:center;justify-content:center;">
+      <button type="button" id="inicio-categoria-ver" style="all:unset;cursor:pointer;
+        font-size:12px;font-weight:600;color:var(--text-2);white-space:nowrap;
+        -webkit-tap-highlight-color:transparent;">${t("inicio.categorySpend.viewAll")}</button>
+    </div>`;
+  const cardAttrs = `class="card" id="inicio-categoria-card"`;
 
   const withSpend = rootRows.filter((r) => r.spent_cents > 0);
   if (withSpend.length === 0) {
-    if (!showVerPresupuesto) return "";
     return `
-      <div class="card" style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">
+      <div ${cardAttrs} style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px;padding:16px 16px 8px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
         ${headerHtml}
         <div style="font-size:12px;color:var(--text-3);">${t("inicio.categorySpend.empty")}</div>
+        ${footerHtml}
       </div>`;
   }
 
@@ -305,7 +317,7 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupue
   const otrasRowHtml = rest.length > 0 ? categoriaDonutRowHtml(t("inicio.categorySpend.others", { n: rest.length }), DONUT_OTHERS_COLOR, restTotal, 0) : "";
 
   return `
-    <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
+    <div ${cardAttrs} style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;padding:16px 16px 8px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
       ${headerHtml}
       <div style="display:flex;justify-content:center;">
         ${donutSvg(slices, centsToStr(categorizedTotal), t("inicio.categorySpend.spent", { currency: currencyCode() }))}
@@ -313,6 +325,7 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupue
       <div style="display:flex;flex-direction:column;gap:12px;">
         ${rowsHtml}${otrasRowHtml}
       </div>
+      ${footerHtml}
     </div>`;
 }
 
@@ -435,7 +448,7 @@ export async function renderInicio(container) {
 
     ${flujoDeGastoHtml(days7)}
 
-    ${gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, budgets.length > 0)}
+    ${gastoPorCategoriaHtml(rootRows, byId, budgetByCategory)}
 
     ${sharedBlockHtml(period, sharedRows, netCents, partnerName)}
 
@@ -480,11 +493,16 @@ export async function renderInicio(container) {
     renderLiquidar(container, goBack);
   };
 
-  const presuBtn = container.querySelector("#inicio-ver-presupuesto");
-  if (presuBtn) presuBtn.onclick = () => {
-    pushBack(() => renderInicio(container));
-    renderPresupuesto(container, goBack);
-  };
+  const categoriaCard = container.querySelector("#inicio-categoria-card");
+  if (categoriaCard) {
+    // Un solo listener: el click del <button id="inicio-categoria-ver"> del pie (de puntero o
+    // sintetizado al activarlo por teclado) burbujea hasta aquí, así que no hace falta cablear
+    // el botón aparte.
+    categoriaCard.onclick = () => {
+      pushBack(() => renderInicio(container));
+      renderGastoPorCategoria(container, goBack);
+    };
+  }
 
   const gestionarBtn = container.querySelector("#prevision-gestionar");
   if (gestionarBtn) gestionarBtn.onclick = () => {

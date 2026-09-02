@@ -116,6 +116,7 @@ export const EN = {
       spent: "{currency} spent",
       of: "of {limit}",
       noLimit: "no limit",
+      viewAll: "View by category →",
     },
     shared: {
       withPartner: "With {name}",
@@ -138,7 +139,6 @@ export const EN = {
       committed: "Remaining committed",
       available: "Actually available",
     },
-    budget: { viewLink: "View budget →" },
     available: {
       title: "Available this period",
       ofBudgeted: "of {amount} budgeted",
@@ -230,39 +230,52 @@ export const EN = {
       merchantFallback: "Settle up",
     },
   },
-  presupuesto: {
-    error: { load: "Couldn’t load Budget: {error}" },
-    title: "Budget",
+  gastoCategoria: {
+    error: { load: "Couldn’t load Spending by category: {error}" },
+    title: "Spending by category",
     header: {
-      openedOn: "{period} · opened on {date}{days}",
-      days: { one: " · {n} day", other: " · {n} days" },
+      dayOf: "{period} · day {day} of {total}",
     },
-    empty: "This period has no category with a limit.",
     total: {
-      title: "Spent of budget",
-      ofBudgeted: "of {amount} budgeted",
+      title: "Spent this period",
+      withLimit: {
+        one: "{spent} of {limit} in the only category with a limit · {pct}",
+        other: "{spent} of {limit} in the {n} categories with a limit · {pct}",
+      },
       remaining: {
-        one: "You have {amount} left in the {n} category with a limit",
+        one: "You have {amount} left in the only category with a limit",
         other: "You have {amount} left in the {n} categories with a limit",
       },
       over: {
-        one: "You’ve gone {amount} over in the {n} category with a limit",
+        one: "You’ve gone {amount} over in the only category with a limit",
         other: "You’ve gone {amount} over in the {n} categories with a limit",
       },
+      noLimits: "No category has a limit this period",
     },
     byCategory: {
       title: "By category",
-      countWithLimit: "{n} with a limit this period",
+      hint: "Tap a category to see the detail or set a limit",
+      empty: "You have no active expense categories.",
     },
-    category: {
-      over: "Over by {amount}",
-      warn: "Almost at the limit · {amount} left",
-      ok: "{amount} left",
+    row: {
+      ofLimit: "{spent} of {limit}",
+      noLimit: "{spent} · no limit",
+      noPct: "—",
     },
-    noLimit: {
-      title: "No limit this period",
-      summary: "{names} · {amount} spent",
-      andMore: "{names} and {n} more",
+    detail: {
+      noSubcategory: "No subcategory",
+      changeLimit: "Change limit",
+      setLimit: "Set limit",
+      limitOfPeriod: "{amount} this period",
+      noLimit: "no limit",
+    },
+    edit: {
+      title: "Limit for {name}",
+      placeholder: "No limit",
+      save: "Save",
+      onlyThisPeriod: "For this period only",
+      remove: "Remove limit",
+      saveFailed: "Couldn’t save the limit: {error}",
     },
   },
   patrimonio: {
@@ -687,6 +700,7 @@ export const EN = {
       txNotFound: "Transaction not found",
       txLockedSettled: "This expense has a linked settlement entry (refund or adjustment): delete it in Transactions first to change the amount, the split or who paid.",
       sharePctInvalid: "The split must be between 0 and 100.",
+      budgetInvalid: "The limit has to be an amount greater than zero.",
       refundLockedSettled: "This entry settles a shared expense. Delete or unlink it before changing its amount.",
       expenseLockedHasRefund: "This expense has a linked settlement entry. Delete it in Transactions first.",
       paidByNotShared: "Only a shared expense can be paid by the partner.",

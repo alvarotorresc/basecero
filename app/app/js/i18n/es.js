@@ -117,6 +117,7 @@ export const ES = {
       spent: "{currency} gastados",
       of: "de {limit}",
       noLimit: "sin límite",
+      viewAll: "Ver por categoría →",
     },
     shared: {
       withPartner: "Con {name}",
@@ -139,7 +140,6 @@ export const ES = {
       committed: "Comprometido restante",
       available: "Disponible real",
     },
-    budget: { viewLink: "Ver presupuesto →" },
     available: {
       title: "Disponible del periodo",
       ofBudgeted: "de {amount} presupuestados",
@@ -231,39 +231,52 @@ export const ES = {
       merchantFallback: "Liquidación",
     },
   },
-  presupuesto: {
-    error: { load: "No se pudo cargar Presupuesto: {error}" },
-    title: "Presupuesto",
+  gastoCategoria: {
+    error: { load: "No se pudo cargar Gasto por categoría: {error}" },
+    title: "Gasto por categoría",
     header: {
-      openedOn: "{period} · abierto el {date}{days}",
-      days: { one: " · {n} día", other: " · {n} días" },
+      dayOf: "{period} · día {day} de {total}",
     },
-    empty: "Este periodo no tiene ninguna categoría con límite.",
     total: {
-      title: "Gastado de lo presupuestado",
-      ofBudgeted: "de {amount} con presupuesto",
+      title: "Gastado este periodo",
+      withLimit: {
+        one: "{spent} de {limit} en la única categoría con límite · {pct}",
+        other: "{spent} de {limit} en las {n} categorías con límite · {pct}",
+      },
       remaining: {
-        one: "Te quedan {amount} en las {n} categoría con límite",
+        one: "Te quedan {amount} en la única categoría con límite",
         other: "Te quedan {amount} en las {n} categorías con límite",
       },
       over: {
-        one: "Te has pasado {amount} en las {n} categoría con límite",
+        one: "Te has pasado {amount} en la única categoría con límite",
         other: "Te has pasado {amount} en las {n} categorías con límite",
       },
+      noLimits: "Ninguna categoría tiene límite este periodo",
     },
     byCategory: {
       title: "Por categoría",
-      countWithLimit: "{n} con límite este periodo",
+      hint: "Toca una categoría para ver el detalle o poner un límite",
+      empty: "No tienes ninguna categoría de gasto activa.",
     },
-    category: {
-      over: "Superado por {amount}",
-      warn: "Casi al límite · te quedan {amount}",
-      ok: "Te quedan {amount}",
+    row: {
+      ofLimit: "{spent} de {limit}",
+      noLimit: "{spent} · sin límite",
+      noPct: "—",
     },
-    noLimit: {
-      title: "Sin límite este periodo",
-      summary: "{names} · {amount} gastados",
-      andMore: "{names} y {n} más",
+    detail: {
+      noSubcategory: "Sin subcategoría",
+      changeLimit: "Cambiar límite",
+      setLimit: "Poner límite",
+      limitOfPeriod: "{amount} este periodo",
+      noLimit: "sin límite",
+    },
+    edit: {
+      title: "Límite de {name}",
+      placeholder: "Sin límite",
+      save: "Guardar",
+      onlyThisPeriod: "Solo para este periodo",
+      remove: "Quitar límite",
+      saveFailed: "No se pudo guardar el límite: {error}",
     },
   },
   patrimonio: {
@@ -690,6 +703,7 @@ export const ES = {
       txNotFound: "Movimiento no encontrado",
       txLockedSettled: "Este gasto tiene un apunte de liquidación enlazado (devolución o ajuste): bórralo antes en Movimientos para cambiar el importe, el reparto o quién pagó.",
       sharePctInvalid: "El reparto debe estar entre 0 y 100.",
+      budgetInvalid: "El límite tiene que ser un importe mayor que cero.",
       refundLockedSettled: "Este apunte liquida un gasto compartido. Bórralo o desvincúlalo antes de cambiar su importe.",
       expenseLockedHasRefund: "Este gasto tiene un apunte de liquidación enlazado. Bórralo antes en Movimientos.",
       paidByNotShared: "Solo un gasto compartido puede pagarlo la contraparte.",

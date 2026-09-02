@@ -9,7 +9,7 @@ const DEFAULT_COLOR = "#9A99A6";
 // Contraste texto/tinte (Task 2 P2, WCAG 1.4.3 AA ≥4.5:1), verificado sobre las dos superficies
 // reales donde se usa TEXT_COLORS: en registro.js chipStyle el texto va sobre su propio tinte al
 // 18% (color-mix(in srgb, <color> 18%, transparent)) compuesto sobre --bg #121214; en
-// presupuesto.js categoryRowHtml el texto va sólido (sin tinte) sobre --card #1C1C21 igualmente
+// gasto-por-categoria.js rootRowHtml el texto va sólido (sin tinte) sobre --card #1C1C21 igualmente
 // sólido, dando ≥5.33:1 para las 12 — la superficie exigente es el tinte sobre --bg. 5 de las 12
 // entradas fallaban 4.5:1 ahí con el hex original (aunque ya pasaban de sobra sobre --card
 // sólido); se subió su lightness en OKLCH manteniendo hue/chroma hasta despejar 4.5:1 con margen
