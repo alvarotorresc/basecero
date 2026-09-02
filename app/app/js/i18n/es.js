@@ -34,6 +34,8 @@ export const ES = {
       youOwe: "Debes a {name}",
       even: "Estáis en paz",
     },
+    paidBy: { label: "Quién pagó", me: "Pagué yo", partner: "Pagó {name}" },
+    paidFull: "{name} pagó · total",
     split: { label: "Reparto", hint: "{name} paga el {pct} %", decreaseAria: "Bajar tu parte", increaseAria: "Subir tu parte" },
     merchant: "Comercio",
     date: "Fecha",

@@ -6,6 +6,7 @@ import {
 import { colorForCategory, iconForCategory, textColorForCategory, rootOf } from "../category-colors.js";
 import { matchesFilter, isUncategorized } from "../movimientos-filter.js";
 import { fmtMoney, fmtDiaLargo, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { pushBack, goBack } from "../back.js";
@@ -13,6 +14,10 @@ import { pushBack, goBack } from "../back.js";
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const needsCategory = (tipo) => tipo === "expense" || tipo === "income" || tipo === "refund";
+
+/** ¿Es el detalle de un gasto compartido que pagó la contraparte? Gatea la sección de cuentas, el
+ *  guard de validación y lo que se guarda — mismo criterio que registro.js#partnerPaid. */
+const partnerPaid = (d) => d.type === "expense" && d.isShared && d.paidBy === "partner";
 
 // TIPO_KEY guarda claves, no texto resuelto: es una const de módulo evaluada al importar el
 // fichero (antes de que boot() llame a initI18n con el idioma real) — ver mismo comentario en
@@ -48,7 +53,7 @@ const ICON_TRANSFER = `<svg width="16" height="16" viewBox="0 0 24 24" fill="non
 // Icono "+" del dotico punteado de una fila sin categorizar (artboard Movimientos.dc.html:46-48).
 const ICON_UNCAT = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="stroke:var(--text-2);" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>`;
 
-function movRowHtml(r, byId, accById) {
+function movRowHtml(r, byId, accById, partnerName) {
   if (r.type === "transfer") {
     const from = accById[r.account_id]?.name ?? "?";
     const to = accById[r.counter_account_id]?.name ?? "?";
@@ -82,9 +87,16 @@ function movRowHtml(r, byId, accById) {
   const dashedStyle = uncategorized ? "border:1.5px dashed var(--rule);" : "";
   const title = r.merchant || catName || t("movimientos.uncategorized");
   const subBase = uncategorized ? t("movimientos.tapToCategorize") : (catName || t("movimientos.uncategorized"));
-  const shareSuffix = r.is_shared ? t("common.myPartSuffix", { amount: fmtMoney(r.my_amount_cents) }) : "";
+  const shareSuffix = !r.is_shared ? ""
+    : r.paid_by === "partner"
+      ? t("movimientos.row.partnerPaid", { name: partnerName || t("movimientos.shared.fallbackName"), amount: fmtMoney(r.my_amount_cents) })
+      : t("common.myPartSuffix", { amount: fmtMoney(r.my_amount_cents) });
   const isExpense = r.type === "expense";
-  const amountClass = isExpense ? "negative" : "positive";
+  // Un gasto que pagó la contraparte enseña el ticket entero (coherencia con el resto de la lista)
+  // pero ATENUADO, no en rojo: ese dinero no salió de ninguna cuenta mía.
+  const partnerPaidRow = isExpense && !!r.is_shared && r.paid_by === "partner";
+  const amountClass = partnerPaidRow ? "" : isExpense ? "negative" : "positive";
+  const amountStyle = partnerPaidRow ? ' style="color:var(--text-3);"' : "";
   const sign = isExpense ? "-" : "+";
   return `
   <button type="button" class="tx-row" data-tx="${r.id}" style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
@@ -93,7 +105,7 @@ function movRowHtml(r, byId, accById) {
       <div class="tx-title">${escHtml(title)}</div>
       <div class="tx-sub" style="${uncategorized ? "color:var(--amber);" : ""}">${escHtml(subBase)}${escHtml(shareSuffix)}</div>
     </div>
-    <div class="tx-amount num ${amountClass}">${sign}${fmtMoney(r.amount_cents)}</div>
+    <div class="tx-amount num ${amountClass}"${amountStyle}>${sign}${fmtMoney(r.amount_cents)}</div>
   </button>`;
 }
 
@@ -205,6 +217,7 @@ export async function renderMovimientos(container) {
       accountId: row.account_id,
       counterAccountId: row.counter_account_id,
       isShared: !!row.is_shared,
+      paidBy: row.paid_by,
       // Fija en apertura si el movimiento YA era compartido, distinto del isShared vivo que cambia
       // con el toggle: gatea la visibilidad del bloque compartido para que no desaparezca al desmarcar
       // sin contraparte configurada, dejando al usuario sin forma de volver a marcarlo antes de guardar.
@@ -218,7 +231,10 @@ export async function renderMovimientos(container) {
       ruleId: row.rule_id,
     };
     state.linkedRefund = null;
-    if (row.type === "refund" && row.ref_id) {
+    // El apunte de liquidación tiene DOS formas desde Task 3: la devolución ENTRANTE (refund) y el
+    // ajuste SALIENTE (adjustment con ref_id, el que se crea cuando pagó ella). Los dos apuntan a un
+    // gasto por ref_id y los dos los cubre refundAmountLocked en repo.js.
+    if ((row.type === "refund" || row.type === "adjustment") && row.ref_id) {
       try { state.linkedRefund = await getTransaction(row.ref_id); } catch { state.linkedRefund = null; }
     }
     // Task 17 ronda 2 (controller ruling, finding A): un gasto ya liquidado con la contraparte (settled=1
@@ -229,7 +245,7 @@ export async function renderMovimientos(container) {
     // Task 7 (5d): espejo en UI del guard refundAmountLocked (repo.js) — el lado del REFUND. Si el
     // gasto enlazado ya está settled, bajar aquí el importe del refund descuadra la deuda liquidada
     // en silencio (el guard de repo lo rechazaría en save, pero mejor prevenirlo en el input).
-    state.detail.refundLocked = row.type === "refund" && !!state.linkedRefund?.settled;
+    state.detail.refundLocked = (row.type === "refund" || row.type === "adjustment") && !!state.linkedRefund?.settled;
     pushBack(backToList);
     state.view = "detail";
     errorMsg = "";
@@ -247,6 +263,10 @@ export async function renderMovimientos(container) {
 
   function validationError() {
     const d = state.detail;
+    // Guard que el detalle no tenía: desmarcar «Compartido» en una fila que pagó la contraparte
+    // (guardada con account_id='') devuelve la cuenta al juego y hay que exigirla — si no, el save
+    // escribiría un gasto mío sin cuenta.
+    if (d.type === "expense" && !partnerPaid(d) && !d.accountId) return t("common.needAccount");
     if (d.type === "transfer") {
       if (d.cents <= 0) return t("common.enterAmount");
       if (!d.counterAccountId || d.counterAccountId === d.accountId) return t("common.pickTwoAccounts");
@@ -260,6 +280,8 @@ export async function renderMovimientos(container) {
   }
 
   function renderAccountsSection(d) {
+    // Un gasto que pagó la contraparte no tiene cuenta que elegir: el dinero no salió de mi banco.
+    if (partnerPaid(d)) return "";
     const accounts = accountsAll.filter((a) => a.type !== "liability");
     if (d.type === "transfer") {
       return `
@@ -290,8 +312,9 @@ export async function renderMovimientos(container) {
     const cats = categoriesFor(d.type);
     const { mine: myCents, partner: partnerCents } = d.isShared ? splitCents(d.cents, d.sharePct) : { mine: d.cents, partner: 0 };
     const locked = !!d.settledLocked;
-    // Task 7 (5d): además de `locked` (lado del gasto), el importe del refund se bloquea si su
-    // gasto enlazado ya está settled — ver refundLocked en openDetail.
+    // Task 7 (5d): además de `locked` (lado del gasto), el importe del apunte de liquidación
+    // (refund entrante o adjustment saliente) se bloquea si su gasto enlazado ya está settled —
+    // ver refundLocked en openDetail.
     const amountLocked = locked || !!d.refundLocked;
 
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
@@ -311,7 +334,7 @@ export async function renderMovimientos(container) {
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
         <div class="section-title">${t("common.amount")}</div>
         <div class="amount-display" style="align-items:center;">
-          ${d.type === "adjustment" ? `<button type="button" class="icon-btn" id="mov-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;" ${locked ? "disabled" : ""}>${d.sign}</button>` : ""}
+          ${d.type === "adjustment" ? `<button type="button" class="icon-btn" id="mov-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;${amountLocked ? "opacity:.5;" : ""}" ${amountLocked ? "disabled" : ""}>${d.sign}</button>` : ""}
           <input type="text" inputmode="decimal" id="mov-raw" value="${escAttr(d.raw)}" placeholder="0" ${amountLocked ? "disabled" : ""}
             style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;${amountLocked ? "opacity:.5;" : ""}">
           <span class="amount-currency">${currencySymbol()}</span>
@@ -370,6 +393,16 @@ export async function renderMovimientos(container) {
         </label>
         ${d.isShared ? `
         <div style="display:flex; flex-direction:column; gap:10px; padding:0 0 14px;${locked ? "opacity:.5;" : ""}">
+          ${d.type === "expense" ? `
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div class="section-title">${t("common.paidBy.label")}</div>
+            <div class="segmented" style="border-radius:999px;">
+              <button type="button" data-paidby="me" class="${d.paidBy === "me" ? "active" : ""}" ${locked ? "disabled" : ""}
+                style="flex:1;border-radius:999px;${d.paidBy === "me" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("common.paidBy.me")}</button>
+              <button type="button" data-paidby="partner" class="${d.paidBy === "partner" ? "active" : ""}" ${locked ? "disabled" : ""}
+                style="flex:1;border-radius:999px;${d.paidBy === "partner" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("common.paidBy.partner", { name: escHtml(partnerName) || t("movimientos.shared.fallbackName") })}</button>
+            </div>
+          </div>` : ""}
           <div style="display:flex; align-items:center; gap:10px;">
             <div style="flex:1; min-width:0;">
               <div style="font-size:14px; font-weight:600;">${t("common.split.label")}</div>
@@ -385,8 +418,8 @@ export async function renderMovimientos(container) {
               <div class="num" id="mov-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
             </div>
             <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
-              <div style="font-size:10px; color:var(--text-3);">${escHtml(partnerName) || t("movimientos.shared.fallbackLabel")} · ${100 - d.sharePct}%</div>
-              <div class="num" id="mov-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerCents)}</div>
+              <div style="font-size:10px; color:var(--text-3);">${partnerPaid(d) ? t("common.paidFull", { name: escHtml(partnerName) || t("movimientos.shared.fallbackLabel") }) : `${escHtml(partnerName) || t("movimientos.shared.fallbackLabel")} · ${100 - d.sharePct}%`}</div>
+              <div class="num" id="mov-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerPaid(d) ? d.cents : partnerCents)}</div>
             </div>
           </div>
         </div>` : ""}
@@ -443,7 +476,7 @@ export async function renderMovimientos(container) {
       if (d.isShared && mineEl && partnerEl) {
         const { mine: myCents, partner: partnerCents } = splitCents(d.cents, d.sharePct);
         mineEl.textContent = fmtMoney(myCents);
-        partnerEl.textContent = fmtMoney(partnerCents);
+        partnerEl.textContent = fmtMoney(partnerPaid(d) ? d.cents : partnerCents);
       }
     };
     container.querySelector("#mov-merchant").oninput = (e) => { d.merchant = e.target.value; state.deleteConfirm = false; };
@@ -452,6 +485,19 @@ export async function renderMovimientos(container) {
 
     const sharedToggle = container.querySelector("#mov-shared");
     if (sharedToggle) sharedToggle.onchange = (e) => updateDetail({ isShared: e.target.checked });
+
+    container.querySelectorAll("[data-paidby]").forEach((b) => {
+      b.onclick = () => {
+        const paidBy = b.dataset.paidby;
+        // Volver a «Pagué yo» en una fila guardada sin cuenta: se precarga la cuenta por defecto
+        // para que el guard de validationError no deje al usuario sin salida.
+        const accounts = accountsAll.filter((a) => a.type !== "liability");
+        updateDetail({
+          paidBy,
+          accountId: paidBy === "me" ? (d.accountId || resolveAccountId(meta.default_account_id, accounts) || "") : d.accountId,
+        });
+      };
+    });
 
     const pctDown = container.querySelector("#mov-pct-down");
     if (pctDown) pctDown.onclick = () => updateDetail({ sharePct: stepPct(d.sharePct, -PCT_STEP) });
@@ -477,15 +523,20 @@ export async function renderMovimientos(container) {
           amountCents: d.type === "adjustment" && d.sign === "-" ? -d.cents : d.cents,
           date: d.fecha,
           categoryId: withCategory ? d.categoryId : "",
-          accountId: d.accountId,
+          // Un gasto que pagó la contraparte no toca ninguna cuenta mía hasta liquidar (el repo
+          // además lo blanquea por su cuenta, pero el payload no debe contradecirlo).
+          accountId: partnerPaid(d) ? "" : d.accountId,
           counterAccountId: d.type === "transfer" ? d.counterAccountId : "",
           merchant: d.merchant,
           note: d.note,
           isShared: withCategory && d.type !== "income" ? d.isShared : false,
-          // Locked (gasto liquidado con reembolso enlazado): se deja undefined para que updateTransaction
+          // Locked (gasto liquidado con apunte enlazado): se deja undefined para que updateTransaction
           // conserve el valor guardado — si mandáramos d.sharePct explícito, un gasto antiguo con override
           // NULL dispararía sharedFieldsLocked al editar solo la nota o la fecha.
           sharePctOverride: d.settledLocked ? undefined : (withCategory && d.type !== "income" && d.isShared ? d.sharePct : null),
+          // Mismo motivo que sharePctOverride: undefined conserva el paid_by guardado. Desmarcar
+          // «Compartido» cae a "me" — el guard del repo rechazaría un 'partner' sin is_shared.
+          paidBy: d.settledLocked ? undefined : (withCategory && d.type === "expense" && d.isShared ? d.paidBy : "me"),
           refId: d.refId,
           ruleId: d.ruleId,
         });
@@ -544,7 +595,7 @@ export async function renderMovimientos(container) {
         <div style="display:flex;flex-direction:column;gap:12px;">
           ${groupByDay(visible).map((g) => `
             <div class="day-label">${g.date === hoy ? t("common.today") : fmtDiaLargo(g.date)}</div>
-            ${g.rows.map((r) => movRowHtml(r, byId, accById)).join("")}
+            ${g.rows.map((r) => movRowHtml(r, byId, accById, partnerName)).join("")}
           `).join("")}
         </div>
       </div>`;

@@ -34,6 +34,8 @@ export const EN = {
       youOwe: "You owe {name}",
       even: "You are square",
     },
+    paidBy: { label: "Who paid", me: "I paid", partner: "{name} paid" },
+    paidFull: "{name} paid · total",
     split: { label: "Split", hint: "{name} pays {pct}%", decreaseAria: "Decrease your share", increaseAria: "Increase your share" },
     merchant: "Merchant",
     date: "Date",
