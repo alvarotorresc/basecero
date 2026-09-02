@@ -289,20 +289,6 @@ export function settleAllSharedStmts(rows, accountId, periodId, date, now, partn
   return stmts;
 }
 
-/** Liquida UN gasto compartido pendiente, en cualquiera de las dos direcciones, reutilizando
- *  settleAllSharedStmts con una sola fila (un único camino para las dos operaciones). Exportada y
- *  con test, aunque hoy ninguna pantalla la use (Liquidar retiró el botón por fila). */
-export async function settleShared(txId, accountId) {
-  // Mismo ORDEN de guards que settleAllShared (periodo primero, fila después): así las dos
-  // funciones lanzan el mismo error ante el mismo estado, y un id obsoleto sin periodo abierto no
-  // reporta "gasto no encontrado" cuando el problema real es que no hay periodo.
-  const [period, pending, meta] = await Promise.all([getOpenPeriod(), pendingSettlements(), getMetaAll()]);
-  if (!period) throw new Error(t("errors.common.noOpenPeriod"));
-  const row = pending.find((r) => r.id === txId);
-  if (!row) throw new Error(t("errors.repo.settleNotFound"));
-  await execMany(settleAllSharedStmts([row], accountId, period.id, hoyISO(), nowIso(), (meta.partner_name || "").trim()));
-}
-
 /** Liquida VARIOS gastos compartidos pendientes DE GOLPE (el botón de Liquidar): las dos
  *  direcciones a la vez — un refund ENTRANTE por cada fila partner_owes (lo pagué yo) y un
  *  adjustment SALIENTE por cada fila i_owe (lo pagó ella) — y el saldo de la cuenta elegida se
@@ -316,7 +302,7 @@ export async function settleShared(txId, accountId) {
  *
  *  Guard de fila: si algún id de `ids` NO aparece en pendingSettlements() (ya liquidado por otra
  *  pestaña, borrado, o directamente no existe), se LANZA (no se liquida un subconjunto en
- *  silencio) — mismo mensaje que settleShared (errors.repo.settleNotFound), reutilizado porque es
+ *  silencio) — se reutiliza errors.repo.settleNotFound porque es
  *  exactamente la misma condición. Se filtra `pending` por `idSet` en vez de mapear `ids` uno a
  *  uno para que un id DUPLICADO en `ids` no cree dos refunds sobre el mismo gasto (el filtro
  *  dedupea; el length-check contra idSet.size detecta tanto duplicados como ids inexistentes). */

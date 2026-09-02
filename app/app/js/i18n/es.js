@@ -145,7 +145,6 @@ export const ES = {
       ofBudgeted: "de {amount} presupuestados",
       paceOver: "▲ {amount} sobre el ritmo del plan",
       paceUnder: "▼ {amount} bajo el ritmo del plan",
-      settleWithAmount: "Liquidar · {amount}",
     },
   },
   registro: {
@@ -704,7 +703,7 @@ export const ES = {
       txLockedSettled: "Este gasto tiene un apunte de liquidación enlazado (devolución o ajuste): bórralo antes en Movimientos para cambiar el importe, el reparto o quién pagó.",
       sharePctInvalid: "El reparto debe estar entre 0 y 100.",
       budgetInvalid: "El límite tiene que ser un importe mayor que cero.",
-      refundLockedSettled: "Este apunte liquida un gasto compartido. Bórralo o desvincúlalo antes de cambiar su importe.",
+      refundLockedSettled: "Este apunte está enlazado a un gasto ya liquidado. Bórralo o desvincúlalo antes de cambiar su importe.",
       expenseLockedHasRefund: "Este gasto tiene un apunte de liquidación enlazado. Bórralo antes en Movimientos.",
       paidByNotShared: "Solo un gasto compartido puede pagarlo la contraparte.",
       ruleNotFound: "Regla no encontrada",

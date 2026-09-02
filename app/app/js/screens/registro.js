@@ -90,8 +90,8 @@ export async function renderRegistro(container, onDone, prefill) {
     state.categoryId = row.category_id;
     if (row.is_shared) {
       // Solo precarga categoría + importe de la parte de la contraparte; el refund de
-      // liquidación en sí NO se marca compartido (mismo criterio que Task 7
-      // settleShared: is_shared=0, ya es el 100% de lo que la contraparte debe).
+      // liquidación en sí NO se marca compartido (mismo criterio que
+      // repo.settleAllSharedStmts: is_shared=0, ya es el 100% de lo que la contraparte debe).
       // Usa el pct EFECTIVO del gasto enlazado (su propio override, o el pct
       // de SU periodo), no el del periodo abierto: el gasto puede venir de un
       // periodo cerrado con reparto distinto o llevar su propio override.
