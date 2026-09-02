@@ -1,4 +1,5 @@
-import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta, setMetaMany, allCategoriesById, retranslateSeedNames } from "../repo.js";
+import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta, setMetaMany, allCategoriesById, retranslateSeedNames, updatePeriodSharePct } from "../repo.js";
+import { PCT_STEP, normalizePct, stepPct } from "../share-pct.js";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
 import { hoyISO, fmtDiaCorto, fmtMoney } from "../format.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
@@ -177,13 +178,14 @@ function importResultText(res, partnerName) {
   return text;
 }
 
-function periodoCardHtml(period, partnerName) {
+function periodoCardHtml(period, partnerName, periodError) {
   if (!period) return "";
   // start_date puede quedar en el futuro (se puede abrir el periodo unos días antes de que
   // empiece): en ese caso no hay "días transcurridos" que mostrar, así que se omite ese tramo
   // en vez de enseñar un número negativo.
   const dias = Math.floor((new Date(hoyISO() + "T12:00:00") - new Date(period.start_date + "T12:00:00")) / 86400000) + 1;
   const diasTxt = dias >= 1 ? t("ajustes.period.days", { n: dias }) : "";
+  const pct = normalizePct(period.my_share_pct, 100);
   return `
   <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
     <div class="section-title">${t("ajustes.period.title")}</div>
@@ -200,6 +202,17 @@ function periodoCardHtml(period, partnerName) {
           <div style="font-size:11px;font-weight:600;color:var(--text-2)">${t("ajustes.period.openLabel")}</div>
         </div>
       </div>
+      ${partnerName ? `
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:14px; font-weight:600;">${t("ajustes.period.shareLabel")}</div>
+          <div style="font-size:11px; color:var(--text-3);">${t("ajustes.period.shareHint", { name: escHtml(partnerName), pct: 100 - pct })}</div>
+        </div>
+        <button type="button" id="aj-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}">−</button>
+        <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${pct} %</div>
+        <button type="button" id="aj-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}">+</button>
+      </div>
+      ${periodError ? `<div class="banner-aviso red">${escHtml(periodError)}</div>` : ""}` : ""}
       <button type="button" class="btn-secondary" id="btn-cerrar-periodo" style="width:100%">${t("ajustes.period.closeBtn")}</button>
       <div style="font-size:11px;color:var(--text-3);line-height:1.5">
         ${partnerName
@@ -234,7 +247,7 @@ export async function renderAjustes(container) {
 
   const state = {
     errors: null, pending: null, busy: false, n26Result: null, n26Error: null,
-    encExport: false, encImport: null,
+    encExport: false, encImport: null, periodError: "",
     view: "main", assistant: null, // Task 6: subvista de asistente de mapeo (needsMapping)
   };
 
@@ -318,7 +331,7 @@ export async function renderAjustes(container) {
         </div>` : ""}
       </div>
 
-      ${periodoCardHtml(openPeriod, partnerName)}
+      ${periodoCardHtml(openPeriod, partnerName, state.periodError)}
 
       <div class="card" style="margin-bottom:12px">
         <button type="button" id="btn-recurrentes" class="list-row"
@@ -511,6 +524,27 @@ export async function renderAjustes(container) {
         },
       });
     };
+
+    const stepShare = async (delta) => {
+      const cur = normalizePct(openPeriod.my_share_pct, 100);
+      const next = stepPct(cur, delta);
+      if (next === cur) return;
+      // Optimista: el siguiente toque parte del valor pendiente (si no, dos toques rápidos leen el
+      // mismo cur y se pierde uno); si el guardado falla se revierte.
+      openPeriod = { ...openPeriod, my_share_pct: next };
+      try {
+        await updatePeriodSharePct(openPeriod.id, next);
+        state.periodError = "";
+      } catch (e) {
+        openPeriod = { ...openPeriod, my_share_pct: cur };
+        state.periodError = t("ajustes.period.shareSaveFailed", { error: e.message });
+      }
+      render();
+    };
+    const pctDown = container.querySelector("#aj-pct-down");
+    if (pctDown) pctDown.onclick = () => stepShare(-PCT_STEP);
+    const pctUp = container.querySelector("#aj-pct-up");
+    if (pctUp) pctUp.onclick = () => stepShare(PCT_STEP);
 
     container.querySelector("#xlsx-file-input").onchange = async (e) => {
       const file = e.target.files[0];
