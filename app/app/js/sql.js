@@ -152,6 +152,26 @@ export const SQL = {
   LEFT JOIN periods p ON p.id=t.period_id
   WHERE root.parent_id='' AND root.flow='expense' AND root.deleted=0 AND root.is_archived=0
   GROUP BY root.id ORDER BY spent_cents DESC`,
+  // Gasto por SUBcategoría dentro de una raíz (pantalla «Gasto por categoría», bloque desplegable).
+  // Una fila por la raíz misma (c.id=?) y otra por cada hija directa (c.parent_id=?) — el árbol de
+  // categorías tiene solo dos niveles, no hay que recursar. La fila con category_id = la raíz es el
+  // gasto anotado DIRECTAMENTE en ella (la pantalla la pinta como «Sin subcategoría», y solo si la
+  // raíz tiene hijas: sin hijas esa fila sería el total de la raíz repetido).
+  // Mismo criterio que spentByRootCategory (MY_AMOUNT prorrateado, REFUND_REDUCES_SPEND, periodo y
+  // t.deleted=0) para que la suma de las filas cuadre EXACTAMENTE con el spent_cents de la raíz.
+  // Por eso NO se filtra is_archived: spentByRootCategory tampoco lo hace en su join de hijas y
+  // archivar conserva el historial; si aquí se filtrara, el desglose dejaría de sumar el total de la
+  // fila de arriba justo cuando el usuario archiva una subcategoría que sí tuvo gasto. La UI ya
+  // descarta las filas a 0, así que una archivada sin usar nunca llega a pintarse.
+  // Bind: [periodId, rootId, rootId].
+  spentByChildCategory: `SELECT c.id AS category_id, c.name,
+    COALESCE(SUM(CASE WHEN t.type='expense' THEN ${MY_AMOUNT}
+                 WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT} ELSE 0 END),0) AS spent_cents
+  FROM categories c
+  LEFT JOIN transactions t ON t.category_id=c.id AND t.period_id=? AND t.deleted=0
+  LEFT JOIN periods p ON p.id=t.period_id
+  WHERE (c.id=? OR c.parent_id=?) AND c.deleted=0
+  GROUP BY c.id ORDER BY spent_cents DESC`,
   insertBudget: `INSERT INTO budgets (id,period_id,category_id,amount_cents,created_at,updated_at,deleted)
     VALUES (?,?,?,?,?,?,0)`,
   budgetsOfPeriod: `SELECT b.id, b.category_id, b.amount_cents FROM budgets b WHERE b.period_id=? AND b.deleted=0`,

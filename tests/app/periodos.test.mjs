@@ -278,3 +278,82 @@ test("execMany: una violación de CHECK en el lote de openNextPeriod hace rollba
   const per2 = db.prepare("SELECT * FROM periods WHERE id='per-2'").get();
   assert.equal(per2, undefined, "no queda ningún rastro del periodo nuevo");
 });
+
+/** Inserta una categoría con la firma literal que usan seedMinimal y los tests vecinos. */
+function insCat(db, { id, name, parent = "", flow = "expense", need = "need", order = 9, archived = 0, deleted = 0 }) {
+  db.prepare(`INSERT INTO categories (id,name,parent_id,flow,need_type,display_order,is_archived,created_at,updated_at,deleted)
+    VALUES (?,?,?,?,?,?,?,?,?,?)`).run(id, name, parent, flow, need, order, archived, T, T, deleted);
+  return id;
+}
+
+test("spentByChildCategory: una fila por la raíz y por cada hija; el gasto directo en la raíz sale en su propia fila y la suma cuadra con spentByRootCategory", () => {
+  const db = openDb();
+  seedMinimal(db);
+  insCat(db, { id: "cat-casa-luz", name: "Luz", parent: "cat-casa", order: 2 });
+  insCat(db, { id: "cat-ocio", name: "Ocio", parent: "", need: "want", order: 5 });
+  insCat(db, { id: "cat-ocio-viajes", name: "Viajes", parent: "cat-ocio", need: "want", order: 1 });
+
+  ins(db, { id: "g-raiz", category: "cat-casa", cents: 5000, shared: 0 });
+  ins(db, { id: "g-alquiler", category: "cat-casa-alquiler", cents: 10000, shared: 1 }); // 60 % -> 6000
+  ins(db, { id: "g-luz", category: "cat-casa-luz", cents: 3000, shared: 0 });
+  ins(db, { id: "g-otra-raiz", category: "cat-ocio-viajes", cents: 7000, shared: 0 });
+
+  const rows = db.prepare(SQL.spentByChildCategory).all("per-1", "cat-casa", "cat-casa");
+
+  assert.deepEqual(
+    rows.map((r) => [r.category_id, r.spent_cents]),
+    [["cat-casa-alquiler", 6000], ["cat-casa", 5000], ["cat-casa-luz", 3000]],
+    "la raíz y sus dos hijas, ordenadas por spent_cents DESC; nada de la otra raíz",
+  );
+  assert.equal(rows.find((r) => r.category_id === "cat-casa").name, "Casa", "la fila de la raíz trae su propio nombre");
+
+  const raiz = db.prepare(SQL.spentByRootCategory).all("per-1").find((r) => r.root_id === "cat-casa");
+  assert.equal(rows.reduce((s, r) => s + r.spent_cents, 0), raiz.spent_cents, "el desglose suma EXACTAMENTE el total de la raíz");
+});
+
+test("spentByChildCategory: prorratea los compartidos al my_share_pct del periodo y resta las devoluciones que no liquidan un compartido", () => {
+  const db = openDb();
+  seedMinimal(db);
+  insCat(db, { id: "cat-casa-luz", name: "Luz", parent: "cat-casa", order: 2 });
+
+  const compartido = ins(db, { id: "g-compartido", category: "cat-casa-alquiler", cents: 10000, shared: 1 }); // 60 % -> 6000
+  ins(db, { id: "d-suelta", type: "refund", category: "cat-casa-alquiler", cents: 2000, shared: 1 });         // 60 % -> -1200
+  ins(db, { id: "d-liquidacion", type: "refund", category: "cat-casa-alquiler", cents: 4000, shared: 0, ref: compartido }); // liquida un compartido: NO resta
+  const propio = ins(db, { id: "g-luz", category: "cat-casa-luz", cents: 3000, shared: 0 });
+  ins(db, { id: "d-tienda", type: "refund", category: "cat-casa-luz", cents: 3000, shared: 0, ref: propio });  // devolución real: SÍ resta
+
+  const rows = db.prepare(SQL.spentByChildCategory).all("per-1", "cat-casa", "cat-casa");
+  const by = Object.fromEntries(rows.map((r) => [r.category_id, r.spent_cents]));
+
+  assert.equal(by["cat-casa-alquiler"], 4800, "6000 (10000 al 60 %) - 1200 (devolución suelta al 60 %)");
+  assert.equal(by["cat-casa-luz"], 0, "3000 - 3000 (devolución enlazada a un gasto NO compartido)");
+  assert.equal(by["cat-casa"], 0, "sin gasto directo en la raíz");
+
+  const raiz = db.prepare(SQL.spentByRootCategory).all("per-1").find((r) => r.root_id === "cat-casa");
+  assert.equal(rows.reduce((s, r) => s + r.spent_cents, 0), raiz.spent_cents, "mismas reglas que spentByRootCategory: la suma cuadra");
+});
+
+test("spentByChildCategory: excluye categorías borradas, movimientos borrados y otros periodos; INCLUYE las hijas archivadas con gasto para que la suma cuadre con la raíz", () => {
+  const db = openDb();
+  seedMinimal(db);
+  insCat(db, { id: "cat-casa-gas", name: "Gas", parent: "cat-casa", order: 3, archived: 1 });
+  insCat(db, { id: "cat-casa-agua", name: "Agua", parent: "cat-casa", order: 4, deleted: 1 });
+  db.prepare(`INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
+    VALUES ('per-otro','Otro periodo','2026-06-01','2026-06-30','closed',50,'',?,?,0)`).run(T, T);
+
+  ins(db, { id: "g-gas", category: "cat-casa-gas", cents: 2500, shared: 0 });        // hija ARCHIVADA con gasto
+  ins(db, { id: "g-agua", category: "cat-casa-agua", cents: 1000, shared: 0 });      // hija BORRADA: su fila no existe
+  const borrado = ins(db, { id: "g-borrado", category: "cat-casa-alquiler", cents: 9999, shared: 0 });
+  db.prepare("UPDATE transactions SET deleted=1 WHERE id=?").run(borrado);
+  ins(db, { id: "g-otro-periodo", period: "per-otro", category: "cat-casa-alquiler", cents: 8888, shared: 0 });
+
+  const rows = db.prepare(SQL.spentByChildCategory).all("per-1", "cat-casa", "cat-casa");
+  const by = Object.fromEntries(rows.map((r) => [r.category_id, r.spent_cents]));
+
+  assert.equal(by["cat-casa-gas"], 2500, "una subcategoría archivada conserva su historial y tiene que aparecer");
+  assert.equal("cat-casa-agua" in by, false, "una subcategoría BORRADA no aparece");
+  assert.equal(by["cat-casa-alquiler"], 0, "el movimiento borrado no cuenta y el de otro periodo tampoco");
+
+  const raiz = db.prepare(SQL.spentByRootCategory).all("per-1").find((r) => r.root_id === "cat-casa");
+  assert.equal(rows.reduce((s, r) => s + r.spent_cents, 0), raiz.spent_cents, "invariante: el desglose SIEMPRE suma el total de la raíz, archivadas incluidas");
+});

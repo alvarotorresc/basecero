@@ -186,6 +186,11 @@ export const countUncategorized = async (pid) => (await query(SQL.countUncategor
 export const pendingSettlements = () => query(SQL.pendingSettlements);
 export const pendingSettlementNetCents = async () => (await query(SQL.pendingSettlementNet))[0].net_cents;
 export const spentByRootCategory = (pid) => query(SQL.spentByRootCategory, [pid]);
+
+/** Desglose del gasto de una raíz por subcategoría (bloque desplegable de «Gasto por categoría»).
+ *  Devuelve también la fila de la propia raíz (category_id === rootId): es el gasto anotado
+ *  directamente en ella. Incluye las filas a 0; quien consume las descarta. */
+export const spentByChildCategory = (periodId, rootId) => query(SQL.spentByChildCategory, [periodId, rootId, rootId]);
 export const budgetsOfPeriod = (pid) => query(SQL.budgetsOfPeriod, [pid]);
 
 /** Pone o cambia el límite de una categoría en un periodo (pantalla «Gasto por categoría»).
