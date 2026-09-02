@@ -7,7 +7,7 @@ import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtNum2, fmtPct, currencyCode } from "../format.js";
 import { dayIndexOfPeriod, expectedPeriodDays, paceDeltaCents } from "../prevision.js";
 import { t } from "../i18n/index.js";
-import { budgetStatus } from "../category-spend.js";
+import { budgetStatus, budgetMap } from "../category-spend.js";
 import { barChartSvg, donutSvg } from "../charts.js";
 import { renderLiquidar } from "./liquidar.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
@@ -341,8 +341,12 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory) {
  *  dedicada a compartidos, con nombre de la contraparte/reparto/importe pendiente ya de
  *  contexto — el botón encaja ahí de forma natural) y se retira de aquí, que es sobre el
  *  presupuesto, no sobre compartidos. */
-function disponibleCardHtml(budgets, spent, period) {
-  const budgetTotal = budgets.reduce((s, b) => s + b.amount_cents, 0);
+// budgetByCategory (el mapa), no las filas en crudo: budgetsOfPeriod ya deja fuera los límites de
+// categorías archivadas o borradas —sumarlos descontaba del disponible un presupuesto que el
+// usuario no veía en ninguna lista— y budgetMap colapsa las parejas duplicadas que solo puede dejar
+// una hoja editada a mano, que con reduce sobre las filas se contarían dos veces.
+function disponibleCardHtml(budgetByCategory, spent, period) {
+  const budgetTotal = Object.values(budgetByCategory).reduce((s, c) => s + c, 0);
   if (!budgetTotal) return "";
   const disp = budgetTotal - spent;
   const delta = paceDeltaCents(budgetTotal, spent, period.start_date, hoyISO());
@@ -391,7 +395,7 @@ export async function renderInicio(container) {
     return;
   }
 
-  const budgetByCategory = Object.fromEntries(budgets.map((b) => [b.category_id, b.amount_cents]));
+  const budgetByCategory = budgetMap(budgets);
 
   const ahorrado = income - spent;
   const tasa = income > 0 ? fmtPct(ahorrado / income) : "—";
@@ -422,7 +426,7 @@ export async function renderInicio(container) {
       <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;">${saludo}</div>
     </button>
 
-    ${disponibleCardHtml(budgets, spent, period)}
+    ${disponibleCardHtml(budgetByCategory, spent, period)}
 
     <div class="card" style="display:flex;flex-direction:column;gap:4px;margin-bottom:16px;">
       <div class="section-title">${t("inicio.spent.title")}</div>

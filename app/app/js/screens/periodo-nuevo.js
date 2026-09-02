@@ -242,7 +242,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
         ${mode === "next" ? `<div style="font-size:11px; color:var(--text-3);">${t("periodo.budget.lastMonth", { amount: fmtMoney(r.spent_cents) })}</div>` : ""}
       </div>
       <div style="position:relative; flex-shrink:0;">
-        <input type="number" min="0" step="1" inputmode="decimal" placeholder="${t("periodo.budget.noLimitPlaceholder")}"
+        <input type="number" min="0" step="0.01" inputmode="decimal" placeholder="${t("periodo.budget.noLimitPlaceholder")}"
           data-budget="${r.root_id}" value="${escAttr(raw)}" class="budget-input${empty ? " is-empty" : ""}">
         <span class="budget-eur" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:12px;
           color:var(--text-3); pointer-events:none; display:${empty ? "none" : ""};">${currencySymbol()}</span>

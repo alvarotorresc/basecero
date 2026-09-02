@@ -155,13 +155,20 @@ export async function renderRegistro(container, onDone, prefill) {
       <div class="card refund-list" style="padding:4px 14px; margin-top:8px;">
         ${refundCandidates.length === 0
           ? `<div style="padding:14px 0; font-size:13px; color:var(--text-3);">${t("registro.refund.empty")}</div>`
-          : refundCandidates.map((r) => `
-            <button type="button" class="refund-row" data-refund-row="${escAttr(r.id)}">
+          : refundCandidates.map((r) => {
+            // Un gasto con algo ya devuelto sigue siendo elegible (una devolución parcial es
+            // legítima): solo se atenúa y se etiqueta. El SQL ya lo ha empujado al final de la
+            // lista (sql.js#recentForRefund), aquí no se reordena nada.
+            const done = r.refunded_cents > 0;
+            return `
+            <button type="button" class="refund-row" data-refund-row="${escAttr(r.id)}"${done ? ' style="opacity:.55;"' : ""}>
               <span style="flex:1; min-width:0; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                 ${escHtml(r.merchant || byId[r.category_id]?.name || t("common.type.expense"))}${r.is_shared ? t("registro.refund.sharedSuffix") : ""}
               </span>
+              ${done ? `<span style="font-size:10.5px; color:var(--text-3); white-space:nowrap; flex-shrink:0;">${t("registro.refund.alreadyRefunded", { amount: escHtml(fmtMoney(r.refunded_cents)) })}</span>` : ""}
               <span class="num">${fmtMoney(r.amount_cents)}</span>
-            </button>`).join("")}
+            </button>`;
+          }).join("")}
       </div>` : ""}
     </div>`;
   }

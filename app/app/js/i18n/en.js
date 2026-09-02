@@ -163,6 +163,7 @@ export const EN = {
       toggle: "Refunding an expense? {arrow}",
       empty: "No recent expenses.",
       sharedSuffix: " · shared",
+      alreadyRefunded: "Already refunded · {amount}",
     },
   },
   movimientos: {
@@ -230,7 +231,10 @@ export const EN = {
     },
   },
   gastoCategoria: {
-    error: { load: "Couldn’t load Spending by category: {error}" },
+    error: {
+      load: "Couldn’t load Spending by category: {error}",
+      detail: "Couldn’t load the detail: {error}",
+    },
     title: "Spending by category",
     header: {
       dayOf: "{period} · day {day} of {total}",

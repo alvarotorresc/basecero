@@ -164,6 +164,7 @@ export const ES = {
       toggle: "¿Devuelve un gasto? {arrow}",
       empty: "No hay gastos recientes.",
       sharedSuffix: " · compartido",
+      alreadyRefunded: "Ya devuelto · {amount}",
     },
   },
   movimientos: {
@@ -231,7 +232,10 @@ export const ES = {
     },
   },
   gastoCategoria: {
-    error: { load: "No se pudo cargar Gasto por categoría: {error}" },
+    error: {
+      load: "No se pudo cargar Gasto por categoría: {error}",
+      detail: "No se pudo cargar el detalle: {error}",
+    },
     title: "Gasto por categoría",
     header: {
       dayOf: "{period} · día {day} de {total}",
