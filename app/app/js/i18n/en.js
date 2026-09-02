@@ -687,6 +687,7 @@ export const EN = {
       txNotFound: "Transaction not found",
       txLockedSettled: "This expense has a linked settlement entry (refund or adjustment): delete it in Transactions first to change the amount, the split or who paid.",
       sharePctInvalid: "The split must be between 0 and 100.",
+      budgetInvalid: "The limit has to be an amount greater than zero.",
       refundLockedSettled: "This entry settles a shared expense. Delete or unlink it before changing its amount.",
       expenseLockedHasRefund: "This expense has a linked settlement entry. Delete it in Transactions first.",
       paidByNotShared: "Only a shared expense can be paid by the partner.",

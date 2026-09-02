@@ -188,6 +188,24 @@ export const pendingSettlementNetCents = async () => (await query(SQL.pendingSet
 export const spentByRootCategory = (pid) => query(SQL.spentByRootCategory, [pid]);
 export const budgetsOfPeriod = (pid) => query(SQL.budgetsOfPeriod, [pid]);
 
+/** Pone o cambia el límite de una categoría en un periodo (pantalla «Gasto por categoría»).
+ *  Guard PURO antes de tocar la BD (mismo patrón que periodStartTooEarly/updatePeriodSharePct):
+ *  un límite es SIEMPRE un entero de céntimos > 0 — «sin límite» se expresa borrando la fila con
+ *  deleteBudget, nunca guardando un 0 (budgetStatus trata el 0 como "sin estado" y una fila a 0
+ *  dejaría una categoría con límite fantasma). Si ya hay fila viva la actualiza; si no, inserta
+ *  con el mismo generador de id que openNextPeriod. */
+export async function upsertBudget(periodId, categoryId, amountCents) {
+  if (!Number.isInteger(amountCents) || amountCents <= 0) throw new Error(t("errors.repo.budgetInvalid"));
+  const now = nowIso();
+  const existing = (await query(SQL.budgetOfCategory, [periodId, categoryId]))[0];
+  if (existing) await exec(SQL.updateBudget, [amountCents, now, existing.id]);
+  else await exec(SQL.insertBudget, [bcUlid(), periodId, categoryId, amountCents, now, now]);
+}
+
+/** Quita el límite de una categoría en un periodo: borrado lógico, idempotente (sin fila viva no
+ *  hace nada). No lleva guard: quitar algo que no está es una operación válida. */
+export const deleteBudget = (periodId, categoryId) => exec(SQL.softDeleteBudget, [nowIso(), periodId, categoryId]);
+
 /** Completa los huecos de SQL.spentByDay (que solo trae los días CON movimiento) con 0, para
  *  los 7 días naturales que terminan en `todayIso` (inclusive). Pura — sin I/O — para que
  *  spentLast7Days (que sí hace la query) sea testable sin duplicar la lógica de relleno (ver

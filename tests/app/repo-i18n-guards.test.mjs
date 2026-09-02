@@ -18,7 +18,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
-  createCategory, updateCategory, setCategoryStyle, updatePeriodSharePct, addTransaction,
+  createCategory, updateCategory, setCategoryStyle, updatePeriodSharePct, addTransaction, upsertBudget,
 } from "../../app/app/js/repo.js";
 import { t } from "../../app/app/js/i18n/index.js";
 
@@ -120,6 +120,21 @@ test("addTransaction rechaza un gasto sin cuenta cuando no lo pagó la contrapar
         assert.equal(e.message, t("common.needAccount"));
         return true;
       },
+    );
+  }
+});
+
+test("upsertBudget con un importe que no es un entero de céntimos > 0 rechaza con errors.repo.budgetInvalid antes de tocar la BD", async () => {
+  for (const cents of [0, -100, 1.5, NaN, "1000", null, undefined]) {
+    await assert.rejects(
+      () => upsertBudget("per-1", "cat-casa", cents),
+      (e) => {
+        assert.ok(e instanceof Error);
+        assert.notEqual(e.constructor.name, "ReferenceError", `no debe ser TDZ ReferenceError: ${e.message}`);
+        assert.equal(e.message, t("errors.repo.budgetInvalid"));
+        return true;
+      },
+      `importe inválido: ${String(cents)}`,
     );
   }
 });

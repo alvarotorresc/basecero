@@ -155,6 +155,18 @@ export const SQL = {
   insertBudget: `INSERT INTO budgets (id,period_id,category_id,amount_cents,created_at,updated_at,deleted)
     VALUES (?,?,?,?,?,?,0)`,
   budgetsOfPeriod: `SELECT b.id, b.category_id, b.amount_cents FROM budgets b WHERE b.period_id=? AND b.deleted=0`,
+  // Límite VIVO de una categoría en un periodo (pantalla «Gasto por categoría»): lo lee upsertBudget
+  // para decidir entre UPDATE e INSERT. LIMIT 1 porque solo puede haber una fila viva por
+  // (periodo, categoría) — la app nunca crea dos; un duplicado solo puede venir de una hoja
+  // importada a mano, y softDeleteBudget las barre todas. Bind: [periodId, categoryId].
+  budgetOfCategory: `SELECT id, amount_cents FROM budgets WHERE period_id=? AND category_id=? AND deleted=0 LIMIT 1`,
+  // Bind: [amountCents, updatedAt, budgetId].
+  updateBudget: `UPDATE budgets SET amount_cents=?, updated_at=? WHERE id=? AND deleted=0`,
+  // Quitar el límite = borrado LÓGICO (la fila se conserva para el round-trip del xlsx, que ya
+  // salta las FKs de las filas con deleted=1). Por (periodo, categoría) y no por id: así es
+  // idempotente (sin fila viva no toca nada) y barre un duplicado colado por un import a mano.
+  // Bind: [updatedAt, periodId, categoryId].
+  softDeleteBudget: `UPDATE budgets SET deleted=1, updated_at=? WHERE period_id=? AND category_id=? AND deleted=0`,
 
   // Gasto por día en un rango (Task 12, tarjeta "Flujo de gasto" de Inicio). Mismo criterio que
   // spentOfPeriod (MY_AMOUNT de expenses, restan las devoluciones que no sean liquidación de un
