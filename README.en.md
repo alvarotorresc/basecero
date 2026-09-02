@@ -150,7 +150,8 @@ script; the app replaced all three.
 ## License
 
 MIT — see [`LICENSE`](LICENSE). It bundles third-party software in
-[`app/app/vendor/`](app/app/vendor/):
+[`app/app/vendor/`](app/app/vendor/); the full notices are in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md):
 
 - [SheetJS](https://sheetjs.com/) (`xlsx.full.min.js`) — Apache-2.0.
 - [SQLite WASM](https://sqlite.org/wasm) — SQLite is public domain; the Emscripten glue code is

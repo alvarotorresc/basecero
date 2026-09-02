@@ -147,7 +147,8 @@ Script; la app sustituyó a los tres.
 ## Licencia
 
 MIT — ver [`LICENSE`](LICENSE). Incluye software de terceros en
-[`app/app/vendor/`](app/app/vendor/):
+[`app/app/vendor/`](app/app/vendor/), con sus avisos completos en
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md):
 
 - [SheetJS](https://sheetjs.com/) (`xlsx.full.min.js`) — Apache-2.0.
 - [SQLite WASM](https://sqlite.org/wasm) — SQLite es de dominio público; el *glue code* de
