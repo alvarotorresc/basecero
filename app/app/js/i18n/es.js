@@ -760,6 +760,7 @@ export const ES = {
       paidByNotShared: "pestaña «transactions» fila {row}: paid_by «partner» solo vale en un gasto compartido",
       paidByAccount: "pestaña «transactions» fila {row}: un gasto que pagó la contraparte no puede llevar cuenta",
       refundOfPartnerPaid: "pestaña «transactions» fila {row}: una devolución no puede enlazar un gasto pagado por la contraparte",
+      budgetDuplicate: "pestaña «budgets» fila {row}: ya hay otro límite vivo para la misma pareja periodo/categoría (fila {first})",
     },
     csvGeneric: {
       invalidHeaders: "cabeceras inválidas",

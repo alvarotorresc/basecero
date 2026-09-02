@@ -755,6 +755,7 @@ export const EN = {
       paidByNotShared: "sheet “transactions” row {row}: paid_by “partner” is only valid on a shared expense",
       paidByAccount: "sheet “transactions” row {row}: an expense paid by your partner cannot have an account",
       refundOfPartnerPaid: "sheet “transactions” row {row}: a refund cannot link an expense paid by the partner",
+      budgetDuplicate: "sheet “budgets” row {row}: another live limit already exists for the same period/category pair (row {first})",
     },
     csvGeneric: {
       invalidHeaders: "invalid headers",

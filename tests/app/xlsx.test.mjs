@@ -788,3 +788,49 @@ test("import: replaceAll fusiona meta — conserva claves que la hoja no trae", 
   assert.equal(meta.currency, "USD", "clave presente en la hoja: se actualiza");
   assert.equal(db.prepare("SELECT COUNT(*) c FROM accounts").get().c, 0, "las demás tablas SÍ se reemplazan");
 });
+
+// Dos límites VIVOS para la misma (periodo, categoría) no los crea nunca la app —upsertBudget
+// actualiza la fila que ya hay— pero una hoja editada a mano sí. Con dos filas vivas, QUÉ límite
+// manda depende del orden de lectura: la pantalla enseñaría uno y el total sumaría los dos. Se
+// rechaza el import en vez de elegir en silencio (ruling: sin cambio de esquema ni índice único).
+test("validate: dos budgets VIVOS con la misma pareja (period_id, category_id) → error", () => {
+  const d = parse();
+  d.budgets.push({ id: "bud-a", period_id: "per-1", category_id: "cat-casa",
+    amount_cents: 45000, created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 0 });
+  d.budgets.push({ id: "bud-b", period_id: "per-1", category_id: "cat-casa",
+    amount_cents: 30000, created_at: "2026-08-02T00:00:00Z", updated_at: "2026-08-02T00:00:00Z", deleted: 0 });
+  assert.deepEqual(validateImport(d),
+    ["pestaña «budgets» fila 3: ya hay otro límite vivo para la misma pareja periodo/categoría (fila 2)"]);
+});
+
+test("validate: la pareja repetida NO es error si una de las dos filas está borrada (histórico de límites quitados)", () => {
+  const d = parse();
+  d.budgets.push({ id: "bud-quitado", period_id: "per-1", category_id: "cat-casa",
+    amount_cents: 45000, created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 1 });
+  d.budgets.push({ id: "bud-actual", period_id: "per-1", category_id: "cat-casa",
+    amount_cents: 30000, created_at: "2026-08-02T00:00:00Z", updated_at: "2026-08-02T00:00:00Z", deleted: 0 });
+  assert.deepEqual(validateImport(d), [],
+    "quitar y volver a poner un límite deja exactamente este estado: una borrada y una viva");
+});
+
+// El borrado lógico de un límite (repo.deleteBudget) tiene que sobrevivir un export→import sin
+// resucitar: BOOL_COLS.budgets = ["deleted"] lo escribe como booleano de celda, y la validación de
+// FKs de xlsx.js:157 salta las filas con deleted=1. Este test lo fija de punta a punta.
+test("ROUND-TRIP: una fila de budgets con deleted=1 sobrevive intacta", () => {
+  const db = openDb(); seedMinimal(db);
+  const T3 = "2026-08-03T00:00:00Z";
+  db.prepare(insertSql("budgets")).run("bud-vivo", "per-1", "cat-casa", 70000, T3, T3, 0);
+  db.prepare(insertSql("budgets")).run("bud-quitado", "per-1", "cat-casa-alquiler", 25000, T3, T3, 1);
+
+  const original = dumpAll(db);
+  const buf = X.write(rowsToWorkbook(X, original), { type: "buffer", bookType: "xlsx" });
+  const { data, errors } = workbookToRows(X, X.read(buf, { type: "buffer" }));
+  assert.deepEqual(errors, []);
+  assert.deepEqual(validateImport(data), []);
+
+  const db2 = openDb();
+  for (const s of replaceAllStmts(data)) db2.prepare(s.sql).run(...(s.bind ?? []));
+  assert.deepEqual(dumpAll(db2), original);
+  assert.equal(db2.prepare("SELECT deleted FROM budgets WHERE id='bud-quitado'").get().deleted, 1,
+    "el límite quitado sigue quitado tras el round-trip: no resucita como límite activo");
+});
