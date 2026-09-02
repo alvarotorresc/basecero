@@ -132,3 +132,28 @@ test("popstate a una profundidad por encima de la pila: no hace nada", () => {
   assert.equal(veces, 0);
   assert.equal(back.depth(), 1);
 });
+
+test("popstate con bc negativo o NaN: no lanza, no ejecuta callback, la pila no cambia", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  // pila vacía: un state ajeno malformado no debe reventar
+  assert.doesNotThrow(() => win.listeners.popstate({ state: { bc: -1 } }));
+  assert.doesNotThrow(() => win.listeners.popstate({ state: { bc: NaN } }));
+  assert.equal(back.depth(), 0);
+
+  // pila con una entrada: tampoco debe deshacerla
+  let veces = 0;
+  back.push(() => { veces += 1; });
+  assert.doesNotThrow(() => win.listeners.popstate({ state: { bc: -1 } }));
+  assert.doesNotThrow(() => win.listeners.popstate({ state: { bc: NaN } }));
+  assert.equal(veces, 0);
+  assert.equal(back.depth(), 1);
+});
+
+test("push: si pushState lanza (límite de Safari), el error se propaga y la pila no registra la entrada", () => {
+  const win = fakeWin();
+  win.history.pushState = () => { throw new Error("rate"); };
+  const back = createBackStack(win);
+  assert.throws(() => back.push(() => {}), /rate/);
+  assert.equal(back.depth(), 0);
+});

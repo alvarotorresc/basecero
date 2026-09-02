@@ -12,15 +12,18 @@ export function createBackStack(win) {
   win.history.replaceState({ bc: 0 }, "");
   win.addEventListener("popstate", (e) => {
     const target = typeof e.state?.bc === "number" ? e.state.bc : 0;
-    if (target >= stack.length) return; // entrada ajena (p. ej. tras recargar): nada que deshacer
+    // entrada ajena o corrupta (recarga, o un {bc} negativo/NaN): nada que deshacer.
+    if (!Number.isInteger(target) || target < 0 || target >= stack.length) return;
     const dropped = stack.splice(target);
     dropped[0].onBack();
   });
   return {
-    /** Abre una subpantalla: apunta su callback de vuelta y una entrada de historial. */
+    /** Abre una subpantalla: apunta su callback de vuelta y una entrada de historial.
+     *  pushState va ANTES del stack.push: si el navegador lo rechaza (p. ej. límite de
+     *  Safari), la pila no debe registrar una entrada que el historial nunca tuvo. */
     push(onBack) {
+      win.history.pushState({ bc: stack.length + 1 }, "");
       stack.push({ onBack });
-      win.history.pushState({ bc: stack.length }, "");
     },
     /** Cierra la subpantalla superior por el historial (no-op sin subpantallas abiertas). */
     back() {
@@ -33,11 +36,12 @@ export function createBackStack(win) {
       stack.length = 0;
       win.history.go(-n);
     },
+    /** Profundidad de la pila — solo para tests. */
     depth: () => stack.length,
   };
 }
 
-const global = typeof window !== "undefined" ? createBackStack(window) : null;
-export const pushBack = (onBack) => global.push(onBack);
-export const goBack = () => global.back();
-export const clearBack = () => global.clear();
+const instance = typeof window !== "undefined" ? createBackStack(window) : null;
+export const pushBack = (onBack) => instance.push(onBack);
+export const goBack = () => instance.back();
+export const clearBack = () => instance.clear();
