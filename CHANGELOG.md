@@ -5,6 +5,20 @@ Versionado según [SemVer](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+### Cambiado
+
+- **«Presupuesto» pasa a ser «Gasto por categoría».** La pantalla ahora lista TODAS tus categorías
+  de gasto —no solo las que tienen límite—, ordenadas por lo que llevas gastado, y se abre tocando
+  la tarjeta de Gasto por categoría del inicio (antes hacía falta tener algún límite puesto para
+  que apareciera el enlace).
+
+### Añadido
+
+- **Detalle por subcategoría.** Toca una categoría y se despliega en qué se ha ido su dinero este
+  periodo, con el gasto anotado directamente en la categoría como una línea más.
+- **Los límites se editan desde ahí.** Poner, cambiar o quitar el límite de una categoría ya no
+  obliga a abrir un periodo nuevo: se hace en el propio desplegable, y solo afecta a este periodo.
+
 ## [1.0.0] — 2026-09-02
 
 La primera versión para compartir. BaseCero ya se instala desde el navegador de cualquiera y

@@ -38,8 +38,10 @@ como una app y funciona sin conexión.
   ves lo gastado, lo ahorrado y tu tasa de ahorro del tramo.
 - **Registrar, rápido.** Todo en una pantalla, con el teclado del móvil para el importe. Cinco
   tipos de apunte: gasto, ingreso, transferencia, devolución y ajuste.
-- **Presupuesto por categoría.** Pones límite solo donde te sirve. La pantalla de inicio te dice
-  si vas por encima o por debajo del ritmo del plan.
+- **Gasto por categoría.** Una pantalla con todas tus categorías, ordenadas por lo que llevas
+  gastado, que se despliegan para ver el detalle por subcategoría. Pones límite solo donde te
+  sirve, y desde ahí mismo lo cambias o lo quitas. La pantalla de inicio te dice si vas por
+  encima o por debajo del ritmo del plan.
 - **Categorías tuyas.** Arrancas con 41 en dos niveles y cambias nombre, color, icono y orden.
   Las que sobran se archivan sin tocar el historial.
 - **Gastos compartidos en las dos direcciones.** Apuntas quién pagó y qué parte es tuya. Si pagó
@@ -55,9 +57,9 @@ como una app y funciona sin conexión.
 
 ## Cómo se ve
 
-| Inicio | Movimientos | Patrimonio | Presupuesto |
+| Inicio | Movimientos | Patrimonio | Gasto por categoría |
 | :----: | :---------: | :--------: | :---------: |
-| <img src=".github/readme/app-inicio.webp" alt="Pantalla de inicio con el disponible del periodo" width="190"> | <img src=".github/readme/app-movimientos.webp" alt="Lista de movimientos agrupados por día" width="190"> | <img src=".github/readme/app-patrimonio.webp" alt="Patrimonio neto, cuentas y objetivos" width="190"> | <img src=".github/readme/app-presupuesto.webp" alt="Presupuesto por categoría" width="190"> |
+| <img src=".github/readme/app-inicio.webp" alt="Pantalla de inicio con el disponible del periodo" width="190"> | <img src=".github/readme/app-movimientos.webp" alt="Lista de movimientos agrupados por día" width="190"> | <img src=".github/readme/app-patrimonio.webp" alt="Patrimonio neto, cuentas y objetivos" width="190"> | <img src=".github/readme/app-presupuesto.webp" alt="Gasto por categoría, con una barra y un límite por categoría" width="190"> |
 
 ## Instalación
 
