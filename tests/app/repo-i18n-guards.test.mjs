@@ -105,6 +105,25 @@ test("addTransaction rechaza paid_by=partner en algo que no es un gasto comparti
   }
 });
 
+// Item 2 (final fix wave): mismo criterio que el guard de arriba — un gasto que NO lo pagó la
+// contraparte SÍ necesita una cuenta mía (si no, no hay saldo del que descontarlo). Se comprueba
+// justo después del guard de paid_by=partner, también ANTES de tocar la BD, así que es alcanzable
+// aquí igual que el test de arriba.
+test("addTransaction rechaza un gasto sin cuenta cuando no lo pagó la contraparte, antes de tocar la BD", async () => {
+  for (const accountId of ["", null, undefined]) {
+    await assert.rejects(
+      () => addTransaction({ type: "expense", isShared: false, categoryId: "cat-casa-alquiler",
+        amountCents: 1000, date: "2026-08-20", accountId, merchant: "", note: "", paidBy: "me" }),
+      (e) => {
+        assert.ok(e instanceof Error);
+        assert.notEqual(e.constructor.name, "ReferenceError", `no debe ser TDZ ReferenceError: ${e.message}`);
+        assert.equal(e.message, t("common.needAccount"));
+        return true;
+      },
+    );
+  }
+});
+
 test("ningún fichero que importa el `t` de i18n declara un `const t`/`let t` local que lo tape", () => {
   const jsDir = fileURLToPath(new URL("../../app/app/js/", import.meta.url));
   const files = [];

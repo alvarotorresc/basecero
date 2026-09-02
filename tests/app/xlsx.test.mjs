@@ -182,6 +182,31 @@ test("validate: account_id vacío en un gasto NORMAL sigue dando fkEmpty", () =>
   assert.match(validateImport(d).join("\n"), /pestaña «transactions» fila 2: account_id vacío/);
 });
 
+// Item 4 (final fix wave): una devolución que enlaza (ref_id) un gasto pagado por la contraparte no
+// es MÍA — el que la devuelve lo hace a quien pagó, no a mí. Fila completa a mano (mismo patrón que
+// "hoja v1 sin cabecera paid_by" más arriba) porque hacen falta DOS filas de transactions enlazadas
+// entre sí, y txSheet solo escribe una.
+function txRow(over) {
+  return { id: "tx-x", date: "2026-08-02", period_id: "per-1", type: "expense",
+    amount_cents: 10000, account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler",
+    merchant: "M", note: "", is_shared: 0, share_pct_override: null, paid_by: "me", settled: 0,
+    ref_id: "", rule_id: "", external_id: "", status: "pending",
+    created_at: "2026-08-02T00:00:00Z", updated_at: "2026-08-02T00:00:00Z", deleted: 0, ...over };
+}
+
+test("validate: una devolución que enlaza un gasto pagado por la contraparte da error; enlazando uno mío, ninguno", () => {
+  const gastoSuyo = txRow({ id: "tx-gasto-suyo", is_shared: 1, paid_by: "partner", account_id: "" });
+  const devolucionDeSuyo = txRow({ id: "tx-devolucion-suyo", type: "refund", ref_id: "tx-gasto-suyo" });
+  const conPartner = parse((x) => { x.transactions.push(gastoSuyo, devolucionDeSuyo); });
+  assert.deepEqual(validateImport(conPartner),
+    ["pestaña «transactions» fila 3: una devolución no puede enlazar un gasto pagado por la contraparte"]);
+
+  const gastoMio = txRow({ id: "tx-gasto-mio" });
+  const devolucionDeMio = txRow({ id: "tx-devolucion-mio", type: "refund", ref_id: "tx-gasto-mio" });
+  const sinPartner = parse((x) => { x.transactions.push(gastoMio, devolucionDeMio); });
+  assert.deepEqual(validateImport(sinPartner), []);
+});
+
 test("import: replaceAll NO importa el schema_version de la hoja", () => {
   const db = openDb(); seedMinimal(db);   // BD en '2'
   const data = {

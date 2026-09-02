@@ -618,6 +618,9 @@ function updateTransactionReproduced(db, id, fields) {
     if (f.type !== "expense" || !f.isShared) throw new Error(t("errors.repo.paidByNotShared"));
     f.accountId = "";
   }
+  // Mismo guard nuevo que repo.updateTransaction (repo.js): un gasto que NO lo pagó la contraparte
+  // SÍ necesita una cuenta mía.
+  if (f.type === "expense" && f.paidBy !== "partner" && !f.accountId) throw new Error(t("common.needAccount"));
   if (sharedFieldsLocked(cur, f) && db.prepare(SQL.hasActiveLinkedRefund).get(id)) {
     throw new Error("LOCKED: gasto liquidado");
   }
@@ -710,6 +713,23 @@ test("updateTransaction (reproducido): paidBy:'partner' en un income se RECHAZA 
   const ingreso = db.prepare("SELECT paid_by, account_id FROM transactions WHERE id=?").get(ingresoId);
   assert.equal(ingreso.paid_by, "me", "el rechazo no debe haber tocado la fila");
   assert.equal(ingreso.account_id, "acc-n26");
+});
+
+// Item 2 (final fix wave): el lado contrario del guard de arriba — un gasto que lo pagué yo SÍ
+// necesita una cuenta, mirror del guard nuevo en repo.updateTransaction.
+test("updateTransaction (reproducido): un gasto mío editado a accountId:'' se RECHAZA (common.needAccount)", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const gastoId = ins(db, { id: "gasto-sin-cuenta", date: "2026-08-12", period: "per-1", cents: 3000, shared: 0, account: "acc-n26" });
+
+  assert.throws(
+    () => updateTransactionReproduced(db, gastoId, { accountId: "" }),
+    (e) => { assert.equal(e.message, t("common.needAccount")); return true; },
+    "un gasto que pagué yo necesita una cuenta de la que salga el dinero",
+  );
+
+  const gasto = db.prepare("SELECT account_id FROM transactions WHERE id=?").get(gastoId);
+  assert.equal(gasto.account_id, "acc-n26", "el rechazo no debe haber tocado la fila");
 });
 
 test("softDeleteTransaction (reproducido): borrar el gasto original liquidado se RECHAZA mientras el refund siga activo", () => {

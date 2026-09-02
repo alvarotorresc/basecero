@@ -186,7 +186,7 @@ export const EN = {
     },
     type: { transfer: "Transfer" },
     detail: {
-      lockedNote: "It has a linked refund: to change the amount or the split, delete that refund first.",
+      lockedNote: "It has a linked settlement entry (refund or adjustment): delete it first to change the amount or the split.",
     },
     shared: {
       fallbackName: "the other party",
@@ -685,10 +685,10 @@ export const EN = {
       periodStartTooEarly: "The date must be after the current period’s start",
       settleNotFound: "Shared expense not found or already settled",
       txNotFound: "Transaction not found",
-      txLockedSettled: "This expense has a linked refund: delete that refund in Transactions first to change the amount or the split.",
+      txLockedSettled: "This expense has a linked settlement entry (refund or adjustment): delete it in Transactions first to change the amount, the split or who paid.",
       sharePctInvalid: "The split must be between 0 and 100.",
-      refundLockedSettled: "This entry is a refund linked to an expense. Delete or unlink it before changing its amount.",
-      expenseLockedHasRefund: "This expense has a linked refund. Delete the refund first in Transactions.",
+      refundLockedSettled: "This entry settles a shared expense. Delete or unlink it before changing its amount.",
+      expenseLockedHasRefund: "This expense has a linked settlement entry. Delete it in Transactions first.",
       paidByNotShared: "Only a shared expense can be paid by the partner.",
       ruleNotFound: "Rule not found",
       accountNotFound: "Account not found",
@@ -740,6 +740,7 @@ export const EN = {
       booleanInvalid: "sheet “{table}” row {row}: {col} is not a valid boolean (“{value}”)",
       paidByNotShared: "sheet “transactions” row {row}: paid_by “partner” is only valid on a shared expense",
       paidByAccount: "sheet “transactions” row {row}: an expense paid by your partner cannot have an account",
+      refundOfPartnerPaid: "sheet “transactions” row {row}: a refund cannot link an expense paid by the partner",
     },
     csvGeneric: {
       invalidHeaders: "invalid headers",

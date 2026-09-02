@@ -98,6 +98,9 @@ function movRowHtml(r, byId, accById, partnerName) {
   const amountClass = partnerPaidRow ? "" : isExpense ? "negative" : "positive";
   const amountStyle = partnerPaidRow ? ' style="color:var(--text-3);"' : "";
   const sign = isExpense ? "-" : "+";
+  // filter/join en vez de interpolar amountClass directo: cuando está vacío (fila pagada por la
+  // contraparte) no deja el atributo con un espacio final ("tx-amount num ").
+  const amountClasses = ["tx-amount", "num", amountClass].filter(Boolean).join(" ");
   return `
   <button type="button" class="tx-row" data-tx="${r.id}" style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
     <div class="dotico" style="--cat:${color};${dashedStyle}">${icon}</div>
@@ -105,7 +108,7 @@ function movRowHtml(r, byId, accById, partnerName) {
       <div class="tx-title">${escHtml(title)}</div>
       <div class="tx-sub" style="${uncategorized ? "color:var(--amber);" : ""}">${escHtml(subBase)}${escHtml(shareSuffix)}</div>
     </div>
-    <div class="tx-amount num ${amountClass}"${amountStyle}>${sign}${fmtMoney(r.amount_cents)}</div>
+    <div class="${amountClasses}"${amountStyle}>${sign}${fmtMoney(r.amount_cents)}</div>
   </button>`;
 }
 

@@ -14,10 +14,11 @@ export const SCHEMA_VERSION = "2";
 export const ACCEPTED_SCHEMA_VERSIONS = ["1", "2"];
 
 /** Lista ORDENADA. `needed(cols)` mira el ESTADO REAL de la tabla, nunca el número guardado en
- *  meta: importar una hoja v1 puede haber pisado meta.schema_version (ver repo.replaceAllStmts) —
- *  ya no desde el filtro de replaceAllStmts; se conserva por las BD dañadas por versiones
- *  anteriores —, y la verdad de si falta la columna la tiene PRAGMA table_info, no una fila de
- *  texto. Añadir la siguiente migración = una entrada más aquí + subir SCHEMA_VERSION. */
+ *  meta: la verdad de si falta una columna la tiene PRAGMA table_info, no una fila de texto. El
+ *  upsert de meta.schema_version se ejecuta en cada arranque. Una hoja v1 podía sobrescribir
+ *  meta.schema_version en versiones anteriores al filtro de replaceAllStmts (ver
+ *  repo.replaceAllStmts), así que ese mismo upsert también repara esas bases de datos. Añadir la
+ *  siguiente migración = una entrada más aquí + subir SCHEMA_VERSION. */
 export const MIGRATIONS = [
   {
     version: "2",

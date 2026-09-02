@@ -235,6 +235,18 @@ export function validateImport(data) {
       errs.push(t("errors.xlsx.paidByAccount", { row: i + 2 }));
   });
 
+  // Item 4 (final fix wave): una devolución que enlaza (ref_id) un gasto pagado por la contraparte
+  // no puede ser mía — la tienda reembolsa a quien pagó el ticket, no a mí. Solo mira 'refund'
+  // (no 'adjustment': el ajuste de salida que liquida un gasto suyo SÍ enlaza uno con
+  // paid_by='partner' a propósito, es justo lo que liquida esa deuda — ver settleAllSharedStmts).
+  // ref_id vacío o roto ya lo cubren fkEmpty/fkMissing más arriba.
+  const txById = Object.fromEntries((data.transactions ?? []).map((r) => [r.id, r]));
+  (data.transactions ?? []).forEach((row, i) => {
+    if (row.type !== "refund" || !row.ref_id) return;
+    if (txById[row.ref_id]?.paid_by === "partner")
+      errs.push(t("errors.xlsx.refundOfPartnerPaid", { row: i + 2 }));
+  });
+
   // Columnas numéricas NO-*_cents del contrato: workbookToRows las deja pasar tal cual llegan
   // de la celda (ni coerción ni parseo), así que un "lunes" en my_share_pct sobrevive intacto
   // hasta aquí como string — sin este check, acaba en SQLite como TEXT (afinidad dinámica) y

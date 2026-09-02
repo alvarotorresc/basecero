@@ -187,7 +187,7 @@ export const ES = {
     },
     type: { transfer: "Transferencia" },
     detail: {
-      lockedNote: "Tiene una devolución enlazada: para cambiar el importe o el reparto, borra antes esa devolución.",
+      lockedNote: "Tiene un apunte de liquidación enlazado (devolución o ajuste): para cambiar el importe o el reparto, bórralo antes.",
     },
     shared: {
       fallbackName: "la contraparte",
@@ -688,10 +688,10 @@ export const ES = {
       periodStartTooEarly: "La fecha debe ser posterior al inicio del periodo actual",
       settleNotFound: "Gasto compartido no encontrado o ya liquidado",
       txNotFound: "Movimiento no encontrado",
-      txLockedSettled: "Este gasto tiene una devolución enlazada: borra antes esa devolución en Movimientos para cambiar el importe o el reparto.",
+      txLockedSettled: "Este gasto tiene un apunte de liquidación enlazado (devolución o ajuste): bórralo antes en Movimientos para cambiar el importe, el reparto o quién pagó.",
       sharePctInvalid: "El reparto debe estar entre 0 y 100.",
-      refundLockedSettled: "Este movimiento es un reembolso enlazado a un gasto. Bórralo o desvincúlalo antes de cambiar su importe.",
-      expenseLockedHasRefund: "Este gasto tiene un reembolso enlazado. Borra antes el reembolso en Movimientos.",
+      refundLockedSettled: "Este apunte liquida un gasto compartido. Bórralo o desvincúlalo antes de cambiar su importe.",
+      expenseLockedHasRefund: "Este gasto tiene un apunte de liquidación enlazado. Bórralo antes en Movimientos.",
       paidByNotShared: "Solo un gasto compartido puede pagarlo la contraparte.",
       ruleNotFound: "Regla no encontrada",
       accountNotFound: "Cuenta no encontrada",
@@ -745,6 +745,7 @@ export const ES = {
       booleanInvalid: "pestaña «{table}» fila {row}: {col} no es un valor booleano válido («{value}»)",
       paidByNotShared: "pestaña «transactions» fila {row}: paid_by «partner» solo vale en un gasto compartido",
       paidByAccount: "pestaña «transactions» fila {row}: un gasto que pagó la contraparte no puede llevar cuenta",
+      refundOfPartnerPaid: "pestaña «transactions» fila {row}: una devolución no puede enlazar un gasto pagado por la contraparte",
     },
     csvGeneric: {
       invalidHeaders: "cabeceras inválidas",

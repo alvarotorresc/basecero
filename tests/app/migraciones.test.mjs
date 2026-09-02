@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { SCHEMA_VERSION, MIGRATIONS, pendingMigrations } from "../../app/app/js/migrations.js";
+import { SCHEMA_VERSION, ACCEPTED_SCHEMA_VERSIONS, MIGRATIONS, pendingMigrations } from "../../app/app/js/migrations.js";
 import { openDb, OLD_TRANSACTIONS_DDL } from "./helpers.mjs";
 
 const T = "2026-08-24T18:00:00Z";
@@ -95,4 +95,14 @@ test("MIGRATIONS está ordenada por versión y la última es SCHEMA_VERSION", ()
   const versions = MIGRATIONS.map((m) => Number(m.version));
   assert.deepEqual(versions, [...versions].sort((a, b) => a - b));
   assert.equal(MIGRATIONS.at(-1).version, SCHEMA_VERSION);
+});
+
+// Item 3 (final fix wave): SCHEMA_VERSION debe estar siempre entre las versiones que xlsx.js acepta
+// importar (si no, una hoja recién exportada de esta misma app se rechazaría a sí misma al
+// reimportarla), y la lista debe leerse ya ordenada ascendente (como strings, que es como se
+// compara/renderiza en todo lo demás) sin depender de que alguien la mantenga a mano en ese orden.
+test("ACCEPTED_SCHEMA_VERSIONS incluye SCHEMA_VERSION y está ordenada ascendente como strings", () => {
+  assert.ok(ACCEPTED_SCHEMA_VERSIONS.includes(SCHEMA_VERSION));
+  assert.deepEqual(ACCEPTED_SCHEMA_VERSIONS, [...ACCEPTED_SCHEMA_VERSIONS].sort());
+  assert.deepEqual(ACCEPTED_SCHEMA_VERSIONS, ["1", "2"]);
 });

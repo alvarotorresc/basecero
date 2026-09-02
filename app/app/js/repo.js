@@ -66,6 +66,9 @@ export async function addTransaction({
     if (type !== "expense" || !isShared) throw new Error(t("errors.repo.paidByNotShared"));
     accountId = "";
   }
+  // Item 2 (final fix wave): el lado contrario del guard de arriba — un gasto que NO lo pagó la
+  // contraparte SÍ necesita una cuenta mía, o no hay saldo del que descontarlo.
+  if (type === "expense" && paidBy !== "partner" && !accountId) throw new Error(t("common.needAccount"));
   const p = await getOpenPeriod();
   if (!p) throw new Error(t("errors.common.noOpenPeriod"));
   const now = nowIso();
@@ -277,9 +280,11 @@ export async function settleShared(txId, accountId) {
   await execMany(settleAllSharedStmts([row], accountId, period.id, hoyISO(), nowIso(), (meta.partner_name || "").trim()));
 }
 
-/** Liquida VARIOS gastos compartidos pendientes DE GOLPE (botón «Liquidar {total}» al pie de
- *  Liquidar.dc.html): un único getOpenPeriod() + una única pendingSettlements() (no una consulta
- *  por fila) + settleAllSharedStmts (arriba) + UN SOLO execMany — o quedan liquidados TODOS los
+/** Liquida VARIOS gastos compartidos pendientes DE GOLPE (el botón de Liquidar): las dos
+ *  direcciones a la vez — un refund ENTRANTE por cada fila partner_owes (lo pagué yo) y un
+ *  adjustment SALIENTE por cada fila i_owe (lo pagó ella) — y el saldo de la cuenta elegida se
+ *  mueve por el NETO de las dos. Un único getOpenPeriod() + una única pendingSettlements() (no una
+ *  consulta por fila) + settleAllSharedStmts (arriba) + UN SOLO execMany — o quedan liquidados TODOS los
  *  `ids` pedidos, o ninguno (si algo falla a medias, la mitad de la deuda con la contraparte
  *  desaparecería mientras la otra mitad sigue pendiente, un estado que ninguna pantalla sabría
  *  explicar). `ids` vacío es un no-op silencioso (nada que liquidar, no es un error). Con neto 0 y
@@ -331,6 +336,9 @@ export async function updateTransaction(id, fields) {
     if (f.type !== "expense" || !f.isShared) throw new Error(t("errors.repo.paidByNotShared"));
     f.accountId = "";
   }
+  // Item 2 (final fix wave): el lado contrario del guard de arriba — un gasto que NO lo pagó la
+  // contraparte SÍ necesita una cuenta mía, o no hay saldo del que descontarlo.
+  if (f.type === "expense" && f.paidBy !== "partner" && !f.accountId) throw new Error(t("common.needAccount"));
   // Task 17 ronda 2 (controller ruling, finding A): un gasto ya liquidado (settled=1) con un
   // refund activo enlazado no puede cambiar de importe/compartido/reparto — si no, el refund
   // se queda congelado con el importe viejo y la deuda con la contraparte se pierde en silencio. Guarda

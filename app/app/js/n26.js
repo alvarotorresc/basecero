@@ -41,7 +41,9 @@ export async function externalIdFor(row, hashFn = sha256Hex) {
  *  por coherencia si `existing` se lee en otro sitio en el futuro.
  *  NO válida para 'adjustment': esa fila puede almacenarse ya con signo negativo (comentario
  *  original más abajo) y el Math.abs() se lo comería — pero adjustment tampoco es nunca candidato
- *  de conciliación, así que queda fuera del alcance de esta función a propósito. */
+ *  de conciliación, así que queda fuera del alcance de esta función a propósito.
+ *  Un adjustment conserva SIEMPRE su propio signo y bcDecideImportAction (pure.js) lo excluye de la
+ *  conciliación aparte — no reutilizar signedAmountCents para adjustments sin revisar antes eso. */
 export function signedAmountCents(type, amountCentsAbs) {
   return Math.abs(amountCentsAbs) * ((type === "expense" || type === "transfer") ? -1 : 1);
 }
