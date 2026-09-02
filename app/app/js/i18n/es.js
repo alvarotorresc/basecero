@@ -263,8 +263,6 @@ export const ES = {
       ofLimit: "{spent} de {limit}",
       noLimit: "{spent} · sin límite",
       noPct: "—",
-      expand: "Ver el detalle de {name}",
-      collapse: "Ocultar el detalle de {name}",
     },
     detail: {
       noSubcategory: "Sin subcategoría",

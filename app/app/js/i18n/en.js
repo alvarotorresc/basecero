@@ -262,8 +262,6 @@ export const EN = {
       ofLimit: "{spent} of {limit}",
       noLimit: "{spent} · no limit",
       noPct: "—",
-      expand: "Show the detail of {name}",
-      collapse: "Hide the detail of {name}",
     },
     detail: {
       noSubcategory: "No subcategory",

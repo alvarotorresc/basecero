@@ -173,7 +173,6 @@ export async function renderGastoPorCategoria(container, onBack) {
     return `
       <div style="display:flex;flex-direction:column;gap:8px;padding:13px 0;${dim ? "opacity:.5;" : ""}">
         <button type="button" data-root="${escAttr(row.root_id)}" aria-expanded="${expanded ? "true" : "false"}"
-          aria-label="${escAttr(expanded ? t("gastoCategoria.row.collapse", { name: row.name }) : t("gastoCategoria.row.expand", { name: row.name }))}"
           style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:0;margin:0;
           color:inherit;font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
           <div class="dotico" style="--cat:${color};">${icon}</div>
