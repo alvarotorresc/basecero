@@ -89,9 +89,7 @@ export async function renderRegistro(container, onDone, prefill) {
       // Usa el pct EFECTIVO del gasto enlazado (su propio override, o el pct
       // de SU periodo), no el del periodo abierto: el gasto puede venir de un
       // periodo cerrado con reparto distinto o llevar su propio override.
-      const rowPct = row.share_pct_override ?? row.period_pct ?? 100;
-      const myPart = Math.round((row.amount_cents * rowPct) / 100);
-      const partnerPart = row.amount_cents - myPart;
+      const { partner: partnerPart } = splitCents(row.amount_cents, normalizePct(row.share_pct_override ?? row.period_pct, 100));
       state.raw = centsToRaw(partnerPart);
       state.cents = partnerPart;
     } else {

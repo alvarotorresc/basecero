@@ -181,7 +181,7 @@ export const ES = {
     },
     type: { transfer: "Transferencia" },
     detail: {
-      lockedNote: "Liquidado. Para editar el importe, borra antes su liquidación en Movimientos.",
+      lockedNote: "Tiene una devolución enlazada: para cambiar el importe o el reparto, borra antes esa devolución.",
     },
     shared: {
       fallbackName: "la contraparte",
@@ -671,7 +671,7 @@ export const ES = {
       periodStartTooEarly: "La fecha debe ser posterior al inicio del periodo actual",
       settleNotFound: "Gasto compartido no encontrado o ya liquidado",
       txNotFound: "Movimiento no encontrado",
-      txLockedSettled: "Gasto ya liquidado: borra su liquidación en Movimientos antes de cambiar el importe o el reparto.",
+      txLockedSettled: "Este gasto tiene una devolución enlazada: borra antes esa devolución en Movimientos para cambiar el importe o el reparto.",
       sharePctInvalid: "El reparto debe estar entre 0 y 100.",
       refundLockedSettled: "Este movimiento es un reembolso enlazado a un gasto. Bórralo o desvincúlalo antes de cambiar su importe.",
       expenseLockedHasRefund: "Este gasto tiene un reembolso enlazado. Borra antes el reembolso en Movimientos.",

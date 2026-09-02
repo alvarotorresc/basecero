@@ -180,7 +180,7 @@ export const EN = {
     },
     type: { transfer: "Transfer" },
     detail: {
-      lockedNote: "Settled. To edit the amount, first delete its settlement in Transactions.",
+      lockedNote: "It has a linked refund: to change the amount or the split, delete that refund first.",
     },
     shared: {
       fallbackName: "the other party",
@@ -668,7 +668,7 @@ export const EN = {
       periodStartTooEarly: "The date must be after the current period’s start",
       settleNotFound: "Shared expense not found or already settled",
       txNotFound: "Transaction not found",
-      txLockedSettled: "This expense is already settled: delete its settlement in Transactions before changing the amount or split.",
+      txLockedSettled: "This expense has a linked refund: delete that refund in Transactions first to change the amount or the split.",
       sharePctInvalid: "The split must be between 0 and 100.",
       refundLockedSettled: "This entry is a refund linked to an expense. Delete or unlink it before changing its amount.",
       expenseLockedHasRefund: "This expense has a linked refund. Delete the refund first in Transactions.",

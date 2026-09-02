@@ -5,9 +5,11 @@ const MY_AMOUNT = `CAST(ROUND(t.amount_cents * (CASE WHEN t.is_shared=1
 // (ref_id apunta a un gasto con is_shared=1): ahí mi gasto ya contaba solo mi parte y lo que
 // vuelve es la parte de la contraparte. Vinculada a un gasto NO compartido (la tienda devuelve el
 // dinero) o sin vincular, resta prorrateada por MY_AMOUNT. Lo usan spentOfPeriod,
-// spentByRootCategory y spentByDay — los tres con el MISMO criterio.
+// spentByRootCategory y spentByDay — los tres con el MISMO criterio. Un gasto enlazado ya borrado
+// (solo alcanzable importando una hoja: la app bloquea borrar un gasto con devolución viva) cuenta
+// como huérfano.
 const REFUND_REDUCES_SPEND = `(t.ref_id='' OR NOT EXISTS (
-  SELECT 1 FROM transactions e WHERE e.id=t.ref_id AND e.is_shared=1))`;
+  SELECT 1 FROM transactions e WHERE e.id=t.ref_id AND e.is_shared=1 AND e.deleted=0))`;
 
 export const SQL = {
   getOpenPeriod: `SELECT * FROM periods WHERE status='open' AND deleted=0 LIMIT 1`,
@@ -144,9 +146,10 @@ export const SQL = {
   budgetsOfPeriod: `SELECT b.id, b.category_id, b.amount_cents FROM budgets b WHERE b.period_id=? AND b.deleted=0`,
 
   // Gasto por día en un rango (Task 12, tarjeta "Flujo de gasto" de Inicio). Mismo criterio que
-  // spentOfPeriod (MY_AMOUNT de expenses, refunds sueltos restan prorrateados), agrupado por
-  // fecha. Solo trae los días con movimiento — repo.spentLast7Days rellena los que faltan con 0
-  // en JS (fillLast7Days). Bind: [periodId, startDateIso, endDateIso].
+  // spentOfPeriod (MY_AMOUNT de expenses, restan las devoluciones que no sean liquidación de un
+  // compartido (REFUND_REDUCES_SPEND), prorrateadas), agrupado por fecha. Solo trae los días con
+  // movimiento — repo.spentLast7Days rellena los que faltan con 0 en JS (fillLast7Days).
+  // Bind: [periodId, startDateIso, endDateIso].
   spentByDay: `SELECT t.date AS date,
     COALESCE(SUM(CASE WHEN t.type='expense' THEN ${MY_AMOUNT}
                  WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT} ELSE 0 END),0) AS cents

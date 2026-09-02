@@ -66,6 +66,16 @@ test("spentOfPeriod: refund vinculado a un gasto que ya no existe (ref_id huérf
   assert.equal(spent, 4000);
 });
 
+test("spentOfPeriod: refund vinculado a un gasto COMPARTIDO ya borrado (deleted=1) resta como huérfano", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const gastoId = ins(db, { type: "expense", cents: 10000, shared: 1 }); // MY_AMOUNT 60% -> 6000 mientras vive
+  ins(db, { type: "refund", cents: 4000, shared: 0, ref: gastoId });
+  db.prepare("UPDATE transactions SET deleted=1 WHERE id=?").run(gastoId);
+  const spent = db.prepare(SQL.spentOfPeriod).get("per-1").spent_cents;
+  assert.equal(spent, -4000, "el gasto borrado ya no cuenta; el refund (is_shared=0) resta su importe entero como huérfano");
+});
+
 test("insertTransaction admite transfer con counter_account_id y adjustment negativo", () => {
   const db = openDb();
   seedMinimal(db);
