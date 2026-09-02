@@ -32,9 +32,9 @@ Para quien lleva sus gastos a mano y quiere seguir siendo dueño de sus datos.
 no del 1 al 30. Abres uno el día que entra el sueldo y lo cierras cuando llega el siguiente; al
 cerrarlo ves lo gastado, lo ahorrado y tu tasa de ahorro del tramo.
 
-**Registrar, rápido.** El teclado numérico funciona como una calculadora de cinta
-(suma tickets sobre la marcha, sin tecla «=»). Cinco tipos de apunte: gasto, ingreso,
-transferencia entre cuentas, devolución —enlazada al gasto que reembolsa— y ajuste.
+**Registrar, rápido.** Importe con el teclado del móvil y todo en una sola pantalla. Cinco tipos
+de apunte: gasto, ingreso, transferencia entre cuentas, devolución —enlazada al gasto que
+reembolsa— y ajuste.
 
 **Presupuesto por categoría y periodo.** Pones límite solo donde te sirve. La pantalla de
 inicio te dice si vas por encima o por debajo del ritmo del plan, y cuánto te queda de verdad.

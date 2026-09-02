@@ -158,7 +158,6 @@ export const EN = {
       empty: "No recent expenses.",
       sharedSuffix: " · shared",
     },
-    keypad: { delete: "Backspace", helper: "the keypad adds up receipts" },
   },
   movimientos: {
     error: {

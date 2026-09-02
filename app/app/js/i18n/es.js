@@ -159,7 +159,6 @@ export const ES = {
       empty: "No hay gastos recientes.",
       sharedSuffix: " · compartido",
     },
-    keypad: { delete: "Borrar", helper: "el teclado suma tickets" },
   },
   movimientos: {
     error: {
