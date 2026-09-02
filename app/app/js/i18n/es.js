@@ -213,6 +213,11 @@ export const ES = {
       settle: "Liquidar {total}",
       confirm: "Sí, liquidar {total}",
     },
+    note: "Liquidación",
+    outflow: {
+      merchant: "Liquidación con {name}",
+      merchantFallback: "Liquidación",
+    },
   },
   presupuesto: {
     error: { load: "No se pudo cargar Presupuesto: {error}" },
@@ -675,6 +680,7 @@ export const ES = {
       sharePctInvalid: "El reparto debe estar entre 0 y 100.",
       refundLockedSettled: "Este movimiento es un reembolso enlazado a un gasto. Bórralo o desvincúlalo antes de cambiar su importe.",
       expenseLockedHasRefund: "Este gasto tiene un reembolso enlazado. Borra antes el reembolso en Movimientos.",
+      paidByNotShared: "Solo un gasto compartido puede pagarlo la contraparte.",
       ruleNotFound: "Regla no encontrada",
       accountNotFound: "Cuenta no encontrada",
       goalNotFound: "Objetivo no encontrado",

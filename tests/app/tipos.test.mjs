@@ -116,3 +116,19 @@ test("recentForRefund: expone period_pct y share_pct_override del gasto enlazado
   assert.equal(overrideRow.period_pct, 60);
   assert.equal(overrideRow.share_pct_override, 50);
 });
+
+test("spentOfPeriod: un gasto que pagó la contraparte cuenta MI parte igual que uno mío", () => {
+  const db = openDb();
+  seedMinimal(db);
+  ins(db, { id: "suyo", cents: 10000, shared: 1, paidBy: "partner", account: "" });
+  assert.equal(db.prepare(SQL.spentOfPeriod).get("per-1").spent_cents, 6000, "60% de 10000, lo pague quien lo pague");
+});
+
+test("spentOfPeriod: el apunte de salida de la liquidación (adjustment) no lo toca", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const suyo = ins(db, { id: "suyo", cents: 10000, shared: 1, paidBy: "partner", account: "" });
+  ins(db, { id: "liq", type: "adjustment", cents: -6000, category: "", ref: suyo });
+  assert.equal(db.prepare(SQL.spentOfPeriod).get("per-1").spent_cents, 6000,
+    "spentOfPeriod solo tiene ramas para expense y refund: cualquier otro tipo cae en ELSE 0");
+});

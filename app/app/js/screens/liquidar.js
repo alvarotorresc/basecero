@@ -1,4 +1,4 @@
-import { pendingShared, listAccounts, allCategoriesById, settleAllShared, getMetaAll } from "../repo.js";
+import { pendingSettlements, listAccounts, allCategoriesById, settleAllShared, getMetaAll } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
@@ -23,21 +23,20 @@ const moneyPartsHtml = (cents) => {
  *  de una vez, un botón por fila liquidaría solo esa fila, un camino distinto al del artboard que
  *  ya no hace falta mantener.
  *
- *  El % es DERIVADO de r.partner_amount_cents/r.amount_cents (ambos ya vienen en la fila de
- *  pendingShared, sql.js:73-78) — no un campo nuevo. Se deriva aquí en vez de leer el pct del
- *  periodo abierto porque repo.js:166 avisa explícitamente de que partner_amount_cents ya viene
- *  calculado con el pct EFECTIVO del propio gasto (puede tener override o venir de un periodo
- *  cerrado), así que recalcularlo desde ese mismo par de importes es más fiel que cualquier otra
- *  fuente disponible. Sustituye al sub anterior (categoría · fecha): el nombre de categoría ya no
- *  se repite aquí porque el título ya lo usa como fallback (`r.merchant || catName`) y el artboard
- *  no lo lleva en el sub de ninguna fila. */
+ *  El % es DERIVADO de r.settle_cents/r.amount_cents (ambos vienen en la fila de
+ *  pendingSettlements, sql.js) — no un campo nuevo. Se deriva aquí en vez de leer el pct del
+ *  periodo abierto porque settle_cents ya viene calculado con el pct EFECTIVO del propio gasto
+ *  (puede tener override o venir de un periodo cerrado), así que recalcularlo desde ese mismo par
+ *  de importes es más fiel que cualquier otra fuente disponible. Sustituye al sub anterior
+ *  (categoría · fecha): el nombre de categoría ya no se repite aquí porque el título ya lo usa
+ *  como fallback (`r.merchant || catName`) y el artboard no lo lleva en el sub de ninguna fila. */
 function rowHtml(r, byId) {
   const cat = byId[r.category_id];
   const catName = cat?.name ?? "";
   const color = colorForCategory(r.category_id, byId);
   const icon = iconForCategory(r.category_id, byId);
   const title = r.merchant || catName || t("common.type.expense");
-  const pct = r.amount_cents ? Math.round((r.partner_amount_cents / r.amount_cents) * 100) : 0;
+  const pct = r.amount_cents ? Math.round((r.settle_cents / r.amount_cents) * 100) : 0;
   const sub = t("liquidar.row.sub", { date: fmtDiaCorto(r.date), amount: fmtMoney(r.amount_cents), pct });
   return `
     <div class="tx-row" style="padding:10px 0;">
@@ -46,7 +45,7 @@ function rowHtml(r, byId) {
         <div class="tx-title">${escHtml(title)}</div>
         <div class="tx-sub">${escHtml(sub)}</div>
       </div>
-      <div class="num" style="font-size:14px;font-weight:700;flex-shrink:0;">${fmtMoney(r.partner_amount_cents)}</div>
+      <div class="num" style="font-size:14px;font-weight:700;flex-shrink:0;">${fmtMoney(r.settle_cents)}</div>
     </div>`;
 }
 
@@ -75,7 +74,7 @@ export async function renderLiquidar(container, onBack) {
   let rows, accountsAll, byId, meta;
   try {
     [rows, accountsAll, byId, meta] = await Promise.all([
-      pendingShared(), listAccounts(), allCategoriesById(), getMetaAll(),
+      pendingSettlements(), listAccounts(), allCategoriesById(), getMetaAll(),
     ]);
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">${t("liquidar.error.load", { error: escHtml(e.message) })}</div>`;
@@ -93,7 +92,9 @@ export async function renderLiquidar(container, onBack) {
   let errorMsg = "";
 
   function render() {
-    const total = state.rows.reduce((s, r) => s + r.partner_amount_cents, 0);
+    // Neto derivado de las filas visibles (no de una query aparte) para que el hero no pueda
+    // desviarse de la lista: 'i_owe' resta, 'partner_owes' suma.
+    const net = state.rows.reduce((s, r) => s + (r.direction === "i_owe" ? -r.settle_cents : r.settle_cents), 0);
 
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
@@ -104,7 +105,7 @@ export async function renderLiquidar(container, onBack) {
 
       <div class="card" style="display:flex;flex-direction:column;gap:4px;margin-bottom:18px;">
         <div class="section-title">${t("liquidar.total.title")}</div>
-        <div class="amount-hero num text-red">${moneyPartsHtml(total)}</div>
+        <div class="amount-hero num text-red">${moneyPartsHtml(Math.abs(net))}</div>
       </div>
 
       ${accounts.length ? `
@@ -127,8 +128,8 @@ export async function renderLiquidar(container, onBack) {
           </div>
           <button type="button" class="btn-primary" id="liq-settle-all" ${state.busy ? "disabled" : ""}>
             ${state.confirm
-              ? t("liquidar.footer.confirm", { total: fmtMoney(total) })
-              : t("liquidar.footer.settle", { total: fmtMoney(total) })}
+              ? t("liquidar.footer.confirm", { total: fmtMoney(Math.abs(net)) })
+              : t("liquidar.footer.settle", { total: fmtMoney(Math.abs(net)) })}
           </button>`}
     `;
     wire();
@@ -161,13 +162,13 @@ export async function renderLiquidar(container, onBack) {
         settleBtn.disabled = true;
         try {
           await settleAllShared(state.rows.map((r) => r.id), state.accountId);
-          state.rows = await pendingShared();
+          state.rows = await pendingSettlements();
           state.confirm = false;
           errorMsg = "";
         } catch (e) {
           errorMsg = t("liquidar.error.settle", { error: e.message });
           state.confirm = false;
-          state.rows = await pendingShared();
+          state.rows = await pendingSettlements();
         } finally {
           state.busy = false;
           render();

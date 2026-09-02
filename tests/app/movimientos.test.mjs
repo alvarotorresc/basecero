@@ -47,6 +47,8 @@ test("listAllByDay: incluye los 5 tipos, orden desc, excluye borrados", () => {
   const rows = db.prepare(SQL.listAllByDay).all("per-1");
   assert.deepEqual(rows.map((r) => r.type), ["refund", "income", "transfer", "expense"]);
   assert.equal(rows.every((r) => r.id !== borrado), true);
+  // paid_by viaja en la proyección (Movimientos lo necesita para el subtítulo "pagó {name}").
+  assert.equal(rows.every((r) => r.paid_by === "me"), true, "las filas del helper son todas mías");
 });
 
 test("getTransaction: devuelve la fila completa por id", () => {
@@ -142,6 +144,21 @@ test("softDelete de un refund con OTRO refund activo enlazado NO revierte settle
     db.prepare("SELECT settled FROM transactions WHERE id=?").get(gastoId).settled, 0,
     "sin refunds activos: el gasto vuelve a settled=0",
   );
+});
+
+test("softDelete del ajuste de liquidación revierte settled=0 del gasto que pagó la contraparte", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const gastoId = ins(db, { type: "expense", cents: 10000, shared: 1, paidBy: "partner", account: "" });
+  db.prepare("UPDATE transactions SET settled=1 WHERE id=?").run(gastoId);
+  const ajusteId = ins(db, { type: "adjustment", cents: -6000, category: "", ref: gastoId });
+
+  db.prepare(SQL.softDeleteTransaction).run(T2, ajusteId);
+  db.prepare(SQL.unsettleIfNoActiveRefunds).run(gastoId, ajusteId, T2, gastoId);
+
+  const gasto = db.prepare("SELECT settled, updated_at FROM transactions WHERE id=?").get(gastoId);
+  assert.equal(gasto.settled, 0);
+  assert.equal(gasto.updated_at, T2);
 });
 
 test("softDelete de un gasto normal (no refund) se comporta igual que antes: solo deleted+updated_at", () => {

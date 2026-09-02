@@ -163,6 +163,15 @@ test("spentByRootCategory: refund vinculado a gasto NO compartido resta en su ra
   assert.equal(casa.spent_cents, 6000, "gasto A (10000) - devol-a (10000, gasto NO compartido) + gasto B al 60% (6000) - 0 (devol-b liquida compartido)");
 });
 
+test("spentByRootCategory: un gasto pagado por la contraparte suma MI parte en su raíz", () => {
+  const db = openDb();
+  seedMinimal(db);
+  ins(db, { id: "suyo", cents: 10000, shared: 1, paidBy: "partner", account: "", category: "cat-casa-alquiler" });
+
+  const rows = db.prepare(SQL.spentByRootCategory).all("per-1");
+  assert.equal(rows.find((r) => r.root_id === "cat-casa").spent_cents, 6000);
+});
+
 test("updatePeriodShare (sentencia sola): cambia my_share_pct/updated_at; sin el freeze previo, los gastos con override NULL seguirían al periodo", () => {
   const db = openDb();
   seedMinimal(db); // per-1 al 60

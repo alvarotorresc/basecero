@@ -212,6 +212,11 @@ export const EN = {
       settle: "Settle up {total}",
       confirm: "Yes, settle up {total}",
     },
+    note: "Settle up",
+    outflow: {
+      merchant: "Settle up with {name}",
+      merchantFallback: "Settle up",
+    },
   },
   presupuesto: {
     error: { load: "Couldn’t load Budget: {error}" },
@@ -672,6 +677,7 @@ export const EN = {
       sharePctInvalid: "The split must be between 0 and 100.",
       refundLockedSettled: "This entry is a refund linked to an expense. Delete or unlink it before changing its amount.",
       expenseLockedHasRefund: "This expense has a linked refund. Delete the refund first in Transactions.",
+      paidByNotShared: "Only a shared expense can be paid by the partner.",
       ruleNotFound: "Rule not found",
       accountNotFound: "Account not found",
       goalNotFound: "Goal not found",
