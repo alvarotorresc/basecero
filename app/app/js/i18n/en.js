@@ -234,8 +234,7 @@ export const EN = {
     error: { load: "Couldn’t load Spending by category: {error}" },
     title: "Spending by category",
     header: {
-      openedOn: "{period} · opened on {date}{days}",
-      days: { one: " · {n} day", other: " · {n} days" },
+      dayOf: "{period} · day {day} of {total}",
     },
     total: {
       title: "Spent this period",

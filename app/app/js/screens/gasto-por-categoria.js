@@ -5,7 +5,8 @@ import {
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
 import { budgetStatus, pctOf, relativeWidth, limitTotals, sortRootRows } from "../category-spend.js";
 import { eurToCents } from "../contract.js";
-import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, currencySymbol } from "../format.js";
+import { fmtMoney, fmtMoneyParts, hoyISO, currencySymbol } from "../format.js";
+import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
 import { t } from "../i18n/index.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -34,9 +35,9 @@ const chevronSvg = (deg) => `<svg width="16" height="16" viewBox="0 0 24 24" fil
  *  desplegable para ver su detalle por subcategoría y poner, cambiar o quitar su límite.
  *  Réplica de docs/design/gasto-por-categoria/Main.dc.html y Limite.dc.html.
  *
- *  El subtítulo de la cabecera reutiliza la semántica de siempre ("{periodo} · abierto el {fecha} ·
- *  N días"): los periodos son manuales y NO tienen fecha de fin conocida mientras están abiertos,
- *  así que el "día 2 de 30" del artboard no es computable y no se inventa.
+ *  El subtítulo de la cabecera es el mismo «{periodo} · día N de M» de Inicio, con los mismos
+ *  helpers (dayIndexOfPeriod/expectedPeriodDays de prevision.js): M es la duración nominal de un
+ *  mes desde start_date, no la fecha real de cierre del periodo (eso llega con la nómina).
  *
  *  La fila tocable es SOLO la cabecera de cada categoría (un <button> de verdad, hermano de la
  *  barra y del bloque desplegado, nunca su envoltorio): el bloque desplegado contiene a su vez
@@ -199,9 +200,6 @@ export async function renderGastoPorCategoria(container, onBack) {
     const limPct = pctOf(lim.spent, lim.limit);
     const remaining = lim.limit - lim.spent;
 
-    const dias = Math.floor((new Date(hoyISO() + "T12:00:00") - new Date(period.start_date + "T12:00:00")) / 86400000) + 1;
-    const diasTxt = dias >= 1 ? t("gastoCategoria.header.days", { n: dias }) : "";
-
     const remainingSpan = `<span style="color:var(--green);font-weight:700;">${escHtml(fmtMoney(remaining))}</span>`;
     const overSpan = `<span style="color:var(--red);font-weight:700;">${escHtml(fmtMoney(-remaining))}</span>`;
 
@@ -211,7 +209,7 @@ export async function renderGastoPorCategoria(container, onBack) {
           style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
         <div style="display:flex;flex-direction:column;gap:2px;">
           <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">${t("gastoCategoria.title")}</div>
-          <div style="font-size:11px;color:var(--text-3);">${t("gastoCategoria.header.openedOn", { period: escHtml(period.name), date: escHtml(fmtDiaCorto(period.start_date)), days: diasTxt })}</div>
+          <div style="font-size:11px;color:var(--text-3);">${t("gastoCategoria.header.dayOf", { period: escHtml(period.name), day: dayIndexOfPeriod(period.start_date, hoyISO()), total: expectedPeriodDays(period.start_date) })}</div>
         </div>
       </div>
 

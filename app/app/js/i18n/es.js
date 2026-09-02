@@ -235,8 +235,7 @@ export const ES = {
     error: { load: "No se pudo cargar Gasto por categoría: {error}" },
     title: "Gasto por categoría",
     header: {
-      openedOn: "{period} · abierto el {date}{days}",
-      days: { one: " · {n} día", other: " · {n} días" },
+      dayOf: "{period} · día {day} de {total}",
     },
     total: {
       title: "Gastado este periodo",
