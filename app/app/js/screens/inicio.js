@@ -208,8 +208,7 @@ function flujoDeGastoHtml(days7) {
  *  gasto-por-categoria.js#rootRowHtml (ok -> color propio de la categoría, warn/over -> ámbar/rojo). No
  *  se reutiliza directamente porque esa pantalla no la exporta (es de detalle interno de esa
  *  pantalla) — aquí además el texto NO se colorea en warn (solo la barra), a diferencia de
- *  Presupuesto: ver docs/design/material-expresivo/Resumen.dc.html:146 (Casa, warn, texto blanco) vs :189 (Transporte,
- *  over, texto rojo). */
+ *  gasto-por-categoria.js (rootRowHtml colorea el % en ámbar en warn; esta tarjeta no). */
 function donutBarColor(level, catColor) {
   if (level === "warn") return "var(--amber)";
   if (level === "over") return "var(--red)";
@@ -266,10 +265,14 @@ function categoriaDonutRowHtml(name, color, spentCents, limitCents) {
  *  límite — es decir, para quien más falta le hace entrar a ponerlos. Sin gasto categorizado se
  *  pinta la versión reducida: cabecera + texto vacío + pie.
  *
- *  role="button"/tabindex sobre el div en vez de un <button> de verdad: la tarjeta es un .card con
- *  un <svg> y una lista dentro, y envolverlo en un botón arrastra su reset de estilos a todo el
- *  contenido. Por eso lleva TAMBIÉN onkeydown (Enter/Espacio) en el wiring: un div con role de
- *  botón no se activa solo con el teclado. */
+ *  Nada de role ARIA de botón ni tabindex en el contenedor: ese role marca sus hijos como
+ *  Children Presentational en ARIA, así que Chrome/WebKit los sacan del árbol de accesibilidad —
+ *  el total del centro del donut y el "X € de Y €" de cada fila desaparecerían para lectores de
+ *  pantalla. En vez de eso, el .card entero se queda con onclick + cursor:pointer (tap en
+ *  cualquier punto sigue navegando para ratón/dedo) y el pie "Ver por categoría →" es un
+ *  <button> real: su click (de puntero o sintetizado por teclado) burbujea al onclick del
+ *  contenedor, así que un solo listener basta y el foco de teclado/lector de pantalla aterriza en
+ *  un control con nombre correcto. */
 function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory) {
   const headerHtml = `
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
@@ -284,10 +287,11 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory) {
   const footerHtml = `
     <hr class="divider">
     <div style="height:44px;display:flex;align-items:center;justify-content:center;">
-      <div style="font-size:12px;font-weight:600;color:var(--text-2);">${t("inicio.categorySpend.viewAll")}</div>
+      <button type="button" id="inicio-categoria-ver" style="all:unset;cursor:pointer;
+        font-size:12px;font-weight:600;color:var(--text-2);white-space:nowrap;
+        -webkit-tap-highlight-color:transparent;">${t("inicio.categorySpend.viewAll")}</button>
     </div>`;
-  const cardAttrs = `class="card" id="inicio-categoria-card" role="button" tabindex="0"
-    aria-label="${escAttr(t("inicio.categorySpend.title"))}"`;
+  const cardAttrs = `class="card" id="inicio-categoria-card"`;
 
   const withSpend = rootRows.filter((r) => r.spent_cents > 0);
   if (withSpend.length === 0) {
@@ -491,16 +495,12 @@ export async function renderInicio(container) {
 
   const categoriaCard = container.querySelector("#inicio-categoria-card");
   if (categoriaCard) {
-    const abrir = () => {
+    // Un solo listener: el click del <button id="inicio-categoria-ver"> del pie (de puntero o
+    // sintetizado al activarlo por teclado) burbujea hasta aquí, así que no hace falta cablear
+    // el botón aparte.
+    categoriaCard.onclick = () => {
       pushBack(() => renderInicio(container));
       renderGastoPorCategoria(container, goBack);
-    };
-    categoriaCard.onclick = abrir;
-    // role="button" sobre un div no trae activación por teclado: hay que darla a mano.
-    categoriaCard.onkeydown = (e) => {
-      if (e.key !== "Enter" && e.key !== " ") return;
-      e.preventDefault();
-      abrir();
     };
   }
 
