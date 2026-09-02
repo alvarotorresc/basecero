@@ -10,6 +10,7 @@ import { renderRegistro } from "./screens/registro.js";
 import { renderMovimientos } from "./screens/movimientos.js";
 import { renderPatrimonio } from "./screens/patrimonio.js";
 import { renderAjustes } from "./screens/ajustes.js";
+import { pushBack, goBack, clearBack } from "./back.js";
 
 const screen = document.getElementById("screen");
 const RUTAS = {
@@ -23,6 +24,7 @@ export function nav(tab) {
   // Durante el asistente de Nuevo periodo (onboarding o cierre normal) el chrome está oculto
   // (ver app.css `body.onboarding`): ignora cualquier navegación mientras dure.
   if (document.body.classList.contains("onboarding")) return;
+  clearBack(); // cambiar de pestaña descarta las subpantallas abiertas (y sus entradas de historial)
   document.querySelectorAll(".tab").forEach((b) => {
     const isActive = b.dataset.tab === tab;
     b.classList.toggle("active", isActive);
@@ -89,5 +91,8 @@ async function boot() {
 }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => nav(b.dataset.tab)));
-document.getElementById("btn-registro").onclick = () => renderRegistro(screen, () => nav("inicio"));
+document.getElementById("btn-registro").onclick = () => {
+  pushBack(() => nav("inicio"));
+  renderRegistro(screen, goBack);
+};
 boot();

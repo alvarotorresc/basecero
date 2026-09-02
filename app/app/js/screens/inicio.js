@@ -14,6 +14,7 @@ import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 import { renderPresupuesto } from "./presupuesto.js";
 import { renderRecurrentes } from "./recurrentes.js";
 import { renderRegistro } from "./registro.js";
+import { pushBack, goBack } from "../back.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -463,20 +464,30 @@ export async function renderInicio(container) {
   // Task 7 (6f): único botón Liquidar (antes también #disp-liquidar en disponibleCardHtml, ver
   // comentario ahí) — un solo id, un solo listener.
   const liquidarBtn = container.querySelector("#shared-liquidar");
-  if (liquidarBtn) liquidarBtn.onclick = () => renderLiquidar(container, () => renderInicio(container));
+  if (liquidarBtn) liquidarBtn.onclick = () => {
+    pushBack(() => renderInicio(container));
+    renderLiquidar(container, goBack);
+  };
 
   const presuBtn = container.querySelector("#inicio-ver-presupuesto");
-  if (presuBtn) presuBtn.onclick = () => renderPresupuesto(container, () => renderInicio(container));
+  if (presuBtn) presuBtn.onclick = () => {
+    pushBack(() => renderInicio(container));
+    renderPresupuesto(container, goBack);
+  };
 
   const gestionarBtn = container.querySelector("#prevision-gestionar");
-  if (gestionarBtn) gestionarBtn.onclick = () => renderRecurrentes(container, () => renderInicio(container));
+  if (gestionarBtn) gestionarBtn.onclick = () => {
+    pushBack(() => renderInicio(container));
+    renderRecurrentes(container, goBack);
+  };
 
   container.querySelectorAll("[data-prevision-rule]").forEach((el) => {
     el.onclick = () => {
       const item = prevision.items.find((it) => it.rule.id === el.dataset.previsionRule);
       if (!item) return;
       const { rule } = item;
-      renderRegistro(container, () => renderInicio(container), {
+      pushBack(() => renderInicio(container));
+      renderRegistro(container, goBack, {
         type: rule.type,
         amountCents: rule.amount_cents,
         categoryId: rule.category_id,
@@ -490,12 +501,10 @@ export async function renderInicio(container) {
 
   container.querySelector("#inicio-periodo-header").onclick = () => {
     document.body.classList.add("onboarding");
-    renderPeriodoNuevo(container, {
-      mode: "next",
-      onDone: () => {
-        document.body.classList.remove("onboarding");
-        renderInicio(container);
-      },
+    pushBack(() => {
+      document.body.classList.remove("onboarding");
+      renderInicio(container);
     });
+    renderPeriodoNuevo(container, { mode: "next", onDone: goBack });
   };
 }

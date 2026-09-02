@@ -4,6 +4,7 @@ import {
 } from "../repo.js";
 import { colorForCategory, iconForCategory, POOL, CURATED_ICONS, hashIndex } from "../category-colors.js";
 import { t } from "../i18n/index.js";
+import { pushBack, goBack } from "../back.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -180,6 +181,7 @@ export async function renderCategorias(container, onBack) {
       iconOrder: buildIconOrder(initialIcon),
       titleKey: mode === "edit" ? "categorias.form.title.edit" : (parentId ? "categorias.form.title.newChild" : "categorias.form.title.new"),
     };
+    pushBack(backToList);
     state.view = "form";
     render();
   }
@@ -401,7 +403,7 @@ export async function renderCategorias(container, onBack) {
 
       await loadData();
       state.flow = form.flow; // así la categoría recién creada/editada es visible sin cambiar de pestaña a mano
-      backToList();
+      goBack();
     } catch (e) {
       btn.disabled = false;
       state.formError = e.message;
@@ -418,7 +420,7 @@ export async function renderCategorias(container, onBack) {
       try {
         await unarchiveCategory(form.id);
         await loadData();
-        backToList();
+        goBack();
       } catch (e) {
         btn.disabled = false;
         state.formError = e.message;
@@ -437,7 +439,7 @@ export async function renderCategorias(container, onBack) {
     try {
       await archiveCategory(form.id);
       await loadData();
-      backToList();
+      goBack();
     } catch (e) {
       btn.disabled = false;
       state.formError = e.message;
@@ -449,7 +451,7 @@ export async function renderCategorias(container, onBack) {
   function wireForm() {
     const form = state.form;
 
-    container.querySelector("#cf-close").onclick = () => backToList();
+    container.querySelector("#cf-close").onclick = () => goBack();
 
     // El nombre NO repinta en cada tecla (perdería el foco/cursor del input, como el resto de
     // pantallas de la app — ver acc-name/goal-name en patrimonio.js): el estado (y la sugerencia

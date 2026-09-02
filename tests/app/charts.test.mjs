@@ -75,6 +75,37 @@ test("barChartSvg: todos los días a 0 no revienta (altura mínima, sin NaN)", (
   assert.ok(!html.includes("Infinity"));
 });
 
+test("barChartSvg: todas las barras llevan su importe; la activa con marcador --active y el resto atenuadas", () => {
+  const days = [
+    { label: "L", cents: 1250, active: false },
+    { label: "M", cents: 0, active: false },
+    { label: "X", cents: 99900, active: true },
+  ];
+  const html = barChartSvg(days);
+
+  // una etiqueta de importe por día, no solo para la activa
+  const labelOpens = html.match(/class="flujo-bar-label/g) || [];
+  assert.equal(labelOpens.length, 3);
+
+  // las inactivas van sin decimales, redondeadas a la unidad (1250 -> 13, 0 -> 0); la activa
+  // conserva los céntimos (999,00)
+  assert.match(html, />13</);
+  assert.match(html, />0</);
+  assert.match(html, />999,00</);
+
+  // solo la activa lleva el marcador --active
+  const activeMarkers = html.match(/flujo-bar-label--active/g) || [];
+  assert.equal(activeMarkers.length, 1);
+
+  // la etiqueta de un día no activo va atenuada; la de la activa, en color de acento
+  const inactiveMatch = html.match(/<div class="flujo-bar-label[^>]*>13</);
+  assert.ok(inactiveMatch, "debe existir la etiqueta inactiva redondeada");
+  assert.match(inactiveMatch[0], /color:var\(--text-3\)/);
+  const activeMatch = html.match(/<div class="flujo-bar-label[^>]*>999,00</);
+  assert.ok(activeMatch, "debe existir la etiqueta activa con decimales");
+  assert.match(activeMatch[0], /color:var\(--accent\)/);
+});
+
 // ---- sparklineSvg --------------------------------------------------------
 
 test("sparklineSvg: N puntos → polyline con N pares de coordenadas", () => {
