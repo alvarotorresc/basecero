@@ -19,7 +19,7 @@ test("esquema aplica y las 8 tablas existen", () => {
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name);
   for (const t of ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"])
     assert.ok(tables.includes(t), t);
-  assert.equal(db.prepare("SELECT value FROM meta WHERE key='schema_version'").get().value, "1");
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='schema_version'").get().value, "2");
 });
 
 test("semillas: 0 cuentas (las crea el usuario) y 41 categorías con integridad", () => {
@@ -35,6 +35,25 @@ test("CHECKs de enums y de importes positivos", () => {
     "INSERT INTO transactions (id,date,period_id,type,amount_cents,account_id,status,created_at,updated_at,deleted) VALUES ('x','2026-08-24','p','trampa',100,'acc-n26','pending','t','t',0)").run());
   assert.throws(() => db.prepare(
     "INSERT INTO transactions (id,date,period_id,type,amount_cents,account_id,status,created_at,updated_at,deleted) VALUES ('x','2026-08-24','p','expense',-5,'acc-n26','pending','t','t',0)").run());
+});
+
+test("transactions.paid_by: NOT NULL, default me y CHECK me/partner", () => {
+  const db = freshDb();
+  const col = db.prepare("PRAGMA table_info(transactions)").all().find((c) => c.name === "paid_by");
+  assert.ok(col, "la columna existe en una BD nueva");
+  assert.equal(col.notnull, 1);
+  assert.equal(col.dflt_value, "'me'");
+
+  db.prepare(`INSERT INTO transactions (id,date,period_id,type,amount_cents,account_id,status,created_at,updated_at,deleted)
+    VALUES ('t-def','2026-08-24','p','expense',100,'acc-n26','pending','t','t',0)`).run();
+  assert.equal(db.prepare("SELECT paid_by FROM transactions WHERE id='t-def'").get().paid_by, "me");
+
+  db.prepare(`INSERT INTO transactions (id,date,period_id,type,amount_cents,account_id,paid_by,status,created_at,updated_at,deleted)
+    VALUES ('t-partner','2026-08-24','p','expense',100,'acc-n26','partner','pending','t','t',0)`).run();
+  assert.equal(db.prepare("SELECT paid_by FROM transactions WHERE id='t-partner'").get().paid_by, "partner");
+
+  assert.throws(() => db.prepare(`INSERT INTO transactions (id,date,period_id,type,amount_cents,account_id,paid_by,status,created_at,updated_at,deleted)
+    VALUES ('t-mala','2026-08-24','p','expense',100,'acc-n26','ambos','pending','t','t',0)`).run(), /CHECK constraint failed/);
 });
 
 test("solo un periodo open", () => {

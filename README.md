@@ -45,9 +45,10 @@ marcas cada una como necesaria, prescindible o ahorro; y archivas las que sobren
 historial.
 
 **Gastos compartidos, sin discusiones.** Dices con quién compartes y el reparto por defecto del
-periodo; en cada gasto lo ajustas si hace falta, de 5 en 5. La app lleva la cuenta de lo
-pendiente y la pantalla «Liquidar» cierra el saldo de golpe. Si no compartes con nadie, esa
-parte de la app ni aparece.
+periodo; en cada gasto lo ajustas si hace falta, de 5 en 5, y apuntas quién lo pagó: si lo pagó
+la otra persona, el gasto cuenta como tuyo en su categoría pero no toca ninguna de tus cuentas
+hasta que liquidas. La pantalla «Liquidar» enseña las dos deudas y el neto, y las cierra de golpe.
+Si no compartes con nadie, esa parte de la app ni aparece.
 
 **Recurrentes y previsión.** Reglas semanales, mensuales, trimestrales o anuales para alquiler,
 suscripciones o la nómina. Con ellas el inicio calcula lo comprometido que queda por pagar y tu

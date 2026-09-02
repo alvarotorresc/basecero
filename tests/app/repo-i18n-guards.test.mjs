@@ -17,7 +17,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { createCategory, updateCategory, setCategoryStyle, updatePeriodSharePct } from "../../app/app/js/repo.js";
+import {
+  createCategory, updateCategory, setCategoryStyle, updatePeriodSharePct, addTransaction,
+} from "../../app/app/js/repo.js";
 import { t } from "../../app/app/js/i18n/index.js";
 
 test("createCategory con nombre vacío: lanza el mensaje localizado, no ReferenceError (repo.js:618, TDZ de `const t = nowIso()` en línea posterior)", async () => {
@@ -79,6 +81,49 @@ test("updatePeriodSharePct con un pct inválido rechaza con errors.repo.sharePct
 // fuente: ningún fichero que importe el `t` de i18n puede declarar un `const t`/`let t` local —
 // es el invariante exacto que el bug violó, y cubre las ~13 funciones que ningún test de Node
 // puede ejercer directamente.
+// La invariante de columna cruzada de paid_by («solo un gasto compartido lo puede pagar la
+// contraparte») vivía SOLO en validateImport (xlsx.js), es decir, solo para una hoja importada: el
+// camino de escritura del repo la daba por buena. addTransaction la comprueba ANTES de tocar la BD
+// (antes incluso de getOpenPeriod), así que es alcanzable en Node con código real, sin mocks del
+// Worker — igual que createCategory/updateCategory de arriba.
+test("addTransaction rechaza paid_by=partner en algo que no es un gasto compartido, antes de tocar la BD", async () => {
+  for (const fields of [
+    { type: "income", isShared: false, categoryId: "cat-nomina" },
+    { type: "expense", isShared: false, categoryId: "cat-casa-alquiler" },
+    { type: "refund", isShared: true, categoryId: "cat-casa-alquiler" },
+  ]) {
+    await assert.rejects(
+      () => addTransaction({ ...fields, amountCents: 1000, date: "2026-08-20", accountId: "acc-n26",
+        merchant: "", note: "", paidBy: "partner" }),
+      (e) => {
+        assert.ok(e instanceof Error);
+        assert.notEqual(e.constructor.name, "ReferenceError", `no debe ser TDZ ReferenceError: ${e.message}`);
+        assert.equal(e.message, t("errors.repo.paidByNotShared"));
+        return true;
+      },
+    );
+  }
+});
+
+// Item 2 (final fix wave): mismo criterio que el guard de arriba — un gasto que NO lo pagó la
+// contraparte SÍ necesita una cuenta mía (si no, no hay saldo del que descontarlo). Se comprueba
+// justo después del guard de paid_by=partner, también ANTES de tocar la BD, así que es alcanzable
+// aquí igual que el test de arriba.
+test("addTransaction rechaza un gasto sin cuenta cuando no lo pagó la contraparte, antes de tocar la BD", async () => {
+  for (const accountId of ["", null, undefined]) {
+    await assert.rejects(
+      () => addTransaction({ type: "expense", isShared: false, categoryId: "cat-casa-alquiler",
+        amountCents: 1000, date: "2026-08-20", accountId, merchant: "", note: "", paidBy: "me" }),
+      (e) => {
+        assert.ok(e instanceof Error);
+        assert.notEqual(e.constructor.name, "ReferenceError", `no debe ser TDZ ReferenceError: ${e.message}`);
+        assert.equal(e.message, t("common.needAccount"));
+        return true;
+      },
+    );
+  }
+});
+
 test("ningún fichero que importa el `t` de i18n declara un `const t`/`let t` local que lo tape", () => {
   const jsDir = fileURLToPath(new URL("../../app/app/js/", import.meta.url));
   const files = [];

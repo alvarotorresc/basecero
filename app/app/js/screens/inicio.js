@@ -1,6 +1,6 @@
 import {
   getOpenPeriod, spentOfPeriod, incomeOfPeriod, listByDay, allCategoriesById,
-  pendingShared, pendingSharedTotalCents, budgetsOfPeriod, previsionOfPeriod,
+  pendingSettlements, pendingSettlementNetCents, budgetsOfPeriod, previsionOfPeriod,
   spentByRootCategory, spentLast7Days, getMetaAll, setMeta, hasSharedData,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
@@ -50,13 +50,20 @@ function groupByDay(rows) {
   return groups;
 }
 
-function txRowHtml(r, byId) {
+function txRowHtml(r, byId, partnerName) {
   const cat = byId[r.category_id];
   const catName = cat?.name ?? "";
   const color = colorForCategory(r.category_id, byId);
   const icon = iconForCategory(r.category_id, byId);
   const title = r.merchant || catName;
-  const sub = catName + (r.is_shared ? t("common.myPartSuffix", { amount: fmtMoney(r.my_amount_cents) }) : "");
+  // Un gasto que pagó la contraparte se anuncia en el sub: sin esto, en la pantalla que más se
+  // mira, se lee exactamente igual que uno mío. El importe sigue siendo el ticket entero en rojo
+  // (la decisión del controlador sobre §12.3 atenúa el importe SOLO en Movimientos).
+  const shareSuffix = !r.is_shared ? ""
+    : r.paid_by === "partner"
+      ? t("movimientos.row.partnerPaid", { name: partnerName || t("movimientos.shared.fallbackName"), amount: fmtMoney(r.my_amount_cents) })
+      : t("common.myPartSuffix", { amount: fmtMoney(r.my_amount_cents) });
+  const sub = catName + shareSuffix;
   const isExpense = r.type === "expense";
   const amountClass = isExpense ? "negative" : "positive";
   const sign = isExpense ? "-" : "+";
@@ -72,13 +79,13 @@ function txRowHtml(r, byId) {
     </div>`;
 }
 
-/** Bloque de compartidos: pendiente de que devuelva, de TODOS los periodos (pendingShared/-Total
- *  cubren cualquier gasto compartido sin liquidar, no solo el del periodo abierto). Se oculta
- *  entero si no hay partnerName configurado (PR C, Task 5: sin nombre no hay a quién liquidar —
- *  ver partnerBannerHtml para el caso "hay compartidos pero falta el nombre") o si no hay nada
- *  pendiente. */
-function sharedBlockHtml(period, sharedRows, sharedTotal, partnerName) {
-  if (!partnerName || (sharedRows.length === 0 && sharedTotal === 0)) return "";
+/** Bloque de compartidos: neto pendiente con la contraparte, de TODOS los periodos
+ *  (pendingSettlements/-Net cubren cualquier gasto compartido sin liquidar en las dos
+ *  direcciones, no solo los del periodo abierto). Se oculta entero si no hay partnerName
+ *  configurado (PR C, Task 5: sin nombre no hay a quién liquidar — ver partnerBannerHtml para el
+ *  caso "hay compartidos pero falta el nombre") o si no hay nada pendiente. */
+function sharedBlockHtml(period, sharedRows, netCents, partnerName) {
+  if (!partnerName || (sharedRows.length === 0 && netCents === 0)) return "";
   const miPct = period.my_share_pct;
   const n = sharedRows.length;
   const masAntiguo = sharedRows[0]?.date;
@@ -92,8 +99,12 @@ function sharedBlockHtml(period, sharedRows, sharedTotal, partnerName) {
       </div>
       <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;">
         <div style="display:flex;flex-direction:column;gap:5px;">
-          <div style="font-size:11px;color:var(--text-3);">${t("inicio.shared.pendingLabel")}</div>
-          <div class="num text-red" style="font-size:30px;font-weight:600;letter-spacing:-0.02em;">${fmtMoney(sharedTotal)}</div>
+          <div style="font-size:11px;color:var(--text-3);">${netCents > 0
+            ? t("common.settlement.theyOwe", { name: escHtml(partnerName) })
+            : netCents < 0
+              ? t("common.settlement.youOwe", { name: escHtml(partnerName) })
+              : t("common.settlement.even")}</div>
+          <div class="num${netCents > 0 ? " text-green" : netCents < 0 ? " text-red" : ""}" style="font-size:30px;font-weight:600;letter-spacing:-0.02em;">${fmtMoney(Math.abs(netCents))}</div>
         </div>
         <button type="button" id="shared-liquidar" style="height:44px;padding:0 18px;border-radius:999px;
           background:var(--card2);color:var(--text);border:0;font-size:12px;font-weight:700;cursor:pointer;
@@ -311,7 +322,7 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, showVerPresupue
  *  (budgetTotal === 0).
  *
  *  Task 7 (6f): esta tarjeta llevaba TAMBIÉN su propio botón «Liquidar» (#disp-liquidar), con
- *  el mismo gate (partnerName && sharedTotal>0) y el mismo handler que #shared-liquidar en
+ *  el mismo gate (partnerName && netCents distinto de 0) y el mismo handler que #shared-liquidar en
  *  sharedBlockHtml — un usuario con presupuestos definidos Y compartidos pendientes veía DOS
  *  botones «Liquidar» a la vez. Consolidado en uno solo: se queda en sharedBlockHtml (la tarjeta
  *  dedicada a compartidos, con nombre de la contraparte/reparto/importe pendiente ya de
@@ -337,7 +348,7 @@ function disponibleCardHtml(budgets, spent, period) {
  *  tarjetas "Flujo de gasto" y "Gasto por categoría", bloque de compartidos (pendiente/liquidar),
  *  bloque "Previsión" (reglas recurrentes del mes) y sus movimientos agrupados por día. */
 export async function renderInicio(container) {
-  let period, spent, income, rows, byId, sharedRows, sharedTotal, budgets, prevision, rootRows, days7,
+  let period, spent, income, rows, byId, sharedRows, netCents, budgets, prevision, rootRows, days7,
     meta, partnerName, showPartnerBanner;
   try {
     period = await getOpenPeriod();
@@ -345,13 +356,13 @@ export async function renderInicio(container) {
       container.innerHTML = `<div class="banner-aviso red">${t("common.noOpenPeriod")}</div>`;
       return;
     }
-    [spent, income, rows, byId, sharedRows, sharedTotal, budgets, prevision, rootRows, days7, meta] = await Promise.all([
+    [spent, income, rows, byId, sharedRows, netCents, budgets, prevision, rootRows, days7, meta] = await Promise.all([
       spentOfPeriod(period.id),
       incomeOfPeriod(period.id),
       listByDay(period.id),
       allCategoriesById(),
-      pendingShared(),
-      pendingSharedTotalCents(),
+      pendingSettlements(),
+      pendingSettlementNetCents(),
       budgetsOfPeriod(period.id),
       previsionOfPeriod(period),
       spentByRootCategory(period.id),
@@ -360,7 +371,7 @@ export async function renderInicio(container) {
     ]);
     partnerName = (meta.partner_name || "").trim();
     // Sin nombre, comprobamos si hay compartidos "huérfanos" (Task 5): con nombre ya configurado
-    // no hace falta esta query extra — sharedBlockHtml decide solo con sharedRows/sharedTotal.
+    // no hace falta esta query extra — sharedBlockHtml decide solo con sharedRows/netCents.
     showPartnerBanner = !partnerName && await hasSharedData();
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">${t("inicio.error.load", { error: escHtml(e.message) })}</div>`;
@@ -385,7 +396,7 @@ export async function renderInicio(container) {
         <div style="display:flex;flex-direction:column;gap:12px;">
           ${groupByDay(rows).map((g) => `
             <div class="day-label">${g.date === hoy ? t("common.today") : fmtDiaLargo(g.date)}</div>
-            ${g.rows.map((r) => txRowHtml(r, byId)).join("")}
+            ${g.rows.map((r) => txRowHtml(r, byId, partnerName)).join("")}
           `).join("")}
         </div>
       </div>`;
@@ -426,7 +437,7 @@ export async function renderInicio(container) {
 
     ${gastoPorCategoriaHtml(rootRows, byId, budgetByCategory, budgets.length > 0)}
 
-    ${sharedBlockHtml(period, sharedRows, sharedTotal, partnerName)}
+    ${sharedBlockHtml(period, sharedRows, netCents, partnerName)}
 
     ${previsionHtml(prevision, byId)}
 

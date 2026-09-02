@@ -5,19 +5,19 @@ import { openDb, seedMinimal } from "./helpers.mjs";
 
 const T = "2026-08-24T18:00:00Z";
 
-/** Inserta una transacción usando la firma NUEVA (19 posicionales) de SQL.insertTransaction. */
+/** Inserta una transacción usando la firma NUEVA (20 posicionales) de SQL.insertTransaction. */
 function ins(db, over = {}) {
   const v = {
     id: "t" + Math.floor(Math.random() * 1e9),
     date: "2026-08-20", period: "per-1", type: "expense", cents: 4520,
     account: "acc-n26", counterAccount: "", category: "cat-casa-alquiler",
-    merchant: "", note: "", shared: 0, override: null, settled: 0,
+    merchant: "", note: "", shared: 0, override: null, paidBy: "me", settled: 0,
     ref: "", rule: "", external: "", status: "pending",
     ...over,
   };
   db.prepare(SQL.insertTransaction).run(
     v.id, v.date, v.period, v.type, v.cents, v.account, v.counterAccount,
-    v.category, v.merchant, v.note, v.shared, v.override, v.settled,
+    v.category, v.merchant, v.note, v.shared, v.override, v.paidBy, v.settled,
     v.ref, v.rule, v.external, v.status, T, T,
   );
   return v.id;
@@ -115,4 +115,20 @@ test("recentForRefund: expone period_pct y share_pct_override del gasto enlazado
   assert.equal(closedRow.share_pct_override, null);
   assert.equal(overrideRow.period_pct, 60);
   assert.equal(overrideRow.share_pct_override, 50);
+});
+
+test("spentOfPeriod: un gasto que pagó la contraparte cuenta MI parte igual que uno mío", () => {
+  const db = openDb();
+  seedMinimal(db);
+  ins(db, { id: "suyo", cents: 10000, shared: 1, paidBy: "partner", account: "" });
+  assert.equal(db.prepare(SQL.spentOfPeriod).get("per-1").spent_cents, 6000, "60% de 10000, lo pague quien lo pague");
+});
+
+test("spentOfPeriod: el apunte de salida de la liquidación (adjustment) no lo toca", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const suyo = ins(db, { id: "suyo", cents: 10000, shared: 1, paidBy: "partner", account: "" });
+  ins(db, { id: "liq", type: "adjustment", cents: -6000, category: "", ref: suyo });
+  assert.equal(db.prepare(SQL.spentOfPeriod).get("per-1").spent_cents, 6000,
+    "spentOfPeriod solo tiene ramas para expense y refund: cualquier otro tipo cae en ELSE 0");
 });

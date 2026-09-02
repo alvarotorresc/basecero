@@ -13,13 +13,13 @@ function ins(db, over = {}) {
     id: "t" + Math.floor(Math.random() * 1e9),
     date: "2026-08-20", period: "per-1", type: "expense", cents: 4520,
     account: "acc-n26", counterAccount: "", category: "cat-casa-alquiler",
-    merchant: "", note: "", shared: 0, override: null, settled: 0,
+    merchant: "", note: "", shared: 0, override: null, paidBy: "me", settled: 0,
     ref: "", rule: "", external: "", status: "pending",
     ...over,
   };
   db.prepare(SQL.insertTransaction).run(
     v.id, v.date, v.period, v.type, v.cents, v.account, v.counterAccount,
-    v.category, v.merchant, v.note, v.shared, v.override, v.settled,
+    v.category, v.merchant, v.note, v.shared, v.override, v.paidBy, v.settled,
     v.ref, v.rule, v.external, v.status, T, T,
   );
   return v.id;
@@ -149,7 +149,11 @@ test("previsión del periodo (composición SQL + prevision.js): pagado por rule_
   // Movimientos del periodo:
   ins(db, { id: "pagoA", cents: 90000, rule: ruleA });                                  // paga A por rule_id
   ins(db, { id: "pagoB", cents: 12000, category: "cat-casa-alquiler" });                // paga B por fallback (mismo cat+importe SIN rule_id)
-  ins(db, { id: "gastoContraparte", cents: 5000, shared: 1 });                          // pendiente con la contraparte, no ligado a ninguna regla
+  ins(db, { id: "gastoContraparte", cents: 5000, shared: 1 });                          // lo pagué yo: me debe 2000
+  // Lo pagó ella (sin cuenta mía: no toca acc-n26): yo le debo mi parte, 3000. Su par
+  // categoría|importe no puede marcar ninguna regla como pagada — ruleC es 5000 en la misma
+  // categoría pero queda fuera por ruleApplies (due_month=3, el periodo es el mes 8).
+  ins(db, { id: "gastoSuyo", cents: 5000, shared: 1, paidBy: "partner", account: "" });
 
   const rules = db.prepare(SQL.listRules).all();
   const paidByRuleSet = new Set(db.prepare(SQL.paidRuleIds).all(period.id).map((r) => r.rule_id));
@@ -184,13 +188,15 @@ test("previsión del periodo (composición SQL + prevision.js): pagado por rule_
   assert.equal(comprometidoCents, 1500, "solo F: pendiente y no es income (D pendiente pero es income, se excluye)");
 
   const saldoCuentaCents = db.prepare(SQL.accountBalance).get("2026-08-24", "acc-n26").balance_cents;
-  assert.equal(saldoCuentaCents, 100000 - 90000 - 12000 - 5000, "opening menos los 3 gastos del periodo");
+  assert.equal(saldoCuentaCents, 100000 - 90000 - 12000 - 5000,
+    "opening menos 3 de los 4 gastos del periodo: gastoSuyo (pagado por la contraparte, sin cuenta) no toca acc-n26");
 
-  const pendientePartnerCents = db.prepare(SQL.pendingSharedTotal).get().total_cents;
-  assert.equal(pendientePartnerCents, 5000 - 3000, "gastoContraparte: 5000 - 60% de mi parte = 2000 de la contraparte");
+  const netPartnerCents = db.prepare(SQL.pendingSettlementNet).get().net_cents;
+  assert.equal(netPartnerCents, -1000, "me debe 2000 (5000 - 60%) y le debo 3000 (60% de 5000)");
 
-  const disponibleCents = saldoCuentaCents - comprometidoCents + pendientePartnerCents;
-  assert.equal(disponibleCents, -7000 - 1500 + 2000);
+  const disponibleCents = saldoCuentaCents - comprometidoCents + netPartnerCents;
+  assert.equal(disponibleCents, -7000 - 1500 + (-1000));
+  assert.equal(disponibleCents, -9500, "el neto en contra RESTA del disponible: eso es lo que faltaba");
 });
 
 test("dayIndexOfPeriod: 1-based y nunca menor que 1", () => {
@@ -217,4 +223,11 @@ test("paceDeltaCents: desviación sobre el plan prorrateado", () => {
   assert.equal(paceDeltaCents(310000, 100000, "2026-08-27", "2026-09-07"), -20000);
   // pasado el mes nominal, el plan se satura en el total
   assert.equal(paceDeltaCents(310000, 310000, "2026-08-27", "2026-10-15"), 0);
+});
+
+test("SQL.accountBalance: un gasto pagado por la contraparte no aparece en ninguna cuenta", () => {
+  const db = openDb();
+  seedMinimal(db);
+  ins(db, { id: "suyo", cents: 20000, shared: 1, paidBy: "partner", account: "" });
+  assert.equal(db.prepare(SQL.accountBalance).get("2026-12-31", "acc-n26").balance_cents, 100000);
 });

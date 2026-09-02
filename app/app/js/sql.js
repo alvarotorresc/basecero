@@ -16,23 +16,25 @@ export const SQL = {
   insertPeriod: `INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
     VALUES (?,?,?,'','open',?,'',?,?,0)`,
   insertTransaction: `INSERT INTO transactions (id,date,period_id,type,amount_cents,account_id,counter_account_id,
-    category_id,merchant,note,is_shared,share_pct_override,settled,ref_id,rule_id,external_id,status,created_at,updated_at,deleted)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
+    category_id,merchant,note,is_shared,share_pct_override,paid_by,settled,ref_id,rule_id,external_id,status,created_at,updated_at,deleted)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
   spentOfPeriod: `SELECT COALESCE(SUM(CASE
       WHEN t.type='expense' THEN ${MY_AMOUNT}
       WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT}
       ELSE 0 END),0) AS spent_cents
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.period_id=? AND t.deleted=0`,
+  // paid_by='me': una devolución de tienda sobre una compra que pagó la contraparte es dinero que
+  // le devuelven a ELLA; enlazarla desde mi Registro crearía un ingreso en mi cuenta que nunca existió.
   recentForRefund: `SELECT t.id, t.date, t.amount_cents, t.merchant, t.category_id, t.is_shared, t.settled,
       t.share_pct_override, p.my_share_pct AS period_pct
     FROM transactions t JOIN periods p ON p.id=t.period_id
-    WHERE t.deleted=0 AND t.type='expense'
+    WHERE t.deleted=0 AND t.type='expense' AND t.paid_by='me'
       AND (t.period_id=? OR (t.is_shared=1 AND t.settled=0))
     ORDER BY t.date DESC, t.created_at DESC LIMIT 15`,
   incomeOfPeriod: `SELECT COALESCE(SUM(CASE WHEN t.type='income' THEN t.amount_cents ELSE 0 END),0) AS income_cents
     FROM transactions t WHERE t.period_id=? AND t.deleted=0`,
-  listByDay: `SELECT t.id, t.date, t.type, t.amount_cents, t.category_id, t.merchant, t.note, t.is_shared,
+  listByDay: `SELECT t.id, t.date, t.type, t.amount_cents, t.category_id, t.merchant, t.note, t.is_shared, t.paid_by,
       ${MY_AMOUNT} AS my_amount_cents
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.period_id=? AND t.deleted=0 AND t.type IN ('expense','income','refund')
@@ -66,50 +68,59 @@ export const SQL = {
   // necesita para mostrar el reparto real (mismo criterio que registro.js), no un 100% fijo.
   listPeriods: `SELECT id, name, start_date, end_date, status, my_share_pct FROM periods WHERE deleted=0 ORDER BY start_date DESC`,
   listAllByDay: `SELECT t.id, t.date, t.type, t.amount_cents, t.category_id, t.merchant, t.note, t.is_shared,
-      t.account_id, t.counter_account_id, t.share_pct_override, t.ref_id, t.rule_id, t.status,
+      t.account_id, t.counter_account_id, t.share_pct_override, t.paid_by, t.ref_id, t.rule_id, t.status,
       ${MY_AMOUNT} AS my_amount_cents
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.period_id=? AND t.deleted=0
     ORDER BY t.date DESC, t.created_at DESC`,
   getTransaction: `SELECT * FROM transactions WHERE id=? AND deleted=0`,
   updateTransaction: `UPDATE transactions SET type=?, amount_cents=?, date=?, category_id=?, account_id=?,
-    counter_account_id=?, merchant=?, note=?, is_shared=?, share_pct_override=?, ref_id=?, rule_id=?, status=?,
+    counter_account_id=?, merchant=?, note=?, is_shared=?, share_pct_override=?, paid_by=?, ref_id=?, rule_id=?, status=?,
     updated_at=? WHERE id=?`,
   softDeleteTransaction: `UPDATE transactions SET deleted=1, updated_at=? WHERE id=?`,
-  // Al borrar un refund enlazado (ref_id), revierte settled=1 del gasto original SOLO si no queda
-  // ningún otro refund activo (no borrado, type='refund') apuntando a él — bind: [refId, refundIdBorrado, now, refId].
+  // Al borrar un apunte de liquidación enlazado (ref_id) —la devolución ENTRANTE de un gasto mío o
+  // el ajuste SALIENTE de uno que pagó la contraparte— revierte settled=1 del gasto original SOLO
+  // si no queda ningún otro apunte activo apuntándole — bind: [refId, apunteIdBorrado, now, refId].
   unsettleIfNoActiveRefunds: `UPDATE transactions SET settled = CASE WHEN EXISTS(
-      SELECT 1 FROM transactions r WHERE r.ref_id=? AND r.type='refund' AND r.deleted=0 AND r.id<>?
+      SELECT 1 FROM transactions r WHERE r.ref_id=? AND r.type IN ('refund','adjustment') AND r.deleted=0 AND r.id<>?
     ) THEN 1 ELSE 0 END, updated_at=? WHERE id=?`,
-  // Task 17 ronda 2 (controller ruling, finding A): ¿tiene `txId` algún refund activo (no
-  // borrado) que lo enlace por ref_id? Guarda tanto la UI (bloquea importe/compartido en
-  // Movimientos) como updateTransaction (rechaza el cambio aunque alguien salte la UI).
+  // ¿Tiene `txId` algún apunte de liquidación ACTIVO (no borrado) que lo enlace por ref_id? Cubre
+  // la devolución entrante y el ajuste saliente. Guarda tanto la UI (bloquea importe/compartido en
+  // Movimientos) como updateTransaction (rechaza el cambio aunque alguien salte la UI). Discriminador
+  // seguro: ningún adjustment de usuario lleva ref_id (Registro solo lo guarda para type='refund',
+  // registro.js:426, y el selector de vínculo solo se pinta para ese tipo, registro.js:245).
   hasActiveLinkedRefund: `SELECT 1 FROM transactions r
-    WHERE r.ref_id=? AND r.type='refund' AND r.deleted=0 LIMIT 1`,
+    WHERE r.ref_id=? AND r.type IN ('refund','adjustment') AND r.deleted=0 LIMIT 1`,
   countUncategorized: `SELECT COUNT(*) AS n FROM transactions
     WHERE period_id=? AND deleted=0 AND category_id='' AND type IN ('expense','income','refund')`,
-  // Gastos compartidos sin liquidar de TODOS los periodos (no solo el abierto): el bloque de
-  // compartidos y la pantalla Liquidar deben poder saldar algo pendiente de un periodo ya cerrado.
-  // type='expense' es necesario: is_shared/settled también existen en income/refund (ver
-  // registro.js needsCategory), y solo un gasto genera una deuda pendiente de que la contraparte devuelva.
-  // t.amount_cents - MY_AMOUNT > 0 excluye repartos 100/0 (pct o override): con partner_amount_cents=0
-  // no hay nada que liquidar, y dejar la fila entrar rompería el CHECK amount_cents>0 del refund
-  // que settleShared crea con ese partner_amount_cents como su amount_cents.
-  pendingShared: `SELECT t.id, t.date, t.amount_cents, t.merchant, t.category_id,
-      t.amount_cents - ${MY_AMOUNT} AS partner_amount_cents
+  // Compartidos sin liquidar de TODOS los periodos (no solo el abierto), en las DOS direcciones.
+  // La fila ya no trae "lo que me debe" sino settle_cents (lo que hay que mover por esa fila) y
+  // direction (quién debe a quién):
+  //   paid_by='me'      → lo pagué yo, ella me debe amount_cents - MY_AMOUNT   → 'partner_owes'
+  //   paid_by='partner' → lo pagó ella, yo le debo MI parte, MY_AMOUNT         → 'i_owe'
+  // type='expense' sigue siendo necesario (is_shared/settled existen también en income/refund) y el
+  // filtro settle_cents > 0 es el criterio de siempre extendido a la otra dirección: una fila a 0 no
+  // cambia el neto, pero SÍ reventaría el CHECK amount_cents>0 del apunte que la liquidación crearía.
+  pendingSettlements: `SELECT t.id, t.date, t.amount_cents, t.merchant, t.category_id, t.paid_by,
+      CASE WHEN t.paid_by='partner' THEN 'i_owe' ELSE 'partner_owes' END AS direction,
+      CASE WHEN t.paid_by='partner' THEN ${MY_AMOUNT} ELSE t.amount_cents - ${MY_AMOUNT} END AS settle_cents
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.type='expense' AND t.is_shared=1 AND t.settled=0 AND t.deleted=0
-      AND t.amount_cents - ${MY_AMOUNT} > 0
+      AND (CASE WHEN t.paid_by='partner' THEN ${MY_AMOUNT} ELSE t.amount_cents - ${MY_AMOUNT} END) > 0
     ORDER BY t.date ASC`,
-  pendingSharedTotal: `SELECT COALESCE(SUM(t.amount_cents - ${MY_AMOUNT}),0) AS total_cents
+  // Neto: POSITIVO = la contraparte me debe, NEGATIVO = le debo yo. Mismo WHERE (filtro > 0
+  // incluido) que pendingSettlements, para que el neto sea siempre la suma exacta de las filas que
+  // la pantalla lista y no pueda divergir del hero de Liquidar.
+  pendingSettlementNet: `SELECT COALESCE(SUM(CASE WHEN t.paid_by='partner'
+        THEN -${MY_AMOUNT} ELSE t.amount_cents - ${MY_AMOUNT} END),0) AS net_cents
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.type='expense' AND t.is_shared=1 AND t.settled=0 AND t.deleted=0
-      AND t.amount_cents - ${MY_AMOUNT} > 0`,
+      AND (CASE WHEN t.paid_by='partner' THEN ${MY_AMOUNT} ELSE t.amount_cents - ${MY_AMOUNT} END) > 0`,
 
   // PR C (contraparte), Task 5: ¿existe alguna transacción o regla con is_shared=1, de
   // cualquier tipo? Detecta el caso "BD con compartidos de antes de la contraparte configurable"
   // para el banner de migración de una sola vez de Inicio (repo.hasSharedData) — a diferencia de
-  // pendingShared, aquí no importa el type ni si está settled: solo si alguna vez se marcó algo
+  // pendingSettlements, aquí no importa el type ni si está settled: solo si alguna vez se marcó algo
   // como compartido.
   hasSharedTx: `SELECT 1 FROM transactions WHERE is_shared=1 AND deleted=0 LIMIT 1`,
   hasSharedRule: `SELECT 1 FROM recurring_rules WHERE is_shared=1 AND deleted=0 LIMIT 1`,

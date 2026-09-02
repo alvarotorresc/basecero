@@ -55,8 +55,20 @@ export async function updatePeriodSharePct(id, pct) {
 
 export async function addTransaction({
   type, amountCents, date, categoryId, accountId, merchant, note, isShared,
-  counterAccountId = "", sharePctOverride = null, refId = "", ruleId = "", externalId = "", status = "pending",
+  counterAccountId = "", sharePctOverride = null, paidBy = "me", refId = "", ruleId = "", externalId = "", status = "pending",
 }) {
+  // Invariante de columna cruzada de paid_by (la misma que validateImport aplica a una hoja,
+  // xlsx.js): solo un GASTO COMPARTIDO puede haberlo pagado la contraparte. Se comprueba ANTES de
+  // tocar la BD. La cuenta se BLANQUEA en vez de rechazarse: la fila no movió ninguna cuenta mía,
+  // así que un accountId heredado de un formulario a medio cambiar se ignora en silencio en vez de
+  // romper el guardado — y nunca puede acabar sumando en accountBalance.
+  if (paidBy === "partner") {
+    if (type !== "expense" || !isShared) throw new Error(t("errors.repo.paidByNotShared"));
+    accountId = "";
+  }
+  // Item 2 (final fix wave): el lado contrario del guard de arriba — un gasto que NO lo pagó la
+  // contraparte SÍ necesita una cuenta mía, o no hay saldo del que descontarlo.
+  if (type === "expense" && paidBy !== "partner" && !accountId) throw new Error(t("common.needAccount"));
   const p = await getOpenPeriod();
   if (!p) throw new Error(t("errors.common.noOpenPeriod"));
   const now = nowIso();
@@ -64,7 +76,7 @@ export async function addTransaction({
     sql: SQL.insertTransaction,
     bind: [bcUlid(), date, p.id, type, amountCents, accountId, counterAccountId,
       categoryId ?? "", bcSanitizeCell(merchant ?? ""), bcSanitizeCell(note ?? ""),
-      isShared ? 1 : 0, sharePctOverride, 0, refId, ruleId, externalId, status, now, now],
+      isShared ? 1 : 0, sharePctOverride, paidBy, 0, refId, ruleId, externalId, status, now, now],
   };
   if (refId) {
     await execMany([insertStmt, { sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [now, refId] }]);
@@ -122,9 +134,9 @@ export async function defaultAccountId() {
 export const listPeriods = () => query(SQL.listPeriods);
 export const listAllByDay = (pid) => query(SQL.listAllByDay, [pid]);
 export const getTransaction = async (id) => (await query(SQL.getTransaction, [id]))[0] ?? null;
-// Task 17 ronda 2 (finding A): ¿`id` tiene algún refund activo enlazado por ref_id? La usa
-// tanto Movimientos (bloquear importe/compartido en la UI) como updateTransaction (rechazar
-// el cambio server-side aunque alguien salte la UI).
+// ¿`id` tiene algún apunte de liquidación activo enlazado por ref_id (la devolución entrante o el
+// ajuste saliente)? La usa tanto Movimientos (bloquear importe/compartido en la UI) como
+// updateTransaction (rechazar el cambio server-side aunque alguien salte la UI).
 export const hasActiveLinkedRefund = async (id) => (await query(SQL.hasActiveLinkedRefund, [id])).length > 0;
 
 /** ¿Debe bloquearse un update por el guard de "gasto liquidado" (Task 17 ronda 2, finding A)?
@@ -137,7 +149,10 @@ export function sharedFieldsLocked(cur, f) {
   if (cur.type !== "expense" || !cur.settled) return false;
   return f.amountCents !== cur.amount_cents
     || !!f.isShared !== !!cur.is_shared
-    || f.sharePctOverride !== cur.share_pct_override;
+    || f.sharePctOverride !== cur.share_pct_override
+    // Cambiar quién pagó un gasto YA liquidado descuadra la deuda saldada igual que cambiar el
+    // importe: el apunte de liquidación se quedó con la dirección y el importe de antes.
+    || f.paidBy !== cur.paid_by;
 }
 
 /** M5 (Task 6, review de seguridad): el guard de arriba solo mira el LADO DEL GASTO. Si en vez
@@ -148,7 +163,10 @@ export function sharedFieldsLocked(cur, f) {
  *  no existe/está borrado — getTransaction filtra deleted=0, así que un refund que ya apunta a un
  *  gasto huérfano de ANTES de este fix queda fuera del guard a propósito, ver nota en el report). */
 export function refundAmountLocked(cur, f, linked) {
-  return cur.type === "refund" && !!cur.ref_id
+  // Cubre los dos apuntes de liquidación: la devolución ENTRANTE (type='refund') y el ajuste
+  // SALIENTE (type='adjustment' con ref_id, que solo crea settleAllSharedStmts). Bajar el importe
+  // de cualquiera de los dos descuadraría una deuda ya saldada sin nada que lo delate.
+  return (cur.type === "refund" || cur.type === "adjustment") && !!cur.ref_id
     && f.amountCents !== cur.amount_cents
     && !!linked?.settled;
 }
@@ -165,8 +183,8 @@ export function expenseDeleteLocked(cur, hasActiveRefund) {
 }
 
 export const countUncategorized = async (pid) => (await query(SQL.countUncategorized, [pid]))[0].n;
-export const pendingShared = () => query(SQL.pendingShared);
-export const pendingSharedTotalCents = async () => (await query(SQL.pendingSharedTotal))[0].total_cents;
+export const pendingSettlements = () => query(SQL.pendingSettlements);
+export const pendingSettlementNetCents = async () => (await query(SQL.pendingSettlementNet))[0].net_cents;
 export const spentByRootCategory = (pid) => query(SQL.spentByRootCategory, [pid]);
 export const budgetsOfPeriod = (pid) => query(SQL.budgetsOfPeriod, [pid]);
 
@@ -203,51 +221,43 @@ export async function spentLast7Days(pid) {
   return fillLast7Days(rows, today);
 }
 
-/** Liquida un gasto compartido pendiente: crea el refund de la parte de la contraparte (categoría/comercio
- *  del gasto original, hoy, cuenta de destino elegida) enlazado por refId. Reutiliza partner_amount_cents
- *  de pendingShared (ya calculado con el pct EFECTIVO del propio periodo del gasto, no el abierto)
- *  en vez de recalcular el pct aquí. El settled=1 del original lo pone addTransaction({refId}) solo. */
-export async function settleShared(txId, accountId) {
-  const row = (await pendingShared()).find((r) => r.id === txId);
-  if (!row) throw new Error(t("errors.repo.settleNotFound"));
-  await addTransaction({
-    type: "refund",
-    amountCents: row.partner_amount_cents,
-    date: hoyISO(),
-    categoryId: row.category_id,
-    accountId,
-    merchant: row.merchant,
-    note: "Liquidación",
-    isShared: false,
-    refId: txId,
-  });
-}
-
-/** Task 5 (backlog, liquidar en bloque): construye los DOS statements (insert del refund +
- *  update de settled=1) de CADA fila de `rows` — misma pareja que addTransaction({refId}) arma
- *  para UNA liquidación (ver settleShared arriba), pero aquí NO se llama a addTransaction (eso
- *  abriría un execMany por fila, con getOpenPeriod() repetido y sin atomicidad conjunta): se monta
- *  el array completo a mano para que settleAllShared pueda mandarlo TODO a un único execMany.
+/** Statements de UNA liquidación completa: por cada fila de pendingSettlements, el apunte que la
+ *  salda + su UPDATE settled=1. Dos direcciones:
+ *   - direction 'partner_owes' (lo pagué yo): devolución ENTRANTE por settle_cents en la cuenta
+ *     elegida, categoría y comercio del gasto original, enlazada por ref_id — la de siempre,
+ *     is_shared=0 porque ya ES el 100% de lo que ella debe.
+ *   - direction 'i_owe' (lo pagó ella): apunte de SALIDA por -settle_cents en la cuenta elegida.
+ *     type='adjustment' con importe negativo (el CHECK de schema.sql:34 lo permite solo para este
+ *     tipo) porque NO es gasto: mi parte ya contó como gasto el día que ella pagó. Sin categoría
+ *     (countUncategorized e isUncategorized excluyen adjustment) y con ref_id al gasto, que es lo
+ *     que permite des-liquidarlo si se borra.
+ *  El saldo de la cuenta se mueve por el NETO de las dos ramas aunque el banco enseñe un único
+ *  Bizum: son N apuntes en la app frente a 1 línea bancaria (riesgo aceptado, ver la spec §12.4).
  *
- *  PURA a propósito (mismo criterio que replaceAllStmts más abajo): recibe `rows` YA resueltas
- *  (de pendingShared, filtradas por los ids pedidos), `periodId`/`date`/`now` ya calculados por el
- *  caller — así es testeable en Node sin Worker, con datos a mano, y el test que comprueba el
- *  ORDEN EXACTO del bind de insertTransaction llama a esta función real (no una reproducción a
- *  mano que podría divergir en silencio si el bind order cambia aquí).
+ *  PURA a propósito (mismo criterio que replaceAllStmts): recibe `rows` YA resueltas, y
+ *  periodId/date/now/partnerName ya calculados por el caller — así es testeable en Node sin Worker,
+ *  y el test que comprueba el ORDEN EXACTO del bind de insertTransaction llama a esta función real.
  *
- *  bcUlid/bcSanitizeCell son globales (cargados por <script src="vendor/pure.js">, igual que en
- *  addTransaction/createAccount/createRule de este mismo archivo — ver n26.js:5 sobre el mismo
- *  patrón). merchant pasa por bcSanitizeCell aunque ya viene sanitizado de la fila original: es
- *  idempotente (bcSanitizeCell("'=X") no vuelve a anteponer otra comilla) y mantiene el mismo
- *  tratamiento que settleShared→addTransaction, que sí lo sanitiza. */
-export function settleAllSharedStmts(rows, accountId, periodId, date, now) {
+ *  bcUlid/bcSanitizeCell son globales (vendor/pure.js), igual que en addTransaction. */
+export function settleAllSharedStmts(rows, accountId, periodId, date, now, partnerName) {
+  const note = t("liquidar.note");
+  const outMerchant = partnerName
+    ? t("liquidar.outflow.merchant", { name: partnerName })
+    : t("liquidar.outflow.merchantFallback");
   const stmts = [];
   for (const row of rows) {
+    const isOut = row.direction === "i_owe";
     stmts.push({
       sql: SQL.insertTransaction,
       bind: [
-        bcUlid(), date, periodId, "refund", row.partner_amount_cents, accountId, "",
-        row.category_id, bcSanitizeCell(row.merchant ?? ""), "Liquidación", 0, null, 0,
+        bcUlid(), date, periodId,
+        isOut ? "adjustment" : "refund",
+        isOut ? -row.settle_cents : row.settle_cents,
+        accountId, "",
+        isOut ? "" : row.category_id,
+        bcSanitizeCell(isOut ? outMerchant : (row.merchant ?? "")),
+        note,
+        0, null, "me", 0,
         row.id, "", "", "pending", now, now,
       ],
     });
@@ -256,14 +266,32 @@ export function settleAllSharedStmts(rows, accountId, periodId, date, now) {
   return stmts;
 }
 
-/** Liquida VARIOS gastos compartidos pendientes DE GOLPE (botón «Liquidar {total}» al pie de
- *  Liquidar.dc.html): un único getOpenPeriod() + una única pendingShared() (no una consulta por
- *  fila) + settleAllSharedStmts (arriba) + UN SOLO execMany — o quedan liquidados TODOS los `ids`
- *  pedidos, o ninguno (si algo falla a medias, la mitad de la deuda con la contraparte
+/** Liquida UN gasto compartido pendiente, en cualquiera de las dos direcciones, reutilizando
+ *  settleAllSharedStmts con una sola fila (un único camino para las dos operaciones). Exportada y
+ *  con test, aunque hoy ninguna pantalla la use (Liquidar retiró el botón por fila). */
+export async function settleShared(txId, accountId) {
+  // Mismo ORDEN de guards que settleAllShared (periodo primero, fila después): así las dos
+  // funciones lanzan el mismo error ante el mismo estado, y un id obsoleto sin periodo abierto no
+  // reporta "gasto no encontrado" cuando el problema real es que no hay periodo.
+  const [period, pending, meta] = await Promise.all([getOpenPeriod(), pendingSettlements(), getMetaAll()]);
+  if (!period) throw new Error(t("errors.common.noOpenPeriod"));
+  const row = pending.find((r) => r.id === txId);
+  if (!row) throw new Error(t("errors.repo.settleNotFound"));
+  await execMany(settleAllSharedStmts([row], accountId, period.id, hoyISO(), nowIso(), (meta.partner_name || "").trim()));
+}
+
+/** Liquida VARIOS gastos compartidos pendientes DE GOLPE (el botón de Liquidar): las dos
+ *  direcciones a la vez — un refund ENTRANTE por cada fila partner_owes (lo pagué yo) y un
+ *  adjustment SALIENTE por cada fila i_owe (lo pagó ella) — y el saldo de la cuenta elegida se
+ *  mueve por el NETO de las dos. Un único getOpenPeriod() + una única pendingSettlements() (no una
+ *  consulta por fila) + settleAllSharedStmts (arriba) + UN SOLO execMany — o quedan liquidados TODOS los
+ *  `ids` pedidos, o ninguno (si algo falla a medias, la mitad de la deuda con la contraparte
  *  desaparecería mientras la otra mitad sigue pendiente, un estado que ninguna pantalla sabría
- *  explicar). `ids` vacío es un no-op silencioso (nada que liquidar, no es un error).
+ *  explicar). `ids` vacío es un no-op silencioso (nada que liquidar, no es un error). Con neto 0 y
+ *  filas en los dos lados se liquidan TODAS igualmente: entran los cobros y salen los pagos, se
+ *  cancelan en el saldo, y ninguna fila se queda pendiente para siempre.
  *
- *  Guard de fila: si algún id de `ids` NO aparece en pendingShared() (ya liquidado por otra
+ *  Guard de fila: si algún id de `ids` NO aparece en pendingSettlements() (ya liquidado por otra
  *  pestaña, borrado, o directamente no existe), se LANZA (no se liquida un subconjunto en
  *  silencio) — mismo mensaje que settleShared (errors.repo.settleNotFound), reutilizado porque es
  *  exactamente la misma condición. Se filtra `pending` por `idSet` en vez de mapear `ids` uno a
@@ -272,13 +300,12 @@ export function settleAllSharedStmts(rows, accountId, periodId, date, now) {
 export async function settleAllShared(ids, accountId) {
   if (!ids || ids.length === 0) return;
   const idSet = new Set(ids);
-  const period = await getOpenPeriod();
+  const [period, pending, meta] = await Promise.all([getOpenPeriod(), pendingSettlements(), getMetaAll()]);
   if (!period) throw new Error(t("errors.common.noOpenPeriod"));
-  const pending = await pendingShared();
   const rows = pending.filter((r) => idSet.has(r.id));
   if (rows.length !== idSet.size) throw new Error(t("errors.repo.settleNotFound"));
   const now = nowIso();
-  await execMany(settleAllSharedStmts(rows, accountId, period.id, hoyISO(), now));
+  await execMany(settleAllSharedStmts(rows, accountId, period.id, hoyISO(), now, (meta.partner_name || "").trim()));
 }
 
 /** Actualiza los campos editables de un movimiento (mismas claves camelCase que addTransaction).
@@ -298,10 +325,20 @@ export async function updateTransaction(id, fields) {
     note: fields.note ?? cur.note,
     isShared: fields.isShared ?? !!cur.is_shared,
     sharePctOverride: fields.sharePctOverride !== undefined ? fields.sharePctOverride : cur.share_pct_override,
+    paidBy: fields.paidBy ?? cur.paid_by,
     refId: fields.refId ?? cur.ref_id,
     ruleId: fields.ruleId ?? cur.rule_id,
     status: fields.status ?? cur.status,
   };
+  // Misma invariante de columna cruzada que en addTransaction (y que validateImport): solo un gasto
+  // compartido puede haberlo pagado la contraparte, y esa fila nunca lleva cuenta.
+  if (f.paidBy === "partner") {
+    if (f.type !== "expense" || !f.isShared) throw new Error(t("errors.repo.paidByNotShared"));
+    f.accountId = "";
+  }
+  // Item 2 (final fix wave): el lado contrario del guard de arriba — un gasto que NO lo pagó la
+  // contraparte SÍ necesita una cuenta mía, o no hay saldo del que descontarlo.
+  if (f.type === "expense" && f.paidBy !== "partner" && !f.accountId) throw new Error(t("common.needAccount"));
   // Task 17 ronda 2 (controller ruling, finding A): un gasto ya liquidado (settled=1) con un
   // refund activo enlazado no puede cambiar de importe/compartido/reparto — si no, el refund
   // se queda congelado con el importe viejo y la deuda con la contraparte se pierde en silencio. Guarda
@@ -310,10 +347,12 @@ export async function updateTransaction(id, fields) {
   if (sharedFieldsLocked(cur, f) && (await hasActiveLinkedRefund(id))) {
     throw new Error(t("errors.repo.txLockedSettled"));
   }
-  // Task 6 (M5): lado del refund del mismo guard — ver refundAmountLocked. cur.ref_id, si existe,
-  // apunta siempre a un gasto (nunca a otro refund), así que reutilizar getTransaction aquí es
-  // correcto y evita duplicar el SELECT.
-  const linkedExpense = cur.type === "refund" && cur.ref_id ? await getTransaction(cur.ref_id) : null;
+  // Task 6 (M5): lado del apunte de liquidación del mismo guard — ver refundAmountLocked.
+  // cur.ref_id, si existe, apunta siempre a un gasto (nunca a otro apunte de liquidación), tanto en
+  // un refund como en el adjustment de salida, así que reutilizar getTransaction aquí es correcto y
+  // evita duplicar el SELECT.
+  const linkedExpense = (cur.type === "refund" || cur.type === "adjustment") && cur.ref_id
+    ? await getTransaction(cur.ref_id) : null;
   if (refundAmountLocked(cur, f, linkedExpense)) {
     throw new Error(t("errors.repo.refundLockedSettled"));
   }
@@ -321,13 +360,14 @@ export async function updateTransaction(id, fields) {
   await exec(SQL.updateTransaction, [
     f.type, f.amountCents, f.date, f.categoryId ?? "", f.accountId, f.counterAccountId ?? "",
     bcSanitizeCell(f.merchant ?? ""), bcSanitizeCell(f.note ?? ""), f.isShared ? 1 : 0,
-    f.sharePctOverride, f.refId ?? "", f.ruleId ?? "", f.status, now, id,
+    f.sharePctOverride, f.paidBy, f.refId ?? "", f.ruleId ?? "", f.status, now, id,
   ]);
 }
 
-/** Borra (soft) un movimiento. Si es un refund enlazado a un gasto (ref_id), revierte el
- *  settled=1 de ese gasto EN LA MISMA operación — salvo que quede algún otro refund activo
- *  apuntándole (p.ej. si alguna vez se permiten varios refunds parciales sobre el mismo gasto).
+/** Borra (soft) un movimiento. Si es un apunte de liquidación enlazado a un gasto (la devolución
+ *  entrante o el ajuste saliente, los dos con ref_id), revierte el settled=1 de ese gasto EN LA
+ *  MISMA operación — salvo que quede algún otro apunte activo apuntándole (p.ej. si alguna vez se
+ *  permiten varios refunds parciales sobre el mismo gasto).
  *
  *  Task 6 (M5): si en cambio se intenta borrar el GASTO original y tiene algún refund activo
  *  enlazado, se BLOQUEA (no se hace cascada) — ver expenseDeleteLocked. Elegido sobre des-liquidar
@@ -346,7 +386,7 @@ export async function softDeleteTransaction(id) {
     throw new Error(t("errors.repo.expenseLockedHasRefund"));
   }
   const now = nowIso();
-  if (cur && cur.type === "refund" && cur.ref_id) {
+  if (cur && (cur.type === "refund" || cur.type === "adjustment") && cur.ref_id) {
     await execMany([
       { sql: SQL.softDeleteTransaction, bind: [now, id] },
       { sql: SQL.unsettleIfNoActiveRefunds, bind: [cur.ref_id, id, now, cur.ref_id] },
@@ -413,12 +453,12 @@ export const accountBalanceCents = async (accountId, atDateIso) =>
 export async function previsionOfPeriod(period) {
   const month = periodMonth(period.start_date, period.end_date);
   const mainAccountId = await defaultAccountId();
-  const [rules, paidByRule, paidByCat, saldoCuentaCents, pendientePartnerCents] = await Promise.all([
+  const [rules, paidByRule, paidByCat, saldoCuentaCents, netPartnerCents] = await Promise.all([
     listRules(),
     query(SQL.paidRuleIds, [period.id]),
     query(SQL.paidByCatAmount, [period.id]),
     mainAccountId ? accountBalanceCents(mainAccountId, hoyISO()) : Promise.resolve(0),
-    pendingSharedTotalCents(),
+    pendingSettlementNetCents(),
   ]);
   const paidRuleIdSet = new Set(paidByRule.map((r) => r.rule_id));
   const paidCatAmountSet = new Set(paidByCat.map((r) => r.k));
@@ -439,8 +479,10 @@ export async function previsionOfPeriod(period) {
     items,
     comprometidoCents,
     saldoCuentaCents,
-    pendientePartnerCents,
-    disponibleCents: saldoCuentaCents - comprometidoCents + pendientePartnerCents,
+    netPartnerCents,
+    // El neto puede ser negativo (le debo más de lo que me debe): entonces RESTA del disponible,
+    // que es justo lo que faltaba — antes solo se sumaba lo que ella me debía.
+    disponibleCents: saldoCuentaCents - comprometidoCents + netPartnerCents,
   };
 }
 
@@ -935,7 +977,11 @@ export const exportAllJson = () => dumpAllTables();
 export function replaceAllStmts(data) {
   const tables = TABLES.filter((t) => t !== "meta");
   const stmts = [...tables].reverse().map((t) => ({ sql: `DELETE FROM ${t}` }));
-  for (const row of data.meta) stmts.push({ sql: SQL.upsertMeta, bind: [row.key, row.value] });
+  // schema_version NO se importa: es una propiedad de ESTA base de datos (la puso el runner de
+  // migraciones al arrancar, ver migrations.js), no de la hoja. Sin este filtro, importar una hoja
+  // v1 en una BD ya migrada dejaría meta.schema_version='1' con la columna paid_by presente, y el
+  // siguiente export produciría una hoja que se declara v1 llevando ya una columna v2.
+  for (const row of data.meta) if (row.key !== "schema_version") stmts.push({ sql: SQL.upsertMeta, bind: [row.key, row.value] });
   for (const t of tables)
     for (const row of data[t]) stmts.push({ sql: insertSql(t), bind: CONTRACT[t].cols.map((c) => row[c]) });
   return stmts;

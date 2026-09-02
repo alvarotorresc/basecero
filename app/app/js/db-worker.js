@@ -1,6 +1,7 @@
 import sqlite3InitModule from "../vendor/sqlite-wasm/jswasm/sqlite3.mjs";
 import { seedStatements } from "./seeds.js";
 import { classifyStorageFailure } from "./format.js";
+import { pendingMigrations, MIGRATIONS } from "./migrations.js";
 
 let db = null, storage = "opfs";
 
@@ -17,6 +18,29 @@ async function init(seedLang = "es") {
   }
   const schema = await (await fetch(new URL("./schema.sql", import.meta.url))).text();
   db.exec(schema);
+  // Migraciones de una BD ya existente (schema.sql no altera tablas ya creadas) — ver migrations.js.
+  // PRAGMA table_info se lee con la MISMA forma que el op "query" de este worker (db-worker.js:72),
+  // una vez por cada tabla DISTINTA que MIGRATIONS declara (hoy solo "transactions"): así una
+  // migración futura sobre otra tabla no dispara un ALTER en cada arranque solo porque esa tabla
+  // nunca llegó a consultarse aquí.
+  // Va DESPUÉS del esquema (la tabla meta tiene que existir) y ANTES de las semillas.
+  const colsByTable = {};
+  for (const table of [...new Set(MIGRATIONS.map((m) => m.table))]) {
+    const cols = [];
+    db.exec({ sql: `PRAGMA table_info(${table})`, rowMode: "object", resultRows: cols });
+    colsByTable[table] = cols.map((c) => c.name);
+  }
+  const stmts = pendingMigrations(colsByTable);
+  db.exec("BEGIN");
+  try {
+    for (const s of stmts) db.exec({ sql: s.sql, bind: s.bind });
+    db.exec("COMMIT");
+  } catch (e) {
+    // Mismo guard B5 que el bloque de semillas: un ROLLBACK sin transacción activa no debe
+    // enmascarar el error real.
+    try { db.exec("ROLLBACK"); } catch {}
+    throw e;
+  }
   const seeded = db.selectValue("SELECT COUNT(*) FROM categories");
   if (seeded === 0) {
     const now = new Date().toISOString().slice(0, 19) + "Z";

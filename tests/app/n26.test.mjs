@@ -98,7 +98,7 @@ async function runPipeline(d, rows, hashFn = sha256hex) {
       const type = r.amountCents < 0 ? "expense" : "income";
       stmts.push({ sql: SQL.insertTransaction, bind: [id, r.bookingDate, "p1", type, Math.abs(r.amountCents),
         "acc-n26", "", "", pure.bcSanitizeCell(r.partnerName), pure.bcSanitizeCell(r.paymentReference),
-        0, null, 0, "", "", r.externalId, "reconciled", NOW, NOW] });
+        0, null, "me", 0, "", "", r.externalId, "reconciled", NOW, NOW] });
       existing.push({ id, dateIso: r.bookingDate, type, amountCents: r.amountCents,
         externalId: r.externalId, status: "reconciled" });
       res.created++;
@@ -188,7 +188,7 @@ test("fila que casa con un pending manual ≤3 días: reconciled, conserva categ
   const T2 = "2026-08-19T10:00:00Z";
   d.prepare(SQL.insertTransaction).run(
     "manual1", "2026-08-19", "p1", "expense", 4520, "acc-n26", "",
-    "cat-alimentacion-supermercado", "Compra en tienda", "", 0, null, 0, "", "", "", "pending", T2, T2);
+    "cat-alimentacion-supermercado", "Compra en tienda", "", 0, null, "me", 0, "", "", "", "pending", T2, T2);
 
   const res = await runImport(d, CSV_2ROWS);
   // Fila 1 (MERCADONA, -45.20, 2026-08-20) casa con manual1 (mismo importe, expense, 1 día de
@@ -212,7 +212,7 @@ test("A2: transferencia pendiente NO se traga un abono ajeno, y su propio cargo 
   // Transferencia manual pendiente de 500€ (dinero saliente de acc-n26 hacia otra cuenta).
   d.prepare(SQL.insertTransaction).run(
     "transfer1", "2026-08-19", "p1", "transfer", 50000, "acc-n26", "acc-ahorro",
-    "", "", "Transferencia a ahorro", 0, null, 0, "", "", "", "pending", T2, T2);
+    "", "", "Transferencia a ahorro", 0, null, "me", 0, "", "", "", "pending", T2, T2);
 
   const text = [CSV_HEADER,
     // Fila 1: abono AJENO de 500€ (p.ej. nómina) a 1 día de la transferencia — hoy (bug A2-a)
@@ -350,7 +350,7 @@ test("importCsv (router): perfil que matchea -> crea y concilia por el pipeline 
   const T2 = "2026-08-19T10:00:00Z";
   d.prepare(SQL.insertTransaction).run(
     "manual1", "2026-08-19", "p1", "expense", 4520, "acc-n26", "",
-    "cat-alimentacion-supermercado", "Compra en tienda", "", 0, null, 0, "", "", "", "pending", T2, T2);
+    "cat-alimentacion-supermercado", "Compra en tienda", "", 0, null, "me", 0, "", "", "", "pending", T2, T2);
 
   const res = await runImportRouter(d, GENERIC_2ROWS);
   // Fila 1 (Compra super, -45,20, 2026-08-20) casa con manual1 (mismo importe, expense, 1 día de

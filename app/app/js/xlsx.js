@@ -1,6 +1,7 @@
-import { CONTRACT, ENUMS, BOOL_COLS, NULLABLE_NUM, FKS, eurToCents, centsToEur, xlsxHeader, toIsoDate } from "./contract.js";
+import { CONTRACT, ENUMS, BOOL_COLS, NULLABLE_NUM, TEXT_DEFAULTS, FKS, eurToCents, centsToEur, xlsxHeader, toIsoDate } from "./contract.js";
 import { nowIso } from "./format.js";
 import { t } from "./i18n/index.js";
+import { ACCEPTED_SCHEMA_VERSIONS } from "./migrations.js";
 
 // dump: { tabla: [{col: valor SQLite}] } → workbook con una pestaña por tabla.
 // Sin dashboards y sin columnas "_": el dump ya solo trae columnas del contrato.
@@ -65,6 +66,7 @@ export function workbookToRows(X, wb, now = nowIso()) {
     const ws = wb.Sheets[table];
     if (!ws) { errors.push(t("errors.xlsx.missingSheet", { table })); continue; }
     const cols = CONTRACT[table].cols, bools = new Set(BOOL_COLS[table] ?? []);
+    const defaults = TEXT_DEFAULTS[table] ?? {};
     const byHeader = Object.fromEntries(cols.map((c) => [xlsxHeader(c), c]));
     const raw = X.utils.sheet_to_json(ws, { defval: "" });
     // Filas totalmente vacías fuera — pero solo cuentan las columnas DEL CONTRATO (byHeader).
@@ -85,9 +87,9 @@ export function workbookToRows(X, wb, now = nowIso()) {
           else if (bools.has(col)) row[col] = BOOL_TRUE.has(v) ? 1 : BOOL_FALSE.has(v) ? 0 : v;
           else if (DATE_COLS.has(col)) row[col] = toIsoDate(v);
           else if (TIMESTAMP_COLS.has(col)) row[col] = v === "" ? now : v;
-          else row[col] = v;
+          else row[col] = v === "" && defaults[col] !== undefined ? defaults[col] : v;
         }
-        for (const c of cols) if (!(c in row)) row[c] = bools.has(c) ? 0 : NULLABLE_NUM.has(c) ? null : (c.endsWith("_cents") ? null : TIMESTAMP_COLS.has(c) ? now : "");
+        for (const c of cols) if (!(c in row)) row[c] = bools.has(c) ? 0 : NULLABLE_NUM.has(c) ? null : (c.endsWith("_cents") ? null : TIMESTAMP_COLS.has(c) ? now : (defaults[c] ?? ""));
         return row;
       });
   }
@@ -97,7 +99,10 @@ export function workbookToRows(X, wb, now = nowIso()) {
 export function validateImport(data) {
   const errs = [];
   const meta = Object.fromEntries((data.meta ?? []).map((m) => [m.key, String(m.value)]));
-  if (meta.schema_version !== "1") errs.push(t("errors.xlsx.schemaVersion", { value: meta.schema_version }));
+  // Se aceptan las hojas v1 (sin columna paid_by): workbookToRows las rellena con 'me', que es
+  // exactamente el mundo que describe una hoja v1 — todo lo pagué yo. Ver TEXT_DEFAULTS.
+  if (!ACCEPTED_SCHEMA_VERSIONS.includes(meta.schema_version))
+    errs.push(t("errors.xlsx.schemaVersion", { value: meta.schema_version, versions: ACCEPTED_SCHEMA_VERSIONS.join(" / ") }));
   if (!["basecero-sheets-mvp", "basecero-pwa"].includes(meta.created_with))
     errs.push(t("errors.xlsx.createdWith", { value: meta.created_with }));
 
@@ -147,7 +152,7 @@ export function validateImport(data) {
   for (const fk of FKS)
     (data[fk.table] ?? []).forEach((row, i) => {
       const v = row[fk.col];
-      if (v === "" || v == null) { if (!fk.optional) errs.push(t("errors.xlsx.fkEmpty", { table: fk.table, row: i + 2, col: fk.col })); return; }
+      if (v === "" || v == null) { if (!fk.optional && !fk.optionalWhen?.(row)) errs.push(t("errors.xlsx.fkEmpty", { table: fk.table, row: i + 2, col: fk.col })); return; }
       if (!ids[fk.ref].has(v)) { errs.push(t("errors.xlsx.fkMissing", { table: fk.table, row: i + 2, col: fk.col, value: v, ref: fk.ref })); return; }
       if (!fk.allowDeletedRef && row.deleted !== 1 && !liveIds[fk.ref].has(v))
         errs.push(t("errors.xlsx.fkDeleted", { table: fk.table, row: i + 2, col: fk.col, value: v, ref: fk.ref }));
@@ -213,6 +218,33 @@ export function validateImport(data) {
   (data.transactions ?? []).forEach((row, i) => {
     if (row.type !== "adjustment" && Number.isFinite(row.amount_cents) && !(row.amount_cents > 0))
       errs.push(t("errors.xlsx.amountNotPositive", { row: i + 2 }));
+  });
+
+  // paid_by solo tiene sentido en un gasto compartido, y un gasto que pagó la contraparte no puede
+  // llevar cuenta mía: son las dos invariantes que sostienen toda la semántica del dinero (una fila
+  // 'partner' con cuenta volvería a restar el ticket entero del saldo, el defecto original).
+  // La comparación row.is_shared === 1 es ESTRICTA a propósito: workbookToRows deja sin coercionar
+  // cualquier booleano no reconocido ("maybe" sigue siendo string) y el guard que los rechaza corre
+  // más abajo, así que una hoja corrupta emite este error ADEMÁS del booleanInvalid real — ruidoso
+  // pero seguro. Una comparación laxa (== 1, o truthy) sí abriría el agujero.
+  (data.transactions ?? []).forEach((row, i) => {
+    if (row.paid_by !== "partner") return;
+    if (!(row.type === "expense" && row.is_shared === 1))
+      errs.push(t("errors.xlsx.paidByNotShared", { row: i + 2 }));
+    if (row.account_id !== "")
+      errs.push(t("errors.xlsx.paidByAccount", { row: i + 2 }));
+  });
+
+  // Item 4 (final fix wave): una devolución que enlaza (ref_id) un gasto pagado por la contraparte
+  // no puede ser mía — la tienda reembolsa a quien pagó el ticket, no a mí. Solo mira 'refund'
+  // (no 'adjustment': el ajuste de salida que liquida un gasto suyo SÍ enlaza uno con
+  // paid_by='partner' a propósito, es justo lo que liquida esa deuda — ver settleAllSharedStmts).
+  // ref_id vacío o roto ya lo cubren fkEmpty/fkMissing más arriba.
+  const txById = Object.fromEntries((data.transactions ?? []).map((r) => [r.id, r]));
+  (data.transactions ?? []).forEach((row, i) => {
+    if (row.type !== "refund" || !row.ref_id) return;
+    if (txById[row.ref_id]?.paid_by === "partner")
+      errs.push(t("errors.xlsx.refundOfPartnerPaid", { row: i + 2 }));
   });
 
   // Columnas numéricas NO-*_cents del contrato: workbookToRows las deja pasar tal cual llegan

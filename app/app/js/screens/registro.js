@@ -62,6 +62,7 @@ export async function renderRegistro(container, onDone, prefill) {
     accountId: prefill?.accountId ?? resolveAccountId(meta.default_account_id, accounts) ?? "",
     counterAccountId: "",
     isShared: partnerName ? (prefill?.isShared ?? false) : false,
+    paidBy: "me",
     sharePct: normalizePct(period?.my_share_pct, 100),
     fecha: hoyISO(),
     merchant: prefill?.merchant ?? "",
@@ -78,6 +79,11 @@ export async function renderRegistro(container, onDone, prefill) {
     if (needsCategory(state.tipo)) return expenseCats;
     return [];
   };
+
+  /** ¿Es un gasto compartido que pagó la contraparte? Gatea la sección de cuentas, el guard de
+   *  validación y lo que se guarda. Solo tiene sentido para expense: la tarjeta de compartido se
+   *  pinta también para refund, pero ahí no hay control de quién pagó. */
+  const partnerPaid = () => state.tipo === "expense" && state.isShared && state.paidBy === "partner";
 
   function selectRefundRow(row) {
     state.refId = row.id;
@@ -109,7 +115,10 @@ export async function renderRegistro(container, onDone, prefill) {
   }
 
   function validationError() {
-    if (!state.accountId) return t("common.needAccount");
+    // Un gasto que pagó la contraparte no toca ninguna cuenta mía: es el único caso sin cuenta que
+    // exigir. Para todo lo demás (incluida la transferencia, que además valida su cuenta destino)
+    // el guard sigue siendo universal.
+    if (!partnerPaid() && !state.accountId) return t("common.needAccount");
     if (state.tipo === "transfer") {
       if (state.cents <= 0) return t("common.enterAmount");
       if (!state.counterAccountId || state.counterAccountId === state.accountId)
@@ -240,7 +249,7 @@ export async function renderRegistro(container, onDone, prefill) {
         </div>
       </div>` : ""}
 
-      ${renderAccountsSection()}
+      ${partnerPaid() ? "" : renderAccountsSection()}
 
       ${state.tipo === "refund" ? renderRefundPicker() : ""}
 
@@ -270,6 +279,16 @@ export async function renderRegistro(container, onDone, prefill) {
         </label>
         ${state.isShared ? `
         <div style="display:flex; flex-direction:column; gap:10px; padding:0 0 14px;">
+          ${state.tipo === "expense" ? `
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div class="section-title">${t("common.paidBy.label")}</div>
+            <div class="segmented" style="border-radius:999px;">
+              <button type="button" data-paidby="me" class="${state.paidBy === "me" ? "active" : ""}"
+                style="flex:1;border-radius:999px;${state.paidBy === "me" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("common.paidBy.me")}</button>
+              <button type="button" data-paidby="partner" class="${state.paidBy === "partner" ? "active" : ""}"
+                style="flex:1;border-radius:999px;${state.paidBy === "partner" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("common.paidBy.partner", { name: escHtml(partnerName) })}</button>
+            </div>
+          </div>` : ""}
           <div style="display:flex; align-items:center; gap:10px;">
             <div style="flex:1; min-width:0;">
               <div style="font-size:14px; font-weight:600;">${t("common.split.label")}</div>
@@ -285,8 +304,8 @@ export async function renderRegistro(container, onDone, prefill) {
               <div class="num" id="reg-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
             </div>
             <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
-              <div style="font-size:10px; color:var(--text-3);">${escHtml(partnerName)} · ${100 - state.sharePct}%</div>
-              <div class="num" id="reg-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerCents)}</div>
+              <div style="font-size:10px; color:var(--text-3);">${partnerPaid() ? t("common.paidFull", { name: escHtml(partnerName) }) : `${escHtml(partnerName)} · ${100 - state.sharePct}%`}</div>
+              <div class="num" id="reg-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerPaid() ? state.cents : partnerCents)}</div>
             </div>
           </div>
         </div>` : ""}
@@ -315,6 +334,9 @@ export async function renderRegistro(container, onDone, prefill) {
         state.refId = "";
         state.refundPickerOpen = false;
         state.counterAccountId = "";
+        // Mismo criterio que el guard B4 de ingresos: un 'partner' heredado no puede colarse con el
+        // control oculto (solo se pinta para expense).
+        state.paidBy = "me";
         errorMsg = "";
         render();
       };
@@ -323,6 +345,15 @@ export async function renderRegistro(container, onDone, prefill) {
     container.querySelectorAll("[data-cat]").forEach((b) => {
       b.onclick = () => {
         state.categoryId = b.dataset.cat;
+        errorMsg = "";
+        render();
+      };
+    });
+
+    container.querySelectorAll("[data-paidby]").forEach((b) => {
+      b.onclick = () => {
+        // state.accountId NO se borra: volver a «Pagué yo» recupera la cuenta ya seleccionada.
+        state.paidBy = b.dataset.paidby;
         errorMsg = "";
         render();
       };
@@ -358,7 +389,7 @@ export async function renderRegistro(container, onDone, prefill) {
       if (state.isShared && mineEl && partnerEl) {
         const { mine: myCents, partner: partnerCents } = splitCents(state.cents, state.sharePct);
         mineEl.textContent = fmtMoney(myCents);
-        partnerEl.textContent = fmtMoney(partnerCents);
+        partnerEl.textContent = fmtMoney(partnerPaid() ? state.cents : partnerCents);
       }
     };
 
@@ -385,6 +416,9 @@ export async function renderRegistro(container, onDone, prefill) {
     const sharedToggle = container.querySelector("#reg-shared");
     if (sharedToggle) sharedToggle.onchange = (e) => {
       state.isShared = e.target.checked;
+      // Desmarcar compartido devuelve el gasto a «Pagué yo»: sin esto un 'partner' heredado
+      // sobreviviría con el control oculto y la cuenta volvería a ser obligatoria sin decirlo.
+      state.paidBy = "me";
       render();
     };
 
@@ -413,7 +447,8 @@ export async function renderRegistro(container, onDone, prefill) {
           amountCents: state.tipo === "adjustment" && state.adjustmentSign === "-" ? -state.cents : state.cents,
           date: state.fecha,
           categoryId: withCategory ? state.categoryId : "",
-          accountId: state.accountId,
+          // Un gasto que pagó la contraparte no toca ninguna cuenta mía hasta liquidar.
+          accountId: partnerPaid() ? "" : state.accountId,
           counterAccountId: state.tipo === "transfer" ? state.counterAccountId : "",
           merchant: state.merchant,
           note: state.note,
@@ -423,6 +458,7 @@ export async function renderRegistro(container, onDone, prefill) {
           // el toggle esté oculto para tipo=income.
           isShared: withCategory && state.tipo !== "income" ? state.isShared : false,
           sharePctOverride: withCategory && state.tipo !== "income" && state.isShared ? state.sharePct : null,
+          paidBy: partnerPaid() ? "partner" : "me",
           refId: state.tipo === "refund" ? state.refId : "",
           ruleId: state.ruleId,
         });

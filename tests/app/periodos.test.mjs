@@ -15,13 +15,13 @@ function ins(db, over = {}) {
     id: "t" + Math.floor(Math.random() * 1e9),
     date: "2026-08-20", period: "per-1", type: "expense", cents: 4520,
     account: "acc-n26", counterAccount: "", category: "cat-casa-alquiler",
-    merchant: "", note: "", shared: 0, override: null, settled: 0,
+    merchant: "", note: "", shared: 0, override: null, paidBy: "me", settled: 0,
     ref: "", rule: "", external: "", status: "pending",
     ...over,
   };
   db.prepare(SQL.insertTransaction).run(
     v.id, v.date, v.period, v.type, v.cents, v.account, v.counterAccount,
-    v.category, v.merchant, v.note, v.shared, v.override, v.settled,
+    v.category, v.merchant, v.note, v.shared, v.override, v.paidBy, v.settled,
     v.ref, v.rule, v.external, v.status, T, T,
   );
   return v.id;
@@ -163,6 +163,15 @@ test("spentByRootCategory: refund vinculado a gasto NO compartido resta en su ra
   assert.equal(casa.spent_cents, 6000, "gasto A (10000) - devol-a (10000, gasto NO compartido) + gasto B al 60% (6000) - 0 (devol-b liquida compartido)");
 });
 
+test("spentByRootCategory: un gasto pagado por la contraparte suma MI parte en su raíz", () => {
+  const db = openDb();
+  seedMinimal(db);
+  ins(db, { id: "suyo", cents: 10000, shared: 1, paidBy: "partner", account: "", category: "cat-casa-alquiler" });
+
+  const rows = db.prepare(SQL.spentByRootCategory).all("per-1");
+  assert.equal(rows.find((r) => r.root_id === "cat-casa").spent_cents, 6000);
+});
+
 test("updatePeriodShare (sentencia sola): cambia my_share_pct/updated_at; sin el freeze previo, los gastos con override NULL seguirían al periodo", () => {
   const db = openDb();
   seedMinimal(db); // per-1 al 60
@@ -256,7 +265,7 @@ test("execMany: una violación de CHECK en el lote de openNextPeriod hace rollba
     // violación deliberada: amount_cents=0 con type='expense' incumple el CHECK de transactions
     {
       sql: SQL.insertTransaction,
-      bind: ["tx-bad", "2026-09-02", "per-2", "expense", 0, "acc-n26", "", "cat-casa-alquiler", "", "", 0, null, 0, "", "", "", "pending", T2, T2],
+      bind: ["tx-bad", "2026-09-02", "per-2", "expense", 0, "acc-n26", "", "cat-casa-alquiler", "", "", 0, null, "me", 0, "", "", "", "pending", T2, T2],
     },
   ];
 

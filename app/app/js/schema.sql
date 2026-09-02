@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version','1'),('currency','EUR'),('created_with','basecero-pwa'),('locale','es-ES'),('import_account_id',''),('default_account_id',''),('partner_name',''),('category_style','{}'),('csv_profile',''),('lang',''),('account_loans','{}');
+INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version','2'),('currency','EUR'),('created_with','basecero-pwa'),('locale','es-ES'),('import_account_id',''),('default_account_id',''),('partner_name',''),('category_style','{}'),('csv_profile',''),('lang',''),('account_loans','{}');
 
 CREATE TABLE IF NOT EXISTS accounts (
   id TEXT PRIMARY KEY, name TEXT NOT NULL,
@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   merchant TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
   is_shared INTEGER NOT NULL DEFAULT 0,
   share_pct_override REAL,
+  paid_by TEXT NOT NULL DEFAULT 'me' CHECK (paid_by IN ('me','partner')),
   settled INTEGER NOT NULL DEFAULT 0,
   ref_id TEXT NOT NULL DEFAULT '', rule_id TEXT NOT NULL DEFAULT '',
   external_id TEXT NOT NULL DEFAULT '',

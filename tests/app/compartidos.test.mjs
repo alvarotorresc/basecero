@@ -5,6 +5,7 @@ import { SQL } from "../../app/app/js/sql.js";
 import {
   sharedFieldsLocked, refundAmountLocked, expenseDeleteLocked, settleAllSharedStmts,
 } from "../../app/app/js/repo.js";
+import { t } from "../../app/app/js/i18n/index.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
 const require = createRequire(import.meta.url);
@@ -14,7 +15,7 @@ const pure = require("../../app/app/vendor/pure.js");
 // n26.js:5 sobre el mismo patrón, y n26.test.mjs:19 sobre cómo se expone en Node). Se importa
 // settleAllSharedStmts REAL (no una reproducción) precisamente porque es la función PURA que
 // construye el bind exacto de insertTransaction — la que el brief pide verificar "orden exacto,
-// 19 campos"; una copia a mano en el test no detectaría un bug de orden introducido en repo.js.
+// 20 campos"; una copia a mano en el test no detectaría un bug de orden introducido en repo.js.
 globalThis.bcUlid = pure.bcUlid;
 globalThis.bcSanitizeCell = pure.bcSanitizeCell;
 
@@ -28,36 +29,37 @@ function ins(db, over = {}) {
     id: "t" + Math.floor(Math.random() * 1e9),
     date: "2026-08-20", period: "per-1", type: "expense", cents: 4520,
     account: "acc-n26", counterAccount: "", category: "cat-casa-alquiler",
-    merchant: "", note: "", shared: 0, override: null, settled: 0,
+    merchant: "", note: "", shared: 0, override: null, paidBy: "me", settled: 0,
     ref: "", rule: "", external: "", status: "pending",
     ...over,
   };
   db.prepare(SQL.insertTransaction).run(
     v.id, v.date, v.period, v.type, v.cents, v.account, v.counterAccount,
-    v.category, v.merchant, v.note, v.shared, v.override, v.settled,
+    v.category, v.merchant, v.note, v.shared, v.override, v.paidBy, v.settled,
     v.ref, v.rule, v.external, v.status, T, T,
   );
   return v.id;
 }
 
-/** Reproduce EXACTAMENTE la secuencia que hace repo.settleShared (que a su vez delega en
- *  repo.addTransaction({refId})): busca la fila en pendingShared (misma fuente de verdad para
- *  el importe/categoría de la contraparte, sin duplicar el cálculo del pct), inserta el refund de
- *  liquidación en el periodo abierto y marca settled=1 en el gasto original — el mismo
- *  execMany([insertStmt, updateSettled]) de repo.addTransaction. */
+/** Reproduce EXACTAMENTE la secuencia que hace repo.settleShared sobre una fila de dirección
+ *  'partner_owes' (un gasto que pagué yo): busca la fila en pendingSettlements (misma fuente de
+ *  verdad para el importe/categoría a liquidar, sin duplicar el cálculo del pct), inserta la
+ *  devolución ENTRANTE en el periodo abierto y marca settled=1 en el gasto original — el mismo
+ *  execMany([insertStmt, updateSettled]) de repo.addTransaction. La otra dirección ('i_owe', que
+ *  crea un adjustment de salida) la ejercen los tests que llaman a settleAllSharedStmts REAL. */
 function settleShared(db, origId, accountId, now, openPeriodId = "per-1") {
-  const row = db.prepare(SQL.pendingShared).all().find((r) => r.id === origId);
+  const row = db.prepare(SQL.pendingSettlements).all().find((r) => r.id === origId);
   if (!row) throw new Error("Gasto compartido no encontrado o ya liquidado");
   const refundId = "refund-" + origId;
   db.prepare(SQL.insertTransaction).run(
-    refundId, "2026-08-24", openPeriodId, "refund", row.partner_amount_cents, accountId, "",
-    row.category_id, row.merchant, "Liquidación", 0, null, 0, origId, "", "", "pending", now, now,
+    refundId, "2026-08-24", openPeriodId, "refund", row.settle_cents, accountId, "",
+    row.category_id, row.merchant, t("liquidar.note"), 0, null, "me", 0, origId, "", "", "pending", now, now,
   );
   db.prepare("UPDATE transactions SET settled=1, updated_at=? WHERE id=?").run(now, origId);
   return refundId;
 }
 
-test("pendingShared: calcula partner_amount_cents con el pct del PROPIO periodo de cada gasto y con override", () => {
+test("pendingSettlements: calcula settle_cents con el pct del PROPIO periodo de cada gasto y con override", () => {
   const db = openDb();
   seedMinimal(db);
   db.prepare(`INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
@@ -77,18 +79,18 @@ test("pendingShared: calcula partner_amount_cents con el pct del PROPIO periodo 
   db.prepare("UPDATE transactions SET deleted=1 WHERE id=?").run(borrado);                   // borrado
   ins(db, { id: "income", type: "income", period: "per-1", cents: 5000, shared: 1, category: "cat-nomina" }); // no es 'expense'
 
-  const rows = db.prepare(SQL.pendingShared).all();
+  const rows = db.prepare(SQL.pendingSettlements).all();
 
   assert.deepEqual(rows.map((r) => r.id), [b, a, c], "orden por date ASC");
-  assert.equal(rows.find((r) => r.id === a).partner_amount_cents, 4000);
-  assert.equal(rows.find((r) => r.id === b).partner_amount_cents, 5000);
-  assert.equal(rows.find((r) => r.id === c).partner_amount_cents, 1000);
+  assert.equal(rows.find((r) => r.id === a).settle_cents, 4000);
+  assert.equal(rows.find((r) => r.id === b).settle_cents, 5000);
+  assert.equal(rows.find((r) => r.id === c).settle_cents, 1000);
 
-  const total = db.prepare(SQL.pendingSharedTotal).get().total_cents;
-  assert.equal(total, 4000 + 5000 + 1000, "el income compartido NO debe sumar al total pendiente");
+  const net = db.prepare(SQL.pendingSettlementNet).get().net_cents;
+  assert.equal(net, 4000 + 5000 + 1000, "el income compartido NO debe sumar al neto pendiente");
 });
 
-test("pendingShared: un reparto 100/0 (pct del periodo o override) da partner_amount_cents=0 y se excluye", () => {
+test("pendingSettlements: un reparto 100/0 (pct del periodo o override) da settle_cents=0 y se excluye", () => {
   const db = openDb();
   seedMinimal(db);
   db.prepare(`INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
@@ -101,13 +103,105 @@ test("pendingShared: un reparto 100/0 (pct del periodo o override) da partner_am
   // control: un compartido normal SÍ debe aparecer
   const normal = ins(db, { id: "normal", period: "per-1", cents: 10000, shared: 1 });
 
-  const rows = db.prepare(SQL.pendingShared).all();
+  const rows = db.prepare(SQL.pendingSettlements).all();
   assert.deepEqual(rows.map((r) => r.id), [normal]);
   assert.equal(rows.find((r) => r.id === soloYo), undefined);
   assert.equal(rows.find((r) => r.id === overrideCien), undefined);
 
-  const total = db.prepare(SQL.pendingSharedTotal).get().total_cents;
-  assert.equal(total, 4000, "solo 'normal' (60/40 de 10000) debe sumar; los 100/0 no aportan nada");
+  const net = db.prepare(SQL.pendingSettlementNet).get().net_cents;
+  assert.equal(net, 4000, "solo 'normal' (60/40 de 10000) debe sumar; los 100/0 no aportan nada");
+});
+
+/** Fixture de las dos direcciones (per-1 al 60 %):
+ *   A = gasto MÍO de 10000 → la contraparte me debe 4000 (partner_owes)
+ *   B = gasto de ELLA de 10000, sin cuenta → yo le debo mi parte, 6000 (i_owe)
+ *  Neto = 4000 - 6000 = -2000 (en mi contra). */
+function seedDosDirecciones(db) {
+  const a = ins(db, { id: "gasto-mio", date: "2026-08-10", cents: 10000, shared: 1, merchant: "IKEA" });
+  const b = ins(db, { id: "gasto-suyo", date: "2026-08-12", cents: 10000, shared: 1,
+    paidBy: "partner", account: "", merchant: "Super" });
+  return { a, b };
+}
+
+test("pendingSettlements: dirección y settle_cents de cada lado, ordenados por fecha", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const { a, b } = seedDosDirecciones(db);
+
+  const rows = db.prepare(SQL.pendingSettlements).all();
+  assert.deepEqual(rows.map((r) => r.id), [a, b], "orden por date ASC");
+
+  const rowA = rows.find((r) => r.id === a);
+  assert.equal(rowA.direction, "partner_owes");
+  assert.equal(rowA.settle_cents, 4000, "10000 - 60% mío = 4000 que me debe");
+  assert.equal(rowA.paid_by, "me");
+
+  const rowB = rows.find((r) => r.id === b);
+  assert.equal(rowB.direction, "i_owe");
+  assert.equal(rowB.settle_cents, 6000, "mi parte del ticket que pagó ella: 60% de 10000");
+  assert.equal(rowB.paid_by, "partner");
+  assert.equal(rowB.amount_cents, 10000, "el ticket entero viaja en la fila");
+});
+
+test("pendingSettlements: excluye las filas cuyo settle_cents sería 0 en cualquiera de las dos direcciones", () => {
+  const db = openDb();
+  seedMinimal(db);
+  // mío con override=100: ella no debe nada. Suyo con override=0: mi parte es 0.
+  ins(db, { id: "mio-100", date: "2026-08-10", cents: 10000, shared: 1, override: 100 });
+  ins(db, { id: "suyo-0", date: "2026-08-11", cents: 10000, shared: 1, override: 0, paidBy: "partner", account: "" });
+  const normal = ins(db, { id: "normal", date: "2026-08-12", cents: 10000, shared: 1 });
+
+  assert.deepEqual(db.prepare(SQL.pendingSettlements).all().map((r) => r.id), [normal],
+    "una fila a 0 no cambia el neto y reventaría el CHECK amount_cents>0 del apunte que crearía");
+});
+
+test("pendingSettlementNet: firma el neto según quién debe más", () => {
+  const dbAmbos = openDb(); seedMinimal(dbAmbos); seedDosDirecciones(dbAmbos);
+  assert.equal(dbAmbos.prepare(SQL.pendingSettlementNet).get().net_cents, -2000, "4000 - 6000");
+
+  const dbMio = openDb(); seedMinimal(dbMio);
+  ins(dbMio, { id: "solo-mio", cents: 10000, shared: 1 });
+  assert.equal(dbMio.prepare(SQL.pendingSettlementNet).get().net_cents, 4000, "solo lo que me debe");
+
+  const dbSuyo = openDb(); seedMinimal(dbSuyo);
+  ins(dbSuyo, { id: "solo-suyo", cents: 10000, shared: 1, paidBy: "partner", account: "" });
+  assert.equal(dbSuyo.prepare(SQL.pendingSettlementNet).get().net_cents, -6000, "solo lo que le debo");
+
+  const dbVacia = openDb(); seedMinimal(dbVacia);
+  assert.equal(dbVacia.prepare(SQL.pendingSettlementNet).get().net_cents, 0, "sin filas, 0 (no NULL)");
+});
+
+test("el neto de SQL es exactamente la suma firmada de las filas que lista pendingSettlements", () => {
+  const db = openDb();
+  seedMinimal(db);
+  seedDosDirecciones(db);
+  ins(db, { id: "mio-100", cents: 10000, shared: 1, override: 100 });      // excluida de las dos
+  ins(db, { id: "suyo-0", cents: 10000, shared: 1, override: 0, paidBy: "partner", account: "" });
+
+  const rows = db.prepare(SQL.pendingSettlements).all();
+  // Misma fórmula que deriva el hero de screens/liquidar.js
+  const net = rows.reduce((s, r) => s + (r.direction === "i_owe" ? -r.settle_cents : r.settle_cents), 0);
+  assert.equal(db.prepare(SQL.pendingSettlementNet).get().net_cents, net);
+});
+
+test("accountBalance: un gasto que pagó la contraparte no mueve NINGUNA cuenta", () => {
+  const db = openDb();
+  seedMinimal(db);
+  ins(db, { id: "suyo", cents: 10000, shared: 1, paidBy: "partner", account: "" });
+
+  assert.equal(db.prepare(SQL.accountBalance).get("2026-12-31", "acc-n26").balance_cents, 100000,
+    "account_id='' no es el id de ninguna cuenta: la fila no entra en ninguna suma");
+  assert.equal(db.prepare(SQL.accountBalance).get("2026-12-31", "acc-revolut").balance_cents, 50000);
+});
+
+test("recentForRefund no ofrece los gastos que pagó la contraparte", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const { a } = seedDosDirecciones(db);
+
+  const rows = db.prepare(SQL.recentForRefund).all("per-1");
+  assert.deepEqual(rows.map((r) => r.id), [a],
+    "una devolución de tienda sobre lo que pagó ella es dinero que le devuelven a ella, no a mí");
 });
 
 test("settleShared: crea el refund con importe/categoría/comercio de la parte de la contraparte y el original queda settled", () => {
@@ -125,7 +219,7 @@ test("settleShared: crea el refund con importe/categoría/comercio de la parte d
   assert.equal(refund.amount_cents, 3200, "8000 - 60% = 3200 (parte de la contraparte)");
   assert.equal(refund.category_id, "cat-casa-alquiler");
   assert.equal(refund.merchant, "IKEA");
-  assert.equal(refund.note, "Liquidación");
+  assert.equal(refund.note, t("liquidar.note"));
   assert.equal(refund.account_id, "acc-n26");
   assert.equal(refund.ref_id, gastoId);
   assert.equal(refund.is_shared, 0, "el refund de liquidación en sí no se marca compartido (ya es el 100% de la contraparte)");
@@ -134,17 +228,17 @@ test("settleShared: crea el refund con importe/categoría/comercio de la parte d
   assert.equal(gasto.settled, 1);
 });
 
-test("pendingSharedTotal: baja a 0 tras liquidar el único gasto pendiente", () => {
+test("pendingSettlementNet: baja a 0 tras liquidar el único gasto pendiente", () => {
   const db = openDb();
   seedMinimal(db);
   const id = ins(db, { id: "unico", date: "2026-08-12", period: "per-1", cents: 5000, shared: 1 });
 
-  assert.equal(db.prepare(SQL.pendingSharedTotal).get().total_cents, 2000);
+  assert.equal(db.prepare(SQL.pendingSettlementNet).get().net_cents, 2000);
 
   settleShared(db, id, "acc-n26", T2);
 
-  assert.equal(db.prepare(SQL.pendingSharedTotal).get().total_cents, 0);
-  assert.deepEqual(db.prepare(SQL.pendingShared).all(), []);
+  assert.equal(db.prepare(SQL.pendingSettlementNet).get().net_cents, 0);
+  assert.deepEqual(db.prepare(SQL.pendingSettlements).all(), []);
 });
 
 test("el refund de liquidación NO altera spentOfPeriod: tiene ref_id, así que spentOfPeriod SQL lo excluye", () => {
@@ -176,21 +270,22 @@ function execManyRaw(db, stmts) {
   }
 }
 
-/** Reproduce la ORQUESTACIÓN de repo.settleAllShared (getOpenPeriod, pendingShared + filtro por
- *  ids, el guard de "algún id no está pendiente"): repo.settleAllShared en sí no es alcanzable en
- *  Node (depende del Worker vía query/execMany, mismo motivo por el que settleShared/
+/** Reproduce la ORQUESTACIÓN de repo.settleAllShared (getOpenPeriod, pendingSettlements + filtro
+ *  por ids, el guard de "algún id no está pendiente"): repo.settleAllShared en sí no es alcanzable
+ *  en Node (depende del Worker vía query/execMany, mismo motivo por el que settleShared/
  *  openNextPeriod de este mismo fichero se reproducen en vez de importarse). El ARRAY de
  *  statements NO se reproduce a mano aquí: se delega en la settleAllSharedStmts REAL importada de
- *  repo.js (arriba) — así un bug en el bind de insertTransaction (orden de los 19 campos) lo
- *  detectaría este test, cosa que una copia manual del bind no podría hacer. */
+ *  repo.js (arriba) — así un bug en el bind de insertTransaction (orden de los 20 campos) lo
+ *  detectaría este test, cosa que una copia manual del bind no podría hacer. "Alex" es el
+ *  partner_name que repo.settleAllShared saca de meta y pasa como sexto argumento. */
 function settleAllSharedReproduced(db, ids, accountId, now, periodId = "per-1") {
   if (!ids || ids.length === 0) return;
   const idSet = new Set(ids);
   const period = db.prepare(SQL.getOpenPeriod).get();
   if (!period) throw new Error("No hay ningún periodo abierto");
-  const pending = db.prepare(SQL.pendingShared).all().filter((r) => idSet.has(r.id));
+  const pending = db.prepare(SQL.pendingSettlements).all().filter((r) => idSet.has(r.id));
   if (pending.length !== idSet.size) throw new Error("Gasto compartido no encontrado o ya liquidado");
-  const stmts = settleAllSharedStmts(pending, accountId, period.id, "2026-08-24", now);
+  const stmts = settleAllSharedStmts(pending, accountId, period.id, "2026-08-24", now, "Alex");
   execManyRaw(db, stmts);
   return period.id;
 }
@@ -212,7 +307,7 @@ test("settleAllShared (reproducido): liquida N pendientes de golpe — N refunds
   const openPeriodId = settleAllSharedReproduced(db, [a, b, c], "acc-n26", T2);
   assert.equal(openPeriodId, "per-1");
 
-  assert.deepEqual(db.prepare(SQL.pendingShared).all(), [], "los 3 quedan liquidados: nada pendiente");
+  assert.deepEqual(db.prepare(SQL.pendingSettlements).all(), [], "los 3 quedan liquidados: nada pendiente");
   assert.equal(db.prepare("SELECT COUNT(*) c FROM transactions WHERE type='refund'").get().c, 3);
 
   for (const id of [a, b, c]) {
@@ -227,7 +322,7 @@ test("settleAllShared (reproducido): liquida N pendientes de golpe — N refunds
   assert.equal(refA.merchant, "IKEA");
   assert.equal(refA.account_id, "acc-n26");
   assert.equal(refA.period_id, "per-1", "el refund se crea en el periodo ABIERTO");
-  assert.equal(refA.note, "Liquidación");
+  assert.equal(refA.note, t("liquidar.note"));
   assert.equal(refA.is_shared, 0);
   assert.equal(refA.status, "pending");
   assert.equal(refA.date, "2026-08-24");
@@ -248,18 +343,21 @@ test("settleAllShared (reproducido): ATOMICIDAD — una fila inválida en MEDIO 
   const e = ins(db, { id: "gasto-e", date: "2026-08-11", cents: 6000, shared: 1 });
   const f = ins(db, { id: "gasto-f", date: "2026-08-12", cents: 7000, shared: 1 });
 
-  const pending = db.prepare(SQL.pendingShared).all();
+  const pending = db.prepare(SQL.pendingSettlements).all();
   const rowD = pending.find((r) => r.id === d);
   const rowE = pending.find((r) => r.id === e);
-  // fila deliberadamente inválida: partner_amount_cents=0 hace que el INSERT de su refund
-  // incumpla el CHECK (type='adjustment' OR amount_cents>0) de transactions — puesta en MEDIO
-  // (no primero) para que el test demuestre un rollback REAL: si solo se comprobara que las filas
-  // POSTERIORES a la mala no se aplican, eso sería trivial (nunca se llegó a ejecutarlas); lo que
-  // hay que probar es que la fila ANTERIOR (rowD), que sí llegó a ejecutar su INSERT+UPDATE con
-  // éxito DENTRO de la misma transacción, también se deshace.
-  const rowBad = { ...pending.find((r) => r.id === f), partner_amount_cents: 0 };
+  // fila deliberadamente inválida: settle_cents=0 hace que el INSERT de su devolución incumpla el
+  // CHECK (type='adjustment' OR amount_cents>0) de transactions — puesta en MEDIO (no primero)
+  // para que el test demuestre un rollback REAL: si solo se comprobara que las filas POSTERIORES a
+  // la mala no se aplican, eso sería trivial (nunca se llegó a ejecutarlas); lo que hay que probar
+  // es que la fila ANTERIOR (rowD), que sí llegó a ejecutar su INSERT+UPDATE con éxito DENTRO de
+  // la misma transacción, también se deshace.
+  // La dirección tiene que ser 'partner_owes': su apunte es un refund, y un refund de importe 0 sí
+  // viola el CHECK. Un 'i_owe' a 0 se insertaría como adjustment de -0, que el CHECK PERMITE, y no
+  // habría rollback que observar.
+  const rowBad = { ...pending.find((r) => r.id === f), settle_cents: 0, direction: "partner_owes" };
 
-  const stmts = settleAllSharedStmts([rowD, rowBad, rowE], "acc-n26", "per-1", "2026-08-24", T2);
+  const stmts = settleAllSharedStmts([rowD, rowBad, rowE], "acc-n26", "per-1", "2026-08-24", T2, "Alex");
   assert.equal(stmts.length, 6, "3 filas × 2 statements (insert refund + update settled)");
 
   assert.throws(() => execManyRaw(db, stmts), /CHECK constraint failed/);
@@ -270,7 +368,7 @@ test("settleAllShared (reproducido): ATOMICIDAD — una fila inválida en MEDIO 
     assert.equal(db.prepare("SELECT settled FROM transactions WHERE id=?").get(id).settled, 0,
       `${id} debe seguir settled=0: rollback completo`);
   }
-  assert.equal(db.prepare(SQL.pendingShared).all().length, 3, "los 3 gastos siguen pendientes tras el rollback");
+  assert.equal(db.prepare(SQL.pendingSettlements).all().length, 3, "los 3 gastos siguen pendientes tras el rollback");
 });
 
 test("settleAllShared (reproducido): ids=[] es un no-op — no toca la BD", () => {
@@ -284,7 +382,7 @@ test("settleAllShared (reproducido): ids=[] es un no-op — no toca la BD", () =
   assert.equal(db.prepare("SELECT COUNT(*) c FROM transactions WHERE type='refund'").get().c, 0);
 });
 
-test("settleAllShared (reproducido): un id que no está en pendingShared (ya liquidado, borrado o inexistente) se RECHAZA — no liquida un subconjunto en silencio", () => {
+test("settleAllShared (reproducido): un id que no está en pendingSettlements (ya liquidado, borrado o inexistente) se RECHAZA — no liquida un subconjunto en silencio", () => {
   const db = openDb();
   seedMinimal(db);
   const a = ins(db, { id: "gasto-valido", cents: 5000, shared: 1 });
@@ -358,43 +456,29 @@ test("hasShared: detecta transacciones y reglas compartidas activas (borradas no
 });
 
 test("sharedFieldsLocked: pura, sin DB — replica exactamente lo que updateTransaction debe bloquear", () => {
-  const settledExpense = { type: "expense", settled: 1, amount_cents: 4550, is_shared: 1, share_pct_override: null };
+  const settledExpense = { type: "expense", settled: 1, amount_cents: 4550, is_shared: 1, share_pct_override: null, paid_by: "me" };
+  const same = { amountCents: 4550, isShared: true, sharePctOverride: null, paidBy: "me" };
 
   // no settled → nunca bloquea, aunque cambie el importe
-  assert.equal(sharedFieldsLocked(
-    { ...settledExpense, settled: 0 },
-    { amountCents: 6000, isShared: true, sharePctOverride: null },
-  ), false, "un gasto NO liquidado no se bloquea");
+  assert.equal(sharedFieldsLocked({ ...settledExpense, settled: 0 }, { ...same, amountCents: 6000 }), false,
+    "un gasto NO liquidado no se bloquea");
 
   // settled pero type != 'expense' (p.ej. un refund) → nunca bloquea
-  assert.equal(sharedFieldsLocked(
-    { ...settledExpense, type: "refund" },
-    { amountCents: 6000, isShared: true, sharePctOverride: null },
-  ), false, "el guard es solo para expense — is_shared/settled también existen en refund/income");
+  assert.equal(sharedFieldsLocked({ ...settledExpense, type: "refund" }, { ...same, amountCents: 6000 }), false,
+    "el guard es solo para expense — is_shared/settled también existen en refund/income");
 
-  // settled + expense + MISMO importe/compartido/override (solo cambia categoría/nota/fecha) → no bloquea
-  assert.equal(sharedFieldsLocked(
-    settledExpense,
-    { amountCents: 4550, isShared: true, sharePctOverride: null },
-  ), false, "editar categoría/fecha/nota/comercio sin tocar importe/compartido/reparto debe seguir funcionando");
+  // settled + expense + MISMO importe/compartido/override/quién pagó → no bloquea
+  assert.equal(sharedFieldsLocked(settledExpense, same), false,
+    "editar categoría/fecha/nota/comercio sin tocar importe/compartido/reparto debe seguir funcionando");
 
-  // settled + expense + importe distinto → bloquea
-  assert.equal(sharedFieldsLocked(
-    settledExpense,
-    { amountCents: 6000, isShared: true, sharePctOverride: null },
-  ), true, "cambiar el importe de un gasto liquidado debe bloquearse");
-
-  // settled + expense + is_shared distinto (desmarcar "Compartido con la contraparte") → bloquea
-  assert.equal(sharedFieldsLocked(
-    settledExpense,
-    { amountCents: 4550, isShared: false, sharePctOverride: null },
-  ), true, "desmarcar compartido en un gasto liquidado debe bloquearse");
-
-  // settled + expense + share_pct_override distinto → bloquea
-  assert.equal(sharedFieldsLocked(
-    settledExpense,
-    { amountCents: 4550, isShared: true, sharePctOverride: 90 },
-  ), true, "cambiar el reparto de un gasto liquidado debe bloquearse");
+  assert.equal(sharedFieldsLocked(settledExpense, { ...same, amountCents: 6000 }), true,
+    "cambiar el importe de un gasto liquidado debe bloquearse");
+  assert.equal(sharedFieldsLocked(settledExpense, { ...same, isShared: false }), true,
+    "desmarcar compartido en un gasto liquidado debe bloquearse");
+  assert.equal(sharedFieldsLocked(settledExpense, { ...same, sharePctOverride: 90 }), true,
+    "cambiar el reparto de un gasto liquidado debe bloquearse");
+  assert.equal(sharedFieldsLocked(settledExpense, { ...same, paidBy: "partner" }), true,
+    "cambiar quién pagó un gasto liquidado debe bloquearse");
 });
 
 // ---- Task 6 (M5, review de seguridad): bloqueo bilateral de gastos liquidados -------------
@@ -521,21 +605,34 @@ function updateTransactionReproduced(db, id, fields) {
   const cur = db.prepare(SQL.getTransaction).get(id);
   if (!cur) throw new Error("Movimiento no encontrado");
   const f = {
+    type: fields.type ?? cur.type,
     amountCents: fields.amountCents ?? cur.amount_cents,
+    accountId: fields.accountId ?? cur.account_id,
     isShared: fields.isShared ?? !!cur.is_shared,
     sharePctOverride: fields.sharePctOverride !== undefined ? fields.sharePctOverride : cur.share_pct_override,
+    paidBy: fields.paidBy ?? cur.paid_by,
   };
+  // Mismo guard de columna cruzada que repo.updateTransaction (repo.js:329-332): solo un gasto
+  // compartido puede haberlo pagado la contraparte, y esa fila nunca lleva cuenta.
+  if (f.paidBy === "partner") {
+    if (f.type !== "expense" || !f.isShared) throw new Error(t("errors.repo.paidByNotShared"));
+    f.accountId = "";
+  }
+  // Mismo guard nuevo que repo.updateTransaction (repo.js): un gasto que NO lo pagó la contraparte
+  // SÍ necesita una cuenta mía.
+  if (f.type === "expense" && f.paidBy !== "partner" && !f.accountId) throw new Error(t("common.needAccount"));
   if (sharedFieldsLocked(cur, f) && db.prepare(SQL.hasActiveLinkedRefund).get(id)) {
     throw new Error("LOCKED: gasto liquidado");
   }
-  const linked = cur.type === "refund" && cur.ref_id ? db.prepare(SQL.getTransaction).get(cur.ref_id) : null;
+  const linked = (cur.type === "refund" || cur.type === "adjustment") && cur.ref_id
+    ? db.prepare(SQL.getTransaction).get(cur.ref_id) : null;
   if (refundAmountLocked(cur, f, linked)) {
     throw new Error("LOCKED: refund de un gasto liquidado");
   }
   db.prepare(SQL.updateTransaction).run(
-    fields.type ?? cur.type, f.amountCents, fields.date ?? cur.date, fields.categoryId ?? cur.category_id,
-    fields.accountId ?? cur.account_id, fields.counterAccountId ?? cur.counter_account_id,
-    fields.merchant ?? cur.merchant, fields.note ?? cur.note, f.isShared ? 1 : 0, f.sharePctOverride,
+    f.type, f.amountCents, fields.date ?? cur.date, fields.categoryId ?? cur.category_id,
+    f.accountId, fields.counterAccountId ?? cur.counter_account_id,
+    fields.merchant ?? cur.merchant, fields.note ?? cur.note, f.isShared ? 1 : 0, f.sharePctOverride, f.paidBy,
     fields.refId ?? cur.ref_id, fields.ruleId ?? cur.rule_id, fields.status ?? cur.status, T2, id,
   );
 }
@@ -548,7 +645,7 @@ function softDeleteTransactionReproduced(db, id) {
   if (expenseDeleteLocked(cur, hasActiveRefund)) {
     throw new Error("LOCKED: gasto liquidado con refund activo");
   }
-  if (cur && cur.type === "refund" && cur.ref_id) {
+  if (cur && (cur.type === "refund" || cur.type === "adjustment") && cur.ref_id) {
     db.prepare(SQL.softDeleteTransaction).run(T2, id);
     db.prepare(SQL.unsettleIfNoActiveRefunds).run(cur.ref_id, id, T2, cur.ref_id);
   } else {
@@ -588,6 +685,51 @@ test("updateTransaction (reproducido): editar categoría/nota del refund enlazad
   const refund = db.prepare("SELECT amount_cents, note FROM transactions WHERE id=?").get(refundId);
   assert.equal(refund.note, "Liquidación de agosto");
   assert.equal(refund.amount_cents, 2000, "el importe no debe tocarse por un cambio de nota");
+});
+
+test("updateTransaction (reproducido): pasar un gasto compartido a paidBy:'partner' vacía account_id", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const gastoId = ins(db, { id: "gasto-cena-3", date: "2026-08-12", period: "per-1", cents: 5000, shared: 1, account: "acc-n26" });
+
+  updateTransactionReproduced(db, gastoId, { paidBy: "partner" });
+
+  const gasto = db.prepare("SELECT paid_by, account_id FROM transactions WHERE id=?").get(gastoId);
+  assert.equal(gasto.paid_by, "partner");
+  assert.equal(gasto.account_id, "", "el gasto lo pagó la contraparte: no toca ninguna cuenta mía");
+});
+
+test("updateTransaction (reproducido): paidBy:'partner' en un income se RECHAZA (errors.repo.paidByNotShared)", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const ingresoId = ins(db, { id: "ingreso-1", date: "2026-08-12", period: "per-1", type: "income", cents: 5000, category: "cat-nomina", account: "acc-n26" });
+
+  assert.throws(
+    () => updateTransactionReproduced(db, ingresoId, { paidBy: "partner" }),
+    (e) => { assert.equal(e.message, t("errors.repo.paidByNotShared")); return true; },
+    "solo un gasto compartido puede pagarlo la contraparte",
+  );
+
+  const ingreso = db.prepare("SELECT paid_by, account_id FROM transactions WHERE id=?").get(ingresoId);
+  assert.equal(ingreso.paid_by, "me", "el rechazo no debe haber tocado la fila");
+  assert.equal(ingreso.account_id, "acc-n26");
+});
+
+// Item 2 (final fix wave): el lado contrario del guard de arriba — un gasto que lo pagué yo SÍ
+// necesita una cuenta, mirror del guard nuevo en repo.updateTransaction.
+test("updateTransaction (reproducido): un gasto mío editado a accountId:'' se RECHAZA (common.needAccount)", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const gastoId = ins(db, { id: "gasto-sin-cuenta", date: "2026-08-12", period: "per-1", cents: 3000, shared: 0, account: "acc-n26" });
+
+  assert.throws(
+    () => updateTransactionReproduced(db, gastoId, { accountId: "" }),
+    (e) => { assert.equal(e.message, t("common.needAccount")); return true; },
+    "un gasto que pagué yo necesita una cuenta de la que salga el dinero",
+  );
+
+  const gasto = db.prepare("SELECT account_id FROM transactions WHERE id=?").get(gastoId);
+  assert.equal(gasto.account_id, "acc-n26", "el rechazo no debe haber tocado la fila");
 });
 
 test("softDeleteTransaction (reproducido): borrar el gasto original liquidado se RECHAZA mientras el refund siga activo", () => {
@@ -634,4 +776,134 @@ test("softDeleteTransaction (reproducido): borrar un gasto normal (nunca liquida
 
   const gasto = db.prepare("SELECT deleted FROM transactions WHERE id=?").get(gastoId);
   assert.equal(gasto.deleted, 1);
+});
+
+test("settleAllSharedStmts: una devolución entrante por lo que me deben y un ajuste de salida por lo que debo", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const { a, b } = seedDosDirecciones(db);
+  const rows = db.prepare(SQL.pendingSettlements).all();
+
+  const stmts = settleAllSharedStmts(rows, "acc-n26", "per-1", "2026-08-24", T2, "Alex");
+  assert.equal(stmts.length, 4, "un insert + un settled=1 por cada una de las dos filas");
+
+  // El id es un ULID nuevo: se compara la cola del bind (los otros 19 valores).
+  assert.deepEqual(stmts[0].bind.slice(1), [
+    "2026-08-24", "per-1", "refund", 4000, "acc-n26", "", "cat-casa-alquiler", "IKEA", t("liquidar.note"),
+    0, null, "me", 0, a, "", "", "pending", T2, T2,
+  ], "lo que pagué yo: devolución entrante por lo que me debe, con la categoría y el comercio del gasto");
+  assert.deepEqual(stmts[1], { sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [T2, a] });
+
+  assert.deepEqual(stmts[2].bind.slice(1), [
+    "2026-08-24", "per-1", "adjustment", -6000, "acc-n26", "", "", "Liquidación con Alex", t("liquidar.note"),
+    0, null, "me", 0, b, "", "", "pending", T2, T2,
+  ], "lo que pagó ella: apunte de SALIDA negativo, sin categoría (no es gasto: mi parte ya contó)");
+  assert.deepEqual(stmts[3], { sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [T2, b] });
+});
+
+test("settleAllSharedStmts: sin partner_name, el comercio del apunte de salida cae al genérico", () => {
+  const db = openDb();
+  seedMinimal(db);
+  ins(db, { id: "suyo", cents: 10000, shared: 1, paidBy: "partner", account: "" });
+  const rows = db.prepare(SQL.pendingSettlements).all();
+
+  const [insert] = settleAllSharedStmts(rows, "acc-n26", "per-1", "2026-08-24", T2, "");
+  // En `es`, liquidar.outflow.merchantFallback y liquidar.note valen los DOS "Liquidación": afirmar
+  // solo bind[8] pasaría igual con el bind desplazado una posición. Se comparan las cuatro
+  // posiciones seguidas 6..9 (counter_account_id, categoría VACÍA del ajuste, comercio y nota), que
+  // sí distinguen el desplazamiento; el caso en que las dos claves difieren de verdad
+  // ("Liquidación con Alex" vs "Liquidación") lo cubre el test anterior.
+  assert.deepEqual(insert.bind.slice(6, 10),
+    ["", "", t("liquidar.outflow.merchantFallback"), t("liquidar.note")]);
+});
+
+test("tras liquidar las dos direcciones, el saldo de la cuenta se mueve exactamente el NETO", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const { a, b } = seedDosDirecciones(db);
+
+  assert.equal(db.prepare(SQL.accountBalance).get("2026-12-31", "acc-n26").balance_cents, 90000,
+    "solo el gasto que pagué yo salió de la cuenta (100000 - 10000)");
+
+  settleAllSharedReproduced(db, [a, b], "acc-n26", T2);
+
+  assert.equal(db.prepare(SQL.accountBalance).get("2026-12-31", "acc-n26").balance_cents, 88000,
+    "+4000 que me devuelve y -6000 que le pago: el neto de -2000 sobre 90000");
+  assert.deepEqual(db.prepare(SQL.pendingSettlements).all(), [], "no queda nada pendiente");
+});
+
+test("tras liquidar las dos direcciones, spentOfPeriod no se mueve", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const { a, b } = seedDosDirecciones(db);
+
+  assert.equal(db.prepare(SQL.spentOfPeriod).get("per-1").spent_cents, 12000, "6000 + 6000, mi parte de cada uno");
+  settleAllSharedReproduced(db, [a, b], "acc-n26", T2);
+  assert.equal(db.prepare(SQL.spentOfPeriod).get("per-1").spent_cents, 12000,
+    "la devolución enlazada a un compartido no resta (REFUND_REDUCES_SPEND) y el ajuste no tiene rama");
+});
+
+test("borrar el apunte de SALIDA des-liquida el gasto que pagó la contraparte", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const { a, b } = seedDosDirecciones(db);
+  settleAllSharedReproduced(db, [b], "acc-n26", T2);
+  const ajuste = db.prepare("SELECT * FROM transactions WHERE ref_id=? AND type='adjustment'").get(b);
+  assert.ok(ajuste, "la liquidación creó el ajuste");
+
+  softDeleteTransactionReproduced(db, ajuste.id);
+
+  assert.equal(db.prepare("SELECT settled FROM transactions WHERE id=?").get(b).settled, 0);
+  // seedDosDirecciones deja DOS gastos y aquí solo se liquidó `b`: al des-liquidarlo vuelven a estar
+  // pendientes los dos (el mío nunca se liquidó). Lo que este test afirma es que `b` es uno de ellos.
+  const pending = db.prepare(SQL.pendingSettlements).all();
+  assert.deepEqual(pending.map((r) => r.id).sort(), [a, b].sort(), "el gasto vuelve a estar pendiente");
+});
+
+test("hasActiveLinkedRefund y expenseDeleteLocked ven el ajuste de liquidación", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const { b } = seedDosDirecciones(db);
+  settleAllSharedReproduced(db, [b], "acc-n26", T2);
+
+  const hasActiveRefund = !!db.prepare(SQL.hasActiveLinkedRefund).get(b);
+  assert.equal(hasActiveRefund, true, "el ajuste enlazado cuenta como apunte de liquidación vivo");
+  const gasto = db.prepare(SQL.getTransaction).get(b);
+  assert.equal(expenseDeleteLocked(gasto, hasActiveRefund), true,
+    "no se puede borrar el gasto mientras su ajuste siga vivo");
+});
+
+test("refundAmountLocked: pura — cambiar el importe del ajuste de un gasto liquidado se bloquea", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const { b } = seedDosDirecciones(db);
+  settleAllSharedReproduced(db, [b], "acc-n26", T2);
+  const ajuste = db.prepare("SELECT * FROM transactions WHERE ref_id=? AND type='adjustment'").get(b);
+  const linked = db.prepare(SQL.getTransaction).get(b);
+
+  assert.equal(refundAmountLocked(ajuste, { amountCents: -1000 }, linked), true);
+  assert.equal(refundAmountLocked(ajuste, { amountCents: ajuste.amount_cents }, linked), false,
+    "editar la nota del ajuste sin tocar el importe sigue funcionando");
+});
+
+test("updateTransaction (reproducido): bajar el importe del AJUSTE de liquidación se RECHAZA", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const { b } = seedDosDirecciones(db);
+  settleAllSharedReproduced(db, [b], "acc-n26", T2);
+  const ajuste = db.prepare("SELECT * FROM transactions WHERE ref_id=? AND type='adjustment'").get(b);
+
+  // Este test pasa por el CAMINO REAL —la resolución de `linked` incluida—, no por la función pura
+  // con el argumento ya resuelto: es justo la línea que se olvidaba. Con repo.js:316 cargando el
+  // gasto enlazado solo para type='refund', `linked` sería null para un ajuste, el guard nunca
+  // dispararía y el test de arriba (que llama a refundAmountLocked con `linked` cargado a mano)
+  // seguiría en verde sobre código roto.
+  assert.throws(() => updateTransactionReproduced(db, ajuste.id, { amountCents: -1000 }),
+    /LOCKED: refund de un gasto liquidado/);
+  assert.equal(db.prepare("SELECT amount_cents FROM transactions WHERE id=?").get(ajuste.id).amount_cents, -6000,
+    "el importe del ajuste no se movió");
+
+  // La salida sigue existiendo: editar la nota del ajuste, sin tocar el importe, no se bloquea.
+  updateTransactionReproduced(db, ajuste.id, { note: "Bizum enviado" });
+  assert.equal(db.prepare("SELECT note FROM transactions WHERE id=?").get(ajuste.id).note, "Bizum enviado");
 });

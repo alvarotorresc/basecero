@@ -174,7 +174,7 @@ function importResultText(res, partnerName) {
   }
   text += t("ajustes.importResult.tail");
   if (partnerName && res.via === "n26") {
-    text += t("ajustes.importResult.bizumHint", { name: partnerName });
+    text += t("ajustes.importResult.bizumHint");
   }
   return text;
 }

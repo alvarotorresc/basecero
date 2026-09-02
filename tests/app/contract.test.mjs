@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CONTRACT, ENUMS, eurToCents, centsToEur, toIsoDate, xlsxHeader, insertSql } from "../../app/app/js/contract.js";
+import { CONTRACT, ENUMS, TEXT_DEFAULTS, eurToCents, centsToEur, toIsoDate, xlsxHeader, insertSql } from "../../app/app/js/contract.js";
 
 test("columnas canónicas de transactions (orden del schema)", () => {
   assert.deepEqual(CONTRACT.transactions.cols, [
     "id","date","period_id","type","amount_cents","account_id","counter_account_id",
-    "category_id","merchant","note","is_shared","share_pct_override","settled",
+    "category_id","merchant","note","is_shared","share_pct_override","paid_by","settled",
     "ref_id","rule_id","external_id","status","created_at","updated_at","deleted"]);
 });
 test("las 8 tablas del contrato", () => {
@@ -33,4 +33,19 @@ test("insertSql genera placeholders", () => {
 test("enums del contrato", () => {
   assert.deepEqual(ENUMS.transactions.type, ["expense","income","transfer","refund","adjustment"]);
   assert.deepEqual(ENUMS.recurring_rules.frequency, ["weekly","monthly","quarterly","yearly"]);
+});
+
+test("insertSql(transactions): 21 columnas y 21 placeholders", () => {
+  const sql = insertSql("transactions");
+  assert.equal(CONTRACT.transactions.cols.length, 21);
+  assert.equal(sql.match(/\?/g).length, 21);
+  assert.match(sql, /share_pct_override,paid_by,settled/, "paid_by va entre el reparto y settled");
+});
+
+test("ENUMS.transactions.paid_by es exactamente me/partner (sin cadena vacía)", () => {
+  assert.deepEqual(ENUMS.transactions.paid_by, ["me", "partner"]);
+});
+
+test("TEXT_DEFAULTS: paid_by de transactions cae a me", () => {
+  assert.equal(TEXT_DEFAULTS.transactions.paid_by, "me");
 });

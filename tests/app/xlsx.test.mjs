@@ -1,8 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { openDb, seedMinimal, dumpAll, X } from "./helpers.mjs";
+import { DatabaseSync } from "node:sqlite";
+import { readFileSync } from "node:fs";
+import { openDb, seedMinimal, dumpAll, X, OLD_TRANSACTIONS_DDL } from "./helpers.mjs";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../../app/app/js/xlsx.js";
 import { insertSql, CONTRACT } from "../../app/app/js/contract.js";
+import { pendingMigrations } from "../../app/app/js/migrations.js";
 import { replaceAllStmts } from "../../app/app/js/repo.js";
 import { SQL } from "../../app/app/js/sql.js";
 
@@ -56,7 +59,7 @@ test("import: meta con columnas de enums del generador (más filas de enum que d
   const wb = wbFromSeed();
   wb.Sheets.meta = X.utils.aoa_to_sheet([
     ["key", "value", "", "account_types", "goal_types"],
-    ["schema_version", "1", "", "checking", "emergency_fund"],
+    ["schema_version", "2", "", "checking", "emergency_fund"],
     ["currency", "EUR", "", "savings", "savings_target"],
     ["created_with", "basecero-pwa", "", "liability", "spending_cap"],
     ["", "", "", "", "savings_rate"],
@@ -86,9 +89,138 @@ test("import: fila totalmente vacía en una pestaña de datos (no meta) se desca
 const parse = (mutate) => workbookToRows(X, wbFromSeed(mutate)).data;
 
 test("validate: base semilla válida", () => { assert.deepEqual(validateImport(parse()), []); });
-test("validate: schema_version distinta de 1", () => {
-  const d = parse((x) => { x.meta.find((m) => m.key === "schema_version").value = "2"; });
+test("validate: schema_version distinta de 1 o 2", () => {
+  const d = parse((x) => { x.meta.find((m) => m.key === "schema_version").value = "3"; });
   assert.match(validateImport(d)[0], /schema_version/);
+});
+
+test("validate: una hoja v1 (schema_version=1) se sigue aceptando", () => {
+  const d = parse((x) => { x.meta.find((m) => m.key === "schema_version").value = "1"; });
+  assert.deepEqual(validateImport(d), []);
+});
+
+test("import: hoja v1 sin cabecera paid_by → todas las filas quedan en me", () => {
+  const wb = wbFromSeed((dump) => {
+    dump.transactions.push({ id: "tx-v1", date: "2026-08-02", period_id: "per-1", type: "expense",
+      amount_cents: 1000, account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler",
+      merchant: "M", note: "", is_shared: 0, share_pct_override: null, paid_by: "me", settled: 0,
+      ref_id: "", rule_id: "", external_id: "", status: "pending",
+      created_at: "2026-08-02T00:00:00Z", updated_at: "2026-08-02T00:00:00Z", deleted: 0 });
+  });
+  const ws = wb.Sheets.transactions;
+  const fullHeader = X.utils.sheet_to_json(ws, { header: 1 })[0];
+  const rows = X.utils.sheet_to_json(ws, { defval: "" });
+  const header = fullHeader.filter((h) => h !== "paid_by");     // hoja v1: la columna no existe
+  wb.Sheets.transactions = X.utils.aoa_to_sheet([header, ...rows.map((r) => header.map((h) => r[h]))]);
+
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  assert.ok(data.transactions.length > 0);
+  for (const r of data.transactions) assert.equal(r.paid_by, "me");
+  assert.deepEqual(validateImport(data), []);
+});
+
+test("import: celda paid_by en blanco (cabecera presente) → me", () => {
+  const wb = wbFromSeed();
+  const header = X.utils.sheet_to_json(wb.Sheets.transactions, { header: 1 })[0];
+  const row = { id: "tx-blank", date: "2026-08-01", period_id: "per-1", type: "expense", amount: 1,
+    account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler", merchant: "", note: "",
+    is_shared: "", share_pct_override: "", paid_by: "", settled: "", ref_id: "", rule_id: "", external_id: "",
+    status: "pending", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: "" };
+  wb.Sheets.transactions = X.utils.aoa_to_sheet([header, header.map((h) => row[h] ?? "")]);
+
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  assert.equal(data.transactions.find((r) => r.id === "tx-blank").paid_by, "me");
+  assert.deepEqual(validateImport(data), []);
+});
+
+test("validate: paid_by fuera del enum → error", () => {
+  const wb = wbFromSeed();
+  const header = X.utils.sheet_to_json(wb.Sheets.transactions, { header: 1 })[0];
+  const row = { id: "tx-enum", date: "2026-08-01", period_id: "per-1", type: "expense", amount: 1,
+    account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler", merchant: "", note: "",
+    is_shared: false, share_pct_override: "", paid_by: "ambos", settled: false, ref_id: "", rule_id: "",
+    external_id: "", status: "pending", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z",
+    deleted: false };
+  wb.Sheets.transactions = X.utils.aoa_to_sheet([header, header.map((h) => row[h] ?? "")]);
+  const { data } = workbookToRows(X, wb);
+  assert.match(validateImport(data).join("\n"), /paid_by/);
+});
+
+// Helper local de los tres tests de invariantes de paid_by: una fila de transactions completa,
+// escrita a mano sobre la cabecera real de la hoja (así el test no depende del orden de columnas).
+function txSheet(wb, over) {
+  const header = X.utils.sheet_to_json(wb.Sheets.transactions, { header: 1 })[0];
+  const row = { id: "tx-1", date: "2026-08-01", period_id: "per-1", type: "expense", amount: 100,
+    account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler", merchant: "", note: "",
+    is_shared: true, share_pct_override: "", paid_by: "partner", settled: false, ref_id: "", rule_id: "",
+    external_id: "", status: "pending", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z",
+    deleted: false, ...over };
+  wb.Sheets.transactions = X.utils.aoa_to_sheet([header, header.map((h) => row[h] ?? "")]);
+  return workbookToRows(X, wb).data;
+}
+
+test("validate: paid_by=partner en un ingreso o en un gasto no compartido → error", () => {
+  const income = txSheet(wbFromSeed(), { type: "income", category_id: "cat-nomina", account_id: "", is_shared: false });
+  assert.match(validateImport(income).join("\n"), /paid_by «partner» solo vale en un gasto compartido/);
+
+  const noShared = txSheet(wbFromSeed(), { is_shared: false, account_id: "" });
+  assert.match(validateImport(noShared).join("\n"), /paid_by «partner» solo vale en un gasto compartido/);
+});
+
+test("validate: paid_by=partner con cuenta llena da error; con cuenta vacía, ninguno", () => {
+  const conCuenta = txSheet(wbFromSeed(), { account_id: "acc-n26" });
+  assert.match(validateImport(conCuenta).join("\n"), /no puede llevar cuenta/);
+
+  const sinCuenta = txSheet(wbFromSeed(), { account_id: "" });
+  assert.deepEqual(validateImport(sinCuenta), [], "un gasto compartido pagado por la contraparte sin cuenta es válido");
+});
+
+test("validate: account_id vacío en un gasto NORMAL sigue dando fkEmpty", () => {
+  const d = txSheet(wbFromSeed(), { paid_by: "me", is_shared: false, account_id: "" });
+  assert.match(validateImport(d).join("\n"), /pestaña «transactions» fila 2: account_id vacío/);
+});
+
+// Item 4 (final fix wave): una devolución que enlaza (ref_id) un gasto pagado por la contraparte no
+// es MÍA — el que la devuelve lo hace a quien pagó, no a mí. Fila completa a mano (mismo patrón que
+// "hoja v1 sin cabecera paid_by" más arriba) porque hacen falta DOS filas de transactions enlazadas
+// entre sí, y txSheet solo escribe una.
+function txRow(over) {
+  return { id: "tx-x", date: "2026-08-02", period_id: "per-1", type: "expense",
+    amount_cents: 10000, account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler",
+    merchant: "M", note: "", is_shared: 0, share_pct_override: null, paid_by: "me", settled: 0,
+    ref_id: "", rule_id: "", external_id: "", status: "pending",
+    created_at: "2026-08-02T00:00:00Z", updated_at: "2026-08-02T00:00:00Z", deleted: 0, ...over };
+}
+
+test("validate: una devolución que enlaza un gasto pagado por la contraparte da error; enlazando uno mío, ninguno", () => {
+  const gastoSuyo = txRow({ id: "tx-gasto-suyo", is_shared: 1, paid_by: "partner", account_id: "" });
+  const devolucionDeSuyo = txRow({ id: "tx-devolucion-suyo", type: "refund", ref_id: "tx-gasto-suyo" });
+  const conPartner = parse((x) => { x.transactions.push(gastoSuyo, devolucionDeSuyo); });
+  assert.deepEqual(validateImport(conPartner),
+    ["pestaña «transactions» fila 3: una devolución no puede enlazar un gasto pagado por la contraparte"]);
+
+  const gastoMio = txRow({ id: "tx-gasto-mio" });
+  const devolucionDeMio = txRow({ id: "tx-devolucion-mio", type: "refund", ref_id: "tx-gasto-mio" });
+  const sinPartner = parse((x) => { x.transactions.push(gastoMio, devolucionDeMio); });
+  assert.deepEqual(validateImport(sinPartner), []);
+});
+
+test("import: replaceAll NO importa el schema_version de la hoja", () => {
+  const db = openDb(); seedMinimal(db);   // BD en '2'
+  const data = {
+    meta: [
+      { key: "schema_version", value: "1" },
+      { key: "currency", value: "USD" },
+      { key: "created_with", value: "basecero-pwa" },
+    ],
+    accounts: [], categories: [], periods: [], transactions: [], recurring_rules: [], goals: [], budgets: [],
+  };
+  for (const s of replaceAllStmts(data)) db.prepare(s.sql).run(...(s.bind ?? []));
+  const meta = Object.fromEntries(db.prepare("SELECT key, value FROM meta").all().map((r) => [r.key, r.value]));
+  assert.equal(meta.schema_version, "2", "la versión es propiedad de ESTA BD, no de la hoja");
+  assert.equal(meta.currency, "USD", "el resto de claves de la hoja sí se aplican");
 });
 test("validate: created_with dual — acepta hoja y pwa, rechaza otros", () => {
   const ok = parse((x) => { x.meta.find((m) => m.key === "created_with").value = "basecero-sheets-mvp"; });
@@ -135,7 +267,7 @@ test("validate: importe no positivo salvo adjustment", () => {
   const d = parse();
   const base = { id: "tx-1", date: "2026-08-01", period_id: "per-1", type: "expense", amount_cents: 0,
     account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler", merchant: "", note: "",
-    is_shared: 0, share_pct_override: null, settled: 0, ref_id: "", rule_id: "", external_id: "",
+    is_shared: 0, share_pct_override: null, paid_by: "me", settled: 0, ref_id: "", rule_id: "", external_id: "",
     status: "pending", created_at: "x", updated_at: "x", deleted: 0 };
   d.transactions.push(base);
   assert.match(validateImport(d)[0], /amount/);
@@ -167,7 +299,7 @@ test("validate: amount no numérico → SOLO numericInvalid, sin amountNotPositi
 // familia; cada test solo toca el campo bajo prueba.
 const txBase = { id: "tx-x", date: "2026-08-01", period_id: "per-1", type: "expense", amount_cents: 100,
   account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler", merchant: "", note: "",
-  is_shared: 0, share_pct_override: null, settled: 0, ref_id: "", rule_id: "", external_id: "",
+  is_shared: 0, share_pct_override: null, paid_by: "me", settled: 0, ref_id: "", rule_id: "", external_id: "",
   status: "pending", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 0 };
 
 test("validate: categoría con parent_id === id → error", () => {
@@ -573,13 +705,17 @@ test("ROUND-TRIP: export → import → mismos datos", () => {
   const tx = (id, type, cents, extra = {}) => db.prepare(insertSql("transactions")).run(...CONTRACT.transactions.cols.map((c) =>
     ({ id, date: "2026-08-02", period_id: "per-1", type, amount_cents: cents, account_id: "acc-n26",
        counter_account_id: "", category_id: type === "transfer" || type === "adjustment" ? "" : "cat-casa-alquiler",
-       merchant: "M", note: "", is_shared: 0, share_pct_override: null, settled: 0, ref_id: "", rule_id: "",
+       merchant: "M", note: "", is_shared: 0, share_pct_override: null, paid_by: "me", settled: 0, ref_id: "", rule_id: "",
        external_id: "", status: "pending", created_at: T2, updated_at: T2, deleted: 0, ...extra })[c]));
   tx("tx-e", "expense", 900, { is_shared: 1 });
   tx("tx-i", "income", 215000, { category_id: "cat-nomina" });
   tx("tx-t", "transfer", 5000, { counter_account_id: "acc-revolut" });
   tx("tx-r", "refund", 360, { ref_id: "tx-e" });
   tx("tx-a", "adjustment", -123);
+  // Las dos direcciones del compartido y el apunte de salida que las liquida (el mundo nuevo):
+  tx("tx-mio", "expense", 10000, { is_shared: 1, paid_by: "me" });
+  tx("tx-suyo", "expense", 10000, { is_shared: 1, paid_by: "partner", account_id: "" });
+  tx("tx-liq", "adjustment", -6000, { ref_id: "tx-suyo", merchant: "Liquidacion con Alex" });
   db.prepare(insertSql("recurring_rules")).run("rr-1","Alquiler","expense",90000,"cat-casa-alquiler","acc-n26","","monthly",1,null,1,1,T2,T2,0);
   db.prepare(insertSql("goals")).run("goal-1","Fondo emergencia","emergency_fund",null,6,null,"","acc-revolut","",1,T2,T2,0);
   db.prepare(insertSql("budgets")).run("bud-1","per-1","cat-casa",70000,T2,T2,0);
@@ -595,6 +731,43 @@ test("ROUND-TRIP: export → import → mismos datos", () => {
   assert.deepEqual(dumpAll(db2), original);
 });
 
+test("ROUND-TRIP sobre una BD MIGRADA (paid_by físicamente la última): los dumps coinciden", () => {
+  // El ALTER TABLE del runner deja paid_by al FINAL de la tabla; schema.sql la declara en medio.
+  // Nada del código depende del orden físico (todo nombra columnas), y esto lo demuestra.
+  // La BD de partida se construye creando PRIMERO la tabla vieja (el DDL literal de helpers.mjs,
+  // el MISMO que usa migraciones.test.mjs) y ejecutando schema.sql DESPUÉS: sus CREATE TABLE IF
+  // NOT EXISTS dejan intacta la transactions que ya existe —justo el motivo por el que migrations.js
+  // hace falta— y crean el resto de tablas, los índices y las semillas. Es exactamente la BD de un
+  // usuario de la versión anterior, y no depende de recortar el texto de schema.sql con un
+  // .replace() (que un cambio de indentación convertiría en un no-op silencioso).
+  const db = new DatabaseSync(":memory:");
+  db.exec(OLD_TRANSACTIONS_DDL);
+  db.exec(readFileSync(new URL("../../app/app/js/schema.sql", import.meta.url), "utf8"));
+  assert.ok(!db.prepare("PRAGMA table_info(transactions)").all().some((c) => c.name === "paid_by"),
+    "la BD de partida es la de la versión anterior: transactions SIN paid_by");
+
+  for (const s of pendingMigrations({ transactions: db.prepare("PRAGMA table_info(transactions)").all().map((c) => c.name) }))
+    (s.bind?.length ? db.prepare(s.sql).run(...s.bind) : db.exec(s.sql));
+  assert.equal(db.prepare("PRAGMA table_info(transactions)").all().at(-1).name, "paid_by");
+  seedMinimal(db);
+  db.prepare(insertSql("transactions")).run(...CONTRACT.transactions.cols.map((c) =>
+    ({ id: "tx-mig", date: "2026-08-02", period_id: "per-1", type: "expense", amount_cents: 10000,
+       account_id: "", counter_account_id: "", category_id: "cat-casa-alquiler", merchant: "M", note: "",
+       is_shared: 1, share_pct_override: null, paid_by: "partner", settled: 0, ref_id: "", rule_id: "",
+       external_id: "", status: "pending", created_at: "2026-08-02T00:00:00Z",
+       updated_at: "2026-08-02T00:00:00Z", deleted: 0 })[c]));
+
+  const original = dumpAll(db);
+  const buf = X.write(rowsToWorkbook(X, original), { type: "buffer", bookType: "xlsx" });
+  const { data, errors } = workbookToRows(X, X.read(buf, { type: "buffer" }));
+  assert.deepEqual(errors, []);
+  assert.deepEqual(validateImport(data), []);
+
+  const db2 = openDb();     // BD de schema.sql FRESCO (paid_by en medio)
+  for (const s of replaceAllStmts(data)) db2.prepare(s.sql).run(...(s.bind ?? []));
+  assert.deepEqual(dumpAll(db2), original);
+});
+
 test("import: replaceAll fusiona meta — conserva claves que la hoja no trae", () => {
   const db = openDb(); seedMinimal(db);
   // config del usuario que una hoja antigua no conoce (upsert: vale antes y después de que existan como semilla)
@@ -602,7 +775,7 @@ test("import: replaceAll fusiona meta — conserva claves que la hoja no trae", 
   db.prepare(SQL.upsertMeta).run("csv_profile", "{}");
   const data = {
     meta: [
-      { key: "schema_version", value: "1" },
+      { key: "schema_version", value: "2" },
       { key: "currency", value: "USD" },
       { key: "created_with", value: "basecero-pwa" },
     ],

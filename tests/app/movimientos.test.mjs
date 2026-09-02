@@ -6,19 +6,19 @@ import { openDb, seedMinimal } from "./helpers.mjs";
 const T = "2026-08-24T18:00:00Z";
 const T2 = "2026-08-24T19:00:00Z";
 
-/** Inserta una transacción usando la firma NUEVA (19 posicionales) de SQL.insertTransaction. */
+/** Inserta una transacción usando la firma NUEVA (20 posicionales) de SQL.insertTransaction. */
 function ins(db, over = {}) {
   const v = {
     id: "t" + Math.floor(Math.random() * 1e9),
     date: "2026-08-20", period: "per-1", type: "expense", cents: 4520,
     account: "acc-n26", counterAccount: "", category: "cat-casa-alquiler",
-    merchant: "", note: "", shared: 0, override: null, settled: 0,
+    merchant: "", note: "", shared: 0, override: null, paidBy: "me", settled: 0,
     ref: "", rule: "", external: "", status: "pending",
     ...over,
   };
   db.prepare(SQL.insertTransaction).run(
     v.id, v.date, v.period, v.type, v.cents, v.account, v.counterAccount,
-    v.category, v.merchant, v.note, v.shared, v.override, v.settled,
+    v.category, v.merchant, v.note, v.shared, v.override, v.paidBy, v.settled,
     v.ref, v.rule, v.external, v.status, T, T,
   );
   return v.id;
@@ -47,6 +47,8 @@ test("listAllByDay: incluye los 5 tipos, orden desc, excluye borrados", () => {
   const rows = db.prepare(SQL.listAllByDay).all("per-1");
   assert.deepEqual(rows.map((r) => r.type), ["refund", "income", "transfer", "expense"]);
   assert.equal(rows.every((r) => r.id !== borrado), true);
+  // paid_by viaja en la proyección (Movimientos lo necesita para el subtítulo "pagó {name}").
+  assert.equal(rows.every((r) => r.paid_by === "me"), true, "las filas del helper son todas mías");
 });
 
 test("getTransaction: devuelve la fila completa por id", () => {
@@ -66,7 +68,7 @@ test("updateTransaction: cambia los campos editables y updated_at, nunca created
 
   db.prepare(SQL.updateTransaction).run(
     "expense", 2500, "2026-08-21", "cat-casa-alquiler", "acc-n26", "",
-    "Actualizado", "nota nueva", 1, 50, "", "", "pending", T2, id,
+    "Actualizado", "nota nueva", 1, 50, "me", "", "", "pending", T2, id,
   );
 
   const after = db.prepare("SELECT * FROM transactions WHERE id=?").get(id);
@@ -142,6 +144,21 @@ test("softDelete de un refund con OTRO refund activo enlazado NO revierte settle
     db.prepare("SELECT settled FROM transactions WHERE id=?").get(gastoId).settled, 0,
     "sin refunds activos: el gasto vuelve a settled=0",
   );
+});
+
+test("softDelete del ajuste de liquidación revierte settled=0 del gasto que pagó la contraparte", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const gastoId = ins(db, { type: "expense", cents: 10000, shared: 1, paidBy: "partner", account: "" });
+  db.prepare("UPDATE transactions SET settled=1 WHERE id=?").run(gastoId);
+  const ajusteId = ins(db, { type: "adjustment", cents: -6000, category: "", ref: gastoId });
+
+  db.prepare(SQL.softDeleteTransaction).run(T2, ajusteId);
+  db.prepare(SQL.unsettleIfNoActiveRefunds).run(gastoId, ajusteId, T2, gastoId);
+
+  const gasto = db.prepare("SELECT settled, updated_at FROM transactions WHERE id=?").get(gastoId);
+  assert.equal(gasto.settled, 0);
+  assert.equal(gasto.updated_at, T2);
 });
 
 test("softDelete de un gasto normal (no refund) se comporta igual que antes: solo deleted+updated_at", () => {
