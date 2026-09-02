@@ -34,3 +34,25 @@ export const dumpAll = (db) => {
     out[t] = db.prepare(`SELECT * FROM ${t}`).all();
   return out;
 };
+
+/** DDL de `transactions` ANTERIOR a esta PR: idéntico al de app/app/js/schema.sql pero SIN la
+ *  columna paid_by. Se escribe entero a mano —no recortando el texto de schema.sql con un
+ *  .replace(), que se convierte en un no-op silencioso en cuanto alguien reindenta el fichero—
+ *  porque es la única forma de tener en Node la BD "de un usuario real" (OPFS, creada con la
+ *  versión anterior) que el runner de migrations.js tiene que migrar. */
+export const OLD_TRANSACTIONS_DDL = `CREATE TABLE transactions (
+  id TEXT PRIMARY KEY, date TEXT NOT NULL,
+  period_id TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('expense','income','transfer','refund','adjustment')),
+  amount_cents INTEGER NOT NULL CHECK (type='adjustment' OR amount_cents > 0),
+  account_id TEXT NOT NULL,
+  counter_account_id TEXT NOT NULL DEFAULT '',
+  category_id TEXT NOT NULL DEFAULT '',
+  merchant TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
+  is_shared INTEGER NOT NULL DEFAULT 0,
+  share_pct_override REAL,
+  settled INTEGER NOT NULL DEFAULT 0,
+  ref_id TEXT NOT NULL DEFAULT '', rule_id TEXT NOT NULL DEFAULT '',
+  external_id TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','reconciled')),
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0)`;

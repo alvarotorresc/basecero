@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   merchant TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
   is_shared INTEGER NOT NULL DEFAULT 0,
   share_pct_override REAL,
+  paid_by TEXT NOT NULL DEFAULT 'me' CHECK (paid_by IN ('me','partner')),
   settled INTEGER NOT NULL DEFAULT 0,
   ref_id TEXT NOT NULL DEFAULT '', rule_id TEXT NOT NULL DEFAULT '',
   external_id TEXT NOT NULL DEFAULT '',
