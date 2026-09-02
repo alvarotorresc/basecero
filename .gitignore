@@ -5,7 +5,8 @@ __pycache__/
 .playwright-mcp/
 /shots/
 
-# Backlog, config de sesión y docs: material de trabajo, local
+# Backlog, config de sesión, docs y lienzos de diseño: material de trabajo, local
 /BACKLOG.md
 /CLAUDE.md
 /docs/
+/design/
