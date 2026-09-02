@@ -84,7 +84,7 @@ export async function renderRecurrentes(container, onBack) {
   }
 
   // Fila plana (sin card propia) dentro de la lista compartida — mismo patrón que
-  // categoryRowHtml/cuentaRowHtml/rowHtml de presupuesto.js/patrimonio.js/liquidar.js (tarea 7):
+  // rootRowHtml/cuentaRowHtml/rowHtml de gasto-por-categoria.js/patrimonio.js/liquidar.js (tarea 7):
   // una única .card con <hr class="divider"> entre filas. Toggle de la derecha: indicador visual
   // (NO interactivo — sin <input>, pointer-events:none) de is_active con los colores exactos del
   // brief; el toggle REAL (que sí cambia el dato) vive en el formulario, y toda la fila sigue

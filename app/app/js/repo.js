@@ -566,7 +566,7 @@ export async function avgSpentOfClosedPeriods() {
   return Math.round(spents.reduce((s, c) => s + c, 0) / spents.length);
 }
 
-// den<=0 -> 0 en vez de NaN/Infinity: mismo criterio que budgetStatus (presupuesto.js), pero sin
+// den<=0 -> 0 en vez de NaN/Infinity: mismo criterio que budgetStatus (category-spend.js), pero sin
 // importarla desde repo.js (capa de datos no depende de una pantalla) — 3 líneas, se duplica aquí.
 const safeDiv = (num, den) => (den > 0 ? (num / den) * 100 : 0);
 
@@ -579,7 +579,7 @@ const fmtMesAnio = (iso) =>
  *  ya viene resuelta en `ctx` (repo.goalsWithProgress hace las queries UNA vez y arma ctx antes
  *  de llamar aquí por cada goal; ver tests/app/patrimonio.test.mjs, que la prueba tipo a tipo
  *  con ctx mínimos, sin tocar la base de datos). pct SIN capar (igual criterio que
- *  presupuesto.js#budgetStatus: el número grande muestra el % real: quien pinta la barra la capa
+ *  category-spend.js#budgetStatus: el número grande muestra el % real: quien pinta la barra la capa
  *  a 100).
  *
  *  level ('ok'/'warn'/'over'): SOLO spending_cap llega a 'over' — es el único tipo con un techo

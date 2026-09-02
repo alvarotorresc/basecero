@@ -116,6 +116,7 @@ export const EN = {
       spent: "{currency} spent",
       of: "of {limit}",
       noLimit: "no limit",
+      viewAll: "View by category →",
     },
     shared: {
       withPartner: "With {name}",
@@ -138,7 +139,6 @@ export const EN = {
       committed: "Remaining committed",
       available: "Actually available",
     },
-    budget: { viewLink: "View budget →" },
     available: {
       title: "Available this period",
       ofBudgeted: "of {amount} budgeted",
@@ -228,41 +228,6 @@ export const EN = {
     outflow: {
       merchant: "Settle up with {name}",
       merchantFallback: "Settle up",
-    },
-  },
-  presupuesto: {
-    error: { load: "Couldn’t load Budget: {error}" },
-    title: "Budget",
-    header: {
-      openedOn: "{period} · opened on {date}{days}",
-      days: { one: " · {n} day", other: " · {n} days" },
-    },
-    empty: "This period has no category with a limit.",
-    total: {
-      title: "Spent of budget",
-      ofBudgeted: "of {amount} budgeted",
-      remaining: {
-        one: "You have {amount} left in the {n} category with a limit",
-        other: "You have {amount} left in the {n} categories with a limit",
-      },
-      over: {
-        one: "You’ve gone {amount} over in the {n} category with a limit",
-        other: "You’ve gone {amount} over in the {n} categories with a limit",
-      },
-    },
-    byCategory: {
-      title: "By category",
-      countWithLimit: "{n} with a limit this period",
-    },
-    category: {
-      over: "Over by {amount}",
-      warn: "Almost at the limit · {amount} left",
-      ok: "{amount} left",
-    },
-    noLimit: {
-      title: "No limit this period",
-      summary: "{names} · {amount} spent",
-      andMore: "{names} and {n} more",
     },
   },
   gastoCategoria: {

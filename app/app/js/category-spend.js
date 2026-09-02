@@ -1,6 +1,6 @@
 /** Aritmética de «gasto vs. límite» por categoría: helpers PUROS (sin DOM ni BD) que comparten la
- *  pantalla «Gasto por categoría» y la tarjeta de Inicio. Vivían dentro de screens/presupuesto.js;
- *  al salir de una pantalla se pueden testear en Node sin Worker. */
+ *  pantalla «Gasto por categoría» y la tarjeta de Inicio. Vivían dentro de la antigua pantalla
+ *  Presupuesto; al salir de una pantalla se pueden testear en Node sin Worker. */
 
 /** Estado de una categoría (o del total) frente a su límite. Umbrales: ok < 85 %,
  *  warn >= 85 % (incluye el 100 % justo), over > 100 %. Sin límite (0/null/undefined) -> null:

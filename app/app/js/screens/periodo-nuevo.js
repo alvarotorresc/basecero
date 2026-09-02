@@ -295,10 +295,10 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
   }
 
   // "Presupuestado" con céntimos small (fmtMoneyParts/moneyPartsHtml, patrón inicio.js/
-  // patrimonio.js/presupuesto.js): es un importe COMPUESTO/derivado (suma de los budget-input,
+  // patrimonio.js/gasto-por-categoria.js): es un importe COMPUESTO/derivado (suma de los budget-input,
   // no un campo editable en sí), así que sí se convierte al patrón .amount-hero — a diferencia de
   // los budget-input de bloqueLimites, que siguen siendo inputs reales sin tocar. Barra: mismo
-  // patrón que presupuesto.js (tarea 7) — clase .bar con --cat:var(--text) en vez del
+  // patrón que gasto-por-categoria.js — clase .bar con --cat:var(--text) en vez del
   // var(--accent) suelto de antes. CTA + error se sacan a bloqueCTA() (bloque final separado,
   // como en el artboard) — el id #pn-presupuestado/#pn-bar/#pn-nota los sigue actualizando
   // patchTotal() sin re-render completo (ver su comentario más abajo).

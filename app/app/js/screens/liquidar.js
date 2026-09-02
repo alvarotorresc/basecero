@@ -18,7 +18,7 @@ const moneyPartsHtml = (cents) => {
  *  parte: el de la contraparte en las filas 'partner_owes', el MÍO en las 'i_owe')
  *  — réplica de docs/design/material-expresivo/Liquidar.dc.html:38-57 (clase `.tx`, sin envoltorio de tarjeta propio: la
  *  lista completa comparte una única `.card` con `<hr class="divider">` entre filas, mismo criterio
- *  que presupuesto.js/patrimonio.js#cuentasCardHtml). Task 5 (backlog, liquidar en bloque): la fila
+ *  que gasto-por-categoria.js/patrimonio.js#cuentasCardHtml). Task 5 (backlog, liquidar en bloque): la fila
  *  ya NO lleva botón propio — el artboard solo tiene el botón de liquidación al pie (armado
  *  inline en render(), más abajo), y con settleAllShared liquidando TODOS los pendientes visibles
  *  de una vez, un botón por fila liquidaría solo esa fila, un camino distinto al del artboard que
