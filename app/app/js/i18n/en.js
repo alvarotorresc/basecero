@@ -717,7 +717,7 @@ export const EN = {
     },
     xlsx: {
       missingSheet: "missing sheet “{table}”",
-      schemaVersion: "meta: schema_version must be 1 or 2 (got “{value}”)",
+      schemaVersion: "meta: schema_version must be {versions} (got “{value}”)",
       createdWith: "meta: created_with not recognized (“{value}”)",
       pkEmpty: "sheet “{table}” row {row}: empty id",
       pkDuplicate: "sheet “{table}” row {row}: duplicate id (“{pk}”)",

@@ -1,7 +1,7 @@
 import sqlite3InitModule from "../vendor/sqlite-wasm/jswasm/sqlite3.mjs";
 import { seedStatements } from "./seeds.js";
 import { classifyStorageFailure } from "./format.js";
-import { pendingMigrations } from "./migrations.js";
+import { pendingMigrations, MIGRATIONS } from "./migrations.js";
 
 let db = null, storage = "opfs";
 
@@ -19,11 +19,18 @@ async function init(seedLang = "es") {
   const schema = await (await fetch(new URL("./schema.sql", import.meta.url))).text();
   db.exec(schema);
   // Migraciones de una BD ya existente (schema.sql no altera tablas ya creadas) — ver migrations.js.
-  // PRAGMA table_info se lee con la MISMA forma que el op "query" de este worker (db-worker.js:65).
+  // PRAGMA table_info se lee con la MISMA forma que el op "query" de este worker (db-worker.js:72),
+  // una vez por cada tabla DISTINTA que MIGRATIONS declara (hoy solo "transactions"): así una
+  // migración futura sobre otra tabla no dispara un ALTER en cada arranque solo porque esa tabla
+  // nunca llegó a consultarse aquí.
   // Va DESPUÉS del esquema (la tabla meta tiene que existir) y ANTES de las semillas.
-  const cols = [];
-  db.exec({ sql: "PRAGMA table_info(transactions)", rowMode: "object", resultRows: cols });
-  const stmts = pendingMigrations({ transactions: cols.map((c) => c.name) });
+  const colsByTable = {};
+  for (const table of [...new Set(MIGRATIONS.map((m) => m.table))]) {
+    const cols = [];
+    db.exec({ sql: `PRAGMA table_info(${table})`, rowMode: "object", resultRows: cols });
+    colsByTable[table] = cols.map((c) => c.name);
+  }
+  const stmts = pendingMigrations(colsByTable);
   db.exec("BEGIN");
   try {
     for (const s of stmts) db.exec({ sql: s.sql, bind: s.bind });

@@ -1,4 +1,4 @@
-const CACHE = "bc-v31";
+const CACHE = "bc-v32";
 // sqlite3-opfs-async-proxy.js queda fuera a propósito: solo lo usa el VFS "opfs" clásico (requiere COOP/COEP), no el sahpool que usamos.
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon.svg", "icons/icon-maskable.svg",
   "css/tokens.css", "css/app.css", "vendor/pure.js", "vendor/xlsx/xlsx.full.min.js", "vendor/fonts/fonts.css",

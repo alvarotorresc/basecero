@@ -188,7 +188,8 @@ test("previsión del periodo (composición SQL + prevision.js): pagado por rule_
   assert.equal(comprometidoCents, 1500, "solo F: pendiente y no es income (D pendiente pero es income, se excluye)");
 
   const saldoCuentaCents = db.prepare(SQL.accountBalance).get("2026-08-24", "acc-n26").balance_cents;
-  assert.equal(saldoCuentaCents, 100000 - 90000 - 12000 - 5000, "opening menos los 3 gastos del periodo");
+  assert.equal(saldoCuentaCents, 100000 - 90000 - 12000 - 5000,
+    "opening menos 3 de los 4 gastos del periodo: gastoSuyo (pagado por la contraparte, sin cuenta) no toca acc-n26");
 
   const netPartnerCents = db.prepare(SQL.pendingSettlementNet).get().net_cents;
   assert.equal(netPartnerCents, -1000, "me debe 2000 (5000 - 60%) y le debo 3000 (60% de 5000)");

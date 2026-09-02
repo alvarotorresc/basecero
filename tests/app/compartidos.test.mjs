@@ -605,11 +605,19 @@ function updateTransactionReproduced(db, id, fields) {
   const cur = db.prepare(SQL.getTransaction).get(id);
   if (!cur) throw new Error("Movimiento no encontrado");
   const f = {
+    type: fields.type ?? cur.type,
     amountCents: fields.amountCents ?? cur.amount_cents,
+    accountId: fields.accountId ?? cur.account_id,
     isShared: fields.isShared ?? !!cur.is_shared,
     sharePctOverride: fields.sharePctOverride !== undefined ? fields.sharePctOverride : cur.share_pct_override,
     paidBy: fields.paidBy ?? cur.paid_by,
   };
+  // Mismo guard de columna cruzada que repo.updateTransaction (repo.js:329-332): solo un gasto
+  // compartido puede haberlo pagado la contraparte, y esa fila nunca lleva cuenta.
+  if (f.paidBy === "partner") {
+    if (f.type !== "expense" || !f.isShared) throw new Error(t("errors.repo.paidByNotShared"));
+    f.accountId = "";
+  }
   if (sharedFieldsLocked(cur, f) && db.prepare(SQL.hasActiveLinkedRefund).get(id)) {
     throw new Error("LOCKED: gasto liquidado");
   }
@@ -619,8 +627,8 @@ function updateTransactionReproduced(db, id, fields) {
     throw new Error("LOCKED: refund de un gasto liquidado");
   }
   db.prepare(SQL.updateTransaction).run(
-    fields.type ?? cur.type, f.amountCents, fields.date ?? cur.date, fields.categoryId ?? cur.category_id,
-    fields.accountId ?? cur.account_id, fields.counterAccountId ?? cur.counter_account_id,
+    f.type, f.amountCents, fields.date ?? cur.date, fields.categoryId ?? cur.category_id,
+    f.accountId, fields.counterAccountId ?? cur.counter_account_id,
     fields.merchant ?? cur.merchant, fields.note ?? cur.note, f.isShared ? 1 : 0, f.sharePctOverride, f.paidBy,
     fields.refId ?? cur.ref_id, fields.ruleId ?? cur.rule_id, fields.status ?? cur.status, T2, id,
   );
@@ -674,6 +682,34 @@ test("updateTransaction (reproducido): editar categoría/nota del refund enlazad
   const refund = db.prepare("SELECT amount_cents, note FROM transactions WHERE id=?").get(refundId);
   assert.equal(refund.note, "Liquidación de agosto");
   assert.equal(refund.amount_cents, 2000, "el importe no debe tocarse por un cambio de nota");
+});
+
+test("updateTransaction (reproducido): pasar un gasto compartido a paidBy:'partner' vacía account_id", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const gastoId = ins(db, { id: "gasto-cena-3", date: "2026-08-12", period: "per-1", cents: 5000, shared: 1, account: "acc-n26" });
+
+  updateTransactionReproduced(db, gastoId, { paidBy: "partner" });
+
+  const gasto = db.prepare("SELECT paid_by, account_id FROM transactions WHERE id=?").get(gastoId);
+  assert.equal(gasto.paid_by, "partner");
+  assert.equal(gasto.account_id, "", "el gasto lo pagó la contraparte: no toca ninguna cuenta mía");
+});
+
+test("updateTransaction (reproducido): paidBy:'partner' en un income se RECHAZA (errors.repo.paidByNotShared)", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const ingresoId = ins(db, { id: "ingreso-1", date: "2026-08-12", period: "per-1", type: "income", cents: 5000, category: "cat-nomina", account: "acc-n26" });
+
+  assert.throws(
+    () => updateTransactionReproduced(db, ingresoId, { paidBy: "partner" }),
+    (e) => { assert.equal(e.message, t("errors.repo.paidByNotShared")); return true; },
+    "solo un gasto compartido puede pagarlo la contraparte",
+  );
+
+  const ingreso = db.prepare("SELECT paid_by, account_id FROM transactions WHERE id=?").get(ingresoId);
+  assert.equal(ingreso.paid_by, "me", "el rechazo no debe haber tocado la fila");
+  assert.equal(ingreso.account_id, "acc-n26");
 });
 
 test("softDeleteTransaction (reproducido): borrar el gasto original liquidado se RECHAZA mientras el refund siga activo", () => {

@@ -722,7 +722,7 @@ export const ES = {
     },
     xlsx: {
       missingSheet: "falta la pestaña «{table}»",
-      schemaVersion: "meta: schema_version debe ser 1 o 2 (es «{value}»)",
+      schemaVersion: "meta: schema_version debe ser {versions} (es «{value}»)",
       createdWith: "meta: created_with no reconocido («{value}»)",
       pkEmpty: "pestaña «{table}» fila {row}: id vacío",
       pkDuplicate: "pestaña «{table}» fila {row}: id duplicado («{pk}»)",

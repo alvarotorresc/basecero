@@ -1,6 +1,7 @@
 import { CONTRACT, ENUMS, BOOL_COLS, NULLABLE_NUM, TEXT_DEFAULTS, FKS, eurToCents, centsToEur, xlsxHeader, toIsoDate } from "./contract.js";
 import { nowIso } from "./format.js";
 import { t } from "./i18n/index.js";
+import { ACCEPTED_SCHEMA_VERSIONS } from "./migrations.js";
 
 // dump: { tabla: [{col: valor SQLite}] } → workbook con una pestaña por tabla.
 // Sin dashboards y sin columnas "_": el dump ya solo trae columnas del contrato.
@@ -100,7 +101,8 @@ export function validateImport(data) {
   const meta = Object.fromEntries((data.meta ?? []).map((m) => [m.key, String(m.value)]));
   // Se aceptan las hojas v1 (sin columna paid_by): workbookToRows las rellena con 'me', que es
   // exactamente el mundo que describe una hoja v1 — todo lo pagué yo. Ver TEXT_DEFAULTS.
-  if (!["1", "2"].includes(meta.schema_version)) errs.push(t("errors.xlsx.schemaVersion", { value: meta.schema_version }));
+  if (!ACCEPTED_SCHEMA_VERSIONS.includes(meta.schema_version))
+    errs.push(t("errors.xlsx.schemaVersion", { value: meta.schema_version, versions: ACCEPTED_SCHEMA_VERSIONS.join(" / ") }));
   if (!["basecero-sheets-mvp", "basecero-pwa"].includes(meta.created_with))
     errs.push(t("errors.xlsx.createdWith", { value: meta.created_with }));
 
