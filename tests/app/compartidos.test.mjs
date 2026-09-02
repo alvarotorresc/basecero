@@ -41,8 +41,8 @@ function ins(db, over = {}) {
   return v.id;
 }
 
-/** Reproduce EXACTAMENTE la secuencia que hace repo.settleShared sobre una fila de dirección
- *  'partner_owes' (un gasto que pagué yo): busca la fila en pendingSettlements (misma fuente de
+/** Reproduce EXACTAMENTE la rama 'partner_owes' de settleAllSharedStmts (repo.js) para UNA sola
+ *  fila (un gasto que pagué yo): busca la fila en pendingSettlements (misma fuente de
  *  verdad para el importe/categoría a liquidar, sin duplicar el cálculo del pct), inserta la
  *  devolución ENTRANTE en el periodo abierto y marca settled=1 en el gasto original — el mismo
  *  execMany([insertStmt, updateSettled]) de repo.addTransaction. La otra dirección ('i_owe', que
@@ -204,7 +204,7 @@ test("recentForRefund no ofrece los gastos que pagó la contraparte", () => {
     "una devolución de tienda sobre lo que pagó ella es dinero que le devuelven a ella, no a mí");
 });
 
-test("settleShared: crea el refund con importe/categoría/comercio de la parte de la contraparte y el original queda settled", () => {
+test("liquidación de un gasto compartido (partner_owes): crea el refund con importe/categoría/comercio de la parte de la contraparte y el original queda settled", () => {
   const db = openDb();
   seedMinimal(db);
   const gastoId = ins(db, {
@@ -272,8 +272,8 @@ function execManyRaw(db, stmts) {
 
 /** Reproduce la ORQUESTACIÓN de repo.settleAllShared (getOpenPeriod, pendingSettlements + filtro
  *  por ids, el guard de "algún id no está pendiente"): repo.settleAllShared en sí no es alcanzable
- *  en Node (depende del Worker vía query/execMany, mismo motivo por el que settleShared/
- *  openNextPeriod de este mismo fichero se reproducen en vez de importarse). El ARRAY de
+ *  en Node (depende del Worker vía query/execMany, mismo motivo por el que la liquidación de una
+ *  sola fila y openNextPeriod de este mismo fichero se reproducen en vez de importarse). El ARRAY de
  *  statements NO se reproduce a mano aquí: se delega en la settleAllSharedStmts REAL importada de
  *  repo.js (arriba) — así un bug en el bind de insertTransaction (orden de los 20 campos) lo
  *  detectaría este test, cosa que una copia manual del bind no podría hacer. "Alex" es el
@@ -299,7 +299,7 @@ test("settleAllShared (reproducido): liquida N pendientes de golpe — N refunds
   // a: per-1 (60/40) sin override → contraparte 4000. b: per-2 (50/50, YA CERRADO) → contraparte
   // 4000 con SU PROPIO pct, no el del periodo abierto. c: per-1 con override=90 → contraparte 1000.
   // El merchant de `c` lleva un prefijo de fórmula a propósito: prueba que bcSanitizeCell se aplica
-  // igual que en settleShared→addTransaction (mismo criterio que categorias.test.mjs:428).
+  // igual que en la liquidación de una sola fila → addTransaction (mismo criterio que categorias.test.mjs:428).
   const a = ins(db, { id: "gasto-a", date: "2026-08-10", period: "per-1", cents: 10000, shared: 1, category: "cat-casa-alquiler", merchant: "IKEA" });
   const b = ins(db, { id: "gasto-b", date: "2026-08-05", period: "per-2", cents: 8000, shared: 1, category: "cat-casa-alquiler", merchant: "Super" });
   const c = ins(db, { id: "gasto-c", date: "2026-08-15", period: "per-1", cents: 10000, shared: 1, override: 90, category: "cat-casa-alquiler", merchant: "=HACK()" });

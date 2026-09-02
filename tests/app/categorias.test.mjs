@@ -251,7 +251,7 @@ test("Regresión: listIncomeCategories agrupa cada raíz con sus propias hijas (
 // ---- Lógica de repo reproducida contra la BD --------------------------------
 // repo.js importa db.js, que usa el Worker del navegador — no hay Worker en Node. Igual que
 // tests/app/patrimonio.test.mjs (updateAccountReproduced) y tests/app/compartidos.test.mjs
-// (settleShared), estas funciones reproducen EXACTAMENTE la lógica de orquestación/guards de
+// (la liquidación de un gasto compartido reproducida), estas funciones reproducen EXACTAMENTE la lógica de orquestación/guards de
 // repo.js contra `db` directo, para poder testearla sin worker de por medio.
 
 /** Reproduce el op "execMany" del Worker (BEGIN/ejecuta/COMMIT, ROLLBACK si falla) — mismo
