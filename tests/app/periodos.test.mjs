@@ -146,6 +146,35 @@ test("spentByRootCategory: agrega el subárbol, resta refunds sin ref prorratead
   assert.equal(rows.some((r) => r.root_id === "cat-nomina"), false, "las raíces de income (flow≠expense) no aparecen");
 });
 
+test("updatePeriodShare: cambia my_share_pct y updated_at del periodo y los gastos SIN override lo siguen; los que tienen override no se mueven", () => {
+  const db = openDb();
+  seedMinimal(db); // per-1 al 60
+
+  const a = ins(db, { id: "a", cents: 10000, shared: 1, override: null });
+  const b = ins(db, { id: "b", cents: 10000, shared: 1, override: 90 });
+
+  db.prepare(SQL.updatePeriodShare).run(50, T2, "per-1");
+
+  const per1 = db.prepare("SELECT my_share_pct, updated_at FROM periods WHERE id='per-1'").get();
+  assert.equal(per1.my_share_pct, 50);
+  assert.equal(per1.updated_at, T2);
+
+  const rows = db.prepare(SQL.listAllByDay).all("per-1");
+  assert.equal(rows.find((r) => r.id === a).my_amount_cents, 5000, "sin override: sigue el nuevo pct del periodo (50%)");
+  assert.equal(rows.find((r) => r.id === b).my_amount_cents, 9000, "con override=90: no se mueve con el cambio del periodo");
+});
+
+test("updatePeriodShare: no toca un periodo borrado", () => {
+  const db = openDb();
+  db.prepare(`INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
+    VALUES ('per-x','Borrado','2026-06-01','2026-06-30','closed',60,'',?,?,1)`).run(T, T);
+
+  db.prepare(SQL.updatePeriodShare).run(50, T2, "per-x");
+
+  const perX = db.prepare("SELECT my_share_pct FROM periods WHERE id='per-x'").get();
+  assert.equal(perX.my_share_pct, 60, "deleted=1: el WHERE deleted=0 no lo alcanza");
+});
+
 test("execMany: una violación de CHECK en el lote de openNextPeriod hace rollback completo (no crea el periodo nuevo)", () => {
   const db = openDb();
   seedMinimal(db);

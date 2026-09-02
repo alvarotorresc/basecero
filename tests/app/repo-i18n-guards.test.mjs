@@ -17,7 +17,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { createCategory, updateCategory, setCategoryStyle } from "../../app/app/js/repo.js";
+import { createCategory, updateCategory, setCategoryStyle, updatePeriodSharePct } from "../../app/app/js/repo.js";
 import { t } from "../../app/app/js/i18n/index.js";
 
 test("createCategory con nombre vacío: lanza el mensaje localizado, no ReferenceError (repo.js:618, TDZ de `const t = nowIso()` en línea posterior)", async () => {
@@ -57,6 +57,18 @@ test("setCategoryStyle con color inválido: ya devuelve el mensaje localizado ho
       return true;
     },
   );
+});
+
+test("updatePeriodSharePct con un pct inválido rechaza con errors.repo.sharePctInvalid antes de tocar la BD", async () => {
+  for (const pct of [120, -5, "60"]) {
+    await assert.rejects(
+      () => updatePeriodSharePct("per-1", pct),
+      (e) => {
+        assert.equal(e.message, t("errors.repo.sharePctInvalid"));
+        return true;
+      },
+    );
+  }
 });
 
 // El resto de las funciones afectadas (openNextPeriod, addTransaction, updateTransaction,

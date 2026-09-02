@@ -669,6 +669,7 @@ export const ES = {
       settleNotFound: "Gasto compartido no encontrado o ya liquidado",
       txNotFound: "Movimiento no encontrado",
       txLockedSettled: "Gasto ya liquidado: borra su liquidación en Movimientos antes de cambiar el importe o el reparto.",
+      sharePctInvalid: "El reparto debe estar entre 0 y 100.",
       refundLockedSettled: "Este movimiento es un reembolso enlazado a un gasto. Bórralo o desvincúlalo antes de cambiar su importe.",
       expenseLockedHasRefund: "Este gasto tiene un reembolso enlazado. Borra antes el reembolso en Movimientos.",
       ruleNotFound: "Regla no encontrada",

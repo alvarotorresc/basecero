@@ -105,6 +105,9 @@ export const SQL = {
   hasSharedRule: `SELECT 1 FROM recurring_rules WHERE is_shared=1 AND deleted=0 LIMIT 1`,
 
   closePeriod: `UPDATE periods SET end_date=?, status='closed', updated_at=? WHERE id=?`,
+  // Cambia el reparto por defecto del periodo (Ajustes). Solo afecta a los gastos cuyo
+  // share_pct_override sea NULL (los guardados por la UI actual llevan siempre override explícito).
+  updatePeriodShare: `UPDATE periods SET my_share_pct=?, updated_at=? WHERE id=? AND deleted=0`,
   // Suma por categoría RAÍZ de gasto (parent_id='') el gasto de toda su subárbol (ella misma +
   // hijas directas): child.id=root.id cubre el gasto registrado directamente en la raíz, y
   // child.parent_id=root.id el de sus hijas. Resta refunds sueltos (ref_id='') prorrateados,

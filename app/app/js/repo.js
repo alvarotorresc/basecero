@@ -7,6 +7,7 @@ import { resolveAccountId, sanitizeLoanMap, parseLoanMap } from "./account-defau
 import { POOL, CURATED_ICONS, CATEGORY_ICONS, parseStyle, initCategoryStyle } from "./category-colors.js";
 import { SEED_NAMES } from "./seeds.js";
 import { t, monthShort } from "./i18n/index.js";
+import { isValidPct } from "./share-pct.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -37,6 +38,13 @@ export async function openNextPeriod({ name, startDate, sharePct, budgets = [] }
   }
   await execMany(stmts);
   return newId;
+}
+
+/** Reparto por defecto del periodo (Ajustes). Valida ANTES de tocar la BD (guard puro, testeable
+ *  sin Worker — mismo patrón que periodStartTooEarly). Ojo al TDZ: aquí no hay `const t` local. */
+export async function updatePeriodSharePct(id, pct) {
+  if (!isValidPct(pct)) throw new Error(t("errors.repo.sharePctInvalid"));
+  await exec(SQL.updatePeriodShare, [pct, nowIso(), id]);
 }
 
 export async function addTransaction({
