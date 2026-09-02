@@ -8,6 +8,7 @@ let locale = "es-ES";
 let currency = "EUR";
 let money = buildMoney();
 let num2 = buildNum2();
+let num0 = buildNum0();
 let pct = buildPct();
 let dec1 = buildDec1();
 function buildMoney() {
@@ -17,6 +18,12 @@ function buildMoney() {
 // que sustituyen — 1800 -> "1800,00", no "1.800,00" (ver tests/app/format.test.mjs).
 function buildNum2() {
   return new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+// A diferencia de num2, SÍ lleva useGrouping:"always" (como money): sin decimales que separen
+// los importes de columnas estrechas, un 4 cifras sin agrupar ("1200") se confunde fácil con
+// otro vecino — ver el uso en charts.js (barChartSvg).
+function buildNum0() {
+  return new Intl.NumberFormat(locale, { minimumFractionDigits: 0, maximumFractionDigits: 0, useGrouping: "always" });
 }
 function buildPct() {
   return new Intl.NumberFormat(locale, { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -31,6 +38,7 @@ export function initFormat(meta) {
   try {
     money = buildMoney();
     num2 = buildNum2();
+    num0 = buildNum0();
     pct = buildPct();
     dec1 = buildDec1();
   } catch {
@@ -38,6 +46,7 @@ export function initFormat(meta) {
     ({ locale, currency } = prev);
     money = buildMoney();
     num2 = buildNum2();
+    num0 = buildNum0();
     pct = buildPct();
     dec1 = buildDec1();
   }
@@ -71,6 +80,7 @@ export const fmtMoneyParts = (cents) => {
   return { main, cents: centsOut, suffix };
 };
 export const fmtNum2 = (n) => num2.format(n);
+export const fmtNum0 = (n) => num0.format(n);
 export const fmtPct = (v) => pct.format(v);
 export const fmtDec1 = (n) => dec1.format(n);
 export const currencySymbol = () => money.formatToParts(0).find((p) => p.type === "currency").value;

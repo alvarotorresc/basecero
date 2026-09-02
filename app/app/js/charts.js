@@ -1,17 +1,20 @@
 // Módulo PURO (sin DOM ni imports de db/repo): construye y devuelve strings SVG/HTML para las
 // gráficas de Inicio (Task 12) y del detalle de cuenta (sparklineSvg, Task 13). Esto permite que
 // los tests de node importen el módulo directamente, sin worker ni DOM (ver tests/app/charts.test.mjs).
-// Importa fmtNum2 de format.js para el formateo de números — format.js también es puro (sin DOM
-// ni imports de db/repo), así que esta independencia se mantiene.
+// Importa fmtNum2 y fmtNum0 de format.js para el formateo de números — format.js también es puro
+// (sin DOM ni imports de db/repo), así que esta independencia se mantiene.
 
-import { fmtNum2 } from "./format.js";
+import { fmtNum2, fmtNum0 } from "./format.js";
 
 const centsToStr = (cents) => fmtNum2((cents ?? 0) / 100);
+// Redondeado a la unidad, sin decimales — para las etiquetas inactivas de barChartSvg (ver ahí
+// el porqué).
+const centsToUnitStr = (cents) => fmtNum0(Math.round((cents ?? 0) / 100));
 
 // ---- barChartSvg ----------------------------------------------------------
 
 const BAR_AREA_H = 124; // alto del área de barras, igual que docs/design/material-expresivo/Resumen.dc.html:73
-const BAR_MAX_H = 100;  // tope de la barra más alta — deja hueco arriba para la etiqueta de la activa
+const BAR_MAX_H = 100;  // tope de la barra más alta — deja hueco arriba para la etiqueta que ahora llevan TODAS las barras (antes solo la activa)
 const BAR_MIN_H = 3;    // alto mínimo visible para un día sin gasto (evita una barra invisible)
 const BAR_INACTIVE_COLOR = "var(--card2)";
 
@@ -29,11 +32,16 @@ export function barChartSvg(days) {
     const h = Math.max(BAR_MIN_H, Math.round(cents * scale));
     const fillColor = d.active ? "var(--accent)" : BAR_INACTIVE_COLOR;
     // Importe encima de CADA barra (antes solo la activa): hoy en acento y negrita, el resto
-    // atenuado — los días a cero muestran «0,00» para que no parezca que falta la cifra.
+    // atenuado — los días a cero muestran «0» para que no parezca que falta la cifra.
+    // Las inactivas van SIN decimales, redondeadas a la unidad (1250 -> «13», no «12,50»): a
+    // 390px cada una de las 7 columnas mide ~37px, y «1.200,00» a 10px ocupa ~41px — dos días
+    // vecinos de cuatro cifras se solapan. Sin decimales, «1.200» sí cabe. Hoy (la activa) es
+    // la única que se lee suelta, así que conserva los céntimos.
     const labelStyle = d.active
       ? "font-size:10px;font-weight:700;color:var(--accent);"
       : "font-size:10px;font-weight:500;color:var(--text-3);";
-    const labelHtml = `<div class="flujo-bar-label${d.active ? " flujo-bar-label--active" : ""}" style="${labelStyle}text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;">${centsToStr(cents)}</div>`;
+    const labelStr = d.active ? centsToStr(cents) : centsToUnitStr(cents);
+    const labelHtml = `<div class="flujo-bar-label${d.active ? " flujo-bar-label--active" : ""}" style="${labelStyle}text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;">${labelStr}</div>`;
     return `
       <div class="flujo-bar${d.active ? " flujo-bar--active" : ""}" data-cents="${cents}"
         style="display:flex;flex-direction:column;align-items:stretch;justify-content:flex-end;gap:6px;">

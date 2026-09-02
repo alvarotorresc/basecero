@@ -87,8 +87,10 @@ test("barChartSvg: todas las barras llevan su importe; la activa con marcador --
   const labelOpens = html.match(/class="flujo-bar-label/g) || [];
   assert.equal(labelOpens.length, 3);
 
-  assert.match(html, />12,50</);
-  assert.match(html, />0,00</);
+  // las inactivas van sin decimales, redondeadas a la unidad (1250 -> 13, 0 -> 0); la activa
+  // conserva los céntimos (999,00)
+  assert.match(html, />13</);
+  assert.match(html, />0</);
   assert.match(html, />999,00</);
 
   // solo la activa lleva el marcador --active
@@ -96,10 +98,12 @@ test("barChartSvg: todas las barras llevan su importe; la activa con marcador --
   assert.equal(activeMarkers.length, 1);
 
   // la etiqueta de un día no activo va atenuada; la de la activa, en color de acento
-  const inactiveLabel = html.match(/<div class="flujo-bar-label[^>]*>12,50</)[0];
-  assert.match(inactiveLabel, /color:var\(--text-3\)/);
-  const activeLabel = html.match(/<div class="flujo-bar-label[^>]*>999,00</)[0];
-  assert.match(activeLabel, /color:var\(--accent\)/);
+  const inactiveMatch = html.match(/<div class="flujo-bar-label[^>]*>13</);
+  assert.ok(inactiveMatch, "debe existir la etiqueta inactiva redondeada");
+  assert.match(inactiveMatch[0], /color:var\(--text-3\)/);
+  const activeMatch = html.match(/<div class="flujo-bar-label[^>]*>999,00</);
+  assert.ok(activeMatch, "debe existir la etiqueta activa con decimales");
+  assert.match(activeMatch[0], /color:var\(--accent\)/);
 });
 
 // ---- sparklineSvg --------------------------------------------------------
