@@ -31,10 +31,54 @@ function nonEmptyLines(text) {
   return String(text ?? "").split(/\r?\n/).filter((l) => l.trim() !== "");
 }
 
+// Candidatos, EN ORDEN DE PREFERENCIA ante un empate: la coma primero (es el default histórico del
+// parser y el separador del CSV de N26), luego el punto y coma (lo que exporta la banca española:
+// en locale es-ES la coma es el decimal, así que Excel separa con ;) y el tabulador (los "CSV" que
+// en realidad son TSV).
+const DELIMITERS = [",", ";", "\t"];
+
+/** Cuántas veces aparece `delim` en `line` FUERA de comillas dobles, con el MISMO modelo de comillas
+ *  que bcParseCsvLine (comilla doble abre/cierra, "" escapa una comilla dentro). Sin ese "fuera de
+ *  comillas", un concepto como «Compra, super» en un fichero de ; le daría votos a la coma. */
+function countOutsideQuotes(line, delim) {
+  let n = 0;
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQ) {
+      if (ch === '"' && line[i + 1] === '"') i++;
+      else if (ch === '"') inQ = false;
+    } else if (ch === '"') inQ = true;
+    else if (ch === delim) n++;
+  }
+  return n;
+}
+
+/** Delimitador del fichero: el candidato con MÁS apariciones fuera de comillas, sumadas sobre las 5
+ *  primeras líneas no vacías (cabecera incluida — un fichero de una sola línea también decide).
+ *  Empate, o ningún candidato presente, → coma: la comparación es estricta (`>`), así que gana el
+ *  primero de DELIMITERS que llegue a ese máximo.
+ *
+ *  NO se guarda en el perfil: meta.csv_profile tiene 6 claves exactas y parseCsvProfile rechaza
+ *  cualquier objeto con otro número de claves, así que añadir `delimiter` invalidaría en silencio
+ *  todos los perfiles ya guardados. Se redetecta en cada sniff/apply — determinista sobre el mismo
+ *  texto y sin migración. */
+export function detectDelimiter(text) {
+  const lines = nonEmptyLines(text).slice(0, 5);
+  let best = ",";
+  let bestCount = 0;
+  for (const d of DELIMITERS) {
+    const n = lines.reduce((sum, l) => sum + countOutsideQuotes(l, d), 0);
+    if (n > bestCount) { best = d; bestCount = n; }
+  }
+  return best;
+}
+
 export function sniffCsv(text, parseLine) {
   const lines = nonEmptyLines(text);
   if (lines.length === 0) return { headers: [], sample: [] };
-  return { headers: parseLine(lines[0]), sample: lines.slice(1, 6).map((l) => parseLine(l)) };
+  const delim = detectDelimiter(text);
+  return { headers: parseLine(lines[0], delim), sample: lines.slice(1, 6).map((l) => parseLine(l, delim)) };
 }
 
 // ---------------------------------------------------------------------- fechas
@@ -190,7 +234,8 @@ export function applyProfile(text, profile, parseLine) {
   const errors = [];
   if (lines.length === 0) return { rows, errors };
 
-  const header = parseLine(lines[0]);
+  const delim = detectDelimiter(text);
+  const header = parseLine(lines[0], delim);
   const dateIdx = header.indexOf(profile.date);
   const conceptIdx = header.indexOf(profile.concept);
   const counterpartyIdx = profile.counterparty ? header.indexOf(profile.counterparty) : -1;
@@ -202,7 +247,7 @@ export function applyProfile(text, profile, parseLine) {
 
   for (let i = 1; i < lines.length; i++) {
     const lineNo = i + 1;
-    const cells = parseLine(lines[i]);
+    const cells = parseLine(lines[i], delim);
 
     const bookingDate = parseDateIso(cells[dateIdx], profile.dateFormat);
     if (!bookingDate) { errors.push({ line: lineNo, reason: t("errors.csvGeneric.invalidDate") }); continue; }

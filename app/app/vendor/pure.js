@@ -26,7 +26,11 @@ function bcBuildExternalId(dateIso, amountCents, partner, reference, sha256HexFn
   return sha256HexFn(payload).slice(0, 16);
 }
 
-function bcParseCsvLine(line) {
+// `delim` es OPCIONAL y cae a coma: las llamadas de siempre (bcParseN26Csv, tests) no cambian.
+// Sin ES6 default parameters, a propósito: este fichero se ejecuta también en Google Apps Script
+// (ver cabecera) y su convención es var + function.
+function bcParseCsvLine(line, delim) {
+  var sep = delim || ",";
   var out = [], cur = "", inQ = false;
   for (var i = 0; i < line.length; i++) {
     var ch = line.charAt(i);
@@ -35,7 +39,7 @@ function bcParseCsvLine(line) {
       else if (ch === '"') inQ = false;
       else cur += ch;
     } else if (ch === '"') inQ = true;
-    else if (ch === ",") { out.push(cur); cur = ""; }
+    else if (ch === sep) { out.push(cur); cur = ""; }
     else cur += ch;
   }
   out.push(cur);

@@ -5,7 +5,7 @@ const require = createRequire(import.meta.url);
 const { bcParseCsvLine } = require("../../app/app/vendor/pure.js");
 import {
   sniffCsv, isN26Headers, detectDateFormat, detectDecimal, parseAmountCents,
-  parseDateIso, buildProfile, applyProfile, parseCsvProfile, profileMatches,
+  parseDateIso, buildProfile, applyProfile, parseCsvProfile, profileMatches, detectDelimiter,
 } from "../../app/app/js/csv-generic.js";
 
 // Cabeceras EXACTAS del CSV de N26 (tests/app/fixtures/n26_sample.csv línea 1).
@@ -291,4 +291,74 @@ test("profileMatches: igualdad exacta del array de cabeceras, orden incluido", (
   assert.equal(profileMatches(profile, ["A", "C", "B"]), false);
   assert.equal(profileMatches(profile, ["A", "B"]), false);
   assert.equal(profileMatches(profile, ["A", "B", "C", "D"]), false);
+});
+
+// ------------------------------------------------------- delimitador (backlog)
+
+test("bcParseCsvLine: delimitador explícito (; y tabulador) y coma por defecto, respetando comillas", () => {
+  assert.deepEqual(bcParseCsvLine("a,b,c"), ["a", "b", "c"], "sin 2o argumento sigue siendo coma");
+  assert.deepEqual(bcParseCsvLine("a,b,c", ""), ["a", "b", "c"], "cadena vacía cae al default, no trocea por nada");
+  assert.deepEqual(bcParseCsvLine("a;b;c", ";"), ["a", "b", "c"]);
+  assert.deepEqual(bcParseCsvLine("a\tb\tc", "\t"), ["a", "b", "c"]);
+  assert.deepEqual(bcParseCsvLine('"a;1";"b, 2";c', ";"), ["a;1", "b, 2", "c"],
+    "el separador dentro de comillas no trocea, y la coma ya no es separadora");
+  assert.deepEqual(bcParseCsvLine('"con ""comillas""";x', ";"), ['con "comillas"', "x"],
+    "el escape de comilla doble sigue funcionando con otro delimitador");
+});
+
+test("detectDelimiter: punto y coma (banca española), y las comas dentro de comillas no votan", () => {
+  const text = [
+    '"Fecha";"Concepto";"Importe"',
+    '"12/09/2026";"Compra, super";"-45,20"',
+    '"13/09/2026";"Nómina, agosto";"1.800,00"',
+  ].join("\n");
+  assert.equal(detectDelimiter(text), ";", "6 puntos y coma fuera de comillas frente a 0 comas fuera de comillas");
+});
+
+test("detectDelimiter: coma, tabulador, empate y fichero sin separadores", () => {
+  assert.equal(detectDelimiter('"Fecha","Concepto","Importe"\n"2026-09-01","Compra","-45,20"'), ",");
+  assert.equal(detectDelimiter("Fecha\tConcepto\tImporte\n2026-09-01\tCompra\t-45.20"), "\t");
+  assert.equal(detectDelimiter("a,b;c\nd,e;f"), ",", "2 comas y 2 puntos y coma: el empate lo gana la coma");
+  assert.equal(detectDelimiter("una sola columna sin separadores"), ",", "sin ningún candidato: coma");
+});
+
+test("detectDelimiter: una sola línea (solo cabecera) también decide; blancos y texto vacío no rompen", () => {
+  assert.equal(detectDelimiter("Fecha;Concepto;Importe"), ";");
+  assert.equal(detectDelimiter("Fecha;Concepto;Importe\n\n   \n"), ";", "las líneas en blanco no cuentan");
+  assert.equal(detectDelimiter(""), ",");
+  assert.equal(detectDelimiter(null), ",");
+});
+
+test("sniffCsv: un CSV de punto y coma se trocea de verdad, no colapsa en una columna", () => {
+  const text = [
+    '"Fecha";"Concepto; detalle";"Importe"',
+    '"2026-09-01";"Compra; super";"-45,20"',
+    '"2026-09-02";"Nómina";"1800,00"',
+  ].join("\n");
+  const { headers, sample } = sniffCsv(text, bcParseCsvLine);
+  assert.deepEqual(headers, ["Fecha", "Concepto; detalle", "Importe"]);
+  assert.deepEqual(sample, [
+    ["2026-09-01", "Compra; super", "-45,20"],
+    ["2026-09-02", "Nómina", "1800,00"],
+  ]);
+});
+
+test("applyProfile: un CSV de punto y coma entra entero por el mismo perfil que uno de comas", () => {
+  const headers = ["Fecha", "Concepto", "Importe"];
+  const sample = [["12/09/2026", "Compra super", "-45,20"], ["13/09/2026", "Nómina", "1.800,00"]];
+  const profile = buildProfile({
+    headers, date: "Fecha", concept: "Concepto", counterparty: null,
+    amountKind: "single", amountCol: "Importe", sample,
+  });
+  const text = [
+    "Fecha;Concepto;Importe",
+    "12/09/2026;Compra super;-45,20",
+    '13/09/2026;"Nómina; extra";1.800,00',
+  ].join("\n");
+  const { rows, errors } = applyProfile(text, profile, bcParseCsvLine);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(rows, [
+    { bookingDate: "2026-09-12", partnerName: "", paymentReference: "Compra super", amountCents: -4520 },
+    { bookingDate: "2026-09-13", partnerName: "", paymentReference: "Nómina; extra", amountCents: 180000 },
+  ]);
 });
