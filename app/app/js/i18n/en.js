@@ -29,6 +29,11 @@ export const EN = {
     myShare: "Your share · {pct}%",
     myPartSuffix: " · your share {amount}",
     sharedWith: "Shared with {name}",
+    settlement: {
+      theyOwe: "{name} owes you",
+      youOwe: "You owe {name}",
+      even: "You are square",
+    },
     split: { label: "Split", hint: "{name} pays {pct}%", decreaseAria: "Decrease your share", increaseAria: "Increase your share" },
     merchant: "Merchant",
     date: "Date",
@@ -113,7 +118,6 @@ export const EN = {
     shared: {
       withPartner: "With {name}",
       periodSplit: "This period: {mine} / {theirs}",
-      pendingLabel: "Pending for them to pay back",
       oldest: {
         one: "{n} unsettled expense · oldest from {date}",
         other: "{n} unsettled expenses · oldest from {date}",
@@ -186,6 +190,7 @@ export const EN = {
       fallbackName: "the other party",
       fallbackLabel: "Other party",
     },
+    row: { partnerPaid: " · {name} paid · your share {amount}" },
     delete: {
       button: "Delete",
       confirm: "Yes, delete",
@@ -202,15 +207,20 @@ export const EN = {
       settle: "Couldn’t settle: {error}",
     },
     title: { withPartner: "Settle up with {name}" },
-    total: { title: "Pending total" },
-    pending: { title: "Pending expenses" },
+    net: { title: "Net" },
+    account: { title: "Settlement account" },
     empty: "Nothing left to settle.",
     row: {
-      sub: "{date} · {amount} · their {pct}%",
+      subTheirs: "{date} · {amount} · their {pct}%",
+      subMine: "{date} · {amount} · your {pct}%",
     },
     footer: {
-      settle: "Settle up {total}",
-      confirm: "Yes, settle up {total}",
+      collect: "Collect {amount} from {name}",
+      collectConfirm: "Yes, collect {amount}",
+      pay: "Pay {amount} to {name}",
+      payConfirm: "Yes, pay {amount}",
+      even: "Settle up · nothing changes hands",
+      evenConfirm: "Yes, settle up",
     },
     note: "Settle up",
     outflow: {
@@ -546,7 +556,7 @@ export const EN = {
       summary: "New: {created} · Reconciled: {reconciled} · Duplicates (skipped): {skipped}",
       omitted: { one: " · 1 unreadable row skipped", other: " · {n} unreadable rows skipped" },
       tail: ". Check the “uncategorized” tray in Transactions.",
-      bizumHint: " {name}’s Bizum transfers reconcile automatically if you use “Settle up” in Home before importing.",
+      bizumHint: " Settle up in Home before importing: an incoming Bizum reconciles itself; one you send comes in as a new transaction.",
     },
     assist: {
       title: "Set up your bank",

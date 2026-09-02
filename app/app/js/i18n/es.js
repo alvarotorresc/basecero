@@ -29,6 +29,11 @@ export const ES = {
     myShare: "Tu parte · {pct}%",
     myPartSuffix: " · tu parte {amount}",
     sharedWith: "Compartido con {name}",
+    settlement: {
+      theyOwe: "{name} te debe",
+      youOwe: "Debes a {name}",
+      even: "Estáis en paz",
+    },
     split: { label: "Reparto", hint: "{name} paga el {pct} %", decreaseAria: "Bajar tu parte", increaseAria: "Subir tu parte" },
     merchant: "Comercio",
     date: "Fecha",
@@ -114,7 +119,6 @@ export const ES = {
     shared: {
       withPartner: "Con {name}",
       periodSplit: "Este periodo: {mine} / {theirs}",
-      pendingLabel: "Pendiente de que te devuelva",
       oldest: {
         one: "{n} gasto sin liquidar · el más antiguo del {date}",
         other: "{n} gastos sin liquidar · el más antiguo del {date}",
@@ -187,6 +191,7 @@ export const ES = {
       fallbackName: "la contraparte",
       fallbackLabel: "Contraparte",
     },
+    row: { partnerPaid: " · pagó {name} · tu parte {amount}" },
     delete: {
       button: "Borrar",
       confirm: "Sí, borrar",
@@ -203,15 +208,20 @@ export const ES = {
       settle: "No se pudo liquidar: {error}",
     },
     title: { withPartner: "Liquidar con {name}" },
-    total: { title: "Total pendiente" },
-    pending: { title: "Gastos pendientes" },
+    net: { title: "Neto" },
+    account: { title: "Cuenta de la liquidación" },
     empty: "No queda nada pendiente de liquidar.",
     row: {
-      sub: "{date} · {amount} · su {pct} %",
+      subTheirs: "{date} · {amount} · su {pct} %",
+      subMine: "{date} · {amount} · tu {pct} %",
     },
     footer: {
-      settle: "Liquidar {total}",
-      confirm: "Sí, liquidar {total}",
+      collect: "Cobrar {amount} de {name}",
+      collectConfirm: "Sí, cobrar {amount}",
+      pay: "Pagar {amount} a {name}",
+      payConfirm: "Sí, pagar {amount}",
+      even: "Liquidar · queda a cero",
+      evenConfirm: "Sí, liquidar",
     },
     note: "Liquidación",
     outflow: {
@@ -546,7 +556,7 @@ export const ES = {
       summary: "Nuevas: {created} · Conciliadas: {reconciled} · Duplicadas (saltadas): {skipped}",
       omitted: { one: " · 1 fila ilegible omitida", other: " · {n} filas ilegibles omitidas" },
       tail: ". Revisa la bandeja «sin categorizar» en Movimientos.",
-      bizumHint: " Los Bizum de {name} se concilian solos si usas «Liquidar» en Inicio antes de importar.",
+      bizumHint: " Liquida en Inicio antes de importar: el Bizum que recibes se concilia solo; el que envías entra como movimiento nuevo.",
     },
     assist: {
       title: "Configura tu banco",
