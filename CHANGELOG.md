@@ -34,10 +34,13 @@ Versionado según [SemVer](https://semver.org/lang/es/).
 - **Los errores que se tragaba la app ahora se ven.** El detalle de una categoría que no carga lo
   dice en su fila, y guardar un límite ya no acusa de «no se pudo guardar» cuando lo que falló fue
   releer los datos después de guardarlo bien.
-- **Los límites de un periodo nuevo aceptan céntimos.** El campo de límite del asistente sólo dejaba
+- **Los límites de un periodo nuevo aceptan céntimos.** El campo de límite del asistente solo dejaba
   poner euros enteros; ahora admite decimales, igual que el de «Gasto por categoría».
 - **Un préstamo ya pagado no dice «quedan 0 cuotas».**
 - **Los enlaces del inicio se ven al llegar con el tabulador.**
+- **Una hoja con dos límites vivos para la misma categoría y periodo ya no se importa.** Solo puede
+  pasar editando el xlsx a mano, y antes entraba en silencio: la app leía un límite y editaba el otro.
+  Ahora la importación lo rechaza y dice qué filas chocan.
 
 ## [1.0.0] — 2026-09-02
 
