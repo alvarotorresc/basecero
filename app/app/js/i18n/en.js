@@ -29,6 +29,7 @@ export const EN = {
     myShare: "Your share · {pct}%",
     myPartSuffix: " · your share {amount}",
     sharedWith: "Shared with {name}",
+    split: { label: "Split", hint: "{name} pays {pct}%", decreaseAria: "Decrease your share", increaseAria: "Increase your share" },
     merchant: "Merchant",
     date: "Date",
     note: "Note",
@@ -158,7 +159,6 @@ export const EN = {
       empty: "No recent expenses.",
       sharedSuffix: " · shared",
     },
-    keypad: { delete: "Backspace", helper: "the keypad adds up receipts" },
   },
   movimientos: {
     error: {
@@ -180,7 +180,7 @@ export const EN = {
     },
     type: { transfer: "Transfer" },
     detail: {
-      lockedNote: "Settled. To edit the amount, first delete its settlement in Transactions.",
+      lockedNote: "It has a linked refund: to change the amount or the split, delete that refund first.",
     },
     shared: {
       fallbackName: "the other party",
@@ -494,6 +494,9 @@ export const EN = {
       subtitle: "Opened on {date}{days} · split {mine} / {theirs}",
       days: { one: " · {n} day", other: " · {n} days" },
       openLabel: "Open",
+      shareLabel: "Default split",
+      shareHint: "For new expenses · {name} pays {pct}%",
+      shareSaveFailed: "Could not save the split: {error}",
       closeBtn: "Close period and open the next one",
       closeNoteWithPartner: "Closing it sets the end date and lets you choose the split with {name} for the new period. Open it the day your paycheck arrives.",
       closeNote: "Closing it sets the end date. Open it the day your paycheck arrives.",
@@ -665,7 +668,8 @@ export const EN = {
       periodStartTooEarly: "The date must be after the current period’s start",
       settleNotFound: "Shared expense not found or already settled",
       txNotFound: "Transaction not found",
-      txLockedSettled: "This expense is already settled: delete its settlement in Transactions before changing the amount or split.",
+      txLockedSettled: "This expense has a linked refund: delete that refund in Transactions first to change the amount or the split.",
+      sharePctInvalid: "The split must be between 0 and 100.",
       refundLockedSettled: "This entry is a refund linked to an expense. Delete or unlink it before changing its amount.",
       expenseLockedHasRefund: "This expense has a linked refund. Delete the refund first in Transactions.",
       ruleNotFound: "Rule not found",

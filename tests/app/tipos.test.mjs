@@ -32,13 +32,48 @@ test("spentOfPeriod: refund compartido sin ref_id resta solo MY_AMOUNT prorratea
   assert.equal(spent, 5400);
 });
 
-test("spentOfPeriod: refund CON ref_id no toca el gasto original", () => {
+test("spentOfPeriod: refund vinculado a un gasto COMPARTIDO (liquidación) no toca el gasto original", () => {
   const db = openDb();
   seedMinimal(db);
   const gastoId = ins(db, { type: "expense", cents: 90000, shared: 1 }); // MY_AMOUNT -> 54000
   ins(db, { type: "refund", cents: 36000, shared: 1, ref: gastoId });
   const spent = db.prepare(SQL.spentOfPeriod).get("per-1").spent_cents;
   assert.equal(spent, 54000);
+});
+
+test("spentOfPeriod: refund vinculado a un gasto NO compartido resta su importe entero", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const gastoId = ins(db, { type: "expense", cents: 5000, shared: 0 });
+  ins(db, { type: "refund", cents: 5000, shared: 0, ref: gastoId });
+  const spent = db.prepare(SQL.spentOfPeriod).get("per-1").spent_cents;
+  assert.equal(spent, 0);
+
+  const db2 = openDb();
+  seedMinimal(db2);
+  const gastoId2 = ins(db2, { type: "expense", cents: 5000, shared: 0 });
+  ins(db2, { type: "refund", cents: 2000, shared: 0, ref: gastoId2 }); // devolución parcial
+  const spent2 = db2.prepare(SQL.spentOfPeriod).get("per-1").spent_cents;
+  assert.equal(spent2, 3000);
+});
+
+test("spentOfPeriod: refund vinculado a un gasto que ya no existe (ref_id huérfano) resta como suelto", () => {
+  const db = openDb();
+  seedMinimal(db);
+  ins(db, { type: "expense", cents: 5000, shared: 0 });
+  ins(db, { type: "refund", cents: 1000, shared: 0, ref: "no-existe" });
+  const spent = db.prepare(SQL.spentOfPeriod).get("per-1").spent_cents;
+  assert.equal(spent, 4000);
+});
+
+test("spentOfPeriod: refund vinculado a un gasto COMPARTIDO ya borrado (deleted=1) resta como huérfano", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const gastoId = ins(db, { type: "expense", cents: 10000, shared: 1 }); // MY_AMOUNT 60% -> 6000 mientras vive
+  ins(db, { type: "refund", cents: 4000, shared: 0, ref: gastoId });
+  db.prepare("UPDATE transactions SET deleted=1 WHERE id=?").run(gastoId);
+  const spent = db.prepare(SQL.spentOfPeriod).get("per-1").spent_cents;
+  assert.equal(spent, -4000, "el gasto borrado ya no cuenta; el refund (is_shared=0) resta su importe entero como huérfano");
 });
 
 test("insertTransaction admite transfer con counter_account_id y adjustment negativo", () => {

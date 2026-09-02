@@ -3,19 +3,10 @@ import {
   listAccounts, allCategoriesById, recentForRefund, getMetaAll,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
-import { fmtMoney, fmtMoneyParts, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
-import { foldPending } from "../expr.js";
+import { fmtMoney, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
-
-// Layout de calculadora (Task 3, ver Registro.dc.html): 4 columnas, operadores en la última
-// columna (÷ × −) más "+" al final de la fila de borrar — SIN tecla "=" (calculadora de cinta
-// izquierda-a-derecha, ver expr.js). OPS es el contrato exacto de expr.js: los símbolos Unicode
-// que renderiza el teclado son literalmente los que viajan en state.op y llegan a evalExpr/
-// foldPending, sin capa de traducción intermedia (− U+2212, × U+00D7, ÷ U+00F7, no sus alias ASCII).
-const KEYS = ["7", "8", "9", "÷", "4", "5", "6", "×", "1", "2", "3", "−", ",", "0", "back", "+"];
-const OPS = new Set(["+", "−", "×", "÷"]);
-const ICON_BACK = `<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 5.5H9.2L3.5 12l5.7 6.5H20a1 1 0 001-1v-11a1 1 0 00-1-1z"></path><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"></path></svg>`;
+import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 
 // labelKey/SAVE_KEY en vez de texto resuelto: son consts de módulo, evaluadas al importar el
 // fichero (antes de que boot() llame a initI18n con el idioma real) — si guardaran el string ya
@@ -35,16 +26,6 @@ const needsCategory = (tipo) => tipo === "expense" || tipo === "income" || tipo 
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-
-// Compone el importe grande cuando hay un resultado CALCULADO que mostrar (state.op != null,
-// Task 3) — mismo patrón .amount-hero que inicio.js/patrimonio.js/presupuesto.js/
-// periodo-nuevo.js/liquidar.js: main + <small>céntimos</small> + sufijo (incluye el símbolo de
-// moneda ya bien colocado por locale — prefijo o sufijo, ver fmtMoneyParts en format.js), sin
-// reimplementar el locale a mano.
-const moneyPartsHtml = (cents) => {
-  const { main, cents: c, suffix } = fmtMoneyParts(cents);
-  return `${escHtml(main)}<small>${escHtml(c)}</small>${escHtml(suffix)}`;
-};
 
 /** Monta la pantalla completa de registro rápido de un movimiento (5 tipos).
  *  onDone() se llama tanto al cerrar (✕) como tras guardar con éxito.
@@ -71,24 +52,17 @@ export async function renderRegistro(container, onDone, prefill) {
   }
 
   const accounts = accountsAll.filter((a) => a.type !== "liability");
-  const pct = period?.my_share_pct ?? 100;
   const partnerName = (meta.partner_name || "").trim();
 
   const state = {
     tipo: prefill?.type ?? "expense",
     raw: centsToRaw(prefill?.amountCents),
     cents: prefill?.amountCents ?? 0,
-    // Máquina incremental del teclado con operadores (Task 3): acc = lo ya confirmado (céntimos
-    // o null si aún no se ha plegado nada), op = operador pendiente. Invariante mantenida por
-    // TODO el código de esta pantalla: acc===null ⟺ op===null (se ponen a null juntos siempre:
-    // aquí, en pressOp al deshacer con "back", y en selectRefundRow/el prefill de arriba — un
-    // prefill o un refund es un importe plano, no arrastra expresión).
-    acc: null,
-    op: null,
     categoryId: prefill?.categoryId ?? null,
     accountId: prefill?.accountId ?? resolveAccountId(meta.default_account_id, accounts) ?? "",
     counterAccountId: "",
     isShared: partnerName ? (prefill?.isShared ?? false) : false,
+    sharePct: normalizePct(period?.my_share_pct, 100),
     fecha: hoyISO(),
     merchant: prefill?.merchant ?? "",
     note: "",
@@ -105,84 +79,6 @@ export async function renderRegistro(container, onDone, prefill) {
     return [];
   };
 
-  // Pliega state.raw (el operando que se está tecleando) dentro de state.acc según state.op —
-  // wrapper de foldPending (expr.js) con parseCentsRaw ya aplicado y `raw !== ""` como señal de
-  // "hay algo tecleado" (foldPending distingue "" de "0": ver su cabecera en expr.js). Es la
-  // MISMA regla para el recálculo en vivo tras cada tecla (setRaw) y para el pliegue al pulsar/
-  // cambiar de operador (pressOp) — así state.cents nunca diverge de lo que guardará
-  // addTransaction, ni siquiera a mitad de tecleo. Con op===null (acc también null por la
-  // invariante de arriba) esto es exactamente parseCentsRaw(raw): paridad con el comportamiento
-  // de hoy en el camino "solo dígitos, sin operador".
-  function computeRunning(acc, op, raw) {
-    return foldPending(acc, op, parseCentsRaw(raw), raw !== "");
-  }
-
-  function setRaw(next) {
-    state.raw = next;
-    state.cents = computeRunning(state.acc, state.op, state.raw);
-    errorMsg = "";
-    render();
-  }
-
-  // Pulsar un operador PLIEGA el operando pendiente en el acumulador y deja el operador nuevo a
-  // la espera del siguiente operando. Casos límite (decisión deliberada, no accidental):
-  //  - operador como PRIMERA tecla (acc=null, raw=""): computeRunning/foldPending trata el
-  //    acumulador como 0 — "+5" empieza en 0+5, nunca en NaN ni en error.
-  //  - operador dos veces seguidas sin teclear nada entre medias (raw=""): foldPending devuelve
-  //    el acc SIN TOCAR — el operador previo simplemente se REEMPLAZA por el nuevo, sin plegar
-  //    un operando fantasma de 0 (que con ‘×’/‘÷’ pondría el importe a 0 o lo dejaría intacto de
-  //    forma inconsistente según el operador — el mismo peligro que señaló el handoff de Task 2
-  //    para el guardado, aquí generalizado al tecleo en caliente).
-  function pressOp(k) {
-    state.acc = computeRunning(state.acc, state.op, state.raw);
-    state.op = k;
-    state.raw = "";
-    state.cents = state.acc;
-    errorMsg = "";
-    render();
-  }
-
-  function pressKey(k) {
-    if (OPS.has(k)) { pressOp(k); return; }
-    if (k === "back") {
-      // Borrar justo tras pulsar un operador, sin haber tecleado nada del siguiente operando:
-      // este teclado no tiene tecla C/AC (ver Registro.dc.html), así que sin este caso el
-      // operador quedaría atascado sin más forma de deshacerlo que cerrar la pantalla. Se
-      // deshace el operador pendiente y se recupera como operando editable el importe de antes
-      // — SOLO cuando ese importe es representable en la gramática de tecleo (acc >= 0): este
-      // teclado no tiene tecla de signo, así que centsToRaw(acc) es Math.abs por contrato
-      // (format.js) — con acc NEGATIVO (p.ej. "5 − 10 +", acc=-500) reconstruir raw así
-      // BLANQUEARÍA el signo y, al re-parsear, convertiría un importe -500 (no guardable) en
-      // +500 guardable: bug real de dinero, corregido en el "fix round 1" de Task 3.
-      if (state.raw === "" && state.op != null && state.acc >= 0) {
-        state.raw = centsToRaw(state.acc);
-        state.acc = null;
-        state.op = null;
-        state.cents = computeRunning(state.acc, state.op, state.raw);
-        errorMsg = "";
-        render();
-        return;
-      }
-      // acc < 0 (o no hay operador pendiente): NO se hace el round-trip que blanquea el signo.
-      // Con raw==="" esto es, en la práctica, un no-op — pero uno CORRECTO: setRaw("")
-      // recalcula state.cents vía computeRunning(acc, op, ""), que con raw vacío devuelve acc
-      // TAL CUAL (con su signo intacto), en vez de "lanzarlo por parseCentsRaw" y perderlo. El
-      // usuario puede seguir corrigiendo pulsando otro operador (pressOp ya tiene su propia
-      // guardia raw==="") o tecleando el siguiente operando.
-      setRaw(state.raw.slice(0, -1));
-      return;
-    }
-    if (k === ",") {
-      if (state.raw.includes(",")) return;
-      setRaw((state.raw || "0") + ",");
-      return;
-    }
-    const [, dec] = state.raw.split(",");
-    if (dec && dec.length >= 2) return; // coma: máx. 2 decimales
-    // evita ceros a la izquierda sin sentido ("05") cuando aún no hay coma
-    setRaw(state.raw === "0" ? k : state.raw + k);
-  }
-
   function selectRefundRow(row) {
     state.refId = row.id;
     state.categoryId = row.category_id;
@@ -193,17 +89,14 @@ export async function renderRegistro(container, onDone, prefill) {
       // Usa el pct EFECTIVO del gasto enlazado (su propio override, o el pct
       // de SU periodo), no el del periodo abierto: el gasto puede venir de un
       // periodo cerrado con reparto distinto o llevar su propio override.
-      const rowPct = row.share_pct_override ?? row.period_pct ?? 100;
-      const myPart = Math.round((row.amount_cents * rowPct) / 100);
-      const partnerPart = row.amount_cents - myPart;
+      const { partner: partnerPart } = splitCents(row.amount_cents, normalizePct(row.share_pct_override ?? row.period_pct, 100));
       state.raw = centsToRaw(partnerPart);
       state.cents = partnerPart;
-      // Un refund es un importe plano, no arrastra expresión (Task 3) — reset AQUÍ, junto a la
-      // asignación de raw/cents, no al principio de la función: solo entramos a esta rama
-      // cuando is_shared de verdad TOCA el importe. Enlazar una fila NO compartida no debe
-      // tirar una operación en curso (acc/op) que el usuario ya estuviera tecleando.
-      state.acc = null;
-      state.op = null;
+    } else {
+      // Gasto NO compartido: lo normal es que la tienda devuelva el importe entero — se precarga
+      // completo y editable (devolución parcial = corregir el importe a mano).
+      state.raw = centsToRaw(row.amount_cents);
+      state.cents = row.amount_cents;
     }
     state.refundPickerOpen = false;
     errorMsg = "";
@@ -291,41 +184,13 @@ export async function renderRegistro(container, onDone, prefill) {
 
   function render() {
     const cats = categoriesFor();
-    const myCents = state.isShared ? Math.round((state.cents * pct) / 100) : state.cents;
-    const partnerCents = state.isShared ? state.cents - myCents : 0;
+    const { mine: myCents, partner: partnerCents } = state.isShared ? splitCents(state.cents, state.sharePct) : { mine: state.cents, partner: 0 };
     // Color del display/importe y del botón de guardar: se leen del state en CADA pintado, así
     // que basta con el render() que ya dispara el click de categoría — sin estado nuevo.
     const amountColor = state.categoryId ? textColorForCategory(state.categoryId, byId) : "var(--text)";
     const saveStyle = needsCategory(state.tipo) && state.categoryId
       ? `background:${colorForCategory(state.categoryId, byId)};color:#FFF4EC;`
       : "";
-
-    // Signo del ajuste: puramente visual (el céntimo interno sigue positivo, el flip ocurre solo
-    // al guardar, ver #reg-save más abajo) — se mantiene igual que antes de Task 3.
-    const signPrefix = state.tipo === "adjustment" && state.adjustmentSign === "-" ? "−" : "";
-    // Importe grande: con op===null (camino "solo dígitos", el caso CRÍTICO de paridad con hoy)
-    // se sigue mostrando literalmente lo tecleado (state.raw), tal cual hacía la pantalla antes
-    // de Task 3 — así ni el valor (state.cents) ni el eco visual cambian un bit en ese camino.
-    // Con op!=null hay un resultado CALCULADO (no algo que el usuario tecleó tal cual), así que
-    // se formatea con fmtMoneyParts (mismo patrón .amount-hero que inicio.js/patrimonio.js/
-    // presupuesto.js/periodo-nuevo.js/liquidar.js) en vez de intentar "ecoar" un cálculo.
-    const amountHtml = state.op != null
-      ? `<span class="num amount-hero" style="font-size:52px; font-weight:700; letter-spacing:-0.01em; color:${amountColor};">${signPrefix}${moneyPartsHtml(state.cents)}</span>`
-      : `<span class="num" style="font-size:52px; font-weight:700; letter-spacing:-0.01em; color:${amountColor};">${signPrefix}${escHtml(state.raw || "0")}</span>
-         <span class="amount-currency" style="color:${amountColor};">${escHtml(currencySymbol())}</span>`;
-    // Renglón de expresión bajo el importe (Registro.dc.html: "12 + 12,90 — el teclado suma
-    // tickets"), solo cuando hay una operación en curso. state.raw se ecoa tal cual se está
-    // tecleando (mismo criterio "ver lo que escribo" que tenía el importe grande antes de Task 3,
-    // ahora reubicado aquí); state.acc se muestra a mano con signo — centsToRaw es Math.abs por
-    // contrato (format.js), así que hay que anteponer el "−" si acc es negativo (resta) para que
-    // este renglón cuadre con el importe grande (fmtMoneyParts(state.cents) SÍ es sensible al
-    // signo). Con acc===0 —operador como primera tecla— centsToRaw da "" y se sustituye por "0"
-    // para no dejar la línea coja.
-    const accText = (state.acc < 0 ? "−" : "") + (centsToRaw(state.acc) || "0");
-    const exprLine = state.op == null ? "" : `
-      <div style="text-align:right; font-size:12px; color:var(--text-3); margin-top:2px;">
-        ${escHtml(accText)} ${escHtml(state.op)} ${escHtml(state.raw)} — ${escHtml(t("registro.keypad.helper"))}
-      </div>`;
 
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
 
@@ -347,11 +212,12 @@ export async function renderRegistro(container, onDone, prefill) {
 
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
         <div class="section-title">${t("common.amount")}</div>
-        <div class="amount-display" style="align-items:baseline; justify-content:flex-end;">
+        <div class="amount-display" style="align-items:center;">
           ${state.tipo === "adjustment" ? `<button type="button" class="icon-btn" id="reg-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;">${state.adjustmentSign}</button>` : ""}
-          ${amountHtml}
+          <input type="text" inputmode="decimal" id="reg-raw" value="${escAttr(state.raw)}" placeholder="0" autocomplete="off"
+            style="border:0;background:none;color:${amountColor};font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
+          <span class="amount-currency" style="color:${amountColor};">${escHtml(currencySymbol())}</span>
         </div>
-        ${exprLine}
         <hr class="divider" style="margin-top:6px;">
       </div>
 
@@ -403,30 +269,28 @@ export async function renderRegistro(container, onDone, prefill) {
           </span>
         </label>
         ${state.isShared ? `
-        <div style="display:flex; gap:8px; padding:0 0 14px;">
-          <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
-            <div style="font-size:10px; color:var(--text-3);">${t("common.myShare", { pct })}</div>
-            <div class="num" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
+        <div style="display:flex; flex-direction:column; gap:10px; padding:0 0 14px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:14px; font-weight:600;">${t("common.split.label")}</div>
+              <div style="font-size:11px; color:var(--text-3);">${t("common.split.hint", { name: escHtml(partnerName), pct: 100 - state.sharePct })}</div>
+            </div>
+            <button type="button" id="reg-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}">−</button>
+            <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${state.sharePct} %</div>
+            <button type="button" id="reg-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}">+</button>
           </div>
-          <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
-            <div style="font-size:10px; color:var(--text-3);">${escHtml(partnerName)} · ${100 - pct}%</div>
-            <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerCents)}</div>
+          <div style="display:flex; gap:8px;">
+            <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
+              <div style="font-size:10px; color:var(--text-3);">${t("common.myShare", { pct: state.sharePct })}</div>
+              <div class="num" id="reg-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
+            </div>
+            <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
+              <div style="font-size:10px; color:var(--text-3);">${escHtml(partnerName)} · ${100 - state.sharePct}%</div>
+              <div class="num" id="reg-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerCents)}</div>
+            </div>
           </div>
         </div>` : ""}
       </div>` : ""}
-
-      <div class="keypad" style="margin-bottom:18px;">
-        ${KEYS.map((k) => {
-          if (k === "back") return `<button type="button" class="key key-back" data-key="back" aria-label="${t("registro.keypad.delete")}">${ICON_BACK}</button>`;
-          // back/coma se quedan con su tratamiento de siempre (key-back/key-comma) aunque el
-          // artboard SÍ pone class="key op" en "back" (Registro.dc.html) — es una decisión MÍA
-          // para esta entrega, no algo que pida el brief/plan (que no mencionan esta distinción):
-          // solo +/−/×/÷ llevan la clase .op nueva. Si se prefiere fidelidad pixel-perfect al
-          // artboard, añadir .op también a "back" es un cambio de una línea (aquí y en app.css).
-          if (OPS.has(k)) return `<button type="button" class="key op" data-key="${k}">${k}</button>`;
-          return `<button type="button" class="key${k === "," ? " key-comma" : ""}" data-key="${k}">${k}</button>`;
-        }).join("")}
-      </div>
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
@@ -454,10 +318,6 @@ export async function renderRegistro(container, onDone, prefill) {
         errorMsg = "";
         render();
       };
-    });
-
-    container.querySelectorAll("[data-key]").forEach((b) => {
-      b.onclick = () => pressKey(b.dataset.key);
     });
 
     container.querySelectorAll("[data-cat]").forEach((b) => {
@@ -489,6 +349,19 @@ export async function renderRegistro(container, onDone, prefill) {
       render();
     };
 
+    container.querySelector("#reg-raw").oninput = (e) => {
+      state.raw = e.target.value;
+      state.cents = parseCentsRaw(state.raw);
+      errorMsg = "";
+      const mineEl = container.querySelector("#reg-split-mine");
+      const partnerEl = container.querySelector("#reg-split-partner");
+      if (state.isShared && mineEl && partnerEl) {
+        const { mine: myCents, partner: partnerCents } = splitCents(state.cents, state.sharePct);
+        mineEl.textContent = fmtMoney(myCents);
+        partnerEl.textContent = fmtMoney(partnerCents);
+      }
+    };
+
     const refundToggle = container.querySelector("#reg-refund-toggle");
     if (refundToggle) refundToggle.onclick = () => {
       state.refundPickerOpen = !state.refundPickerOpen;
@@ -515,15 +388,14 @@ export async function renderRegistro(container, onDone, prefill) {
       render();
     };
 
+    const pctDown = container.querySelector("#reg-pct-down");
+    if (pctDown) pctDown.onclick = () => { state.sharePct = stepPct(state.sharePct, -PCT_STEP); render(); };
+    const pctUp = container.querySelector("#reg-pct-up");
+    if (pctUp) pctUp.onclick = () => { state.sharePct = stepPct(state.sharePct, PCT_STEP); render(); };
+
     container.querySelector("#reg-save").onclick = async () => {
       const btn = container.querySelector("#reg-save");
-      // Pliegue final MANDATORIO (handoff de Task 2): por invariante, state.cents ya está al día
-      // en todo momento (setRaw/pressOp llaman a computeRunning tras cada tecla), pero se
-      // recalcula explícito aquí también — a propósito, no por desconfianza en la invariante,
-      // sino porque este es el punto exacto que el handoff marcó como el que NO puede plegar un
-      // operando "" a través de un ‘×’/‘÷’ pendiente (evalExpr(acc,"×",0) daría 0, no acc). Con
-      // raw==="" computeRunning ya hace exactamente eso: devuelve acc intacto.
-      state.cents = computeRunning(state.acc, state.op, state.raw);
+      state.cents = parseCentsRaw(state.raw);
       const msg = validationError();
       if (msg) {
         errorMsg = msg;
@@ -550,6 +422,7 @@ export async function renderRegistro(container, onDone, prefill) {
           // una regla recurrente marcada compartida, inicio.js) se cuele en el guardado aunque
           // el toggle esté oculto para tipo=income.
           isShared: withCategory && state.tipo !== "income" ? state.isShared : false,
+          sharePctOverride: withCategory && state.tipo !== "income" && state.isShared ? state.sharePct : null,
           refId: state.tipo === "refund" ? state.refId : "",
           ruleId: state.ruleId,
         });

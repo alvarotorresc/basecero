@@ -1,6 +1,16 @@
 const MY_AMOUNT = `CAST(ROUND(t.amount_cents * (CASE WHEN t.is_shared=1
   THEN COALESCE(t.share_pct_override, p.my_share_pct, 100) ELSE 100 END) / 100.0) AS INTEGER)`;
 
+// Una devolución resta del gasto SIEMPRE, salvo que sea la liquidación de un gasto compartido
+// (ref_id apunta a un gasto con is_shared=1): ahí mi gasto ya contaba solo mi parte y lo que
+// vuelve es la parte de la contraparte. Vinculada a un gasto NO compartido (la tienda devuelve el
+// dinero) o sin vincular, resta prorrateada por MY_AMOUNT. Lo usan spentOfPeriod,
+// spentByRootCategory y spentByDay — los tres con el MISMO criterio. Un gasto enlazado ya borrado
+// (solo alcanzable importando una hoja: la app bloquea borrar un gasto con devolución viva) cuenta
+// como huérfano.
+const REFUND_REDUCES_SPEND = `(t.ref_id='' OR NOT EXISTS (
+  SELECT 1 FROM transactions e WHERE e.id=t.ref_id AND e.is_shared=1 AND e.deleted=0))`;
+
 export const SQL = {
   getOpenPeriod: `SELECT * FROM periods WHERE status='open' AND deleted=0 LIMIT 1`,
   insertPeriod: `INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
@@ -10,7 +20,7 @@ export const SQL = {
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
   spentOfPeriod: `SELECT COALESCE(SUM(CASE
       WHEN t.type='expense' THEN ${MY_AMOUNT}
-      WHEN t.type='refund' AND t.ref_id='' THEN -${MY_AMOUNT}
+      WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT}
       ELSE 0 END),0) AS spent_cents
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.period_id=? AND t.deleted=0`,
@@ -105,13 +115,26 @@ export const SQL = {
   hasSharedRule: `SELECT 1 FROM recurring_rules WHERE is_shared=1 AND deleted=0 LIMIT 1`,
 
   closePeriod: `UPDATE periods SET end_date=?, status='closed', updated_at=? WHERE id=?`,
+  // Cambia el reparto por defecto del periodo (Ajustes). Va SIEMPRE precedido, en el mismo
+  // execMany, de freezePeriodShareOverrides: los gastos compartidos del periodo que aún seguían al
+  // periodo (override NULL: filas de antes de que la UI guardara el % explícito, o importadas de
+  // una hoja con la celda en blanco) se congelan en el valor ACTUAL antes de cambiarlo — así el
+  // cambio afecta solo a los gastos nuevos, que es lo que promete el texto de Ajustes, y ningún
+  // importe ya calculado se mueve.
+  updatePeriodShare: `UPDATE periods SET my_share_pct=?, updated_at=? WHERE id=? AND deleted=0`,
+  // Bind: [periodId, now, periodId]. La subconsulta lee el my_share_pct VIGENTE (por eso debe
+  // ejecutarse ANTES de updatePeriodShare dentro de la misma transacción).
+  freezePeriodShareOverrides: `UPDATE transactions
+    SET share_pct_override=(SELECT my_share_pct FROM periods WHERE id=?), updated_at=?
+    WHERE period_id=? AND is_shared=1 AND share_pct_override IS NULL AND deleted=0`,
   // Suma por categoría RAÍZ de gasto (parent_id='') el gasto de toda su subárbol (ella misma +
   // hijas directas): child.id=root.id cubre el gasto registrado directamente en la raíz, y
-  // child.parent_id=root.id el de sus hijas. Resta refunds sueltos (ref_id='') prorrateados,
-  // igual criterio que spentOfPeriod. La reutilizan Tasks 9 (Presupuesto) y 12 (gráficas).
+  // child.parent_id=root.id el de sus hijas. Resta refunds que no sean liquidación de un
+  // compartido (REFUND_REDUCES_SPEND), prorrateados, igual criterio que spentOfPeriod. La
+  // reutilizan Tasks 9 (Presupuesto) y 12 (gráficas).
   spentByRootCategory: `SELECT root.id AS root_id, root.name,
     COALESCE(SUM(CASE WHEN t.type='expense' THEN ${MY_AMOUNT}
-                 WHEN t.type='refund' AND t.ref_id='' THEN -${MY_AMOUNT} ELSE 0 END),0) AS spent_cents
+                 WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT} ELSE 0 END),0) AS spent_cents
   FROM categories root
   LEFT JOIN categories child ON (child.id=root.id OR child.parent_id=root.id) AND child.deleted=0
   LEFT JOIN transactions t ON t.category_id=child.id AND t.period_id=? AND t.deleted=0
@@ -123,12 +146,13 @@ export const SQL = {
   budgetsOfPeriod: `SELECT b.id, b.category_id, b.amount_cents FROM budgets b WHERE b.period_id=? AND b.deleted=0`,
 
   // Gasto por día en un rango (Task 12, tarjeta "Flujo de gasto" de Inicio). Mismo criterio que
-  // spentOfPeriod (MY_AMOUNT de expenses, refunds sueltos restan prorrateados), agrupado por
-  // fecha. Solo trae los días con movimiento — repo.spentLast7Days rellena los que faltan con 0
-  // en JS (fillLast7Days). Bind: [periodId, startDateIso, endDateIso].
+  // spentOfPeriod (MY_AMOUNT de expenses, restan las devoluciones que no sean liquidación de un
+  // compartido (REFUND_REDUCES_SPEND), prorrateadas), agrupado por fecha. Solo trae los días con
+  // movimiento — repo.spentLast7Days rellena los que faltan con 0 en JS (fillLast7Days).
+  // Bind: [periodId, startDateIso, endDateIso].
   spentByDay: `SELECT t.date AS date,
     COALESCE(SUM(CASE WHEN t.type='expense' THEN ${MY_AMOUNT}
-                 WHEN t.type='refund' AND t.ref_id='' THEN -${MY_AMOUNT} ELSE 0 END),0) AS cents
+                 WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT} ELSE 0 END),0) AS cents
   FROM transactions t JOIN periods p ON p.id=t.period_id
   WHERE t.period_id=? AND t.deleted=0 AND t.date BETWEEN ? AND ?
   GROUP BY t.date`,

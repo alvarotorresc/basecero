@@ -348,35 +348,6 @@ main#screen {
   font-weight: 700;
 }
 
-/* ===== teclado numérico (con operadores, Task 3 — ver Registro.dc.html) ===== */
-.keypad {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-}
-.key {
-  height: 52px;
-  background: var(--card);
-  border: 0;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-num);
-  font-size: 19px;
-  font-weight: 600;
-  color: var(--text);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.key:active { background: var(--rule); }
-.key-comma { color: var(--text-2); }
-.key-back svg { width: 23px; height: 23px; stroke: var(--text-2); fill: none; }
-/* +/−/×/÷: fondo/color atenuados frente a los dígitos (artboard: .op) — back/coma se quedan con
-   su tratamiento de siempre (key-back/key-comma), decisión explícita, ver registro.js. */
-.key.op { background: var(--card2); color: var(--text-2); font-size: 17px; }
-.key.op:active { background: var(--rule); }
-
 /* ===== filas de movimiento ===== */
 .tx-row {
   display: flex;
@@ -632,6 +603,9 @@ body:has(> .banner-aviso) main#screen { margin-top: 46px; }
   -webkit-tap-highlight-color: transparent;
 }
 .stepper-btn:active { color: var(--text); }
+
+/* variante 44px/radius14 del stepper (Periodo nuevo, Registro, Movimientos, Ajustes) */
+.stepper-btn.lg { width: 44px; height: 44px; border-radius: 14px; background: var(--card2); color: var(--text); font-size: 17px; }
 
 /* input € de cada presupuesto por categoría: vacío = "Sin límite", estilo punteado */
 .budget-input {

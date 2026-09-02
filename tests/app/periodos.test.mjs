@@ -125,11 +125,12 @@ test("spentByRootCategory: agrega el subárbol, resta refunds sin ref prorratead
     VALUES ('per-otro','Otro periodo','2026-06-01','2026-06-30','closed',50,'',?,?,0)`).run(T, T);
 
   // per-1 (60/40): gasto directo en la raíz + gasto en el hijo (cuenta para la raíz) +
-  // refund sin ref (resta, prorrateado) + refund CON ref (NO resta: ref_id != '')
+  // refund sin ref (resta, prorrateado) + refund enlazado a la liquidación del gasto
+  // COMPARTIDO del hijo (NO resta: is_shared=1 en el gasto enlazado)
   ins(db, { id: "gasto-raiz", period: "per-1", category: "cat-casa", cents: 5000, shared: 0 });
   ins(db, { id: "gasto-hijo", period: "per-1", category: "cat-casa-alquiler", cents: 10000, shared: 1 }); // 60% → 6000
   ins(db, { id: "devol-suelta", period: "per-1", type: "refund", category: "cat-casa-alquiler", cents: 2000, shared: 1 }); // 60% → -1200
-  ins(db, { id: "devol-enlazada", period: "per-1", type: "refund", category: "cat-casa-alquiler", cents: 1000, shared: 0, ref: "gasto-raiz" }); // no resta
+  ins(db, { id: "devol-enlazada", period: "per-1", type: "refund", category: "cat-casa-alquiler", cents: 1000, shared: 0, ref: "gasto-hijo" }); // liquidación de compartido: no resta
   ins(db, { id: "otro-periodo", period: "per-otro", category: "cat-casa-alquiler", cents: 99999, shared: 0 }); // otro periodo: excluido
   ins(db, { id: "ingreso", period: "per-1", type: "income", category: "cat-nomina", cents: 200000 }); // income: su raíz no aparece
 
@@ -144,6 +145,105 @@ test("spentByRootCategory: agrega el subárbol, resta refunds sin ref prorratead
     "ORDER BY spent_cents DESC",
   );
   assert.equal(rows.some((r) => r.root_id === "cat-nomina"), false, "las raíces de income (flow≠expense) no aparecen");
+});
+
+test("spentByRootCategory: refund vinculado a gasto NO compartido resta en su raíz; vinculado a compartido no", () => {
+  const db = openDb();
+  seedMinimal(db);
+
+  const gastoA = ins(db, { id: "gasto-a", period: "per-1", category: "cat-casa-alquiler", cents: 10000, shared: 0 });
+  ins(db, { id: "devol-a", period: "per-1", type: "refund", category: "cat-casa-alquiler", cents: 10000, shared: 0, ref: gastoA });
+
+  const gastoB = ins(db, { id: "gasto-b", period: "per-1", category: "cat-casa-alquiler", cents: 10000, shared: 1 }); // 60% → 6000
+  ins(db, { id: "devol-b", period: "per-1", type: "refund", category: "cat-casa-alquiler", cents: 4000, shared: 0, ref: gastoB });
+
+  const rows = db.prepare(SQL.spentByRootCategory).all("per-1");
+  const casa = rows.find((r) => r.root_id === "cat-casa");
+
+  assert.equal(casa.spent_cents, 6000, "gasto A (10000) - devol-a (10000, gasto NO compartido) + gasto B al 60% (6000) - 0 (devol-b liquida compartido)");
+});
+
+test("updatePeriodShare (sentencia sola): cambia my_share_pct/updated_at; sin el freeze previo, los gastos con override NULL seguirían al periodo", () => {
+  const db = openDb();
+  seedMinimal(db); // per-1 al 60
+
+  const a = ins(db, { id: "a", cents: 10000, shared: 1, override: null });
+  const b = ins(db, { id: "b", cents: 10000, shared: 1, override: 90 });
+
+  db.prepare(SQL.updatePeriodShare).run(50, T2, "per-1");
+
+  const per1 = db.prepare("SELECT my_share_pct, updated_at FROM periods WHERE id='per-1'").get();
+  assert.equal(per1.my_share_pct, 50);
+  assert.equal(per1.updated_at, T2);
+
+  const rows = db.prepare(SQL.listAllByDay).all("per-1");
+  assert.equal(rows.find((r) => r.id === a).my_amount_cents, 5000, "sin override: sigue el nuevo pct del periodo (50%)");
+  assert.equal(rows.find((r) => r.id === b).my_amount_cents, 9000, "con override=90: no se mueve con el cambio del periodo");
+});
+
+test("freezePeriodShareOverrides + updatePeriodShare (mismo execMany, como repo.updatePeriodSharePct): los compartidos con override NULL se congelan en el valor vigente y NO se mueven; los que ya tenían override no se tocan; un gasto nuevo sin override sí sigue al valor nuevo", () => {
+  const db = openDb();
+  seedMinimal(db); // per-1 al 60
+
+  const a = ins(db, { id: "a", cents: 10000, shared: 1, override: null });
+  const b = ins(db, { id: "b", cents: 10000, shared: 1, override: 90 });
+  const c = ins(db, { id: "c", cents: 10000, shared: 0, override: null }); // no compartido: debe seguir NULL
+
+  db.prepare(`INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
+    VALUES ('per-2','Otro periodo','2026-06-01','2026-06-30','closed',60,'',?,?,0)`).run(T, T);
+  const d = ins(db, { id: "d", period: "per-2", cents: 10000, shared: 1, override: null }); // otro periodo: debe seguir NULL
+
+  execManyRaw(db, [
+    { sql: SQL.freezePeriodShareOverrides, bind: ["per-1", T2, "per-1"] },
+    { sql: SQL.updatePeriodShare, bind: [50, T2, "per-1"] },
+  ]);
+
+  const per1 = db.prepare("SELECT my_share_pct FROM periods WHERE id='per-1'").get();
+  assert.equal(per1.my_share_pct, 50);
+
+  const row = (id) => db.prepare("SELECT share_pct_override, updated_at FROM transactions WHERE id=?").get(id);
+  assert.equal(row(a).share_pct_override, 60, "congelado en el valor VIGENTE (60) antes de bajar a 50");
+  assert.equal(row(a).updated_at, T2);
+  assert.equal(row(b).share_pct_override, 90, "ya tenía override: no se toca");
+  assert.equal(row(c).share_pct_override, null, "no compartido: el freeze no lo alcanza");
+  assert.equal(row(d).share_pct_override, null, "otro periodo: el freeze no lo alcanza");
+
+  const rows = db.prepare(SQL.listAllByDay).all("per-1");
+  assert.equal(rows.find((r) => r.id === a).my_amount_cents, 6000, "congelado al 60%: no se mueve con el cambio del periodo a 50%");
+  assert.equal(rows.find((r) => r.id === b).my_amount_cents, 9000, "override propio (90%): sin cambios");
+
+  const e = ins(db, { id: "e", cents: 10000, shared: 1, override: null });
+  const rows2 = db.prepare(SQL.listAllByDay).all("per-1");
+  assert.equal(rows2.find((r) => r.id === e).my_amount_cents, 5000, "gasto NUEVO sin override: sigue el nuevo pct del periodo (50%)");
+});
+
+test("el freeze es atómico con el update: si la segunda sentencia falla, no queda ningún override congelado", () => {
+  const db = openDb();
+  seedMinimal(db); // per-1 al 60
+
+  const a = ins(db, { id: "a", cents: 10000, shared: 1, override: null });
+
+  assert.throws(() => execManyRaw(db, [
+    { sql: SQL.freezePeriodShareOverrides, bind: ["per-1", T2, "per-1"] },
+    { sql: "INSERT INTO periods (id) VALUES (NULL)" },
+  ]));
+
+  const row = db.prepare("SELECT share_pct_override FROM transactions WHERE id=?").get(a);
+  assert.equal(row.share_pct_override, null, "rollback completo: el freeze no queda a medias");
+
+  const per1 = db.prepare("SELECT my_share_pct FROM periods WHERE id='per-1'").get();
+  assert.equal(per1.my_share_pct, 60, "tampoco se aplicó (nunca se llegó a esa sentencia, y aun así habría hecho rollback)");
+});
+
+test("updatePeriodShare: no toca un periodo borrado", () => {
+  const db = openDb();
+  db.prepare(`INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
+    VALUES ('per-x','Borrado','2026-06-01','2026-06-30','closed',60,'',?,?,1)`).run(T, T);
+
+  db.prepare(SQL.updatePeriodShare).run(50, T2, "per-x");
+
+  const perX = db.prepare("SELECT my_share_pct FROM periods WHERE id='per-x'").get();
+  assert.equal(perX.my_share_pct, 60, "deleted=1: el WHERE deleted=0 no lo alcanza");
 });
 
 test("execMany: una violación de CHECK en el lote de openNextPeriod hace rollback completo (no crea el periodo nuevo)", () => {

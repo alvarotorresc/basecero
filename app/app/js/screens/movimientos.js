@@ -7,6 +7,7 @@ import { colorForCategory, iconForCategory, textColorForCategory, rootOf } from 
 import { matchesFilter, isUncategorized } from "../movimientos-filter.js";
 import { fmtMoney, fmtDiaLargo, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { t } from "../i18n/index.js";
+import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -201,7 +202,8 @@ export async function renderMovimientos(container) {
       // con el toggle: gatea la visibilidad del bloque compartido para que no desaparezca al desmarcar
       // sin contraparte configurada, dejando al usuario sin forma de volver a marcarlo antes de guardar.
       wasShared: !!row.is_shared,
-      sharePctOverride: row.share_pct_override,
+      // El override manda; si no hay (null), el % del periodo del propio gasto (no el abierto).
+      sharePct: normalizePct(row.share_pct_override ?? periods.find((p) => p.id === row.period_id)?.my_share_pct, 100),
       fecha: row.date,
       merchant: row.merchant,
       note: row.note,
@@ -276,13 +278,8 @@ export async function renderMovimientos(container) {
 
   function renderDetail() {
     const d = state.detail;
-    const period = periods.find((p) => p.id === state.periodId);
-    // B4: mismo COALESCE que MY_AMOUNT en sql.js (t.share_pct_override, p.my_share_pct, 100) —
-    // antes ignoraba el override por transacción y la lista/detalle mostraban importes distintos.
-    const pct = d.sharePctOverride ?? period?.my_share_pct ?? 100;
     const cats = categoriesFor(d.type);
-    const myCents = d.isShared ? Math.round((d.cents * pct) / 100) : d.cents;
-    const partnerCents = d.isShared ? d.cents - myCents : 0;
+    const { mine: myCents, partner: partnerCents } = d.isShared ? splitCents(d.cents, d.sharePct) : { mine: d.cents, partner: 0 };
     const locked = !!d.settledLocked;
     // Task 7 (5d): además de `locked` (lado del gasto), el importe del refund se bloquea si su
     // gasto enlazado ya está settled — ver refundLocked en openDetail.
@@ -363,14 +360,25 @@ export async function renderMovimientos(container) {
           </span>
         </label>
         ${d.isShared ? `
-        <div style="display:flex; gap:8px; padding:0 0 14px;">
-          <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
-            <div style="font-size:10px; color:var(--text-3);">${t("common.myShare", { pct })}</div>
-            <div class="num" id="mov-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
+        <div style="display:flex; flex-direction:column; gap:10px; padding:0 0 14px;${locked ? "opacity:.5;" : ""}">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:14px; font-weight:600;">${t("common.split.label")}</div>
+              <div style="font-size:11px; color:var(--text-3);">${t("common.split.hint", { name: escHtml(partnerName || t("movimientos.shared.fallbackName")), pct: 100 - d.sharePct })}</div>
+            </div>
+            <button type="button" id="mov-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}" ${locked ? "disabled" : ""}>−</button>
+            <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${d.sharePct} %</div>
+            <button type="button" id="mov-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}" ${locked ? "disabled" : ""}>+</button>
           </div>
-          <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
-            <div style="font-size:10px; color:var(--text-3);">${escHtml(partnerName) || t("movimientos.shared.fallbackLabel")} · ${100 - pct}%</div>
-            <div class="num" id="mov-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerCents)}</div>
+          <div style="display:flex; gap:8px;">
+            <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
+              <div style="font-size:10px; color:var(--text-3);">${t("common.myShare", { pct: d.sharePct })}</div>
+              <div class="num" id="mov-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
+            </div>
+            <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
+              <div style="font-size:10px; color:var(--text-3);">${escHtml(partnerName) || t("movimientos.shared.fallbackLabel")} · ${100 - d.sharePct}%</div>
+              <div class="num" id="mov-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerCents)}</div>
+            </div>
           </div>
         </div>` : ""}
       </div>` : ""}
@@ -424,11 +432,9 @@ export async function renderMovimientos(container) {
       const mineEl = container.querySelector("#mov-split-mine");
       const partnerEl = container.querySelector("#mov-split-partner");
       if (d.isShared && mineEl && partnerEl) {
-        const period = periods.find((p) => p.id === state.periodId);
-        const pct = d.sharePctOverride ?? period?.my_share_pct ?? 100;
-        const myCents = Math.round((d.cents * pct) / 100);
+        const { mine: myCents, partner: partnerCents } = splitCents(d.cents, d.sharePct);
         mineEl.textContent = fmtMoney(myCents);
-        partnerEl.textContent = fmtMoney(d.cents - myCents);
+        partnerEl.textContent = fmtMoney(partnerCents);
       }
     };
     container.querySelector("#mov-merchant").oninput = (e) => { d.merchant = e.target.value; state.deleteConfirm = false; };
@@ -437,6 +443,11 @@ export async function renderMovimientos(container) {
 
     const sharedToggle = container.querySelector("#mov-shared");
     if (sharedToggle) sharedToggle.onchange = (e) => updateDetail({ isShared: e.target.checked });
+
+    const pctDown = container.querySelector("#mov-pct-down");
+    if (pctDown) pctDown.onclick = () => updateDetail({ sharePct: stepPct(d.sharePct, -PCT_STEP) });
+    const pctUp = container.querySelector("#mov-pct-up");
+    if (pctUp) pctUp.onclick = () => updateDetail({ sharePct: stepPct(d.sharePct, PCT_STEP) });
 
     container.querySelector("#mov-save").onclick = async () => {
       const btn = container.querySelector("#mov-save");
@@ -462,7 +473,10 @@ export async function renderMovimientos(container) {
           merchant: d.merchant,
           note: d.note,
           isShared: withCategory && d.type !== "income" ? d.isShared : false,
-          sharePctOverride: d.sharePctOverride,
+          // Locked (gasto liquidado con reembolso enlazado): se deja undefined para que updateTransaction
+          // conserve el valor guardado — si mandáramos d.sharePct explícito, un gasto antiguo con override
+          // NULL dispararía sharedFieldsLocked al editar solo la nota o la fecha.
+          sharePctOverride: d.settledLocked ? undefined : (withCategory && d.type !== "income" && d.isShared ? d.sharePct : null),
           refId: d.refId,
           ruleId: d.ruleId,
         });

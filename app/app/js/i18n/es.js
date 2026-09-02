@@ -29,6 +29,7 @@ export const ES = {
     myShare: "Tu parte · {pct}%",
     myPartSuffix: " · tu parte {amount}",
     sharedWith: "Compartido con {name}",
+    split: { label: "Reparto", hint: "{name} paga el {pct} %", decreaseAria: "Bajar tu parte", increaseAria: "Subir tu parte" },
     merchant: "Comercio",
     date: "Fecha",
     note: "Nota",
@@ -159,7 +160,6 @@ export const ES = {
       empty: "No hay gastos recientes.",
       sharedSuffix: " · compartido",
     },
-    keypad: { delete: "Borrar", helper: "el teclado suma tickets" },
   },
   movimientos: {
     error: {
@@ -181,7 +181,7 @@ export const ES = {
     },
     type: { transfer: "Transferencia" },
     detail: {
-      lockedNote: "Liquidado. Para editar el importe, borra antes su liquidación en Movimientos.",
+      lockedNote: "Tiene una devolución enlazada: para cambiar el importe o el reparto, borra antes esa devolución.",
     },
     shared: {
       fallbackName: "la contraparte",
@@ -494,6 +494,9 @@ export const ES = {
       subtitle: "Abierto el {date}{days} · reparto {mine} / {theirs}",
       days: { one: " · {n} día", other: " · {n} días" },
       openLabel: "Abierto",
+      shareLabel: "Reparto por defecto",
+      shareHint: "Para los gastos nuevos · {name} paga el {pct} %",
+      shareSaveFailed: "No se pudo guardar el reparto: {error}",
       closeBtn: "Cerrar periodo y abrir el siguiente",
       closeNoteWithPartner: "Al cerrar fijarás la fecha final y elegirás el reparto con {name} del periodo nuevo. Ábrelo el día que entre la nómina.",
       closeNote: "Al cerrar fijarás la fecha final. Ábrelo el día que entre la nómina.",
@@ -668,7 +671,8 @@ export const ES = {
       periodStartTooEarly: "La fecha debe ser posterior al inicio del periodo actual",
       settleNotFound: "Gasto compartido no encontrado o ya liquidado",
       txNotFound: "Movimiento no encontrado",
-      txLockedSettled: "Gasto ya liquidado: borra su liquidación en Movimientos antes de cambiar el importe o el reparto.",
+      txLockedSettled: "Este gasto tiene una devolución enlazada: borra antes esa devolución en Movimientos para cambiar el importe o el reparto.",
+      sharePctInvalid: "El reparto debe estar entre 0 y 100.",
       refundLockedSettled: "Este movimiento es un reembolso enlazado a un gasto. Bórralo o desvincúlalo antes de cambiar su importe.",
       expenseLockedHasRefund: "Este gasto tiene un reembolso enlazado. Borra antes el reembolso en Movimientos.",
       ruleNotFound: "Regla no encontrada",
