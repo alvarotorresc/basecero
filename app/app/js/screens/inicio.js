@@ -7,7 +7,7 @@ import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtNum2, fmtPct, currencyCode } from "../format.js";
 import { dayIndexOfPeriod, expectedPeriodDays, paceDeltaCents } from "../prevision.js";
 import { t } from "../i18n/index.js";
-import { budgetStatus } from "./presupuesto.js";
+import { budgetStatus } from "../category-spend.js";
 import { barChartSvg, donutSvg } from "../charts.js";
 import { renderLiquidar } from "./liquidar.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";

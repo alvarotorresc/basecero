@@ -1,5 +1,6 @@
 import { getOpenPeriod, spentByRootCategory, budgetsOfPeriod, allCategoriesById } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
+import { budgetStatus } from "../category-spend.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO } from "../format.js";
 import { t } from "../i18n/index.js";
 
@@ -12,17 +13,6 @@ const moneyPartsHtml = (cents) => {
   const { main, cents: c, suffix } = fmtMoneyParts(cents);
   return `${escHtml(main)}<small>${escHtml(c)}</small>${escHtml(suffix)}`;
 };
-
-/** Estado de una categoría (o del total) frente a su límite. Umbrales: ok < 85 %,
- *  warn >= 85 % (incluye el 100 % justo), over > 100 %. Sin límite (0/null/undefined) -> null:
- *  quien llama decide qué hacer (p.ej. tratarla como "sin límite este periodo"). pct SIN capar
- *  (para el número grande); quien pinta la barra la capa a 100 al renderizar. */
-export function budgetStatus(spent, limit) {
-  if (!limit) return null;
-  const pct = (spent / limit) * 100;
-  const level = pct > 100 ? "over" : pct >= 85 ? "warn" : "ok";
-  return { pct, level };
-}
 
 // Icono ⓘ del recuadro informativo (design/material-expresivo/Presupuesto.dc.html:102, círculo +
 // línea/punto) — color en style="stroke:..." (no en el atributo de presentación stroke="var(...)"),
