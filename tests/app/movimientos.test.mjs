@@ -102,10 +102,10 @@ test("softDeleteTransaction: excluye la fila de listAllByDay y de spentOfPeriod"
 });
 
 /** Reproduce exactamente la secuencia de repo.softDeleteTransaction para un refund enlazado:
- *  softDelete + unsettleIfNoActiveRefunds (mismo bind order que la ruling del controller). */
+ *  softDelete + unsettleIfNoActiveSettlements (mismo bind order que la ruling del controller). */
 function softDeleteRefund(db, refundId, refId, t) {
   db.prepare(SQL.softDeleteTransaction).run(t, refundId);
-  db.prepare(SQL.unsettleIfNoActiveRefunds).run(refId, refundId, t, refId);
+  db.prepare(SQL.unsettleIfNoActiveSettlements).run(refId, refundId, t, refId);
 }
 
 test("softDelete de un refund enlazado revierte settled=0 del gasto original", () => {
@@ -154,7 +154,7 @@ test("softDelete del ajuste de liquidación revierte settled=0 del gasto que pag
   const ajusteId = ins(db, { type: "adjustment", cents: -6000, category: "", ref: gastoId });
 
   db.prepare(SQL.softDeleteTransaction).run(T2, ajusteId);
-  db.prepare(SQL.unsettleIfNoActiveRefunds).run(gastoId, ajusteId, T2, gastoId);
+  db.prepare(SQL.unsettleIfNoActiveSettlements).run(gastoId, ajusteId, T2, gastoId);
 
   const gasto = db.prepare("SELECT settled, updated_at FROM transactions WHERE id=?").get(gastoId);
   assert.equal(gasto.settled, 0);
@@ -166,7 +166,7 @@ test("softDelete de un gasto normal (no refund) se comporta igual que antes: sol
   seedMinimal(db);
   const id = ins(db, { type: "expense", cents: 4000, settled: 0 });
 
-  db.prepare(SQL.softDeleteTransaction).run(T2, id); // ruta plana, sin unsettleIfNoActiveRefunds
+  db.prepare(SQL.softDeleteTransaction).run(T2, id); // ruta plana, sin unsettleIfNoActiveSettlements
 
   const row = db.prepare("SELECT deleted, updated_at, settled FROM transactions WHERE id=?").get(id);
   assert.equal(row.deleted, 1);

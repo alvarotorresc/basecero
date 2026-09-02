@@ -81,7 +81,7 @@ export const SQL = {
   // Al borrar un apunte de liquidación enlazado (ref_id) —la devolución ENTRANTE de un gasto mío o
   // el ajuste SALIENTE de uno que pagó la contraparte— revierte settled=1 del gasto original SOLO
   // si no queda ningún otro apunte activo apuntándole — bind: [refId, apunteIdBorrado, now, refId].
-  unsettleIfNoActiveRefunds: `UPDATE transactions SET settled = CASE WHEN EXISTS(
+  unsettleIfNoActiveSettlements: `UPDATE transactions SET settled = CASE WHEN EXISTS(
       SELECT 1 FROM transactions r WHERE r.ref_id=? AND r.type IN ('refund','adjustment') AND r.deleted=0 AND r.id<>?
     ) THEN 1 ELSE 0 END, updated_at=? WHERE id=?`,
   // ¿Tiene `txId` algún apunte de liquidación ACTIVO (no borrado) que lo enlace por ref_id? Cubre
@@ -89,7 +89,7 @@ export const SQL = {
   // Movimientos) como updateTransaction (rechaza el cambio aunque alguien salte la UI). Discriminador
   // seguro: ningún adjustment de usuario lleva ref_id (Registro solo lo guarda para type='refund',
   // registro.js:426, y el selector de vínculo solo se pinta para ese tipo, registro.js:245).
-  hasActiveLinkedRefund: `SELECT 1 FROM transactions r
+  hasActiveLinkedSettlement: `SELECT 1 FROM transactions r
     WHERE r.ref_id=? AND r.type IN ('refund','adjustment') AND r.deleted=0 LIMIT 1`,
   countUncategorized: `SELECT COUNT(*) AS n FROM transactions
     WHERE period_id=? AND deleted=0 AND category_id='' AND type IN ('expense','income','refund')`,
@@ -307,7 +307,7 @@ export const SQL = {
   // ¿Tiene `id` alguna hija ACTIVA? Ya NO la usa el guard de updateCategory (ver hasChildren) —
   // se conserva porque el label de cascada de archivar SÍ es active-only a propósito (archiveCategory
   // solo archiva en cascada las hijas activas, ver childrenOf) y porque tests/app/categorias.test.mjs
-  // la ejerce directamente. Mismo patrón que hasActiveLinkedRefund (SELECT 1 ... LIMIT 1, solo
+  // la ejerce directamente. Mismo patrón que hasActiveLinkedSettlement (SELECT 1 ... LIMIT 1, solo
   // interesa la existencia).
   hasActiveChildren: `SELECT 1 FROM categories WHERE parent_id=? AND deleted=0 AND is_archived=0 LIMIT 1`,
   // Item 3 (Important, review final): ¿tiene `id` alguna hija, ACTIVA o ARCHIVADA? Guard real de

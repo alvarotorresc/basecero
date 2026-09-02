@@ -121,7 +121,7 @@ test("SQL.childrenOf: solo hijas ACTIVAS (ni archivadas ni borradas), nunca hija
   assert.deepEqual(kids.map((k) => k.id).sort(), ["cat-casa-alquiler", "cat-casa-comunidad"]);
 });
 
-test("SQL.hasActiveChildren: true solo con una hija ACTIVA (mismo patrón que hasActiveLinkedRefund)", () => {
+test("SQL.hasActiveChildren: true solo con una hija ACTIVA (mismo patrón que hasActiveLinkedSettlement)", () => {
   const db = openDb();
   seedMinimal(db);
   assert.equal(db.prepare(SQL.hasActiveChildren).get("cat-casa-alquiler"), undefined, "una hija no tiene hijas propias");

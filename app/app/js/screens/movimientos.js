@@ -1,6 +1,6 @@
 import {
   listPeriods, listAllByDay, getTransaction, updateTransaction, softDeleteTransaction, countUncategorized,
-  listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById, hasActiveLinkedRefund,
+  listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById, hasActiveLinkedSettlement,
   getMetaAll,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory, rootOf } from "../category-colors.js";
@@ -233,22 +233,22 @@ export async function renderMovimientos(container) {
       refId: row.ref_id,
       ruleId: row.rule_id,
     };
-    state.linkedRefund = null;
+    state.linkedExpense = null;
     // El apunte de liquidación tiene DOS formas desde Task 3: la devolución ENTRANTE (refund) y el
     // ajuste SALIENTE (adjustment con ref_id, el que se crea cuando pagó ella). Los dos apuntan a un
-    // gasto por ref_id y los dos los cubre refundAmountLocked en repo.js.
+    // gasto por ref_id y los dos los cubre settlementAmountLocked en repo.js.
     if ((row.type === "refund" || row.type === "adjustment") && row.ref_id) {
-      try { state.linkedRefund = await getTransaction(row.ref_id); } catch { state.linkedRefund = null; }
+      try { state.linkedExpense = await getTransaction(row.ref_id); } catch { state.linkedExpense = null; }
     }
     // Task 17 ronda 2 (controller ruling, finding A): un gasto ya liquidado con la contraparte (settled=1
     // Y con un refund activo enlazado) bloquea importe/compartido — editar el importe aquí sin
     // tocar el refund deja la deuda con la contraparte mal calculada y sin nada pendiente que lo delate.
     state.detail.settledLocked = row.type === "expense" && !!row.settled
-      && (await hasActiveLinkedRefund(id).catch(() => false));
-    // Task 7 (5d): espejo en UI del guard refundAmountLocked (repo.js) — el lado del REFUND. Si el
+      && (await hasActiveLinkedSettlement(id).catch(() => false));
+    // Task 7 (5d): espejo en UI del guard settlementAmountLocked (repo.js) — el lado del REFUND. Si el
     // gasto enlazado ya está settled, bajar aquí el importe del refund descuadra la deuda liquidada
     // en silencio (el guard de repo lo rechazaría en save, pero mejor prevenirlo en el input).
-    state.detail.refundLocked = (row.type === "refund" || row.type === "adjustment") && !!state.linkedRefund?.settled;
+    state.detail.refundLocked = (row.type === "refund" || row.type === "adjustment") && !!state.linkedExpense?.settled;
     pushBack(backToList);
     state.view = "detail";
     errorMsg = "";
@@ -362,11 +362,11 @@ export async function renderMovimientos(container) {
 
       ${renderAccountsSection(d)}
 
-      ${d.type === "refund" && state.linkedRefund ? `
+      ${d.type === "refund" && state.linkedExpense ? `
       <div class="card" style="padding:12px 14px; margin-bottom:18px;">
         <div style="font-size:10px; color:var(--text-3);">${t("common.linkedTo")}</div>
         <div style="font-size:14px; font-weight:600;">
-          ${escHtml(state.linkedRefund.merchant || byId[state.linkedRefund.category_id]?.name || t("common.type.expense"))} · ${fmtMoney(state.linkedRefund.amount_cents)}
+          ${escHtml(state.linkedExpense.merchant || byId[state.linkedExpense.category_id]?.name || t("common.type.expense"))} · ${fmtMoney(state.linkedExpense.amount_cents)}
         </div>
       </div>` : ""}
 

@@ -137,14 +137,14 @@ export const getTransaction = async (id) => (await query(SQL.getTransaction, [id
 // ¿`id` tiene algún apunte de liquidación activo enlazado por ref_id (la devolución entrante o el
 // ajuste saliente)? La usa tanto Movimientos (bloquear importe/compartido en la UI) como
 // updateTransaction (rechazar el cambio server-side aunque alguien salte la UI).
-export const hasActiveLinkedRefund = async (id) => (await query(SQL.hasActiveLinkedRefund, [id])).length > 0;
+export const hasActiveLinkedSettlement = async (id) => (await query(SQL.hasActiveLinkedSettlement, [id])).length > 0;
 
 /** ¿Debe bloquearse un update por el guard de "gasto liquidado" (Task 17 ronda 2, finding A)?
  *  Pura y sin DB (mismo patrón que prevision.js: así se testea sin worker/sqlite de por
  *  medio). `f` son los campos YA RESUELTOS de updateTransaction (con los defaults de `cur`
  *  aplicados para lo que el caller no mandó) — comparar `f` contra `cur` es lo que hace que
  *  un save que NO toca importe/compartido/reparto (solo categoría/fecha/nota/comercio) no se
- *  bloquee aunque el gasto esté settled. El caller aún debe comprobar hasActiveLinkedRefund. */
+ *  bloquee aunque el gasto esté settled. El caller aún debe comprobar hasActiveLinkedSettlement. */
 export function sharedFieldsLocked(cur, f) {
   if (cur.type !== "expense" || !cur.settled) return false;
   return f.amountCents !== cur.amount_cents
@@ -162,7 +162,7 @@ export function sharedFieldsLocked(cur, f) {
  *  sharedFieldsLocked): `linked` es la fila YA CARGADA del gasto que apunta cur.ref_id (o null si
  *  no existe/está borrado — getTransaction filtra deleted=0, así que un refund que ya apunta a un
  *  gasto huérfano de ANTES de este fix queda fuera del guard a propósito, ver nota en el report). */
-export function refundAmountLocked(cur, f, linked) {
+export function settlementAmountLocked(cur, f, linked) {
   // Cubre los dos apuntes de liquidación: la devolución ENTRANTE (type='refund') y el ajuste
   // SALIENTE (type='adjustment' con ref_id, que solo crea settleAllSharedStmts). Bajar el importe
   // de cualquiera de los dos descuadraría una deuda ya saldada sin nada que lo delate.
@@ -175,7 +175,7 @@ export function refundAmountLocked(cur, f, linked) {
  *  ACTIVO enlazado por ref_id? Deliberadamente NO mira cur.settled — un import a mano puede dejar
  *  settled=1 sin ningún refund vivo (fila ya borrada a mano, o backup viejo), y bloquear por ese
  *  campo dejaría el gasto sin ninguna vía para borrarse nunca. Se ancla solo en `hasActiveRefund`
- *  (ya resuelto por el caller vía hasActiveLinkedRefund): así SIEMPRE hay una salida — borrar
+ *  (ya resuelto por el caller vía hasActiveLinkedSettlement): así SIEMPRE hay una salida — borrar
  *  primero el refund (rama existente de softDeleteTransaction: unsettle + borra) deja el gasto
  *  como uno normal, no liquidado, borrable por la vía de siempre. */
 export function expenseDeleteLocked(cur, hasActiveRefund) {
@@ -367,16 +367,16 @@ export async function updateTransaction(id, fields) {
   // se queda congelado con el importe viejo y la deuda con la contraparte se pierde en silencio. Guarda
   // server-side (no solo UI, que ya bloquea los campos): un save que NO toca esos campos
   // (solo categoría/fecha/nota/comercio) sigue funcionando con normalidad.
-  if (sharedFieldsLocked(cur, f) && (await hasActiveLinkedRefund(id))) {
+  if (sharedFieldsLocked(cur, f) && (await hasActiveLinkedSettlement(id))) {
     throw new Error(t("errors.repo.txLockedSettled"));
   }
-  // Task 6 (M5): lado del apunte de liquidación del mismo guard — ver refundAmountLocked.
+  // Task 6 (M5): lado del apunte de liquidación del mismo guard — ver settlementAmountLocked.
   // cur.ref_id, si existe, apunta siempre a un gasto (nunca a otro apunte de liquidación), tanto en
   // un refund como en el adjustment de salida, así que reutilizar getTransaction aquí es correcto y
   // evita duplicar el SELECT.
   const linkedExpense = (cur.type === "refund" || cur.type === "adjustment") && cur.ref_id
     ? await getTransaction(cur.ref_id) : null;
-  if (refundAmountLocked(cur, f, linkedExpense)) {
+  if (settlementAmountLocked(cur, f, linkedExpense)) {
     throw new Error(t("errors.repo.refundLockedSettled"));
   }
   const now = nowIso();
@@ -402,9 +402,9 @@ export async function updateTransaction(id, fields) {
  *  fila — pérdida de datos silenciosa que el usuario no pidió. */
 export async function softDeleteTransaction(id) {
   const cur = await getTransaction(id);
-  // hasActiveLinkedRefund solo se consulta cuando cur.type==='expense': para el resto de tipos
+  // hasActiveLinkedSettlement solo se consulta cuando cur.type==='expense': para el resto de tipos
   // expenseDeleteLocked ya descarta por type sin necesidad del SELECT extra.
-  const hasActiveRefund = cur?.type === "expense" && (await hasActiveLinkedRefund(id));
+  const hasActiveRefund = cur?.type === "expense" && (await hasActiveLinkedSettlement(id));
   if (expenseDeleteLocked(cur, hasActiveRefund)) {
     throw new Error(t("errors.repo.expenseLockedHasRefund"));
   }
@@ -412,7 +412,7 @@ export async function softDeleteTransaction(id) {
   if (cur && (cur.type === "refund" || cur.type === "adjustment") && cur.ref_id) {
     await execMany([
       { sql: SQL.softDeleteTransaction, bind: [now, id] },
-      { sql: SQL.unsettleIfNoActiveRefunds, bind: [cur.ref_id, id, now, cur.ref_id] },
+      { sql: SQL.unsettleIfNoActiveSettlements, bind: [cur.ref_id, id, now, cur.ref_id] },
     ]);
   } else {
     await exec(SQL.softDeleteTransaction, [now, id]);
