@@ -24,14 +24,34 @@ export const SQL = {
       ELSE 0 END),0) AS spent_cents
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.period_id=? AND t.deleted=0`,
-  // paid_by='me': una devolución de tienda sobre una compra que pagó la contraparte es dinero que
-  // le devuelven a ELLA; enlazarla desde mi Registro crearía un ingreso en mi cuenta que nunca existió.
-  recentForRefund: `SELECT t.id, t.date, t.amount_cents, t.merchant, t.category_id, t.is_shared, t.settled,
-      t.share_pct_override, p.my_share_pct AS period_pct
-    FROM transactions t JOIN periods p ON p.id=t.period_id
-    WHERE t.deleted=0 AND t.type='expense' AND t.paid_by='me'
-      AND (t.period_id=? OR (t.is_shared=1 AND t.settled=0))
-    ORDER BY t.date DESC, t.created_at DESC LIMIT 15`,
+  // Gastos que se pueden enlazar desde una devolución (selector de Registro). paid_by='me': una
+  // devolución de tienda sobre una compra que pagó la contraparte es dinero que le devuelven a ELLA;
+  // enlazarla desde mi Registro crearía un ingreso en mi cuenta que nunca existió.
+  //
+  // refunded_cents = lo que ya ha vuelto de ese gasto: la suma de los apuntes de liquidación VIVOS
+  // que lo enlazan por ref_id, con el mismo criterio de tipos que hasActiveLinkedSettlement
+  // ('refund' + 'adjustment'). ABS a propósito: el ajuste SALIENTE de una liquidación se guarda con
+  // importe negativo (repo.settleAllSharedStmts). Hoy no puede alcanzar esta consulta —solo enlaza
+  // gastos con paid_by='partner', que el WHERE excluye—, pero una hoja editada a mano sí puede dejar
+  // uno colgando de un gasto mío, y sin el ABS ese gasto sumaría un «devuelto» NEGATIVO que el
+  // marcador de la UI (refunded_cents > 0) leería como «sin devolver».
+  //
+  // Dos ORDER BY, no uno: el de DENTRO con su LIMIT 15 elige EXACTAMENTE las mismas 15 filas de
+  // siempre (las más recientes); el de FUERA solo las recoloca, empujando al final las que ya tienen
+  // algo devuelto. Con un único ORDER BY, el LIMIT preferiría los gastos sin devolver y un gasto
+  // reciente ya devuelto —el que el usuario más probablemente busca para una devolución parcial—
+  // podría desaparecer de la lista.
+  recentForRefund: `SELECT * FROM (
+      SELECT t.id, t.date, t.created_at, t.amount_cents, t.merchant, t.category_id, t.is_shared, t.settled,
+        t.share_pct_override, p.my_share_pct AS period_pct,
+        COALESCE((SELECT SUM(ABS(r.amount_cents)) FROM transactions r
+          WHERE r.ref_id=t.id AND r.type IN ('refund','adjustment') AND r.deleted=0),0) AS refunded_cents
+      FROM transactions t JOIN periods p ON p.id=t.period_id
+      WHERE t.deleted=0 AND t.type='expense' AND t.paid_by='me'
+        AND (t.period_id=? OR (t.is_shared=1 AND t.settled=0))
+      ORDER BY t.date DESC, t.created_at DESC LIMIT 15
+    ) AS recent
+    ORDER BY (refunded_cents > 0), date DESC, created_at DESC`,
   incomeOfPeriod: `SELECT COALESCE(SUM(CASE WHEN t.type='income' THEN t.amount_cents ELSE 0 END),0) AS income_cents
     FROM transactions t WHERE t.period_id=? AND t.deleted=0`,
   listByDay: `SELECT t.id, t.date, t.type, t.amount_cents, t.category_id, t.merchant, t.note, t.is_shared, t.paid_by,
@@ -178,12 +198,28 @@ export const SQL = {
   GROUP BY c.id ORDER BY spent_cents DESC`,
   insertBudget: `INSERT INTO budgets (id,period_id,category_id,amount_cents,created_at,updated_at,deleted)
     VALUES (?,?,?,?,?,?,0)`,
-  budgetsOfPeriod: `SELECT b.id, b.category_id, b.amount_cents FROM budgets b WHERE b.period_id=? AND b.deleted=0`,
+  // Límites VIVOS del periodo, SOLO los de categorías vivas y NO archivadas — el JOIN es el filtro.
+  // Un límite cuya categoría se archivó (o se borró) después de ponerlo sigue en la tabla, así que
+  // desarchivarla lo recupera tal cual; pero mientras tanto no puede sumar en ningún total. Era el
+  // defecto real: spentByRootCategory filtra root.is_archived=0, así que esa categoría desaparecía
+  // de todas las listas, y sin embargo disponibleCardHtml (inicio.js) seguía descontando su límite
+  // del «disponible» — un presupuesto invisible que el usuario no podía ni ver ni quitar.
+  //
+  // ORDER BY updated_at DESC, id DESC: el MISMO desempate que budgetOfCategory. La app nunca crea dos
+  // filas vivas para la misma (periodo, categoría) —upsertBudget actualiza la que ya hay—, pero una
+  // hoja editada a mano sí; con este orden, «el primero gana» (category-spend.js#budgetMap) elige
+  // siempre el más reciente, exactamente el mismo que budgetOfCategory carga al editarlo.
+  budgetsOfPeriod: `SELECT b.id, b.category_id, b.amount_cents FROM budgets b
+    JOIN categories c ON c.id=b.category_id AND c.deleted=0 AND c.is_archived=0
+    WHERE b.period_id=? AND b.deleted=0
+    ORDER BY b.updated_at DESC, b.id DESC`,
   // Límite VIVO de una categoría en un periodo (pantalla «Gasto por categoría»): lo lee upsertBudget
-  // para decidir entre UPDATE e INSERT. LIMIT 1 porque solo puede haber una fila viva por
-  // (periodo, categoría) — la app nunca crea dos; un duplicado solo puede venir de una hoja
-  // importada a mano, y softDeleteBudget las barre todas. Bind: [periodId, categoryId].
-  budgetOfCategory: `SELECT id, amount_cents FROM budgets WHERE period_id=? AND category_id=? AND deleted=0 LIMIT 1`,
+  // para decidir entre UPDATE e INSERT. Con más de una fila viva —solo alcanzable importando una
+  // hoja a mano; softDeleteBudget las barre todas— gana la de updated_at más reciente, con id DESC
+  // de desempate para que la elección sea determinista aunque coincidan los timestamps.
+  // Bind: [periodId, categoryId].
+  budgetOfCategory: `SELECT id, amount_cents FROM budgets WHERE period_id=? AND category_id=? AND deleted=0
+    ORDER BY updated_at DESC, id DESC LIMIT 1`,
   // Bind: [amountCents, updatedAt, budgetId].
   updateBudget: `UPDATE budgets SET amount_cents=?, updated_at=? WHERE id=? AND deleted=0`,
   // Quitar el límite = borrado LÓGICO (la fila se conserva para el round-trip del xlsx, que ya

@@ -57,3 +57,21 @@ export function sortRootRows(rows, budgetByCategory) {
     || hasLimit(b) - hasLimit(a)
     || String(a.name).localeCompare(String(b.name)));
 }
+
+/** Mapa categoría → límite en céntimos a partir de las filas de SQL.budgetsOfPeriod. Gana la PRIMERA
+ *  fila de cada categoría: la consulta ya llega ordenada por updated_at DESC, id DESC, así que la
+ *  primera es la más reciente — el mismo límite que budgetOfCategory carga al editarlo.
+ *  Object.fromEntries NO vale aquí: se queda con la ÚLTIMA, justo la contraria. Las filas duplicadas
+ *  solo llegan de una hoja xlsx editada a mano (la app nunca crea dos vivas por categoría), pero sin
+ *  un criterio único la pantalla enseñaría un límite y el editor otro. */
+export function budgetMap(rows) {
+  const out = {};
+  for (const b of rows) {
+    // Mismo guard que sanitizeLoanMap (account-defaults.js): out[k]= con k="__proto__" dispara el
+    // setter especial de Object.prototype. Object.hasOwn y no `in`: `in` da true para toString,
+    // constructor y demás heredadas, y descartaría en silencio una categoría llamada así.
+    if (b.category_id === "__proto__") continue;
+    if (!Object.hasOwn(out, b.category_id)) out[b.category_id] = b.amount_cents;
+  }
+  return out;
+}

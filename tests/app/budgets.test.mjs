@@ -99,3 +99,33 @@ test("upsertBudget después de un delete: crea una fila NUEVA activa y deja la b
   const viva = db.prepare(SQL.budgetsOfPeriod).all("per-1");
   assert.deepEqual(viva.map((r) => r.amount_cents), [20000]);
 });
+
+test("budgetsOfPeriod: ignora los límites cuya categoría está archivada o borrada (no pueden sumar en ningún total)", () => {
+  const db = openDb();
+  seedMinimal(db);
+  db.prepare(`INSERT INTO categories (id,name,parent_id,flow,need_type,display_order,is_archived,created_at,updated_at,deleted)
+    VALUES ('cat-ocio','Ocio','','expense','want',5,1,?,?,0)`).run(T1, T1);
+  db.prepare(`INSERT INTO categories (id,name,parent_id,flow,need_type,display_order,is_archived,created_at,updated_at,deleted)
+    VALUES ('cat-viejo','Viejo','','expense','want',6,0,?,?,1)`).run(T1, T1);
+  db.prepare(SQL.insertBudget).run("bud-casa", "per-1", "cat-casa", 45000, T1, T1);
+  db.prepare(SQL.insertBudget).run("bud-ocio", "per-1", "cat-ocio", 12000, T1, T1);
+  db.prepare(SQL.insertBudget).run("bud-viejo", "per-1", "cat-viejo", 9000, T1, T1);
+
+  assert.deepEqual(db.prepare(SQL.budgetsOfPeriod).all("per-1").map((b) => b.id), ["bud-casa"],
+    "la archivada y la borrada no salen: si salieran, el disponible de Inicio descontaría un límite invisible");
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM budgets WHERE deleted=0").get().n, 3,
+    "las tres filas siguen VIVAS en la tabla: desarchivar la categoría recupera su límite tal cual");
+});
+
+test("budgetsOfPeriod y budgetOfCategory: con dos filas vivas duplicadas gana la de updated_at más reciente", () => {
+  const db = openDb();
+  seedMinimal(db);
+  // Estado solo alcanzable importando una hoja editada a mano: upsertBudget actualiza la fila que ya
+  // hay, nunca crea una segunda viva para la misma pareja.
+  db.prepare(SQL.insertBudget).run("bud-vieja", "per-1", "cat-casa", 45000, T1, T1);
+  db.prepare(SQL.insertBudget).run("bud-nueva", "per-1", "cat-casa", 30000, T1, T2);
+
+  assert.equal(db.prepare(SQL.budgetOfCategory).get("per-1", "cat-casa").id, "bud-nueva");
+  assert.deepEqual(db.prepare(SQL.budgetsOfPeriod).all("per-1").map((b) => b.id), ["bud-nueva", "bud-vieja"],
+    "la más reciente PRIMERO: budgetMap se queda con la primera de cada categoría, el mismo límite que se edita");
+});
