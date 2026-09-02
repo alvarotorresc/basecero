@@ -142,7 +142,11 @@ export const SQL = {
   // hijas directas): child.id=root.id cubre el gasto registrado directamente en la raíz, y
   // child.parent_id=root.id el de sus hijas. Resta refunds que no sean liquidación de un
   // compartido (REFUND_REDUCES_SPEND), prorrateados, igual criterio que spentOfPeriod. La
-  // reutilizan inicio.js y gasto-por-categoria.js.
+  // reutilizan CUATRO consumidores, no dos: inicio.js (donut y tarjeta de categorías),
+  // gasto-por-categoria.js (la lista entera), periodo-nuevo.js (las filas de límites del asistente,
+  // en los dos modos) y repo.goalsWithProgress (el ctx de un goal de tipo spending_cap). Filtrar
+  // aquí is_archived/deleted en la raíz afecta a los cuatro a la vez: es lo que hace, por ejemplo,
+  // que una raíz archivada no pueda recibir límite en Periodo nuevo.
   spentByRootCategory: `SELECT root.id AS root_id, root.name,
     COALESCE(SUM(CASE WHEN t.type='expense' THEN ${MY_AMOUNT}
                  WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT} ELSE 0 END),0) AS spent_cents
