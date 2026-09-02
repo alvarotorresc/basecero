@@ -142,7 +142,7 @@ export const SQL = {
   // hijas directas): child.id=root.id cubre el gasto registrado directamente en la raíz, y
   // child.parent_id=root.id el de sus hijas. Resta refunds que no sean liquidación de un
   // compartido (REFUND_REDUCES_SPEND), prorrateados, igual criterio que spentOfPeriod. La
-  // reutilizan Tasks 9 (Presupuesto) y 12 (gráficas).
+  // reutilizan inicio.js y gasto-por-categoria.js.
   spentByRootCategory: `SELECT root.id AS root_id, root.name,
     COALESCE(SUM(CASE WHEN t.type='expense' THEN ${MY_AMOUNT}
                  WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT} ELSE 0 END),0) AS spent_cents

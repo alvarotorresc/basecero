@@ -29,7 +29,7 @@ const fmtPctInt = (pct) => `${Math.round(pct)}\u00A0%`;
 // descarta la declaración y el relleno se pinta al 100 %.
 const clampPct = (pct) => Math.min(100, Math.max(0, pct));
 
-const chevronSvg = (deg) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(${deg}deg);"><path d="M9 5l7 7-7 7"></path></svg>`;
+const chevronSvg = (deg) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${deg}deg);"><path d="M9 5l7 7-7 7"></path></svg>`;
 
 /** Pantalla «Gasto por categoría»: total del periodo + TODAS las raíces de gasto activas, cada una
  *  desplegable para ver su detalle por subcategoría y poner, cambiar o quitar su límite.
@@ -107,10 +107,10 @@ export async function renderGastoPorCategoria(container, onBack) {
     const empty = state.editRaw === "";
     return `
       <div style="display:flex;flex-direction:column;gap:10px;">
-        <div class="section-title">${t("gastoCategoria.edit.title", { name: escHtml(row.name) })}</div>
+        <div class="section-title" id="gc-limit-label">${t("gastoCategoria.edit.title", { name: escHtml(row.name) })}</div>
         <div style="display:flex;align-items:center;gap:10px;">
           <div style="position:relative;flex-shrink:0;">
-            <input type="number" min="0" step="1" inputmode="decimal" id="gc-limit-input"
+            <input type="number" min="0" step="0.01" inputmode="decimal" id="gc-limit-input" aria-labelledby="gc-limit-label"
               placeholder="${escAttr(t("gastoCategoria.edit.placeholder"))}" value="${escAttr(state.editRaw)}"
               class="budget-input${empty ? " is-empty" : ""}">
             <span class="budget-eur" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
@@ -200,8 +200,8 @@ export async function renderGastoPorCategoria(container, onBack) {
     const limPct = pctOf(lim.spent, lim.limit);
     const remaining = lim.limit - lim.spent;
 
-    const remainingSpan = `<span style="color:var(--green);font-weight:700;">${escHtml(fmtMoney(remaining))}</span>`;
-    const overSpan = `<span style="color:var(--red);font-weight:700;">${escHtml(fmtMoney(-remaining))}</span>`;
+    const remainingSpan = `<span class="num" style="color:var(--green);font-weight:700;">${escHtml(fmtMoney(remaining))}</span>`;
+    const overSpan = `<span class="num" style="color:var(--red);font-weight:700;">${escHtml(fmtMoney(-remaining))}</span>`;
 
     container.innerHTML = `
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
@@ -301,10 +301,12 @@ export async function renderGastoPorCategoria(container, onBack) {
         const cents = budgetByCategory[id] ?? 0;
         // Solo una raíz en edición a la vez: abrir una cierra la anterior.
         state.editing = id;
-        // Los límites se capturan en euros enteros (mismo input que periodo-nuevo.js).
-        state.editRaw = cents > 0 ? String(Math.round(cents / 100)) : "";
+        // El input admite céntimos (step 0.01); se prefiere el valor exacto guardado, sin redondear,
+        // para que un «Guardar» sin cambios no reescriba el límite. periodo-nuevo.js sigue capturando euros enteros.
+        state.editRaw = cents > 0 ? String(cents / 100) : "";
         state.editError = "";
         render();
+        container.querySelector("#gc-limit-input")?.focus();
       };
     });
 
@@ -319,6 +321,7 @@ export async function renderGastoPorCategoria(container, onBack) {
      *  vacío. Vacío o 0 equivale a quitar el límite; cualquier otra cosa va a upsertBudget, cuyo
      *  guard rechaza lo que no sea un entero de céntimos > 0 (NaN de un texto, negativos...). */
     const submitLimit = () => {
+      if (saveBtn && saveBtn.disabled) return;
       const rootId = state.editing;
       const raw = state.editRaw.trim();
       const cents = raw === "" || Number(raw) === 0 ? null : eurToCents(raw);
