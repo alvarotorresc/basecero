@@ -5,6 +5,7 @@ import { hoyISO, fmtDiaCorto, fmtMoney } from "../format.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 import { renderRecurrentes } from "./recurrentes.js";
 import { renderCategorias } from "./categorias.js";
+import { pushBack, goBack } from "../back.js";
 import { importCsv, importWithProfile } from "../n26.js";
 import { buildProfile, applyProfile, detectDateFormat, detectDecimal, parseDateIso, parseAmountCents } from "../csv-generic.js";
 import { encryptBackup, decryptBackup, isEncryptedBackup, WrongPassphraseError, MIN_PASSPHRASE } from "../backup-crypto.js";
@@ -278,6 +279,14 @@ export async function renderAjustes(container) {
     renderMain();
   }
 
+  // Vuelta del asistente de mapeo a Ajustes: es el callback que apunta la entrada de historial
+  // (pushBack más abajo), así que el gesto «atrás» del sistema y el ✕ hacen lo mismo.
+  function backToMain() {
+    state.view = "main";
+    state.assistant = null;
+    render();
+  }
+
   function renderMain() {
     container.innerHTML = `
       <header class="screen-header"><h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">${t("ajustes.title")}</h1></header>
@@ -441,11 +450,13 @@ export async function renderAjustes(container) {
     };
 
     container.querySelector("#btn-recurrentes").onclick = () => {
-      renderRecurrentes(container, () => renderAjustes(container));
+      pushBack(() => renderAjustes(container));
+      renderRecurrentes(container, goBack);
     };
 
     container.querySelector("#btn-categorias").onclick = () => {
-      renderCategorias(container, () => renderAjustes(container));
+      pushBack(() => renderAjustes(container));
+      renderCategorias(container, goBack);
     };
 
     container.querySelector("#btn-n26-import").onclick = () => {
@@ -464,6 +475,7 @@ export async function renderAjustes(container) {
           // Banco sin soporte dedicado y sin perfil guardado que case: abre el asistente en vez
           // de tocar la base de datos. Nada se ha escrito todavía (importCsv con needsMapping no
           // ejecuta ningún INSERT/UPDATE — ver n26.js).
+          pushBack(backToMain);
           state.view = "assistant";
           state.assistant = {
             fileName: file.name, text, headers: res.needsMapping.headers, sample: res.needsMapping.sample,
@@ -516,13 +528,11 @@ export async function renderAjustes(container) {
     const cerrarBtn = container.querySelector("#btn-cerrar-periodo");
     if (cerrarBtn) cerrarBtn.onclick = () => {
       document.body.classList.add("onboarding");
-      renderPeriodoNuevo(container, {
-        mode: "next",
-        onDone: () => {
-          document.body.classList.remove("onboarding");
-          renderAjustes(container);
-        },
+      pushBack(() => {
+        document.body.classList.remove("onboarding");
+        renderAjustes(container);
       });
+      renderPeriodoNuevo(container, { mode: "next", onDone: goBack });
     };
 
     const stepShare = async (delta) => {
@@ -813,11 +823,7 @@ export async function renderAjustes(container) {
   function wireAssistant(profile, profileValid) {
     const a = state.assistant;
 
-    container.querySelector("#assist-close").onclick = () => {
-      state.view = "main";
-      state.assistant = null;
-      render();
-    };
+    container.querySelector("#assist-close").onclick = () => goBack();
 
     // Delegación uniforme para las 6 filas de chips (fecha/concepto/contraparte/importe-única/
     // cargo/abono): el nombre del campo viaja en el propio data-attribute, así que un único
@@ -845,14 +851,14 @@ export async function renderAjustes(container) {
       try {
         await setMeta("csv_profile", JSON.stringify(profile));
         const res = await importWithProfile(a.text, profile);
-        state.view = "main";
-        state.assistant = null;
+        // El resultado se deja en state ANTES de goBack(): backToMain corre luego en el popstate
+        // y renderMain() ya lo encuentra puesto, así que el banner del import sigue apareciendo.
         state.n26Result = importResultText({ ...res, via: "profile" }, partnerName);
         state.n26Error = null;
+        goBack();
       } catch (err) {
         a.saveBusy = false;
         a.saveError = err.message;
-      } finally {
         render();
       }
     };

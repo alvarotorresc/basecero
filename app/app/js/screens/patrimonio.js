@@ -7,6 +7,7 @@ import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, hoyISO, fmtDec1, currencySymbol, currencyCode, parseCentsRaw, centsToRaw } from "../format.js";
 import { netWorthBarsHtml } from "../charts.js";
 import { t } from "../i18n/index.js";
+import { pushBack, goBack } from "../back.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -332,6 +333,7 @@ export async function renderPatrimonio(container) {
     editingAccountId: null, accountForm: null,
     editingGoalId: null, goalForm: null,
     deleteConfirm: false,
+    opening: false, // apertura de formulario de cuenta en curso (ver openAccountEdit)
   };
   let errorMsg = "";
 
@@ -350,20 +352,26 @@ export async function renderPatrimonio(container) {
     state.editingAccountId = null;
     state.accountForm = { name: "", type: "checking", raw: "", cents: 0, sign: "+", loanRaw: "", loanCents: 0 };
     errorMsg = "";
+    pushBack(backToMain);
     state.view = "account-form";
     render();
   }
 
   async function openAccountEdit(id) {
+    // Guard de apertura en curso: la vista principal sigue viva durante el await, y dos toques
+    // seguidos apuntarían DOS entradas de historial para un solo formulario abierto.
+    if (state.opening) return;
+    state.opening = true;
     let row;
     try {
       row = await getAccount(id);
     } catch (e) {
       errorMsg = t("patrimonio.error.openAccount", { error: e.message });
+      state.opening = false;
       render();
       return;
     }
-    if (!row) return;
+    if (!row) { state.opening = false; return; }
     state.editingAccountId = id;
     // monthlyCents (Task 6): precarga desde accountLoans (cargado en loadData), no desde `row` —
     // vive en meta.account_loans, no en la tabla accounts (config-in-meta, sin migración).
@@ -376,7 +384,9 @@ export async function renderPatrimonio(container) {
       loanRaw: centsToRaw(monthlyCents), loanCents: monthlyCents,
     };
     errorMsg = "";
+    pushBack(backToMain);
     state.view = "account-form";
+    state.opening = false;
     render();
   }
 
@@ -437,7 +447,7 @@ export async function renderPatrimonio(container) {
 
   function wireAccountForm() {
     const f = state.accountForm;
-    container.querySelector("#acc-back").onclick = () => backToMain();
+    container.querySelector("#acc-back").onclick = () => goBack();
 
     container.querySelector("#acc-name").oninput = (e) => { f.name = e.target.value; };
 
@@ -497,7 +507,7 @@ export async function renderPatrimonio(container) {
         }
         await setAccountLoan(accountId, monthlyCents);
         await loadData();
-        backToMain();
+        goBack();
       } catch (e) {
         btn.disabled = false;
         errorMsg = t("common.saveFailed", { error: e.message });
@@ -516,6 +526,7 @@ export async function renderPatrimonio(container) {
     };
     state.deleteConfirm = false;
     errorMsg = "";
+    pushBack(backToMain);
     state.view = "goal-form";
     render();
   }
@@ -535,6 +546,7 @@ export async function renderPatrimonio(container) {
     };
     state.deleteConfirm = false;
     errorMsg = "";
+    pushBack(backToMain);
     state.view = "goal-form";
     render();
   }
@@ -706,7 +718,7 @@ export async function renderPatrimonio(container) {
 
   function wireGoalForm() {
     const f = state.goalForm;
-    container.querySelector("#goal-back").onclick = () => backToMain();
+    container.querySelector("#goal-back").onclick = () => goBack();
     container.querySelector("#goal-name").oninput = (e) => { f.name = e.target.value; state.deleteConfirm = false; };
 
     container.querySelectorAll("[data-goal-tipo]").forEach((b) => {
@@ -758,7 +770,7 @@ export async function renderPatrimonio(container) {
         if (state.editingGoalId) await updateGoal(state.editingGoalId, fields);
         else await createGoal(fields);
         await loadData();
-        backToMain();
+        goBack();
       } catch (e) {
         btn.disabled = false;
         errorMsg = t("common.saveFailed", { error: e.message });
@@ -778,7 +790,7 @@ export async function renderPatrimonio(container) {
       try {
         await softDeleteGoal(state.editingGoalId);
         await loadData();
-        backToMain();
+        goBack();
       } catch (e) {
         btn.disabled = false;
         errorMsg = t("common.deleteFailed", { error: e.message });

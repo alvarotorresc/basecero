@@ -8,6 +8,7 @@ import { matchesFilter, isUncategorized } from "../movimientos-filter.js";
 import { fmtMoney, fmtDiaLargo, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
+import { pushBack, goBack } from "../back.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -134,6 +135,7 @@ export async function renderMovimientos(container) {
     detailId: null,
     detail: null,
     deleteConfirm: false,
+    opening: false, // apertura de detalle en curso (ver openDetail)
   };
   let errorMsg = "";
 
@@ -178,15 +180,20 @@ export async function renderMovimientos(container) {
   }
 
   async function openDetail(id) {
+    // Guard de apertura en curso: la lista sigue viva durante el await, y dos toques seguidos
+    // apuntarían DOS entradas de historial para una sola vista abierta.
+    if (state.opening) return;
+    state.opening = true;
     let row;
     try {
       row = await getTransaction(id);
     } catch (e) {
       errorMsg = t("movimientos.error.openDetail", { error: e.message });
+      state.opening = false;
       render();
       return;
     }
-    if (!row) return;
+    if (!row) { state.opening = false; return; }
     state.detailId = id;
     state.deleteConfirm = false;
     state.detail = {
@@ -223,8 +230,10 @@ export async function renderMovimientos(container) {
     // gasto enlazado ya está settled, bajar aquí el importe del refund descuadra la deuda liquidada
     // en silencio (el guard de repo lo rechazaría en save, pero mejor prevenirlo en el input).
     state.detail.refundLocked = row.type === "refund" && !!state.linkedRefund?.settled;
+    pushBack(backToList);
     state.view = "detail";
     errorMsg = "";
+    state.opening = false;
     render();
   }
 
@@ -403,7 +412,7 @@ export async function renderMovimientos(container) {
 
   function wireDetail() {
     const d = state.detail;
-    container.querySelector("#mov-back").onclick = () => backToList();
+    container.querySelector("#mov-back").onclick = () => goBack();
 
     container.querySelectorAll("[data-cat]").forEach((b) => {
       b.onclick = () => updateDetail({ categoryId: b.dataset.cat });
@@ -481,7 +490,7 @@ export async function renderMovimientos(container) {
           ruleId: d.ruleId,
         });
         await loadPeriodData();
-        backToList();
+        goBack();
       } catch (e) {
         btn.disabled = false;
         errorMsg = t("common.saveFailed", { error: e.message });
@@ -500,7 +509,7 @@ export async function renderMovimientos(container) {
       try {
         await softDeleteTransaction(state.detailId);
         await loadPeriodData();
-        backToList();
+        goBack();
       } catch (e) {
         btn.disabled = false;
         errorMsg = t("movimientos.error.delete", { error: e.message });

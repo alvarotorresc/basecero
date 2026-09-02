@@ -5,6 +5,7 @@ import {
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { t, monthLong } from "../i18n/index.js";
+import { pushBack, goBack } from "../back.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -119,6 +120,7 @@ export async function renderRecurrentes(container, onBack) {
       isShared: false, isActive: true,
     };
     state.deleteConfirm = false;
+    pushBack(backToList);
     state.view = "form";
     errorMsg = "";
     render();
@@ -134,6 +136,7 @@ export async function renderRecurrentes(container, onBack) {
       isShared: !!r.is_shared, isActive: !!r.is_active,
     };
     state.deleteConfirm = false;
+    pushBack(backToList);
     state.view = "form";
     errorMsg = "";
     render();
@@ -337,7 +340,7 @@ export async function renderRecurrentes(container, onBack) {
 
   function wireForm() {
     const f = state.form;
-    container.querySelector("#rec-form-back").onclick = () => backToList();
+    container.querySelector("#rec-form-back").onclick = () => goBack();
 
     container.querySelectorAll("[data-tipo]").forEach((b) => {
       b.onclick = () => {
@@ -419,7 +422,7 @@ export async function renderRecurrentes(container, onBack) {
         if (state.editId) await updateRule(state.editId, fields);
         else await createRule(fields);
         state.rules = await listRules();
-        backToList();
+        goBack();
       } catch (e) {
         btn.disabled = false;
         errorMsg = t("common.saveFailed", { error: e.message });
@@ -439,7 +442,7 @@ export async function renderRecurrentes(container, onBack) {
       try {
         await softDeleteRule(state.editId);
         state.rules = await listRules();
-        backToList();
+        goBack();
       } catch (e) {
         btn.disabled = false;
         errorMsg = t("common.deleteFailed", { error: e.message });
