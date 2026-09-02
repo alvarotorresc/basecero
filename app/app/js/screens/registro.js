@@ -94,6 +94,11 @@ export async function renderRegistro(container, onDone, prefill) {
       const partnerPart = row.amount_cents - myPart;
       state.raw = centsToRaw(partnerPart);
       state.cents = partnerPart;
+    } else {
+      // Gasto NO compartido: lo normal es que la tienda devuelva el importe entero — se precarga
+      // completo y editable (devolución parcial = corregir el importe a mano).
+      state.raw = centsToRaw(row.amount_cents);
+      state.cents = row.amount_cents;
     }
     state.refundPickerOpen = false;
     errorMsg = "";

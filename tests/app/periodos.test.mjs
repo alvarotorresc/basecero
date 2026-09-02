@@ -125,11 +125,12 @@ test("spentByRootCategory: agrega el subárbol, resta refunds sin ref prorratead
     VALUES ('per-otro','Otro periodo','2026-06-01','2026-06-30','closed',50,'',?,?,0)`).run(T, T);
 
   // per-1 (60/40): gasto directo en la raíz + gasto en el hijo (cuenta para la raíz) +
-  // refund sin ref (resta, prorrateado) + refund CON ref (NO resta: ref_id != '')
+  // refund sin ref (resta, prorrateado) + refund enlazado a la liquidación del gasto
+  // COMPARTIDO del hijo (NO resta: is_shared=1 en el gasto enlazado)
   ins(db, { id: "gasto-raiz", period: "per-1", category: "cat-casa", cents: 5000, shared: 0 });
   ins(db, { id: "gasto-hijo", period: "per-1", category: "cat-casa-alquiler", cents: 10000, shared: 1 }); // 60% → 6000
   ins(db, { id: "devol-suelta", period: "per-1", type: "refund", category: "cat-casa-alquiler", cents: 2000, shared: 1 }); // 60% → -1200
-  ins(db, { id: "devol-enlazada", period: "per-1", type: "refund", category: "cat-casa-alquiler", cents: 1000, shared: 0, ref: "gasto-raiz" }); // no resta
+  ins(db, { id: "devol-enlazada", period: "per-1", type: "refund", category: "cat-casa-alquiler", cents: 1000, shared: 0, ref: "gasto-hijo" }); // liquidación de compartido: no resta
   ins(db, { id: "otro-periodo", period: "per-otro", category: "cat-casa-alquiler", cents: 99999, shared: 0 }); // otro periodo: excluido
   ins(db, { id: "ingreso", period: "per-1", type: "income", category: "cat-nomina", cents: 200000 }); // income: su raíz no aparece
 
@@ -144,6 +145,22 @@ test("spentByRootCategory: agrega el subárbol, resta refunds sin ref prorratead
     "ORDER BY spent_cents DESC",
   );
   assert.equal(rows.some((r) => r.root_id === "cat-nomina"), false, "las raíces de income (flow≠expense) no aparecen");
+});
+
+test("spentByRootCategory: refund vinculado a gasto NO compartido resta en su raíz; vinculado a compartido no", () => {
+  const db = openDb();
+  seedMinimal(db);
+
+  const gastoA = ins(db, { id: "gasto-a", period: "per-1", category: "cat-casa-alquiler", cents: 10000, shared: 0 });
+  ins(db, { id: "devol-a", period: "per-1", type: "refund", category: "cat-casa-alquiler", cents: 10000, shared: 0, ref: gastoA });
+
+  const gastoB = ins(db, { id: "gasto-b", period: "per-1", category: "cat-casa-alquiler", cents: 10000, shared: 1 }); // 60% → 6000
+  ins(db, { id: "devol-b", period: "per-1", type: "refund", category: "cat-casa-alquiler", cents: 4000, shared: 0, ref: gastoB });
+
+  const rows = db.prepare(SQL.spentByRootCategory).all("per-1");
+  const casa = rows.find((r) => r.root_id === "cat-casa");
+
+  assert.equal(casa.spent_cents, 6000, "gasto A (10000) - devol-a (10000, gasto NO compartido) + gasto B al 60% (6000) - 0 (devol-b liquida compartido)");
 });
 
 test("updatePeriodShare: cambia my_share_pct y updated_at del periodo y los gastos SIN override lo siguen; los que tienen override no se mueven", () => {

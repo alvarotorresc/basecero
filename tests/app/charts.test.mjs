@@ -180,6 +180,24 @@ test("SQL.spentByDay + fillLast7Days: 7 días con ceros rellenos y suma correcta
   assert.equal(sum, 2000 + (2400 - 500));
 });
 
+test("SQL.spentByDay: refund vinculado a gasto NO compartido resta ese día; vinculado a compartido no", () => {
+  const d = openDb();
+  seedMinimal(d);
+
+  const gastoA = tx(d, { date: "2026-08-20", cents: 2000, shared: 0 });
+  tx(d, { date: "2026-08-20", type: "refund", cents: 2000, shared: 0, ref: gastoA });
+
+  const gastoB = tx(d, { date: "2026-08-22", cents: 4000, shared: 1 }); // 60% → 2400
+  tx(d, { date: "2026-08-22", type: "refund", cents: 1600, shared: 0, ref: gastoB });
+
+  const rows = d.prepare(SQL.spentByDay).all("per-1", "2026-08-18", "2026-08-24");
+  const dia20 = rows.find((r) => r.date === "2026-08-20");
+  const dia22 = rows.find((r) => r.date === "2026-08-22");
+
+  assert.equal(dia20.cents, 0, "gasto 2000 - refund 2000 (gasto NO compartido) = 0");
+  assert.equal(dia22.cents, 2400, "gasto al 60% (2400) - 0 (refund liquida gasto compartido)");
+});
+
 test("fillLast7Days: sin filas, devuelve 7 ceros", () => {
   const days = fillLast7Days([], "2026-08-24");
   assert.equal(days.length, 7);

@@ -1,6 +1,14 @@
 const MY_AMOUNT = `CAST(ROUND(t.amount_cents * (CASE WHEN t.is_shared=1
   THEN COALESCE(t.share_pct_override, p.my_share_pct, 100) ELSE 100 END) / 100.0) AS INTEGER)`;
 
+// Una devolución resta del gasto SIEMPRE, salvo que sea la liquidación de un gasto compartido
+// (ref_id apunta a un gasto con is_shared=1): ahí mi gasto ya contaba solo mi parte y lo que
+// vuelve es la parte de la contraparte. Vinculada a un gasto NO compartido (la tienda devuelve el
+// dinero) o sin vincular, resta prorrateada por MY_AMOUNT. Lo usan spentOfPeriod,
+// spentByRootCategory y spentByDay — los tres con el MISMO criterio.
+const REFUND_REDUCES_SPEND = `(t.ref_id='' OR NOT EXISTS (
+  SELECT 1 FROM transactions e WHERE e.id=t.ref_id AND e.is_shared=1))`;
+
 export const SQL = {
   getOpenPeriod: `SELECT * FROM periods WHERE status='open' AND deleted=0 LIMIT 1`,
   insertPeriod: `INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
@@ -10,7 +18,7 @@ export const SQL = {
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
   spentOfPeriod: `SELECT COALESCE(SUM(CASE
       WHEN t.type='expense' THEN ${MY_AMOUNT}
-      WHEN t.type='refund' AND t.ref_id='' THEN -${MY_AMOUNT}
+      WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT}
       ELSE 0 END),0) AS spent_cents
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.period_id=? AND t.deleted=0`,
@@ -110,11 +118,12 @@ export const SQL = {
   updatePeriodShare: `UPDATE periods SET my_share_pct=?, updated_at=? WHERE id=? AND deleted=0`,
   // Suma por categoría RAÍZ de gasto (parent_id='') el gasto de toda su subárbol (ella misma +
   // hijas directas): child.id=root.id cubre el gasto registrado directamente en la raíz, y
-  // child.parent_id=root.id el de sus hijas. Resta refunds sueltos (ref_id='') prorrateados,
-  // igual criterio que spentOfPeriod. La reutilizan Tasks 9 (Presupuesto) y 12 (gráficas).
+  // child.parent_id=root.id el de sus hijas. Resta refunds que no sean liquidación de un
+  // compartido (REFUND_REDUCES_SPEND), prorrateados, igual criterio que spentOfPeriod. La
+  // reutilizan Tasks 9 (Presupuesto) y 12 (gráficas).
   spentByRootCategory: `SELECT root.id AS root_id, root.name,
     COALESCE(SUM(CASE WHEN t.type='expense' THEN ${MY_AMOUNT}
-                 WHEN t.type='refund' AND t.ref_id='' THEN -${MY_AMOUNT} ELSE 0 END),0) AS spent_cents
+                 WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT} ELSE 0 END),0) AS spent_cents
   FROM categories root
   LEFT JOIN categories child ON (child.id=root.id OR child.parent_id=root.id) AND child.deleted=0
   LEFT JOIN transactions t ON t.category_id=child.id AND t.period_id=? AND t.deleted=0
@@ -131,7 +140,7 @@ export const SQL = {
   // en JS (fillLast7Days). Bind: [periodId, startDateIso, endDateIso].
   spentByDay: `SELECT t.date AS date,
     COALESCE(SUM(CASE WHEN t.type='expense' THEN ${MY_AMOUNT}
-                 WHEN t.type='refund' AND t.ref_id='' THEN -${MY_AMOUNT} ELSE 0 END),0) AS cents
+                 WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT} ELSE 0 END),0) AS cents
   FROM transactions t JOIN periods p ON p.id=t.period_id
   WHERE t.period_id=? AND t.deleted=0 AND t.date BETWEEN ? AND ?
   GROUP BY t.date`,
