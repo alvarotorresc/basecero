@@ -17,9 +17,9 @@ const BAR_INACTIVE_COLOR = "var(--card2)";
 
 /** Tarjeta "Flujo de gasto": grid de N barras `align-items:end` + fila de iniciales de día
  *  debajo — réplica de docs/design/material-expresivo/Resumen.dc.html:73-106. Sin ejes.
- *  days: [{label, cents, active}] — la barra `active` (hoy) usa el color de acento y muestra el
- *  importe encima; el resto van en gris y sin etiqueta. La escala es relativa al día de mayor
- *  gasto del propio array (ese día ocupa el 100% de BAR_MAX_H). */
+ *  days: [{label, cents, active}] — la barra `active` (hoy) usa el color de acento; todas llevan
+ *  su importe encima (la activa en acento, el resto atenuadas). La escala es relativa al día de
+ *  mayor gasto del propio array (ese día ocupa el 100% de BAR_MAX_H). */
 export function barChartSvg(days) {
   const maxCents = Math.max(0, ...days.map((d) => Math.max(0, d.cents ?? 0)));
   const scale = maxCents > 0 ? BAR_MAX_H / maxCents : 0;
@@ -28,9 +28,12 @@ export function barChartSvg(days) {
     const cents = Math.max(0, d.cents ?? 0);
     const h = Math.max(BAR_MIN_H, Math.round(cents * scale));
     const fillColor = d.active ? "var(--accent)" : BAR_INACTIVE_COLOR;
-    const labelHtml = d.active
-      ? `<div class="flujo-bar-label" style="font-size:10px;font-weight:700;color:var(--accent);text-align:center;font-variant-numeric:tabular-nums;">${centsToStr(cents)}</div>`
-      : "";
+    // Importe encima de CADA barra (antes solo la activa): hoy en acento y negrita, el resto
+    // atenuado — los días a cero muestran «0,00» para que no parezca que falta la cifra.
+    const labelStyle = d.active
+      ? "font-size:10px;font-weight:700;color:var(--accent);"
+      : "font-size:10px;font-weight:500;color:var(--text-3);";
+    const labelHtml = `<div class="flujo-bar-label${d.active ? " flujo-bar-label--active" : ""}" style="${labelStyle}text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;">${centsToStr(cents)}</div>`;
     return `
       <div class="flujo-bar${d.active ? " flujo-bar--active" : ""}" data-cents="${cents}"
         style="display:flex;flex-direction:column;align-items:stretch;justify-content:flex-end;gap:6px;">
