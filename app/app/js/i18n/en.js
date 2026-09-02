@@ -265,6 +265,57 @@ export const EN = {
       andMore: "{names} and {n} more",
     },
   },
+  gastoCategoria: {
+    error: { load: "Couldn’t load Spending by category: {error}" },
+    title: "Spending by category",
+    header: {
+      openedOn: "{period} · opened on {date}{days}",
+      days: { one: " · {n} day", other: " · {n} days" },
+    },
+    total: {
+      title: "Spent this period",
+      withLimit: {
+        one: "{spent} of {limit} in the only category with a limit · {pct}",
+        other: "{spent} of {limit} in the {n} categories with a limit · {pct}",
+      },
+      remaining: {
+        one: "You have {amount} left in the only category with a limit",
+        other: "You have {amount} left in the {n} categories with a limit",
+      },
+      over: {
+        one: "You’ve gone {amount} over in the only category with a limit",
+        other: "You’ve gone {amount} over in the {n} categories with a limit",
+      },
+      noLimits: "No category has a limit this period",
+    },
+    byCategory: {
+      title: "By category",
+      hint: "Tap a category to see the detail or set a limit",
+      empty: "You have no active expense categories.",
+    },
+    row: {
+      ofLimit: "{spent} of {limit}",
+      noLimit: "{spent} · no limit",
+      noPct: "—",
+      expand: "Show the detail of {name}",
+      collapse: "Hide the detail of {name}",
+    },
+    detail: {
+      noSubcategory: "No subcategory",
+      changeLimit: "Change limit",
+      setLimit: "Set limit",
+      limitOfPeriod: "{amount} this period",
+      noLimit: "no limit",
+    },
+    edit: {
+      title: "Limit for {name}",
+      placeholder: "No limit",
+      save: "Save",
+      onlyThisPeriod: "For this period only",
+      remove: "Remove limit",
+      saveFailed: "Couldn’t save the limit: {error}",
+    },
+  },
   patrimonio: {
     error: {
       load: "Couldn’t load Net worth: {error}",
