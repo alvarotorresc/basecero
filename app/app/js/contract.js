@@ -5,7 +5,7 @@ export const CONTRACT = {
   accounts: { cols: ["id","name","type","opening_balance_cents","display_order","is_archived","created_at","updated_at","deleted"] },
   categories: { cols: ["id","name","parent_id","flow","need_type","display_order","is_archived","created_at","updated_at","deleted"] },
   periods: { cols: ["id","name","start_date","end_date","status","my_share_pct","notes","created_at","updated_at","deleted"] },
-  transactions: { cols: ["id","date","period_id","type","amount_cents","account_id","counter_account_id","category_id","merchant","note","is_shared","share_pct_override","settled","ref_id","rule_id","external_id","status","created_at","updated_at","deleted"] },
+  transactions: { cols: ["id","date","period_id","type","amount_cents","account_id","counter_account_id","category_id","merchant","note","is_shared","share_pct_override","paid_by","settled","ref_id","rule_id","external_id","status","created_at","updated_at","deleted"] },
   recurring_rules: { cols: ["id","name","type","amount_cents","category_id","account_id","counter_account_id","frequency","due_day","due_month","is_shared","is_active","created_at","updated_at","deleted"] },
   goals: { cols: ["id","name","type","target_amount_cents","target_months","target_pct","target_date","account_id","category_id","is_active","created_at","updated_at","deleted"] },
   budgets: { cols: ["id","period_id","category_id","amount_cents","created_at","updated_at","deleted"] },
@@ -15,7 +15,7 @@ export const ENUMS = {
   accounts: { type: ["checking","savings","liability"] },
   categories: { flow: ["expense","income"], need_type: ["need","want","savings",""] },
   periods: { status: ["open","closed"] },
-  transactions: { type: ["expense","income","transfer","refund","adjustment"], status: ["pending","reconciled"] },
+  transactions: { type: ["expense","income","transfer","refund","adjustment"], status: ["pending","reconciled"], paid_by: ["me","partner"] },
   recurring_rules: { type: ["expense","income","transfer"], frequency: ["weekly","monthly","quarterly","yearly"] },
   goals: { type: ["emergency_fund","savings_target","spending_cap","savings_rate","provision"] },
 };
@@ -28,6 +28,12 @@ export const BOOL_COLS = {
 };
 
 export const NULLABLE_NUM = new Set(["share_pct_override","due_day","due_month","target_amount_cents","target_months","target_pct"]);
+
+// Valor por defecto de una columna TEXT del contrato cuando la celda llega vacía o la hoja no trae
+// su cabecera. paid_by es NOT NULL DEFAULT 'me' en la BD y su ENUM no admite "": una hoja v1 (sin
+// la columna) o una hoja rellenada a mano con la celda en blanco describen exactamente el mundo
+// "todo lo pagué yo", así que ese es el default — no un error de import.
+export const TEXT_DEFAULTS = { transactions: { paid_by: "me" } };
 
 // optional=true → '' permitido (FK vacía). ref_id/rule_id/parent_id/counter_account_id son opcionales por contrato.
 //
@@ -48,7 +54,11 @@ export const NULLABLE_NUM = new Set(["share_pct_override","due_day","due_month",
 export const FKS = [
   { table: "categories", col: "parent_id", ref: "categories", optional: true },
   { table: "transactions", col: "period_id", ref: "periods", optional: false },
-  { table: "transactions", col: "account_id", ref: "accounts", optional: false },
+  // account_id es obligatorio SALVO en un gasto compartido que pagó la contraparte: ahí no intervino
+  // ninguna cuenta mía (el dinero no sale de mi banco hasta liquidar) y '' es lo que guarda el repo.
+  // La invariante contraria (paid_by='partner' ⇒ account_id vacío) la valida validateImport aparte.
+  { table: "transactions", col: "account_id", ref: "accounts", optional: false,
+    optionalWhen: (row) => row.type === "expense" && row.is_shared === 1 && row.paid_by === "partner" },
   { table: "transactions", col: "counter_account_id", ref: "accounts", optional: true },
   { table: "transactions", col: "category_id", ref: "categories", optional: true },
   { table: "transactions", col: "ref_id", ref: "transactions", optional: true, allowDeletedRef: true },

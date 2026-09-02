@@ -96,7 +96,7 @@ async function runImportPipeline(rows) {
         sql: SQL.insertTransaction,
         bind: [id, r.bookingDate, period.id, type, Math.abs(r.amountCents), accountId, "",
           "", bcSanitizeCell(r.partnerName), bcSanitizeCell(r.paymentReference),
-          0, null, 0, "", "", r.externalId, "reconciled", now, now],
+          0, null, "me", 0, "", "", r.externalId, "reconciled", now, now],
       });
       existing.push({ id, dateIso: r.bookingDate, type, amountCents: r.amountCents,
         externalId: r.externalId, status: "reconciled" });

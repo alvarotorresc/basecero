@@ -14,7 +14,7 @@ const pure = require("../../app/app/vendor/pure.js");
 // n26.js:5 sobre el mismo patrón, y n26.test.mjs:19 sobre cómo se expone en Node). Se importa
 // settleAllSharedStmts REAL (no una reproducción) precisamente porque es la función PURA que
 // construye el bind exacto de insertTransaction — la que el brief pide verificar "orden exacto,
-// 19 campos"; una copia a mano en el test no detectaría un bug de orden introducido en repo.js.
+// 20 campos"; una copia a mano en el test no detectaría un bug de orden introducido en repo.js.
 globalThis.bcUlid = pure.bcUlid;
 globalThis.bcSanitizeCell = pure.bcSanitizeCell;
 
@@ -28,13 +28,13 @@ function ins(db, over = {}) {
     id: "t" + Math.floor(Math.random() * 1e9),
     date: "2026-08-20", period: "per-1", type: "expense", cents: 4520,
     account: "acc-n26", counterAccount: "", category: "cat-casa-alquiler",
-    merchant: "", note: "", shared: 0, override: null, settled: 0,
+    merchant: "", note: "", shared: 0, override: null, paidBy: "me", settled: 0,
     ref: "", rule: "", external: "", status: "pending",
     ...over,
   };
   db.prepare(SQL.insertTransaction).run(
     v.id, v.date, v.period, v.type, v.cents, v.account, v.counterAccount,
-    v.category, v.merchant, v.note, v.shared, v.override, v.settled,
+    v.category, v.merchant, v.note, v.shared, v.override, v.paidBy, v.settled,
     v.ref, v.rule, v.external, v.status, T, T,
   );
   return v.id;
@@ -51,7 +51,7 @@ function settleShared(db, origId, accountId, now, openPeriodId = "per-1") {
   const refundId = "refund-" + origId;
   db.prepare(SQL.insertTransaction).run(
     refundId, "2026-08-24", openPeriodId, "refund", row.partner_amount_cents, accountId, "",
-    row.category_id, row.merchant, "Liquidación", 0, null, 0, origId, "", "", "pending", now, now,
+    row.category_id, row.merchant, "Liquidación", 0, null, "me", 0, origId, "", "", "pending", now, now,
   );
   db.prepare("UPDATE transactions SET settled=1, updated_at=? WHERE id=?").run(now, origId);
   return refundId;
@@ -181,7 +181,7 @@ function execManyRaw(db, stmts) {
  *  Node (depende del Worker vía query/execMany, mismo motivo por el que settleShared/
  *  openNextPeriod de este mismo fichero se reproducen en vez de importarse). El ARRAY de
  *  statements NO se reproduce a mano aquí: se delega en la settleAllSharedStmts REAL importada de
- *  repo.js (arriba) — así un bug en el bind de insertTransaction (orden de los 19 campos) lo
+ *  repo.js (arriba) — así un bug en el bind de insertTransaction (orden de los 20 campos) lo
  *  detectaría este test, cosa que una copia manual del bind no podría hacer. */
 function settleAllSharedReproduced(db, ids, accountId, now, periodId = "per-1") {
   if (!ids || ids.length === 0) return;
@@ -358,43 +358,29 @@ test("hasShared: detecta transacciones y reglas compartidas activas (borradas no
 });
 
 test("sharedFieldsLocked: pura, sin DB — replica exactamente lo que updateTransaction debe bloquear", () => {
-  const settledExpense = { type: "expense", settled: 1, amount_cents: 4550, is_shared: 1, share_pct_override: null };
+  const settledExpense = { type: "expense", settled: 1, amount_cents: 4550, is_shared: 1, share_pct_override: null, paid_by: "me" };
+  const same = { amountCents: 4550, isShared: true, sharePctOverride: null, paidBy: "me" };
 
   // no settled → nunca bloquea, aunque cambie el importe
-  assert.equal(sharedFieldsLocked(
-    { ...settledExpense, settled: 0 },
-    { amountCents: 6000, isShared: true, sharePctOverride: null },
-  ), false, "un gasto NO liquidado no se bloquea");
+  assert.equal(sharedFieldsLocked({ ...settledExpense, settled: 0 }, { ...same, amountCents: 6000 }), false,
+    "un gasto NO liquidado no se bloquea");
 
   // settled pero type != 'expense' (p.ej. un refund) → nunca bloquea
-  assert.equal(sharedFieldsLocked(
-    { ...settledExpense, type: "refund" },
-    { amountCents: 6000, isShared: true, sharePctOverride: null },
-  ), false, "el guard es solo para expense — is_shared/settled también existen en refund/income");
+  assert.equal(sharedFieldsLocked({ ...settledExpense, type: "refund" }, { ...same, amountCents: 6000 }), false,
+    "el guard es solo para expense — is_shared/settled también existen en refund/income");
 
-  // settled + expense + MISMO importe/compartido/override (solo cambia categoría/nota/fecha) → no bloquea
-  assert.equal(sharedFieldsLocked(
-    settledExpense,
-    { amountCents: 4550, isShared: true, sharePctOverride: null },
-  ), false, "editar categoría/fecha/nota/comercio sin tocar importe/compartido/reparto debe seguir funcionando");
+  // settled + expense + MISMO importe/compartido/override/quién pagó → no bloquea
+  assert.equal(sharedFieldsLocked(settledExpense, same), false,
+    "editar categoría/fecha/nota/comercio sin tocar importe/compartido/reparto debe seguir funcionando");
 
-  // settled + expense + importe distinto → bloquea
-  assert.equal(sharedFieldsLocked(
-    settledExpense,
-    { amountCents: 6000, isShared: true, sharePctOverride: null },
-  ), true, "cambiar el importe de un gasto liquidado debe bloquearse");
-
-  // settled + expense + is_shared distinto (desmarcar "Compartido con la contraparte") → bloquea
-  assert.equal(sharedFieldsLocked(
-    settledExpense,
-    { amountCents: 4550, isShared: false, sharePctOverride: null },
-  ), true, "desmarcar compartido en un gasto liquidado debe bloquearse");
-
-  // settled + expense + share_pct_override distinto → bloquea
-  assert.equal(sharedFieldsLocked(
-    settledExpense,
-    { amountCents: 4550, isShared: true, sharePctOverride: 90 },
-  ), true, "cambiar el reparto de un gasto liquidado debe bloquearse");
+  assert.equal(sharedFieldsLocked(settledExpense, { ...same, amountCents: 6000 }), true,
+    "cambiar el importe de un gasto liquidado debe bloquearse");
+  assert.equal(sharedFieldsLocked(settledExpense, { ...same, isShared: false }), true,
+    "desmarcar compartido en un gasto liquidado debe bloquearse");
+  assert.equal(sharedFieldsLocked(settledExpense, { ...same, sharePctOverride: 90 }), true,
+    "cambiar el reparto de un gasto liquidado debe bloquearse");
+  assert.equal(sharedFieldsLocked(settledExpense, { ...same, paidBy: "partner" }), true,
+    "cambiar quién pagó un gasto liquidado debe bloquearse");
 });
 
 // ---- Task 6 (M5, review de seguridad): bloqueo bilateral de gastos liquidados -------------
@@ -524,6 +510,7 @@ function updateTransactionReproduced(db, id, fields) {
     amountCents: fields.amountCents ?? cur.amount_cents,
     isShared: fields.isShared ?? !!cur.is_shared,
     sharePctOverride: fields.sharePctOverride !== undefined ? fields.sharePctOverride : cur.share_pct_override,
+    paidBy: fields.paidBy ?? cur.paid_by,
   };
   if (sharedFieldsLocked(cur, f) && db.prepare(SQL.hasActiveLinkedRefund).get(id)) {
     throw new Error("LOCKED: gasto liquidado");
@@ -535,7 +522,7 @@ function updateTransactionReproduced(db, id, fields) {
   db.prepare(SQL.updateTransaction).run(
     fields.type ?? cur.type, f.amountCents, fields.date ?? cur.date, fields.categoryId ?? cur.category_id,
     fields.accountId ?? cur.account_id, fields.counterAccountId ?? cur.counter_account_id,
-    fields.merchant ?? cur.merchant, fields.note ?? cur.note, f.isShared ? 1 : 0, f.sharePctOverride,
+    fields.merchant ?? cur.merchant, fields.note ?? cur.note, f.isShared ? 1 : 0, f.sharePctOverride, f.paidBy,
     fields.refId ?? cur.ref_id, fields.ruleId ?? cur.rule_id, fields.status ?? cur.status, T2, id,
   );
 }

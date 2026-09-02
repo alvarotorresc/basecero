@@ -704,7 +704,7 @@ export const ES = {
     },
     xlsx: {
       missingSheet: "falta la pestaña «{table}»",
-      schemaVersion: "meta: schema_version debe ser 1 (es «{value}»)",
+      schemaVersion: "meta: schema_version debe ser 1 o 2 (es «{value}»)",
       createdWith: "meta: created_with no reconocido («{value}»)",
       pkEmpty: "pestaña «{table}» fila {row}: id vacío",
       pkDuplicate: "pestaña «{table}» fila {row}: id duplicado («{pk}»)",
@@ -725,6 +725,8 @@ export const ES = {
       numericInvalid: "pestaña «{table}» fila {row}: {col} no es un número válido («{value}»)",
       numericRange: "pestaña «{table}» fila {row}: {col} fuera de rango [{min}, {max}] («{value}»)",
       booleanInvalid: "pestaña «{table}» fila {row}: {col} no es un valor booleano válido («{value}»)",
+      paidByNotShared: "pestaña «transactions» fila {row}: paid_by «partner» solo vale en un gasto compartido",
+      paidByAccount: "pestaña «transactions» fila {row}: un gasto que pagó la contraparte no puede llevar cuenta",
     },
     csvGeneric: {
       invalidHeaders: "cabeceras inválidas",

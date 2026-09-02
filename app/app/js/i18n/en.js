@@ -699,7 +699,7 @@ export const EN = {
     },
     xlsx: {
       missingSheet: "missing sheet “{table}”",
-      schemaVersion: "meta: schema_version must be 1 (got “{value}”)",
+      schemaVersion: "meta: schema_version must be 1 or 2 (got “{value}”)",
       createdWith: "meta: created_with not recognized (“{value}”)",
       pkEmpty: "sheet “{table}” row {row}: empty id",
       pkDuplicate: "sheet “{table}” row {row}: duplicate id (“{pk}”)",
@@ -720,6 +720,8 @@ export const EN = {
       numericInvalid: "sheet “{table}” row {row}: {col} is not a valid number (“{value}”)",
       numericRange: "sheet “{table}” row {row}: {col} out of range [{min}, {max}] (“{value}”)",
       booleanInvalid: "sheet “{table}” row {row}: {col} is not a valid boolean (“{value}”)",
+      paidByNotShared: "sheet “transactions” row {row}: paid_by “partner” is only valid on a shared expense",
+      paidByAccount: "sheet “transactions” row {row}: an expense paid by your partner cannot have an account",
     },
     csvGeneric: {
       invalidHeaders: "invalid headers",

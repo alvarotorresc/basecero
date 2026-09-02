@@ -55,7 +55,7 @@ export async function updatePeriodSharePct(id, pct) {
 
 export async function addTransaction({
   type, amountCents, date, categoryId, accountId, merchant, note, isShared,
-  counterAccountId = "", sharePctOverride = null, refId = "", ruleId = "", externalId = "", status = "pending",
+  counterAccountId = "", sharePctOverride = null, paidBy = "me", refId = "", ruleId = "", externalId = "", status = "pending",
 }) {
   const p = await getOpenPeriod();
   if (!p) throw new Error(t("errors.common.noOpenPeriod"));
@@ -64,7 +64,7 @@ export async function addTransaction({
     sql: SQL.insertTransaction,
     bind: [bcUlid(), date, p.id, type, amountCents, accountId, counterAccountId,
       categoryId ?? "", bcSanitizeCell(merchant ?? ""), bcSanitizeCell(note ?? ""),
-      isShared ? 1 : 0, sharePctOverride, 0, refId, ruleId, externalId, status, now, now],
+      isShared ? 1 : 0, sharePctOverride, paidBy, 0, refId, ruleId, externalId, status, now, now],
   };
   if (refId) {
     await execMany([insertStmt, { sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [now, refId] }]);
@@ -137,7 +137,10 @@ export function sharedFieldsLocked(cur, f) {
   if (cur.type !== "expense" || !cur.settled) return false;
   return f.amountCents !== cur.amount_cents
     || !!f.isShared !== !!cur.is_shared
-    || f.sharePctOverride !== cur.share_pct_override;
+    || f.sharePctOverride !== cur.share_pct_override
+    // Cambiar quién pagó un gasto YA liquidado descuadra la deuda saldada igual que cambiar el
+    // importe: el apunte de liquidación se quedó con la dirección y el importe de antes.
+    || f.paidBy !== cur.paid_by;
 }
 
 /** M5 (Task 6, review de seguridad): el guard de arriba solo mira el LADO DEL GASTO. Si en vez
@@ -247,7 +250,7 @@ export function settleAllSharedStmts(rows, accountId, periodId, date, now) {
       sql: SQL.insertTransaction,
       bind: [
         bcUlid(), date, periodId, "refund", row.partner_amount_cents, accountId, "",
-        row.category_id, bcSanitizeCell(row.merchant ?? ""), "Liquidación", 0, null, 0,
+        row.category_id, bcSanitizeCell(row.merchant ?? ""), "Liquidación", 0, null, "me", 0,
         row.id, "", "", "pending", now, now,
       ],
     });
@@ -298,6 +301,7 @@ export async function updateTransaction(id, fields) {
     note: fields.note ?? cur.note,
     isShared: fields.isShared ?? !!cur.is_shared,
     sharePctOverride: fields.sharePctOverride !== undefined ? fields.sharePctOverride : cur.share_pct_override,
+    paidBy: fields.paidBy ?? cur.paid_by,
     refId: fields.refId ?? cur.ref_id,
     ruleId: fields.ruleId ?? cur.rule_id,
     status: fields.status ?? cur.status,
@@ -321,7 +325,7 @@ export async function updateTransaction(id, fields) {
   await exec(SQL.updateTransaction, [
     f.type, f.amountCents, f.date, f.categoryId ?? "", f.accountId, f.counterAccountId ?? "",
     bcSanitizeCell(f.merchant ?? ""), bcSanitizeCell(f.note ?? ""), f.isShared ? 1 : 0,
-    f.sharePctOverride, f.refId ?? "", f.ruleId ?? "", f.status, now, id,
+    f.sharePctOverride, f.paidBy, f.refId ?? "", f.ruleId ?? "", f.status, now, id,
   ]);
 }
 
@@ -935,7 +939,11 @@ export const exportAllJson = () => dumpAllTables();
 export function replaceAllStmts(data) {
   const tables = TABLES.filter((t) => t !== "meta");
   const stmts = [...tables].reverse().map((t) => ({ sql: `DELETE FROM ${t}` }));
-  for (const row of data.meta) stmts.push({ sql: SQL.upsertMeta, bind: [row.key, row.value] });
+  // schema_version NO se importa: es una propiedad de ESTA base de datos (la puso el runner de
+  // migraciones al arrancar, ver migrations.js), no de la hoja. Sin este filtro, importar una hoja
+  // v1 en una BD ya migrada dejaría meta.schema_version='1' con la columna paid_by presente, y el
+  // siguiente export produciría una hoja que se declara v1 llevando ya una columna v2.
+  for (const row of data.meta) if (row.key !== "schema_version") stmts.push({ sql: SQL.upsertMeta, bind: [row.key, row.value] });
   for (const t of tables)
     for (const row of data[t]) stmts.push({ sql: insertSql(t), bind: CONTRACT[t].cols.map((c) => row[c]) });
   return stmts;

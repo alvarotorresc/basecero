@@ -19,7 +19,7 @@ test("esquema aplica y las 8 tablas existen", () => {
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name);
   for (const t of ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"])
     assert.ok(tables.includes(t), t);
-  assert.equal(db.prepare("SELECT value FROM meta WHERE key='schema_version'").get().value, "1");
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='schema_version'").get().value, "2");
 });
 
 test("semillas: 0 cuentas (las crea el usuario) y 41 categorías con integridad", () => {
