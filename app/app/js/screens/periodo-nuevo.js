@@ -5,6 +5,7 @@ import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { eurToCents } from "../contract.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol } from "../format.js";
 import { t } from "../i18n/index.js";
+import { PCT_STEP, stepPct } from "../share-pct.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -218,12 +219,10 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
           <div style="font-size:14px; font-weight:600;">${t("periodo.share.youPay")}</div>
           <div style="font-size:11px; color:var(--text-3);">${t("periodo.share.partnerPays", { name: escHtml(partnerName), pct: restante })}</div>
         </div>
-        <button type="button" id="pn-pct-down" class="stepper-btn"
-          style="width:44px; height:44px; border-radius:14px; background:var(--card2); color:var(--text); font-size:17px;"
+        <button type="button" id="pn-pct-down" class="stepper-btn lg"
           aria-label="${t("periodo.share.decreaseAria")}">−</button>
         <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${state.sharePct} %</div>
-        <button type="button" id="pn-pct-up" class="stepper-btn"
-          style="width:44px; height:44px; border-radius:14px; background:var(--card2); color:var(--text); font-size:17px;"
+        <button type="button" id="pn-pct-up" class="stepper-btn lg"
           aria-label="${t("periodo.share.increaseAria")}">+</button>
       </div>
     </div>`;
@@ -361,9 +360,9 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
     container.querySelector("#pn-nombre").oninput = (e) => { state.name = e.target.value; };
 
     const pctUp = container.querySelector("#pn-pct-up");
-    if (pctUp) pctUp.onclick = () => { state.sharePct = Math.min(100, state.sharePct + 5); render(); };
+    if (pctUp) pctUp.onclick = () => { state.sharePct = stepPct(state.sharePct, PCT_STEP); render(); };
     const pctDown = container.querySelector("#pn-pct-down");
-    if (pctDown) pctDown.onclick = () => { state.sharePct = Math.max(0, state.sharePct - 5); render(); };
+    if (pctDown) pctDown.onclick = () => { state.sharePct = stepPct(state.sharePct, -PCT_STEP); render(); };
 
     container.querySelectorAll("[data-budget]").forEach((el) => {
       // oninput (no render()) para no perder el foco a media escritura ni "tragarse" el

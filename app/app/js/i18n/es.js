@@ -29,6 +29,7 @@ export const ES = {
     myShare: "Tu parte · {pct}%",
     myPartSuffix: " · tu parte {amount}",
     sharedWith: "Compartido con {name}",
+    split: { label: "Reparto", hint: "{name} paga el {pct} %", decreaseAria: "Bajar tu parte", increaseAria: "Subir tu parte" },
     merchant: "Comercio",
     date: "Fecha",
     note: "Nota",

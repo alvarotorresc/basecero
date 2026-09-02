@@ -604,6 +604,9 @@ body:has(> .banner-aviso) main#screen { margin-top: 46px; }
 }
 .stepper-btn:active { color: var(--text); }
 
+/* variante 44px/radius14 del stepper (Periodo nuevo, Registro, Movimientos, Ajustes) */
+.stepper-btn.lg { width: 44px; height: 44px; border-radius: 14px; background: var(--card2); color: var(--text); font-size: 17px; }
+
 /* input € de cada presupuesto por categoría: vacío = "Sin límite", estilo punteado */
 .budget-input {
   height: 42px;

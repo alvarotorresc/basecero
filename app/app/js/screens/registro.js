@@ -6,6 +6,7 @@ import { colorForCategory, iconForCategory, textColorForCategory } from "../cate
 import { fmtMoney, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
+import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 
 // labelKey/SAVE_KEY en vez de texto resuelto: son consts de módulo, evaluadas al importar el
 // fichero (antes de que boot() llame a initI18n con el idioma real) — si guardaran el string ya
@@ -51,7 +52,6 @@ export async function renderRegistro(container, onDone, prefill) {
   }
 
   const accounts = accountsAll.filter((a) => a.type !== "liability");
-  const pct = period?.my_share_pct ?? 100;
   const partnerName = (meta.partner_name || "").trim();
 
   const state = {
@@ -62,6 +62,7 @@ export async function renderRegistro(container, onDone, prefill) {
     accountId: prefill?.accountId ?? resolveAccountId(meta.default_account_id, accounts) ?? "",
     counterAccountId: "",
     isShared: partnerName ? (prefill?.isShared ?? false) : false,
+    sharePct: normalizePct(period?.my_share_pct, 100),
     fecha: hoyISO(),
     merchant: prefill?.merchant ?? "",
     note: "",
@@ -180,8 +181,7 @@ export async function renderRegistro(container, onDone, prefill) {
 
   function render() {
     const cats = categoriesFor();
-    const myCents = state.isShared ? Math.round((state.cents * pct) / 100) : state.cents;
-    const partnerCents = state.isShared ? state.cents - myCents : 0;
+    const { mine: myCents, partner: partnerCents } = state.isShared ? splitCents(state.cents, state.sharePct) : { mine: state.cents, partner: 0 };
     // Color del display/importe y del botón de guardar: se leen del state en CADA pintado, así
     // que basta con el render() que ya dispara el click de categoría — sin estado nuevo.
     const amountColor = state.categoryId ? textColorForCategory(state.categoryId, byId) : "var(--text)";
@@ -266,14 +266,25 @@ export async function renderRegistro(container, onDone, prefill) {
           </span>
         </label>
         ${state.isShared ? `
-        <div style="display:flex; gap:8px; padding:0 0 14px;">
-          <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
-            <div style="font-size:10px; color:var(--text-3);">${t("common.myShare", { pct })}</div>
-            <div class="num" id="reg-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
+        <div style="display:flex; flex-direction:column; gap:10px; padding:0 0 14px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:14px; font-weight:600;">${t("common.split.label")}</div>
+              <div style="font-size:11px; color:var(--text-3);">${t("common.split.hint", { name: escHtml(partnerName), pct: 100 - state.sharePct })}</div>
+            </div>
+            <button type="button" id="reg-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}">−</button>
+            <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${state.sharePct} %</div>
+            <button type="button" id="reg-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}">+</button>
           </div>
-          <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
-            <div style="font-size:10px; color:var(--text-3);">${escHtml(partnerName)} · ${100 - pct}%</div>
-            <div class="num" id="reg-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerCents)}</div>
+          <div style="display:flex; gap:8px;">
+            <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
+              <div style="font-size:10px; color:var(--text-3);">${t("common.myShare", { pct: state.sharePct })}</div>
+              <div class="num" id="reg-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
+            </div>
+            <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
+              <div style="font-size:10px; color:var(--text-3);">${escHtml(partnerName)} · ${100 - state.sharePct}%</div>
+              <div class="num" id="reg-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerCents)}</div>
+            </div>
           </div>
         </div>` : ""}
       </div>` : ""}
@@ -342,9 +353,9 @@ export async function renderRegistro(container, onDone, prefill) {
       const mineEl = container.querySelector("#reg-split-mine");
       const partnerEl = container.querySelector("#reg-split-partner");
       if (state.isShared && mineEl && partnerEl) {
-        const myCents = Math.round((state.cents * pct) / 100);
+        const { mine: myCents, partner: partnerCents } = splitCents(state.cents, state.sharePct);
         mineEl.textContent = fmtMoney(myCents);
-        partnerEl.textContent = fmtMoney(state.cents - myCents);
+        partnerEl.textContent = fmtMoney(partnerCents);
       }
     };
 
@@ -373,6 +384,11 @@ export async function renderRegistro(container, onDone, prefill) {
       state.isShared = e.target.checked;
       render();
     };
+
+    const pctDown = container.querySelector("#reg-pct-down");
+    if (pctDown) pctDown.onclick = () => { state.sharePct = stepPct(state.sharePct, -PCT_STEP); render(); };
+    const pctUp = container.querySelector("#reg-pct-up");
+    if (pctUp) pctUp.onclick = () => { state.sharePct = stepPct(state.sharePct, PCT_STEP); render(); };
 
     container.querySelector("#reg-save").onclick = async () => {
       const btn = container.querySelector("#reg-save");
@@ -403,6 +419,7 @@ export async function renderRegistro(container, onDone, prefill) {
           // una regla recurrente marcada compartida, inicio.js) se cuele en el guardado aunque
           // el toggle esté oculto para tipo=income.
           isShared: withCategory && state.tipo !== "income" ? state.isShared : false,
+          sharePctOverride: withCategory && state.tipo !== "income" && state.isShared ? state.sharePct : null,
           refId: state.tipo === "refund" ? state.refId : "",
           ruleId: state.ruleId,
         });
