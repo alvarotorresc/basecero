@@ -41,10 +41,16 @@ export async function openNextPeriod({ name, startDate, sharePct, budgets = [] }
 }
 
 /** Reparto por defecto del periodo (Ajustes). Valida ANTES de tocar la BD (guard puro, testeable
- *  sin Worker — mismo patrón que periodStartTooEarly). Ojo al TDZ: aquí no hay `const t` local. */
+ *  sin Worker — mismo patrón que periodStartTooEarly). Ojo al TDZ: aquí no hay `const t` local.
+ *  Antes de aplicar el nuevo pct, congela (freezePeriodShareOverrides) en el MISMO execMany los
+ *  compartidos con override NULL en el valor VIGENTE: el cambio afecta solo a los gastos nuevos. */
 export async function updatePeriodSharePct(id, pct) {
   if (!isValidPct(pct)) throw new Error(t("errors.repo.sharePctInvalid"));
-  await exec(SQL.updatePeriodShare, [pct, nowIso(), id]);
+  const now = nowIso();
+  await execMany([
+    { sql: SQL.freezePeriodShareOverrides, bind: [id, now, id] },
+    { sql: SQL.updatePeriodShare, bind: [pct, now, id] },
+  ]);
 }
 
 export async function addTransaction({

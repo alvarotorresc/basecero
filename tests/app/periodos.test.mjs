@@ -163,7 +163,7 @@ test("spentByRootCategory: refund vinculado a gasto NO compartido resta en su ra
   assert.equal(casa.spent_cents, 6000, "gasto A (10000) - devol-a (10000, gasto NO compartido) + gasto B al 60% (6000) - 0 (devol-b liquida compartido)");
 });
 
-test("updatePeriodShare: cambia my_share_pct y updated_at del periodo y los gastos SIN override lo siguen; los que tienen override no se mueven", () => {
+test("updatePeriodShare (sentencia sola): cambia my_share_pct/updated_at; sin el freeze previo, los gastos con override NULL seguirían al periodo", () => {
   const db = openDb();
   seedMinimal(db); // per-1 al 60
 
@@ -179,6 +179,60 @@ test("updatePeriodShare: cambia my_share_pct y updated_at del periodo y los gast
   const rows = db.prepare(SQL.listAllByDay).all("per-1");
   assert.equal(rows.find((r) => r.id === a).my_amount_cents, 5000, "sin override: sigue el nuevo pct del periodo (50%)");
   assert.equal(rows.find((r) => r.id === b).my_amount_cents, 9000, "con override=90: no se mueve con el cambio del periodo");
+});
+
+test("freezePeriodShareOverrides + updatePeriodShare (mismo execMany, como repo.updatePeriodSharePct): los compartidos con override NULL se congelan en el valor vigente y NO se mueven; los que ya tenían override no se tocan; un gasto nuevo sin override sí sigue al valor nuevo", () => {
+  const db = openDb();
+  seedMinimal(db); // per-1 al 60
+
+  const a = ins(db, { id: "a", cents: 10000, shared: 1, override: null });
+  const b = ins(db, { id: "b", cents: 10000, shared: 1, override: 90 });
+  const c = ins(db, { id: "c", cents: 10000, shared: 0, override: null }); // no compartido: debe seguir NULL
+
+  db.prepare(`INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
+    VALUES ('per-2','Otro periodo','2026-06-01','2026-06-30','closed',60,'',?,?,0)`).run(T, T);
+  const d = ins(db, { id: "d", period: "per-2", cents: 10000, shared: 1, override: null }); // otro periodo: debe seguir NULL
+
+  execManyRaw(db, [
+    { sql: SQL.freezePeriodShareOverrides, bind: ["per-1", T2, "per-1"] },
+    { sql: SQL.updatePeriodShare, bind: [50, T2, "per-1"] },
+  ]);
+
+  const per1 = db.prepare("SELECT my_share_pct FROM periods WHERE id='per-1'").get();
+  assert.equal(per1.my_share_pct, 50);
+
+  const row = (id) => db.prepare("SELECT share_pct_override, updated_at FROM transactions WHERE id=?").get(id);
+  assert.equal(row(a).share_pct_override, 60, "congelado en el valor VIGENTE (60) antes de bajar a 50");
+  assert.equal(row(a).updated_at, T2);
+  assert.equal(row(b).share_pct_override, 90, "ya tenía override: no se toca");
+  assert.equal(row(c).share_pct_override, null, "no compartido: el freeze no lo alcanza");
+  assert.equal(row(d).share_pct_override, null, "otro periodo: el freeze no lo alcanza");
+
+  const rows = db.prepare(SQL.listAllByDay).all("per-1");
+  assert.equal(rows.find((r) => r.id === a).my_amount_cents, 6000, "congelado al 60%: no se mueve con el cambio del periodo a 50%");
+  assert.equal(rows.find((r) => r.id === b).my_amount_cents, 9000, "override propio (90%): sin cambios");
+
+  const e = ins(db, { id: "e", cents: 10000, shared: 1, override: null });
+  const rows2 = db.prepare(SQL.listAllByDay).all("per-1");
+  assert.equal(rows2.find((r) => r.id === e).my_amount_cents, 5000, "gasto NUEVO sin override: sigue el nuevo pct del periodo (50%)");
+});
+
+test("el freeze es atómico con el update: si la segunda sentencia falla, no queda ningún override congelado", () => {
+  const db = openDb();
+  seedMinimal(db); // per-1 al 60
+
+  const a = ins(db, { id: "a", cents: 10000, shared: 1, override: null });
+
+  assert.throws(() => execManyRaw(db, [
+    { sql: SQL.freezePeriodShareOverrides, bind: ["per-1", T2, "per-1"] },
+    { sql: "INSERT INTO periods (id) VALUES (NULL)" },
+  ]));
+
+  const row = db.prepare("SELECT share_pct_override FROM transactions WHERE id=?").get(a);
+  assert.equal(row.share_pct_override, null, "rollback completo: el freeze no queda a medias");
+
+  const per1 = db.prepare("SELECT my_share_pct FROM periods WHERE id='per-1'").get();
+  assert.equal(per1.my_share_pct, 60, "tampoco se aplicó (nunca se llegó a esa sentencia, y aun así habría hecho rollback)");
 });
 
 test("updatePeriodShare: no toca un periodo borrado", () => {

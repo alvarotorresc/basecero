@@ -113,9 +113,18 @@ export const SQL = {
   hasSharedRule: `SELECT 1 FROM recurring_rules WHERE is_shared=1 AND deleted=0 LIMIT 1`,
 
   closePeriod: `UPDATE periods SET end_date=?, status='closed', updated_at=? WHERE id=?`,
-  // Cambia el reparto por defecto del periodo (Ajustes). Solo afecta a los gastos cuyo
-  // share_pct_override sea NULL (los guardados por la UI actual llevan siempre override explícito).
+  // Cambia el reparto por defecto del periodo (Ajustes). Va SIEMPRE precedido, en el mismo
+  // execMany, de freezePeriodShareOverrides: los gastos compartidos del periodo que aún seguían al
+  // periodo (override NULL: filas de antes de que la UI guardara el % explícito, o importadas de
+  // una hoja con la celda en blanco) se congelan en el valor ACTUAL antes de cambiarlo — así el
+  // cambio afecta solo a los gastos nuevos, que es lo que promete el texto de Ajustes, y ningún
+  // importe ya calculado se mueve.
   updatePeriodShare: `UPDATE periods SET my_share_pct=?, updated_at=? WHERE id=? AND deleted=0`,
+  // Bind: [periodId, now, periodId]. La subconsulta lee el my_share_pct VIGENTE (por eso debe
+  // ejecutarse ANTES de updatePeriodShare dentro de la misma transacción).
+  freezePeriodShareOverrides: `UPDATE transactions
+    SET share_pct_override=(SELECT my_share_pct FROM periods WHERE id=?), updated_at=?
+    WHERE period_id=? AND is_shared=1 AND share_pct_override IS NULL AND deleted=0`,
   // Suma por categoría RAÍZ de gasto (parent_id='') el gasto de toda su subárbol (ella misma +
   // hijas directas): child.id=root.id cubre el gasto registrado directamente en la raíz, y
   // child.parent_id=root.id el de sus hijas. Resta refunds que no sean liquidación de un
