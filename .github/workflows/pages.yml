@@ -1,4 +1,9 @@
 name: pages
+# Este workflow NO publica la app. El sitio de verdad (basecero.alvarotc.com, servido por Vercel)
+# es el único que la sirve: aquí se publicaba una copia de app/ que ni siquiera funcionaba —las
+# rutas absolutas del index y del manifest apuntan a la raíz del dominio, no a /basecero/—, así que
+# el espejo era una versión rota e indexable de lo mismo. Se queda solo una redirección
+# (pages-redirect/) que conserva la ruta, la query y el hash.
 on:
   push: { branches: [main] }
   workflow_dispatch:
@@ -12,6 +17,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
-        with: { path: app }
+        with: { path: pages-redirect }
       - id: deployment
         uses: actions/deploy-pages@v4
