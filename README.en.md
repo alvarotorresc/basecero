@@ -61,9 +61,7 @@ browser, installs like an app, and works offline.
 
 | Home | Transactions | Net worth | Spending by category |
 | :--: | :----------: | :-------: | :----: |
-| <img src=".github/readme/app-inicio.webp" alt="Home screen showing what's available in the period" width="190"> | <img src=".github/readme/app-movimientos.webp" alt="Transactions grouped by day" width="190"> | <img src=".github/readme/app-patrimonio.webp" alt="Net worth, accounts and goals" width="190"> | <img src=".github/readme/app-presupuesto.webp" alt="Spending by category, with a bar and a limit per category" width="190"> |
-
-_The screenshots show the Spanish build; the app is fully translated._
+| <img src=".github/readme/en/app-inicio.webp" alt="Home screen showing what's available in the period" width="190"> | <img src=".github/readme/en/app-movimientos.webp" alt="Transactions grouped by day" width="190"> | <img src=".github/readme/en/app-patrimonio.webp" alt="Net worth, accounts and goals" width="190"> | <img src=".github/readme/en/app-categorias.webp" alt="Spending by category, with a row and a percentage per category, and Groceries expanded with its subcategories" width="190"> |
 
 ## Installation
 
