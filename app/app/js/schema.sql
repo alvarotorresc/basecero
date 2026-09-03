@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE INDEX IF NOT EXISTS tx_period ON transactions (period_id, deleted);
 CREATE INDEX IF NOT EXISTS tx_date ON transactions (date);
 CREATE INDEX IF NOT EXISTS tx_category ON transactions (category_id);
+-- ref_id enlaza el apunte de liquidación (refund entrante o adjustment saliente) con su gasto.
+-- Lo consultan hasActiveLinkedSettlement, unsettleIfNoActiveSettlements, recentForRefund (el
+-- subselect de refunded_cents) y REFUND_REDUCES_SPEND, que corre en CADA suma de gasto.
+CREATE INDEX IF NOT EXISTS tx_ref ON transactions (ref_id);
 
 CREATE TABLE IF NOT EXISTS recurring_rules (
   id TEXT PRIMARY KEY, name TEXT NOT NULL,

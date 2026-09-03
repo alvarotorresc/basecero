@@ -8,6 +8,8 @@ import { eurToCents } from "../contract.js";
 import { fmtMoney, fmtMoneyParts, hoyISO, currencySymbol } from "../format.js";
 import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
 import { t } from "../i18n/index.js";
+import { userMessage } from "../errors.js";
+import { showToast } from "../toast.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -153,8 +155,17 @@ export async function renderGastoPorCategoria(container, onBack) {
     // lista completa (12 raíces de serie) no compita con las que sí tienen algo que contar.
     const dim = !st && noBar;
 
+    // Pasado el límite, el exceso va escrito: «450,00 € de 300,00 € · superado por 150,00 €».
+    // Solo en 'over' — en ok/warn el número que falta es el que queda, y ese ya sale en el pie de
+    // la tarjeta de arriba.
     const sub = st
-      ? t("gastoCategoria.row.ofLimit", { spent: escHtml(fmtMoney(row.spent_cents)), limit: escHtml(fmtMoney(limitCents)) })
+      ? st.level === "over"
+        ? t("gastoCategoria.row.ofLimitOver", {
+          spent: escHtml(fmtMoney(row.spent_cents)),
+          limit: escHtml(fmtMoney(limitCents)),
+          over: escHtml(fmtMoney(row.spent_cents - limitCents)),
+        })
+        : t("gastoCategoria.row.ofLimit", { spent: escHtml(fmtMoney(row.spent_cents)), limit: escHtml(fmtMoney(limitCents)) })
       : t("gastoCategoria.row.noLimit", { spent: escHtml(fmtMoney(row.spent_cents)) });
 
     const pctColor = !st ? "var(--text-2)"
@@ -175,21 +186,28 @@ export async function renderGastoPorCategoria(container, onBack) {
 
     const rootError = state.rootErrors.get(row.root_id);
 
+    // La atenuación de una raíz sin gasto ni límite se queda SOLO en la cabecera y su barra. Antes
+    // envolvía toda la fila, y `opacity` crea un grupo de composición: todo lo de dentro se pinta
+    // ya fusionado al 50 % y ningún hijo puede recuperarse con opacity:1. Así salían medio
+    // borrados el aviso rojo de un desglose que no se pudo cargar y —peor— el editor de límite al
+    // desplegar una categoría sin gasto, que es justo el caso más habitual de ponerle uno.
     return `
-      <div style="display:flex;flex-direction:column;gap:8px;padding:13px 0;${dim ? "opacity:.5;" : ""}">
-        <button type="button" data-root="${escAttr(row.root_id)}" aria-expanded="${expanded ? "true" : "false"}"
-          style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:0;margin:0;
-          color:inherit;font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-          <div class="dotico" style="--cat:${color};">${icon}</div>
-          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;">
-            <div style="font-size:13.5px;font-weight:600;">${escHtml(row.name)}</div>
-            <div class="num" style="font-size:11px;color:var(--text-2);">${sub}</div>
-          </div>
-          <div class="num" style="font-size:14px;font-weight:700;white-space:nowrap;flex-shrink:0;color:${pctColor};">${pctText}</div>
-          <span style="width:44px;height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
-            color:${expanded ? "var(--text)" : "var(--text-2)"};">${chevronSvg(expanded ? 90 : 0)}</span>
-        </button>
-        ${barHtml}
+      <div style="display:flex;flex-direction:column;gap:8px;padding:13px 0;">
+        <div style="display:flex;flex-direction:column;gap:8px;${dim ? "opacity:.5;" : ""}">
+          <button type="button" data-root="${escAttr(row.root_id)}" aria-expanded="${expanded ? "true" : "false"}"
+            style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:0;margin:0;
+            color:inherit;font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+            <div class="dotico" style="--cat:${color};">${icon}</div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;">
+              <div style="font-size:13.5px;font-weight:600;">${escHtml(row.name)}</div>
+              <div class="num" style="font-size:11px;color:var(--text-2);">${sub}</div>
+            </div>
+            <div class="num" style="font-size:14px;font-weight:700;white-space:nowrap;flex-shrink:0;color:${pctColor};">${pctText}</div>
+            <span style="width:44px;height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+              color:${expanded ? "var(--text)" : "var(--text-2)"};">${chevronSvg(expanded ? 90 : 0)}</span>
+          </button>
+          ${barHtml}
+        </div>
         ${rootError ? `<div style="font-size:11px;color:var(--red);">${escHtml(rootError)}</div>` : ""}
         ${expanded ? expandedHtml(row, limitCents) : ""}
       </div>`;
@@ -269,15 +287,22 @@ export async function renderGastoPorCategoria(container, onBack) {
       if (cents === null) await deleteBudget(period.id, rootId);
       else await upsertBudget(period.id, rootId, cents);
     } catch (e) {
-      state.editError = t("gastoCategoria.edit.saveFailed", { error: e.message });
+      state.editError = t("gastoCategoria.edit.saveFailed", { error: userMessage(e) });
       render();
       return;
     }
+    // Acuse de recibo: al guardar, el bloque desplegado se cierra y la lista vuelve a pintarse
+    // parecida — sin esto no se distingue de no haber hecho nada.
+    showToast(t(cents === null ? "toast.limitRemoved" : "toast.limitSaved"));
     try {
-      await load();
+      // load() a false = ya no hay periodo abierto: otra pestaña lo cerró mientras esta pantalla
+      // estaba encima. `period` se queda a null y el render() de abajo reventaría en period.name,
+      // así que se sale a la pantalla anterior, que sí sabe qué pintar sin periodo. El límite ya
+      // está guardado: no se pierde nada.
+      if (!(await load())) { onBack(); return; }
       closeEdit();
     } catch (e) {
-      state.editError = t("gastoCategoria.error.load", { error: e.message });
+      state.editError = t("gastoCategoria.error.load", { error: userMessage(e) });
     }
     render();
   }
@@ -287,6 +312,9 @@ export async function renderGastoPorCategoria(container, onBack) {
 
     container.querySelectorAll("[data-root]").forEach((el) => {
       el.onclick = async () => {
+        // Mismo caso que en saveLimit: si otra pestaña cerró el periodo, `period` es null y el
+        // spentByChildCategory(period.id, …) de más abajo reventaría con un TypeError crudo.
+        if (!period) { onBack(); return; }
         const id = el.dataset.root;
         if (state.expanded.has(id)) {
           state.expanded.delete(id);
@@ -306,7 +334,7 @@ export async function renderGastoPorCategoria(container, onBack) {
               // usuario tocaba, no pasaba nada, y no había forma de saber por qué. Ahora se pliega
               // igual (el bloque desplegado sin datos no aporta nada) pero la fila explica el fallo.
               state.expanded.delete(id);
-              state.rootErrors.set(id, t("gastoCategoria.error.detail", { error: e.message }));
+              state.rootErrors.set(id, t("gastoCategoria.error.detail", { error: userMessage(e) }));
             }
           }
         }
@@ -383,7 +411,7 @@ export async function renderGastoPorCategoria(container, onBack) {
       return;
     }
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("gastoCategoria.error.load", { error: escHtml(e.message) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("gastoCategoria.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
   render();

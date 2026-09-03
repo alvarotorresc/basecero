@@ -4,6 +4,7 @@
  *  Las iteraciones viajan en la cabecera para poder subir el coste en el futuro sin
  *  romper la lectura de copias antiguas. La passphrase no se persiste jamás. */
 import { t } from "./i18n/index.js";
+import { UserError } from "./errors.js";
 
 const MAGIC = new Uint8Array([0x42, 0x43, 0x45, 0x31]); // "BCE1"
 const VERSION = 1;
@@ -18,10 +19,14 @@ const MAX_ITERATIONS = 10_000_000;
 export const PBKDF2_ITERATIONS = 600000; // OWASP 2023 para PBKDF2-HMAC-SHA256
 export const MIN_PASSPHRASE = 10;
 
-export class BackupFormatError extends Error {
+// Los cinco mensajes que lanzan estas dos clases (errors.backupCrypto.*) están escritos para el
+// usuario y son accionables («Contraseña incorrecta o archivo dañado», «Actualiza BaseCero»):
+// heredan de UserError para que los banners los enseñen tal cual en vez del texto genérico. El
+// `instanceof WrongPassphraseError` de onboarding.js:400 sigue funcionando igual.
+export class BackupFormatError extends UserError {
   constructor(message) { super(message); this.name = "BackupFormatError"; }
 }
-export class WrongPassphraseError extends Error {
+export class WrongPassphraseError extends UserError {
   constructor(message) { super(message); this.name = "WrongPassphraseError"; }
 }
 

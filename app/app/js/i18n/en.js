@@ -164,6 +164,7 @@ export const EN = {
       empty: "No recent expenses.",
       sharedSuffix: " · shared",
       alreadyRefunded: "Already refunded · {amount}",
+      settledLabel: "Settled · {amount}",
     },
   },
   movimientos: {
@@ -262,6 +263,7 @@ export const EN = {
     },
     row: {
       ofLimit: "{spent} of {limit}",
+      ofLimitOver: "{spent} of {limit} · over by {over}",
       noLimit: "{spent} · no limit",
       noPct: "—",
     },
@@ -696,7 +698,14 @@ export const EN = {
       summaryMovements: { one: "{n} transaction", other: "{n} transactions" },
     },
   },
+  toast: {
+    saved: "Saved",
+    limitSaved: "Limit saved",
+    limitRemoved: "Limit removed",
+    profileSaved: "Bank profile saved",
+  },
   errors: {
+    generic: "Something went wrong. Try again.",
     repo: {
       periodStartTooEarly: "The date must be after the current period’s start",
       settleNotFound: "Shared expense not found or already settled",

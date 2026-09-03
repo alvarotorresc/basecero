@@ -165,6 +165,9 @@ export const ES = {
       empty: "No hay gastos recientes.",
       sharedSuffix: " · compartido",
       alreadyRefunded: "Ya devuelto · {amount}",
+      // Un gasto compartido ya liquidado: lo que volvió es la parte de la contraparte, no una
+      // devolución. Se marca distinto de alreadyRefunded para que no se lean como lo mismo.
+      settledLabel: "Liquidado · {amount}",
     },
   },
   movimientos: {
@@ -263,6 +266,9 @@ export const ES = {
     },
     row: {
       ofLimit: "{spent} de {limit}",
+      // Solo cuando se ha pasado del límite: el exceso, ya calculado, para no tener que restar de
+      // cabeza. Por debajo del límite se sigue usando ofLimit.
+      ofLimitOver: "{spent} de {limit} · superado por {over}",
       noLimit: "{spent} · sin límite",
       noPct: "—",
     },
@@ -696,10 +702,21 @@ export const ES = {
       summaryMovements: { one: "{n} movimiento", other: "{n} movimientos" },
     },
   },
+  // Acuses de recibo de toast.js: guardados que antes no decían nada. Frases cortas, en pasado y
+  // sin signos de puntuación finales — se leen de reojo mientras el usuario ya está en otra cosa.
+  toast: {
+    saved: "Guardado",
+    limitSaved: "Límite guardado",
+    limitRemoved: "Límite quitado",
+    profileSaved: "Perfil de banco guardado",
+  },
   // Task 5 (PR i18n): errores de capas no-UI (repo/n26/xlsx/csv-generic/backup-crypto/db-worker) —
   // el string ES es el mensaje literal que ya lanzaban esas capas (byte-exacto, lo pinnean los
   // asserts de xlsx.test/patrimonio.test/categorias.test bajo el idioma por defecto).
   errors: {
+    // Lo que ve el usuario cuando el error NO está escrito para él (errors.js#userMessage): el
+    // detalle técnico se va a console.error y aquí queda algo accionable.
+    generic: "Algo no fue bien. Inténtalo de nuevo.",
     repo: {
       periodStartTooEarly: "La fecha debe ser posterior al inicio del periodo actual",
       settleNotFound: "Gasto compartido no encontrado o ya liquidado",

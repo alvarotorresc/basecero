@@ -106,3 +106,18 @@ test("meta: las claves de cuenta entran vacías con INSERT OR IGNORE", () => {
   db.exec(schema);
   assert.equal(db.prepare("SELECT value FROM meta WHERE key='account_loans'").get().value, "{\"acc-x\":{\"monthlyCents\":18900}}");
 });
+
+test("índice tx_ref sobre transactions(ref_id): existe en una BD nueva y re-aplicar el esquema no rompe una BD con datos", () => {
+  const db = freshDb();
+  const idx = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='transactions' ORDER BY name")
+    .all().map((r) => r.name);
+  assert.ok(idx.includes("tx_ref"), `índices de transactions: ${idx.join(", ")}`);
+
+  // db-worker.js#init ejecuta schema.sql EN CADA ARRANQUE, también sobre una base que ya existe:
+  // el IF NOT EXISTS tiene que dejarla intacta, con sus filas y sin lanzar.
+  db.prepare(`INSERT INTO transactions (id,date,period_id,type,amount_cents,account_id,ref_id,status,created_at,updated_at,deleted)
+    VALUES ('t-idx','2026-08-24','p','refund',100,'acc-n26','t-gasto','pending','t','t',0)`).run();
+  assert.doesNotThrow(() => db.exec(schema));
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM transactions").get().c, 1);
+  assert.equal(db.prepare("SELECT ref_id FROM transactions WHERE id='t-idx'").get().ref_id, "t-gasto");
+});

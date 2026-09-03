@@ -54,10 +54,21 @@ export const SQL = {
     ORDER BY (refunded_cents > 0), date DESC, created_at DESC`,
   incomeOfPeriod: `SELECT COALESCE(SUM(CASE WHEN t.type='income' THEN t.amount_cents ELSE 0 END),0) AS income_cents
     FROM transactions t WHERE t.period_id=? AND t.deleted=0`,
+  // 'adjustment' entra en la lista de Inicio (antes: expense/income/refund). Una liquidación crea
+  // DOS apuntes (repo.js#settleAllSharedStmts): la devolución ENTRANTE de un gasto que pagué yo y
+  // el ajuste SALIENTE —negativo— de uno que pagó ella. Sin los adjustments, Inicio enseñaba solo
+  // la mitad de la liquidación y el pago a la contraparte desaparecía de la pantalla que más se
+  // mira. Entran TODOS, no solo los enlazados por ref_id: un ajuste suelto también mueve dinero de
+  // una cuenta y Movimientos (listAllByDay) ya los enseña, así que las dos listas dicen lo mismo.
+  // NO cambia ningún total: spentOfPeriod / spentByRootCategory / spentByDay solo suman expense y
+  // refund, e incomeOfPeriod solo income. Las transferencias siguen fuera (no son del periodo, son
+  // entre cuentas propias).
+  // OJO para quien pinte estas filas: amount_cents (y my_amount_cents) de un adjustment pueden ser
+  // NEGATIVOS — el CHECK de schema.sql:34 lo permite solo para este tipo.
   listByDay: `SELECT t.id, t.date, t.type, t.amount_cents, t.category_id, t.merchant, t.note, t.is_shared, t.paid_by,
       ${MY_AMOUNT} AS my_amount_cents
     FROM transactions t JOIN periods p ON p.id=t.period_id
-    WHERE t.period_id=? AND t.deleted=0 AND t.type IN ('expense','income','refund')
+    WHERE t.period_id=? AND t.deleted=0 AND t.type IN ('expense','income','refund','adjustment')
     ORDER BY t.date DESC, t.created_at DESC`,
   // PR D (categorías editables), Task 4 fix round: el NOT EXISTS comprobaba h.deleted=0 pero NO
   // h.is_archived — una raíz con su única hija archivada (no borrada) seguía "teniendo hijas"

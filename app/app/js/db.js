@@ -1,4 +1,5 @@
 import { t } from "./i18n/index.js";
+import { UserError } from "./errors.js";
 
 let worker = null, seq = 0, deadError = null;
 const pending = new Map();
@@ -6,10 +7,16 @@ const pending = new Map();
 // B3: traduce el código de error crudo del worker a un Error localizado. Pura y exportada
 // para poder testear el mapeo sin un Worker real (no disponible en Node — ver db.test.mjs).
 export function mapWorkerError(error) {
+  // unknown_op es un bug de programación (una op que este db.js no debería estar posteando): se
+  // traduce para el log, pero NO es un UserError — al usuario no le dice nada.
   if (error.startsWith("unknown_op:")) {
     return new Error(t("errors.worker.unknownOp", { op: error.slice("unknown_op:".length) }));
   }
-  if (error === "not_initialized") return new Error(t("errors.worker.notInitialized"));
+  // Este SÍ: pasa cuando se toca algo mientras la base todavía está abriéndose, y lo que hay que
+  // hacer (esperar un momento y volver a intentarlo) cabe en el propio mensaje.
+  if (error === "not_initialized") return new UserError(t("errors.worker.notInitialized"));
+  // Cualquier otra cosa es el mensaje crudo de SQLite: se conserva entero para console.error
+  // (errors.js#userMessage lo loguea) y el usuario ve el texto genérico.
   return new Error(error);
 }
 

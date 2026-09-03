@@ -766,7 +766,49 @@ body.onboarding .fab { display: none; }
   outline-offset: 2px;
 }
 
+/* ===== toast de confirmación (toast.js) ===== */
+/* Un solo nodo, colgado de <body>: por encima de la tabbar (z-index 20) y por debajo de la franja
+   de aviso de almacenamiento (30). Centrado y anclado justo encima de la tabbar, cuyo alto es
+   84px + el safe-area del dispositivo. pointer-events:none — es un acuse de recibo, no un control:
+   no debe interceptar el toque siguiente. */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px) + 12px);
+  z-index: 25;
+  max-width: min(calc(100% - 40px), 440px);
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--card2);
+  color: var(--text);
+  font: 500 13px var(--font-ui);
+  text-align: center;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+#toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ===== esqueleto de carga (skeleton.js) ===== */
+/* Misma tinta y mismo radio que las tarjetas para que la silueta prometa lo que va a llegar. */
+.skeleton {
+  background: var(--card2);
+  border-radius: var(--radius);
+  animation: bc-skeleton 1.2s ease-in-out infinite;
+}
+@keyframes bc-skeleton {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shake { animation: none; }
   .toggle-track, .toggle-knob { transition: none; }
+  .skeleton { animation: none; }
+  #toast { transition: none; }
 }

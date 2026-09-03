@@ -3,6 +3,7 @@ import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
+import { userMessage } from "../errors.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
@@ -85,7 +86,7 @@ export async function renderLiquidar(container, onBack) {
       pendingSettlements(), listAccounts(), allCategoriesById(), getMetaAll(),
     ]);
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("liquidar.error.load", { error: escHtml(e.message) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("liquidar.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
   const accounts = accountsAll.filter((a) => a.type !== "liability");
@@ -193,7 +194,7 @@ export async function renderLiquidar(container, onBack) {
           state.confirm = false;
           errorMsg = "";
         } catch (e) {
-          errorMsg = t("liquidar.error.settle", { error: e.message });
+          errorMsg = t("liquidar.error.settle", { error: userMessage(e) });
           state.confirm = false;
           // La recarga va en su PROPIO try: si settleAllShared falló porque la base no responde,
           // pendingSettlements() falla igual, y sin este guard el manejador de errores lanzaría

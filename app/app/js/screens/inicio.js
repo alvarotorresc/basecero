@@ -15,6 +15,9 @@ import { renderGastoPorCategoria } from "./gasto-por-categoria.js";
 import { renderRecurrentes } from "./recurrentes.js";
 import { renderRegistro } from "./registro.js";
 import { pushBack, goBack } from "../back.js";
+import { userMessage } from "../errors.js";
+import { showToast } from "../toast.js";
+import { skeletonHtml } from "../skeleton.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -51,6 +54,25 @@ function groupByDay(rows) {
 }
 
 function txRowHtml(r, byId, partnerName) {
+  // Una liquidación deja DOS apuntes (repo.js#settleAllSharedStmts): la devolución ENTRANTE de un
+  // gasto que pagué yo y el ajuste SALIENTE —negativo, sin categoría— de uno que pagó ella. Antes
+  // listByDay escondía los ajustes y aquí solo se veía la mitad del movimiento de dinero.
+  // Se pinta igual que en Movimientos (movimientos.js:70-81): balanza sobre el gris de tarjeta,
+  // «Ajuste» de título y el comercio debajo («Liquidación con {nombre}» cuando lo es). El signo
+  // sale del importe, que en un adjustment PUEDE ser negativo — sin este caso, la rama genérica de
+  // abajo pintaría «+-45,20 €» en verde, porque da por hecho que solo los gastos restan.
+  if (r.type === "adjustment") {
+    const isNeg = r.amount_cents < 0;
+    return `
+    <div class="tx-row">
+      <div class="dotico" style="--cat:var(--card2);">⚖️</div>
+      <div class="tx-body">
+        <div class="tx-title">${t("common.type.adjustment")}</div>
+        <div class="tx-sub">${escHtml(r.merchant || r.note || "")}</div>
+      </div>
+      <div class="tx-amount num ${isNeg ? "negative" : "positive"}">${isNeg ? "-" : "+"}${fmtMoney(Math.abs(r.amount_cents))}</div>
+    </div>`;
+  }
   const cat = byId[r.category_id];
   const catName = cat?.name ?? "";
   const color = colorForCategory(r.category_id, byId);
@@ -302,7 +324,13 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory) {
   const top = withSpend.slice(0, DONUT_TOP_N);
   const rest = withSpend.slice(DONUT_TOP_N);
   const restTotal = rest.reduce((s, r) => s + r.spent_cents, 0);
-  const categorizedTotal = withSpend.reduce((s, r) => s + r.spent_cents, 0);
+  // El número del centro es el NETO de TODAS las raíces, incluidas las que quedan en negativo (una
+  // devolución mayor que el gasto de su categoría): es exactamente la misma suma que el héroe de
+  // «Gasto por categoría» (gasto-por-categoria.js#render), la pantalla que abre esta tarjeta.
+  // Antes aquí se sumaban solo las positivas y las dos cifras no cuadraban.
+  // Las PORCIONES del anillo siguen saliendo solo de las raíces con gasto > 0 (`withSpend`): una
+  // porción de ángulo negativo no existe.
+  const netTotal = rootRows.reduce((s, r) => s + r.spent_cents, 0);
 
   const slices = top.map((r) => ({ color: colorForCategory(r.root_id, byId), cents: r.spent_cents }));
   if (rest.length > 0) slices.push({ color: DONUT_OTHERS_COLOR, cents: restTotal });
@@ -316,7 +344,7 @@ function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory) {
     <div ${cardAttrs} style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;padding:16px 16px 8px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
       ${headerHtml}
       <div style="display:flex;justify-content:center;">
-        ${donutSvg(slices, centsToStr(categorizedTotal), t("inicio.categorySpend.spent", { currency: currencyCode() }))}
+        ${donutSvg(slices, centsToStr(netTotal), t("inicio.categorySpend.spent", { currency: currencyCode() }))}
       </div>
       <div style="display:flex;flex-direction:column;gap:12px;">
         ${rowsHtml}${otrasRowHtml}
@@ -361,6 +389,16 @@ function disponibleCardHtml(budgetByCategory, spent, period) {
  *  tarjetas "Flujo de gasto" y "Gasto por categoría", bloque de compartidos (pendiente/liquidar),
  *  bloque "Previsión" (reglas recurrentes del mes) y sus movimientos agrupados por día. */
 export async function renderInicio(container) {
+  // Silueta gris mientras llega la primera consulta: antes la pantalla se quedaba EN BLANCO desde
+  // que se tocaba la pestaña hasta que volvía el Worker.
+  // Solo en el PRIMER pintado: un re-render (guardar el nombre de la contraparte, volver de una
+  // subpantalla) tiene que repintar directo, sin un parpadeo gris de por medio. El testigo es
+  // container.dataset.screen, que escriben SOLO esta pantalla y Movimientos — ninguna otra lo toca
+  // (si alguna lo escribiera, las dos empezarían a parpadear cuando no toca).
+  if (container.dataset.screen !== "inicio") {
+    container.dataset.screen = "inicio";
+    container.innerHTML = skeletonHtml([72, 168, 236, 320]);
+  }
   let period, spent, income, rows, byId, sharedRows, netCents, budgets, prevision, rootRows, days7,
     meta, partnerName, showPartnerBanner;
   try {
@@ -387,7 +425,10 @@ export async function renderInicio(container) {
     // no hace falta esta query extra — sharedBlockHtml decide solo con sharedRows/netCents.
     showPartnerBanner = !partnerName && await hasSharedData();
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("inicio.error.load", { error: escHtml(e.message) })}</div>`;
+    // userMessage: si el error está escrito para el usuario (un UserError) se enseña tal cual; si
+    // es técnico (SQLite, un bug), se va a console.error y aquí queda el texto genérico. Sigue
+    // pasando por escHtml porque va dentro de un innerHTML.
+    container.innerHTML = `<div class="banner-aviso red">${t("inicio.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
 
@@ -473,13 +514,16 @@ export async function renderInicio(container) {
       // partner_name va sin bcSanitizeCell a propósito: SheetJS exporta la celda como string (sin riesgo
       // de fórmula) y sanitizar ensuciaría el nombre en toda la UI («+Ana» → «'+Ana»).
       await setMeta("partner_name", value);
+      // El banner desaparece al repintar y la pantalla queda igual que estaba: sin esto, guardar
+      // el nombre no se distingue de no haber hecho nada.
+      showToast(t("toast.saved"));
       renderInicio(container);
     } catch (e) {
       partnerBannerSaveBtn.disabled = false;
       partnerBannerSaveBtn.classList.add("shake");
       setTimeout(() => partnerBannerSaveBtn.classList.remove("shake"), 400);
       if (errEl) {
-        errEl.innerHTML = t("common.saveFailed", { error: escHtml(e.message) });
+        errEl.innerHTML = t("common.saveFailed", { error: escHtml(userMessage(e)) });
         errEl.style.display = "";
       }
     }

@@ -8,6 +8,7 @@ import { fmtMoney, fmtMoneyParts, hoyISO, fmtDec1, currencySymbol, currencyCode,
 import { netWorthBarsHtml } from "../charts.js";
 import { t } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
+import { userMessage } from "../errors.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -325,7 +326,7 @@ export async function renderPatrimonio(container) {
   try {
     await loadData();
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("patrimonio.error.load", { error: escHtml(e.message) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("patrimonio.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
 
@@ -369,7 +370,7 @@ export async function renderPatrimonio(container) {
     try {
       row = await getAccount(id);
     } catch (e) {
-      errorMsg = t("patrimonio.error.openAccount", { error: e.message });
+      errorMsg = t("patrimonio.error.openAccount", { error: userMessage(e) });
       state.opening = false;
       render();
       return;
@@ -513,7 +514,7 @@ export async function renderPatrimonio(container) {
         goBack();
       } catch (e) {
         btn.disabled = false;
-        errorMsg = t("common.saveFailed", { error: e.message });
+        errorMsg = t("common.saveFailed", { error: userMessage(e) });
         render();
       }
     };
@@ -776,7 +777,7 @@ export async function renderPatrimonio(container) {
         goBack();
       } catch (e) {
         btn.disabled = false;
-        errorMsg = t("common.saveFailed", { error: e.message });
+        errorMsg = t("common.saveFailed", { error: userMessage(e) });
         render();
       }
     };
@@ -796,7 +797,7 @@ export async function renderPatrimonio(container) {
         goBack();
       } catch (e) {
         btn.disabled = false;
-        errorMsg = t("common.deleteFailed", { error: e.message });
+        errorMsg = t("common.deleteFailed", { error: userMessage(e) });
         state.deleteConfirm = false;
         render();
       }

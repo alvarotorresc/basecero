@@ -10,7 +10,8 @@ import { renderRegistro } from "./screens/registro.js";
 import { renderMovimientos } from "./screens/movimientos.js";
 import { renderPatrimonio } from "./screens/patrimonio.js";
 import { renderAjustes } from "./screens/ajustes.js";
-import { pushBack, goBack, clearBack } from "./back.js";
+import { pushBack, goBack, clearBack, resetBack } from "./back.js";
+import { userMessage } from "./errors.js";
 
 const screen = document.getElementById("screen");
 const RUTAS = {
@@ -24,7 +25,12 @@ export function nav(tab) {
   // Durante el asistente de Nuevo periodo (onboarding o cierre normal) el chrome está oculto
   // (ver app.css `body.onboarding`): ignora cualquier navegación mientras dure.
   if (document.body.classList.contains("onboarding")) return;
-  clearBack(); // cambiar de pestaña descarta las subpantallas abiertas (y sus entradas de historial)
+  // Cambiar de pestaña descarta las subpantallas abiertas (y sus entradas de historial). Además,
+  // Inicio es la raíz de la app: desde cualquier OTRA pestaña, el gesto «atrás» del sistema tiene
+  // que volver a Inicio, no cerrar la aplicación — así que la pestaña deja una entrada de
+  // historial con «volver a Inicio» como callback, en la misma pila que las subpantallas.
+  if (tab === "inicio") clearBack();
+  else resetBack(() => nav("inicio"));
   document.querySelectorAll(".tab").forEach((b) => {
     const isActive = b.dataset.tab === tab;
     b.classList.toggle("active", isActive);
@@ -85,7 +91,7 @@ async function boot() {
     console.error(err);
     const aviso = document.createElement("div");
     aviso.className = "banner-aviso red";
-    aviso.textContent = t("main.banner.boot_failed", { error: err?.message || err });
+    aviso.textContent = t("main.banner.boot_failed", { error: userMessage(err) });
     document.body.prepend(aviso);
   }
 }

@@ -38,13 +38,16 @@ browser, installs like an app, and works offline.
   Close one and you see what you spent, what you saved, and your savings rate for the stretch.
 - **Logging, fast.** One screen, with the phone keypad for the amount. Five kinds of entry:
   expense, income, transfer, refund and adjustment.
-- **A budget per category.** You set a limit only where it helps. The home screen tells you
-  whether you are above or below the pace of the plan.
+- **Spending by category.** One screen with all your categories, sorted by what you have spent so
+  far, each one expanding into its breakdown by subcategory. You set a limit only where it helps,
+  and change or remove it right there. The home screen tells you whether you are above or below the
+  pace of the plan.
 - **Categories that are yours.** You start with 41 across two levels and change the name,
   colour, icon and order. The ones you don't need get archived without touching your history.
 - **Shared expenses, both ways.** You log who paid and which share is yours. If the other person
-  paid, the expense counts as yours but doesn't touch your accounts until you settle up;
-  "Settle up" shows both debts, the net figure, and closes them in one go.
+  paid, the expense counts as yours but doesn’t touch your accounts until you settle up;
+  “Settle up” shows both debts, the net figure, and closes them in one go. Expenses are the ones
+  that get split: income belongs to whoever earns it.
 - **Recurring entries and forecasting.** Rules for the rent, subscriptions or your salary. With
   them the home screen works out what is still committed and what is really available.
 - **Net worth.** Your net worth today and how it moved, current and savings accounts, debts with
@@ -56,9 +59,9 @@ browser, installs like an app, and works offline.
 
 ## What it looks like
 
-| Home | Transactions | Net worth | Budget |
+| Home | Transactions | Net worth | Spending by category |
 | :--: | :----------: | :-------: | :----: |
-| <img src=".github/readme/app-inicio.webp" alt="Home screen showing what's available in the period" width="190"> | <img src=".github/readme/app-movimientos.webp" alt="Transactions grouped by day" width="190"> | <img src=".github/readme/app-patrimonio.webp" alt="Net worth, accounts and goals" width="190"> | <img src=".github/readme/app-presupuesto.webp" alt="Budget by category" width="190"> |
+| <img src=".github/readme/app-inicio.webp" alt="Home screen showing what's available in the period" width="190"> | <img src=".github/readme/app-movimientos.webp" alt="Transactions grouped by day" width="190"> | <img src=".github/readme/app-patrimonio.webp" alt="Net worth, accounts and goals" width="190"> | <img src=".github/readme/app-presupuesto.webp" alt="Spending by category, with a bar and a limit per category" width="190"> |
 
 _The screenshots show the Spanish build; the app is fully translated._
 
@@ -140,10 +143,21 @@ node --test tests/app/*.test.mjs        # the tests
   (es/en) and `vendor/`.
 - [`tests/app/`](tests/app/) — the suite, one file per logic module.
 
+### Known limitations
+
+- **A transfer imported from a CSV can end up duplicated.** The statement carries the transfer’s
+  charge as one more line, so it comes in as an uncategorised expense on top of the transfer entry
+  you already had. It is not reconciled automatically: delete the duplicate by hand.
+- **Income is not split with the other person.** The period’s percentage applies to shared
+  expenses; income belongs, in full, to whoever earns it.
+
 ### History
 
 BaseCero started life as a Google Sheets spreadsheet with a Python generator and an Apps Script
-script; the app replaced all three.
+script. The app replaced all three, and neither program is in the repository any more: all that
+survives from those days is the data contract — the same one the `.xlsx` exports and imports today
+— and the pure import logic in [`app/app/vendor/pure.js`](app/app/vendor/pure.js), still written in
+the Apps Script dialect it was born in.
 
 </details>
 

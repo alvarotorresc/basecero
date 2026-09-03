@@ -1,11 +1,14 @@
 import {
-  getOpenPeriod, spentOfPeriod, incomeOfPeriod, listAllByDay, spentByRootCategory, openNextPeriod, getMetaAll,
+  getOpenPeriod, spentOfPeriod, incomeOfPeriod, listAllByDay, spentByRootCategory, budgetsOfPeriod,
+  openNextPeriod, getMetaAll,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { eurToCents } from "../contract.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol } from "../format.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, stepPct } from "../share-pct.js";
+import { inheritedBudgetsRaw } from "../category-spend.js";
+import { userMessage } from "../errors.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -44,6 +47,7 @@ function renderAsistenteError(container, mode, onDone, message) {
  *  onDone() se llama tanto al abrir con éxito como al cancelar con la flecha atrás (modo 'next'). */
 export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
   let closingPeriod = null, closingSpent = 0, closingIncome = 0, closingCount = 0, rootRows = [], meta = {};
+  let closingBudgets = [];
   try {
     if (mode === "next") {
       closingPeriod = await getOpenPeriod();
@@ -51,19 +55,21 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
         renderAsistenteError(container, mode, onDone, t("periodo.error.noOpenToClose"));
         return;
       }
-      const [spent, income, all, roots, metaAll] = await Promise.all([
+      const [spent, income, all, roots, budgetRows, metaAll] = await Promise.all([
         spentOfPeriod(closingPeriod.id),
         incomeOfPeriod(closingPeriod.id),
         listAllByDay(closingPeriod.id),
         spentByRootCategory(closingPeriod.id),
+        budgetsOfPeriod(closingPeriod.id),
         getMetaAll(),
       ]);
-      closingSpent = spent; closingIncome = income; closingCount = all.length; rootRows = roots; meta = metaAll;
+      closingSpent = spent; closingIncome = income; closingCount = all.length; rootRows = roots;
+      closingBudgets = budgetRows; meta = metaAll;
     } else {
       [rootRows, meta] = await Promise.all([spentByRootCategory(""), getMetaAll()]);
     }
   } catch (e) {
-    renderAsistenteError(container, mode, onDone, t("periodo.error.load", { error: e.message }));
+    renderAsistenteError(container, mode, onDone, t("periodo.error.load", { error: userMessage(e) }));
     return;
   }
   const partnerName = (meta.partner_name || "").trim();
@@ -72,12 +78,24 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
   // por parent_id hasta encontrar la raíz): como root_id YA es una raíz, basta con parent_id=''.
   const byId = Object.fromEntries(rootRows.map((r) => [r.root_id, { id: r.root_id, parent_id: "" }]));
 
+  // El periodo nuevo arranca con los límites del que se cierra, rellenados y editables: vaciar un
+  // campo vuelve a dejar esa categoría sin límite (el submit ya salta los vacíos). En modo 'first'
+  // no hay periodo previo del que heredar nada.
+  const inherited = mode === "next" ? inheritedBudgetsRaw(closingBudgets, rootRows) : {};
+
   const state = {
     startDate: hoyISO(),
     name: nombrePorDefecto(),
     sharePct: mode === "next" ? closingPeriod.my_share_pct : 50,
-    budgets: {}, // rootId -> string en euros tal cual lo escribe el usuario ("" = sin límite)
-    visible: new Set(rootRows.filter((r) => r.spent_cents > 0).map((r) => r.root_id)),
+    budgets: { ...inherited }, // rootId -> string en euros tal cual lo escribe el usuario ("" = sin límite)
+    // Una raíz con límite heredado TIENE que estar visible: totalPresupuestadoCents suma todo lo
+    // que haya en state.budgets, así que una fila oculta metería en el «Presupuestado» del pie un
+    // importe que el usuario no ve, no puede editar y no puede quitar. Las que ya salían por tener
+    // gasto siguen saliendo.
+    visible: new Set([
+      ...rootRows.filter((r) => r.spent_cents > 0).map((r) => r.root_id),
+      ...Object.keys(inherited),
+    ]),
     addOpen: false,
     saving: false,
   };
@@ -411,7 +429,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
         onDone();
       } catch (e) {
         state.saving = false;
-        errorMsg = t("periodo.error.open", { error: e.message });
+        errorMsg = t("periodo.error.open", { error: userMessage(e) });
         render();
       }
     };
