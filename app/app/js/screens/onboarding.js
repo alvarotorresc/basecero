@@ -15,6 +15,7 @@ import { isEncryptedBackup, decryptBackup, WrongPassphraseError } from "../backu
 import { workbookToRows, validateImport } from "../xlsx.js";
 import { t, LANGS, activeLang, initI18n } from "../i18n/index.js";
 import { loadXlsx } from "../xlsx-loader.js";
+import { userMessage } from "../errors.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -267,7 +268,7 @@ export async function renderOnboarding(container, { onDone }) {
           state.accounts = await balancesAt(hoyISO());
           state.form = { name: "", type: "checking", raw: "" };
           state.errorMsg = "";
-        } catch (e) { state.errorMsg = t("onboarding.account.createFailed", { error: e.message }); }
+        } catch (e) { state.errorMsg = t("onboarding.account.createFailed", { error: userMessage(e) }); }
         state.busy = false;
         render();
       };
@@ -291,7 +292,7 @@ export async function renderOnboarding(container, { onDone }) {
           await retranslateSeedNames(v);
           initI18n({ lang: v });
           document.documentElement.lang = v;
-        } catch (e) { state.errorMsg = t("common.saveFailed", { error: e.message }); }
+        } catch (e) { state.errorMsg = t("common.saveFailed", { error: userMessage(e) }); }
         state.busy = false;
         render();
       }));
@@ -317,7 +318,7 @@ export async function renderOnboarding(container, { onDone }) {
           // dedicado, derivarlo de locale pisaría el idioma elegido (p.ej. lang=en + locale=es-ES).
           document.documentElement.lang = activeLang();
           state.step = 3;
-        } catch (e) { state.errorMsg = t("common.saveFailed", { error: e.message }); }
+        } catch (e) { state.errorMsg = t("common.saveFailed", { error: userMessage(e) }); }
         state.busy = false;
         render();
       };
@@ -381,7 +382,7 @@ export async function renderOnboarding(container, { onDone }) {
         const buf = new Uint8Array(await f.arrayBuffer());
         if (isEncryptedBackup(buf)) { imp.buffer = buf; imp.needsPass = true; render(); return; }
         await parseAndOffer(imp, buf);
-      } catch (err) { imp.errors = [t("onboarding.import.readFailed", { error: err.message })]; render(); }
+      } catch (err) { imp.errors = [t("onboarding.import.readFailed", { error: userMessage(err) })]; render(); }
     };
     const clear = q("#onb-imp-clear");
     if (clear) clear.onclick = () => { state.imp = null; render(); };
@@ -397,7 +398,10 @@ export async function renderOnboarding(container, { onDone }) {
         await parseAndOffer(imp, plain);
       } catch (e) {
         imp.busy = false;
-        imp.errors = [e instanceof WrongPassphraseError ? t("onboarding.import.wrongPass") : t("onboarding.import.decryptFailed", { error: e.message })];
+        // WrongPassphraseError sigue teniendo su copy propio (más corto y sin envolver). El resto
+        // pasa por userMessage: los demás errores de backup-crypto son UserError y se leen tal
+        // cual; un fallo de WebCrypto o de lectura cae al texto genérico.
+        imp.errors = [e instanceof WrongPassphraseError ? t("onboarding.import.wrongPass") : t("onboarding.import.decryptFailed", { error: userMessage(e) })];
         render();
       }
     };
@@ -409,7 +413,7 @@ export async function renderOnboarding(container, { onDone }) {
         // Sin backup previo (a diferencia de Ajustes): la BD todavía está virgen.
         await replaceAll(imp.pending);
         location.reload(); // boot() reevalúa el gate: con periodos en la copia, el onboarding no vuelve.
-      } catch (e) { imp.busy = false; imp.errors = [t("onboarding.import.loadFailed", { error: e.message })]; imp.pending = null; render(); }
+      } catch (e) { imp.busy = false; imp.errors = [t("onboarding.import.loadFailed", { error: userMessage(e) })]; imp.pending = null; render(); }
     };
   }
 
@@ -427,6 +431,6 @@ export async function renderOnboarding(container, { onDone }) {
         t("onboarding.import.summaryMovements", { n: data.transactions.length }),
       ].join(" · ");
       render();
-    } catch (e) { imp.errors = [t("onboarding.import.readFailed", { error: e.message })]; render(); }
+    } catch (e) { imp.errors = [t("onboarding.import.readFailed", { error: userMessage(e) })]; render(); }
   }
 }

@@ -6,6 +6,7 @@ import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { t, monthLong } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
+import { userMessage } from "../errors.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -39,7 +40,7 @@ export async function renderRecurrentes(container, onBack) {
       getMetaAll(),
     ]);
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("recurrentes.error.load", { error: escHtml(e.message) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("recurrentes.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
   const accounts = accountsAll.filter((a) => a.type !== "liability");
@@ -425,7 +426,7 @@ export async function renderRecurrentes(container, onBack) {
         goBack();
       } catch (e) {
         btn.disabled = false;
-        errorMsg = t("common.saveFailed", { error: e.message });
+        errorMsg = t("common.saveFailed", { error: userMessage(e) });
         render();
       }
     };
@@ -445,7 +446,7 @@ export async function renderRecurrentes(container, onBack) {
         goBack();
       } catch (e) {
         btn.disabled = false;
-        errorMsg = t("common.deleteFailed", { error: e.message });
+        errorMsg = t("common.deleteFailed", { error: userMessage(e) });
         state.deleteConfirm = false;
         render();
       }

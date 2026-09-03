@@ -5,6 +5,7 @@ import {
 import { colorForCategory, iconForCategory, POOL, CURATED_ICONS, hashIndex } from "../category-colors.js";
 import { t } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
+import { userMessage } from "../errors.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -91,7 +92,7 @@ export async function renderCategorias(container, onBack) {
   try {
     await loadData();
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("categorias.error.load", { error: escHtml(e.message) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("categorias.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
 
@@ -406,7 +407,7 @@ export async function renderCategorias(container, onBack) {
       goBack();
     } catch (e) {
       btn.disabled = false;
-      state.formError = e.message;
+      state.formError = userMessage(e);
       renderForm();
     }
   }
@@ -423,7 +424,7 @@ export async function renderCategorias(container, onBack) {
         goBack();
       } catch (e) {
         btn.disabled = false;
-        state.formError = e.message;
+        state.formError = userMessage(e);
         renderForm();
       }
       return;
@@ -442,7 +443,7 @@ export async function renderCategorias(container, onBack) {
       goBack();
     } catch (e) {
       btn.disabled = false;
-      state.formError = e.message;
+      state.formError = userMessage(e);
       state.deleteConfirm = false;
       renderForm();
     }
