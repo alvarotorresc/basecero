@@ -28,7 +28,7 @@ licencia.
 
 El artefacto minificado no incorpora el texto de la licencia ni un fichero `NOTICE` propio; la
 licencia procede de los metadatos del proyecto upstream. La Apache-2.0 no exige reproducir su texto
-íntegro cuando no hay un `NOTICE` que propagar, sólo conservar los avisos de copyright — que es lo
+íntegro cuando no hay un `NOTICE` que propagar, solo conservar los avisos de copyright — que es lo
 que hace este apartado.
 
 ## Outfit (fuente)

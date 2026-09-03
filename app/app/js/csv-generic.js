@@ -62,7 +62,11 @@ function countOutsideQuotes(line, delim) {
  *  NO se guarda en el perfil: meta.csv_profile tiene 6 claves exactas y parseCsvProfile rechaza
  *  cualquier objeto con otro número de claves, así que añadir `delimiter` invalidaría en silencio
  *  todos los perfiles ya guardados. Se redetecta en cada sniff/apply — determinista sobre el mismo
- *  texto y sin migración. */
+ *  texto y sin migración.
+ *
+ *  Límite conocido: un fichero con `;` sin comillas cuyas comas (texto + decimales) superen a los
+ *  punto y coma en las 5 primeras líneas se detecta como coma (solo con 2-3 columnas y conceptos con
+ *  varias comas); un desempate por consistencia del número de columnas queda para más adelante. */
 export function detectDelimiter(text) {
   const lines = nonEmptyLines(text).slice(0, 5);
   let best = ",";

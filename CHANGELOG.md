@@ -14,6 +14,9 @@ Versionado según [SemVer](https://semver.org/lang/es/).
 - **Los gastos que ya has devuelto se marcan.** Al enlazar una devolución, la lista de gastos los
   sigue mostrando todos, pero los que ya tienen algo devuelto bajan al final, atenuados y con cuánto
   volvió: una devolución parcial se puede seguir apuntando, sin apuntar dos veces la misma por error.
+- **El aviso al cambiar el importe de una devolución ya liquidada dice lo que pasa.** Antes hablaba de
+  un gasto «compartido» aunque la devolución fuera de un gasto normal; ahora explica que el apunte está
+  enlazado a un gasto ya liquidado y que hay que borrarlo o desvincularlo antes de cambiar su importe.
 
 ### Añadido
 
