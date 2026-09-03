@@ -5,15 +5,20 @@ import { createBackStack } from "../../app/app/js/back.js";
 // `win` falso: history que registra las llamadas y addEventListener que guarda el listener para
 // poder disparar el popstate a mano (en Node no hay window; el módulo deja su instancia global a
 // null y solo se prueba la fábrica).
-function fakeWin() {
+// `state` y `length` simulan lo que el navegador conserva tras una recarga: el state de la entrada
+// actual (con su {bc:n}) y cuántas entradas hay en la sesión. Por defecto, pestaña recién abierta:
+// sin state y con una sola entrada.
+function fakeWin({ state = null, length = 1 } = {}) {
   const calls = [];
   const listeners = {};
   return {
     calls,
     listeners,
     history: {
-      pushState: (state, title) => calls.push(["pushState", state, title]),
-      replaceState: (state, title) => calls.push(["replaceState", state, title]),
+      state,
+      length,
+      pushState: (s, title) => calls.push(["pushState", s, title]),
+      replaceState: (s, title) => calls.push(["replaceState", s, title]),
       back: () => calls.push(["back"]),
       go: (n) => calls.push(["go", n]),
     },
@@ -155,5 +160,89 @@ test("push: si pushState lanza (límite de Safari), el error se propaga y la pil
   win.history.pushState = () => { throw new Error("rate"); };
   const back = createBackStack(win);
   assert.throws(() => back.push(() => {}), /rate/);
+  assert.equal(back.depth(), 0);
+});
+
+// ------------------------------------------- recarga con una subpantalla abierta (backlog, D1)
+
+test("createBackStack tras recargar con dos subpantallas abiertas: rebobina el historial hasta la base", () => {
+  // El navegador conserva las entradas y el state de la actual; la pila, en cambio, nace vacía.
+  const win = fakeWin({ state: { bc: 2 }, length: 5 });
+  const back = createBackStack(win);
+  assert.deepEqual(win.calls, [["replaceState", { bc: 0 }, ""], ["go", -2]],
+    "primero se marca la entrada actual como base, después se salta a la de verdad");
+  assert.equal(back.depth(), 0);
+  // El popstate que provoca ese go llega con el state de la entrada destino: la pila ya está
+  // vacía, así que tiene que ser inocuo (no repintar nada).
+  win.listeners.popstate({ state: { bc: 0 } });
+  assert.equal(back.depth(), 0);
+});
+
+test("createBackStack: no rebobina con un bc que no describe una pila propia", () => {
+  for (const [state, length, motivo] of [
+    [null, 3, "pestaña nueva, sin state"],
+    [{ bc: 0 }, 3, "ya estaba en la entrada base"],
+    [{ bc: -1 }, 3, "state ajeno o corrupto"],
+    [{ bc: 1.5 }, 3, "no es un entero"],
+    [{ bc: NaN }, 3, "NaN"],
+    [{ bc: "2" }, 3, "no es un número"],
+    [{ bc: 3 }, 3, "no caben 3 entradas por debajo en un historial de 3"],
+    [{ bc: 9 }, 2, "más profundidad que historial: saltaría fuera de la app"],
+  ]) {
+    const win = fakeWin({ state, length });
+    createBackStack(win);
+    assert.deepEqual(win.calls.filter((c) => c[0] === "go"), [], motivo);
+  }
+});
+
+// ------------------------------------------- cambio de pestaña principal (backlog, D2)
+
+test("resetTo desde Inicio (pila vacía): apunta la única entrada de la pestaña", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  const vistas = [];
+  back.resetTo(() => vistas.push("inicio"));
+  assert.deepEqual(win.calls.at(-1), ["pushState", { bc: 1 }, ""]);
+  assert.equal(back.depth(), 1);
+  // Atrás desde la pestaña: vuelve a Inicio en vez de cerrar la app.
+  win.listeners.popstate({ state: { bc: 0 } });
+  assert.deepEqual(vistas, ["inicio"]);
+  assert.equal(back.depth(), 0);
+});
+
+test("resetTo con la pestaña ya a profundidad 1: NO toca el historial y cambia el callback", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  const vistas = [];
+  back.resetTo(() => vistas.push("primera"));
+  const antes = win.calls.length;
+  back.resetTo(() => vistas.push("segunda"));
+  assert.equal(win.calls.length, antes, "la entrada ya existe: ni pushState ni go");
+  assert.equal(back.depth(), 1);
+  win.listeners.popstate({ state: { bc: 0 } });
+  assert.deepEqual(vistas, ["segunda"], "manda el callback de la pestaña actual, no el de la anterior");
+});
+
+test("resetTo con subpantallas abiertas: descarta las de arriba en UN salto, sin ejecutar sus callbacks", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  const vistas = [];
+  back.resetTo(() => vistas.push("movimientos"));
+  back.push(() => vistas.push("detalle"));
+  back.push(() => vistas.push("subdetalle"));
+  assert.equal(back.depth(), 3);
+
+  back.resetTo(() => vistas.push("patrimonio"));
+  assert.deepEqual(win.calls.at(-1), ["go", -2], "un solo salto de historial, nunca go + pushState");
+  assert.equal(back.depth(), 1);
+  assert.deepEqual(vistas, [], "cambiar de pestaña no repinta las subpantallas que cierra");
+
+  // El popstate del salto llega a la entrada 1, que sigue viva: no debe deshacer la pestaña.
+  win.listeners.popstate({ state: { bc: 1 } });
+  assert.equal(back.depth(), 1);
+  assert.deepEqual(vistas, []);
+  // Y el siguiente atrás sí vuelve a Inicio, con el callback de la pestaña NUEVA.
+  win.listeners.popstate({ state: { bc: 0 } });
+  assert.deepEqual(vistas, ["patrimonio"]);
   assert.equal(back.depth(), 0);
 });
