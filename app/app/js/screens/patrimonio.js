@@ -110,7 +110,10 @@ function accountSubtitle(a, isDefault, accountLoans) {
   if (a.type === "checking") return isDefault ? t("patrimonio.accountSubtitle.checkingDefault") : t("patrimonio.accountSubtitle.checking");
   if (a.type === "savings") return t("patrimonio.accountSubtitle.savings");
   const monthlyCents = accountLoans[a.id]?.monthlyCents;
-  if (monthlyCents > 0) {
+  // balance_cents < 0: un pasivo ya pagado (saldo 0, o en positivo si se pagó de más) no tiene
+  // ninguna cuota que contar, y Math.ceil(0 / monthlyCents) daba «quedan 0 cuotas», que se lee como
+  // un error de la app. Cae al subtítulo genérico, igual que un pasivo sin cuota definida.
+  if (monthlyCents > 0 && a.balance_cents < 0) {
     const n = Math.ceil(Math.abs(a.balance_cents) / monthlyCents);
     return t("patrimonio.accountSubtitle.installmentsLeft", { n });
   }

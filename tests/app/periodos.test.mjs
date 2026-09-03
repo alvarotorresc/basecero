@@ -357,3 +357,42 @@ test("spentByChildCategory: excluye categorías borradas, movimientos borrados y
   const raiz = db.prepare(SQL.spentByRootCategory).all("per-1").find((r) => r.root_id === "cat-casa");
   assert.equal(rows.reduce((s, r) => s + r.spent_cents, 0), raiz.spent_cents, "invariante: el desglose SIEMPRE suma el total de la raíz, archivadas incluidas");
 });
+
+test("spentByChildCategory: una hija NEGATIVA (devolución mayor que su gasto) y la invariante «el desglose suma el total» sigue cuadrando", () => {
+  const db = openDb();
+  seedMinimal(db);
+  insCat(db, { id: "cat-casa-luz", name: "Luz", parent: "cat-casa", order: 2 });
+
+  ins(db, { id: "g-luz", category: "cat-casa-luz", cents: 3000, shared: 0 });
+  // Devolución de 5000 sobre un gasto de 3000 en la misma hija: la fila queda a -2000. Ocurre de
+  // verdad cuando la tienda reembolsa una compra de un periodo anterior contra la categoría de hoy.
+  ins(db, { id: "d-luz", type: "refund", category: "cat-casa-luz", cents: 5000, shared: 0 });
+  ins(db, { id: "g-alquiler", category: "cat-casa-alquiler", cents: 10000, shared: 0 });
+
+  const rows = db.prepare(SQL.spentByChildCategory).all("per-1", "cat-casa", "cat-casa");
+  const by = Object.fromEntries(rows.map((r) => [r.category_id, r.spent_cents]));
+  assert.equal(by["cat-casa-luz"], -2000, "3000 - 5000: la fila puede quedar en negativo");
+  assert.equal(by["cat-casa-alquiler"], 10000);
+  assert.equal(rows[0].category_id, "cat-casa-alquiler", "ORDER BY spent_cents DESC: la negativa cae al final");
+  assert.equal(rows.at(-1).category_id, "cat-casa-luz");
+
+  const raiz = db.prepare(SQL.spentByRootCategory).all("per-1").find((r) => r.root_id === "cat-casa");
+  assert.equal(raiz.spent_cents, 8000, "10000 - 2000");
+  assert.equal(rows.reduce((s, r) => s + r.spent_cents, 0), raiz.spent_cents,
+    "la invariante aguanta con filas negativas: sumar en negativo es sumar igual");
+});
+
+test("spentByChildCategory: una raíz SIN hijas devuelve exactamente una fila, la suya", () => {
+  const db = openDb();
+  seedMinimal(db);
+  insCat(db, { id: "cat-ropa", name: "Ropa y cuidado personal", parent: "", need: "want", order: 7 });
+  ins(db, { id: "g-ropa", category: "cat-ropa", cents: 4500, shared: 0 });
+  ins(db, { id: "g-casa", category: "cat-casa-alquiler", cents: 10000, shared: 0 });
+
+  const rows = db.prepare(SQL.spentByChildCategory).all("per-1", "cat-ropa", "cat-ropa");
+  assert.deepEqual(rows.map((r) => [r.category_id, r.spent_cents]), [["cat-ropa", 4500]],
+    "sin hijas, todo el gasto es directo: la única fila repetiría la cifra de arriba, por eso la pantalla no pinta desglose");
+
+  const raiz = db.prepare(SQL.spentByRootCategory).all("per-1").find((r) => r.root_id === "cat-ropa");
+  assert.equal(rows[0].spent_cents, raiz.spent_cents, "y aun así la invariante se cumple");
+});

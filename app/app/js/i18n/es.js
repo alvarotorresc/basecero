@@ -145,7 +145,6 @@ export const ES = {
       ofBudgeted: "de {amount} presupuestados",
       paceOver: "▲ {amount} sobre el ritmo del plan",
       paceUnder: "▼ {amount} bajo el ritmo del plan",
-      settleWithAmount: "Liquidar · {amount}",
     },
   },
   registro: {
@@ -165,6 +164,7 @@ export const ES = {
       toggle: "¿Devuelve un gasto? {arrow}",
       empty: "No hay gastos recientes.",
       sharedSuffix: " · compartido",
+      alreadyRefunded: "Ya devuelto · {amount}",
     },
   },
   movimientos: {
@@ -232,7 +232,10 @@ export const ES = {
     },
   },
   gastoCategoria: {
-    error: { load: "No se pudo cargar Gasto por categoría: {error}" },
+    error: {
+      load: "No se pudo cargar Gasto por categoría: {error}",
+      detail: "No se pudo cargar el detalle: {error}",
+    },
     title: "Gasto por categoría",
     header: {
       dayOf: "{period} · día {day} de {total}",
@@ -704,7 +707,7 @@ export const ES = {
       txLockedSettled: "Este gasto tiene un apunte de liquidación enlazado (devolución o ajuste): bórralo antes en Movimientos para cambiar el importe, el reparto o quién pagó.",
       sharePctInvalid: "El reparto debe estar entre 0 y 100.",
       budgetInvalid: "El límite tiene que ser un importe mayor que cero.",
-      refundLockedSettled: "Este apunte liquida un gasto compartido. Bórralo o desvincúlalo antes de cambiar su importe.",
+      refundLockedSettled: "Este apunte está enlazado a un gasto ya liquidado. Bórralo o desvincúlalo antes de cambiar su importe.",
       expenseLockedHasRefund: "Este gasto tiene un apunte de liquidación enlazado. Bórralo antes en Movimientos.",
       paidByNotShared: "Solo un gasto compartido puede pagarlo la contraparte.",
       ruleNotFound: "Regla no encontrada",
@@ -760,6 +763,7 @@ export const ES = {
       paidByNotShared: "pestaña «transactions» fila {row}: paid_by «partner» solo vale en un gasto compartido",
       paidByAccount: "pestaña «transactions» fila {row}: un gasto que pagó la contraparte no puede llevar cuenta",
       refundOfPartnerPaid: "pestaña «transactions» fila {row}: una devolución no puede enlazar un gasto pagado por la contraparte",
+      budgetDuplicate: "pestaña «budgets» fila {row}: ya hay otro límite vivo para la misma pareja periodo/categoría (fila {first})",
     },
     csvGeneric: {
       invalidHeaders: "cabeceras inválidas",

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  budgetStatus, pctOf, relativeWidth, limitTotals, sortRootRows,
+  budgetStatus, pctOf, relativeWidth, limitTotals, sortRootRows, budgetMap,
 } from "../../app/app/js/category-spend.js";
 
 test("budgetStatus: 82% del límite -> ok", () => {
@@ -102,4 +102,15 @@ test("sortRootRows: a igual gasto y mismo estado de límite, desempata el nombre
     { root_id: "c", name: "Ocio", spent_cents: 1000 },
   ];
   assert.deepEqual(sortRootRows(rows, {}).map((r) => r.name), ["Alquiler", "Ocio", "Zapatos"]);
+});
+
+test("budgetMap: una entrada por categoría, gana la PRIMERA fila (la consulta ya llega por updated_at DESC)", () => {
+  assert.deepEqual(budgetMap([
+    { id: "b-nueva", category_id: "cat-casa", amount_cents: 30000 },
+    { id: "b-vieja", category_id: "cat-casa", amount_cents: 45000 },
+    { id: "b-ocio", category_id: "cat-ocio", amount_cents: 12000 },
+  ]), { "cat-casa": 30000, "cat-ocio": 12000 }, "Object.fromEntries se quedaría con la VIEJA: aquí gana la primera");
+  assert.deepEqual(budgetMap([]), {});
+  assert.deepEqual(budgetMap([{ id: "b-x", category_id: "__proto__", amount_cents: 1 }]), {},
+    "un category_id «__proto__» (el charset de ids del import admite guiones bajos) se descarta en vez de tocar Object.prototype");
 });

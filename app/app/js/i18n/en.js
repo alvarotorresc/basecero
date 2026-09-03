@@ -144,7 +144,6 @@ export const EN = {
       ofBudgeted: "of {amount} budgeted",
       paceOver: "▲ {amount} over the plan’s pace",
       paceUnder: "▼ {amount} under the plan’s pace",
-      settleWithAmount: "Settle up · {amount}",
     },
   },
   registro: {
@@ -164,6 +163,7 @@ export const EN = {
       toggle: "Refunding an expense? {arrow}",
       empty: "No recent expenses.",
       sharedSuffix: " · shared",
+      alreadyRefunded: "Already refunded · {amount}",
     },
   },
   movimientos: {
@@ -231,7 +231,10 @@ export const EN = {
     },
   },
   gastoCategoria: {
-    error: { load: "Couldn’t load Spending by category: {error}" },
+    error: {
+      load: "Couldn’t load Spending by category: {error}",
+      detail: "Couldn’t load the detail: {error}",
+    },
     title: "Spending by category",
     header: {
       dayOf: "{period} · day {day} of {total}",
@@ -701,7 +704,7 @@ export const EN = {
       txLockedSettled: "This expense has a linked settlement entry (refund or adjustment): delete it in Transactions first to change the amount, the split or who paid.",
       sharePctInvalid: "The split must be between 0 and 100.",
       budgetInvalid: "The limit has to be an amount greater than zero.",
-      refundLockedSettled: "This entry settles a shared expense. Delete or unlink it before changing its amount.",
+      refundLockedSettled: "This entry is linked to an already settled expense. Delete or unlink it before changing its amount.",
       expenseLockedHasRefund: "This expense has a linked settlement entry. Delete it in Transactions first.",
       paidByNotShared: "Only a shared expense can be paid by the partner.",
       ruleNotFound: "Rule not found",
@@ -755,6 +758,7 @@ export const EN = {
       paidByNotShared: "sheet “transactions” row {row}: paid_by “partner” is only valid on a shared expense",
       paidByAccount: "sheet “transactions” row {row}: an expense paid by your partner cannot have an account",
       refundOfPartnerPaid: "sheet “transactions” row {row}: a refund cannot link an expense paid by the partner",
+      budgetDuplicate: "sheet “budgets” row {row}: another live limit already exists for the same period/category pair (row {first})",
     },
     csvGeneric: {
       invalidHeaders: "invalid headers",

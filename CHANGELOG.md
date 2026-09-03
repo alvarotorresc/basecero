@@ -11,6 +11,12 @@ Versionado según [SemVer](https://semver.org/lang/es/).
   de gasto —no solo las que tienen límite—, ordenadas por lo que llevas gastado, y se abre tocando
   la tarjeta de Gasto por categoría del inicio (antes hacía falta tener algún límite puesto para
   que apareciera el enlace).
+- **Los gastos que ya has devuelto se marcan.** Al enlazar una devolución, la lista de gastos los
+  sigue mostrando todos, pero los que ya tienen algo devuelto bajan al final, atenuados y con cuánto
+  volvió: una devolución parcial se puede seguir apuntando, sin apuntar dos veces la misma por error.
+- **El aviso al cambiar el importe de una devolución ya liquidada dice lo que pasa.** Antes hablaba de
+  un gasto «compartido» aunque la devolución fuera de un gasto normal; ahora explica que el apunte está
+  enlazado a un gasto ya liquidado y que hay que borrarlo o desvincularlo antes de cambiar su importe.
 
 ### Añadido
 
@@ -18,6 +24,26 @@ Versionado según [SemVer](https://semver.org/lang/es/).
   periodo, con el gasto anotado directamente en la categoría como una línea más.
 - **Los límites se editan desde ahí.** Poner, cambiar o quitar el límite de una categoría ya no
   obliga a abrir un periodo nuevo: se hace en el propio desplegable, y solo afecta a este periodo.
+- **Los extractos con punto y coma se importan solos.** Los CSV de la banca española usan `;` en vez
+  de coma; ahora el separador se detecta al vuelo —coma, punto y coma o tabulador— y el asistente ve
+  las columnas de verdad en lugar de una sola.
+- **Avisos de terceros.** Un `THIRD_PARTY_NOTICES.md` con la licencia y la atribución de todo lo que
+  viaja dentro del repositorio: SheetJS, la fuente Outfit y SQLite WASM.
+
+### Arreglado
+
+- **El disponible ya no descuenta límites invisibles.** Si archivabas una categoría con límite, la
+  categoría desaparecía de todas las listas pero su límite seguía restando del disponible del inicio.
+- **Los errores que se tragaba la app ahora se ven.** El detalle de una categoría que no carga lo
+  dice en su fila, y guardar un límite ya no acusa de «no se pudo guardar» cuando lo que falló fue
+  releer los datos después de guardarlo bien.
+- **Los límites de un periodo nuevo aceptan céntimos.** El campo de límite del asistente solo dejaba
+  poner euros enteros; ahora admite decimales, igual que el de «Gasto por categoría».
+- **Un préstamo ya pagado no dice «quedan 0 cuotas».**
+- **Los enlaces del inicio se ven al llegar con el tabulador.**
+- **Una hoja con dos límites vivos para la misma categoría y periodo ya no se importa.** Solo puede
+  pasar editando el xlsx a mano, y antes entraba en silencio: la app leía un límite y editaba el otro.
+  Ahora la importación lo rechaza y dice qué filas chocan.
 
 ## [1.0.0] — 2026-09-02
 

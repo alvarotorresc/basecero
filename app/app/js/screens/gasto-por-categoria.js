@@ -3,7 +3,7 @@ import {
   allCategoriesById, upsertBudget, deleteBudget,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
-import { budgetStatus, pctOf, relativeWidth, limitTotals, sortRootRows } from "../category-spend.js";
+import { budgetStatus, pctOf, relativeWidth, limitTotals, sortRootRows, budgetMap } from "../category-spend.js";
 import { eurToCents } from "../contract.js";
 import { fmtMoney, fmtMoneyParts, hoyISO, currencySymbol } from "../format.js";
 import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
@@ -44,7 +44,9 @@ const chevronSvg = (deg) => `<svg width="16" height="16" viewBox="0 0 24 24" fil
  *  botones y un input, y un botón dentro de otro es HTML inválido que el navegador desarma (mismo
  *  criterio que categorias.js#rootRowHtml). */
 export async function renderGastoPorCategoria(container, onBack) {
-  const state = { expanded: new Set(), editing: null, editRaw: "", editError: "" };
+  // rootErrors: rootId → mensaje, para la línea roja inline de una raíz cuyo desglose no se pudo
+  // leer. Se limpia al volver a intentarlo y al plegar, para que no se quede pegada para siempre.
+  const state = { expanded: new Set(), editing: null, editRaw: "", editError: "", rootErrors: new Map() };
   // Cache del desglose por raíz: solo se pide al desplegar, y editar un límite NO cambia el gasto,
   // así que sobrevive a los re-render posteriores a guardar/quitar.
   const childrenByRoot = new Map();
@@ -62,7 +64,7 @@ export async function renderGastoPorCategoria(container, onBack) {
       allCategoriesById(),
     ]);
     rootRows = rows;
-    budgetByCategory = Object.fromEntries(budgetRows.map((b) => [b.category_id, b.amount_cents]));
+    budgetByCategory = budgetMap(budgetRows);
     byId = cats;
     return true;
   }
@@ -171,6 +173,8 @@ export async function renderGastoPorCategoria(container, onBack) {
       barHtml = `<div class="bar" style="--cat:color-mix(in srgb, ${color} 55%, transparent);"><i style="width:${relativeWidth(row.spent_cents, maxSpent)}%;"></i></div>`;
     }
 
+    const rootError = state.rootErrors.get(row.root_id);
+
     return `
       <div style="display:flex;flex-direction:column;gap:8px;padding:13px 0;${dim ? "opacity:.5;" : ""}">
         <button type="button" data-root="${escAttr(row.root_id)}" aria-expanded="${expanded ? "true" : "false"}"
@@ -186,6 +190,7 @@ export async function renderGastoPorCategoria(container, onBack) {
             color:${expanded ? "var(--text)" : "var(--text-2)"};">${chevronSvg(expanded ? 90 : 0)}</span>
         </button>
         ${barHtml}
+        ${rootError ? `<div style="font-size:11px;color:var(--red);">${escHtml(rootError)}</div>` : ""}
         ${expanded ? expandedHtml(row, limitCents) : ""}
       </div>`;
   }
@@ -253,16 +258,26 @@ export async function renderGastoPorCategoria(container, onBack) {
     state.editError = "";
   }
 
-  /** Escribe el límite y vuelve a leer los datos. Si algo falla, el modo edición SE QUEDA abierto
-   *  con el error debajo del input: el usuario no pierde lo que había escrito. */
+  /** Escribe el límite y vuelve a leer los datos. Dos try SEPARADOS a propósito: si lo que falla es
+   *  la RECARGA, el límite ya está guardado y decir «No se pudo guardar el límite» sería mentira —
+   *  el usuario volvería a darle a Guardar sobre un dato que ya está en la base. Se muestra
+   *  entonces el error de carga de la pantalla, el mismo que su banner de arranque.
+   *  Si falla la escritura, el modo edición SE QUEDA abierto con el error debajo del input: el
+   *  usuario no pierde lo que había escrito. */
   async function saveLimit(rootId, cents) {
     try {
       if (cents === null) await deleteBudget(period.id, rootId);
       else await upsertBudget(period.id, rootId, cents);
+    } catch (e) {
+      state.editError = t("gastoCategoria.edit.saveFailed", { error: e.message });
+      render();
+      return;
+    }
+    try {
       await load();
       closeEdit();
     } catch (e) {
-      state.editError = t("gastoCategoria.edit.saveFailed", { error: e.message });
+      state.editError = t("gastoCategoria.error.load", { error: e.message });
     }
     render();
   }
@@ -275,19 +290,23 @@ export async function renderGastoPorCategoria(container, onBack) {
         const id = el.dataset.root;
         if (state.expanded.has(id)) {
           state.expanded.delete(id);
+          state.rootErrors.delete(id);
           if (state.editing === id) closeEdit();
         } else {
+          // Reintentar limpia el error anterior: si vuelve a fallar, se vuelve a poner abajo.
+          state.rootErrors.delete(id);
           state.expanded.add(id);
           // Una raíz sin hijas no tiene desglose que pedir (ver subRowsHtml): se despliega
           // directamente con su fila de límite, sin ir a la BD.
           if (hasChildren(id) && !childrenByRoot.has(id)) {
             try {
               childrenByRoot.set(id, await spentByChildCategory(period.id, id));
-            } catch {
-              // Si el desglose no se puede leer, la raíz no se queda marcada como desplegada sin
-              // haberse repintado (eso se tragaría el siguiente toque): se pliega otra vez y la
-              // pantalla queda exactamente como estaba antes de tocarla.
+            } catch (e) {
+              // Antes se plegaba en SILENCIO y la pantalla quedaba igual que antes de tocarla: el
+              // usuario tocaba, no pasaba nada, y no había forma de saber por qué. Ahora se pliega
+              // igual (el bloque desplegado sin datos no aporta nada) pero la fila explica el fallo.
               state.expanded.delete(id);
+              state.rootErrors.set(id, t("gastoCategoria.error.detail", { error: e.message }));
             }
           }
         }

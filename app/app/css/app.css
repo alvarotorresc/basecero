@@ -96,6 +96,26 @@ main#screen {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ===== enlace de texto que en realidad es un <button> ===== */
+/* Pies y cabeceras tocables de Inicio: reset total del chrome nativo del botón + la tipografía de
+   enlace secundario del sistema. Longhands y no el shorthand `font:`: `all: unset` deja
+   font-family y line-height heredadas del contenedor, y el shorthand las reescribiría (line-height
+   pasaría a `normal`), moviendo el texto un pelo. El :focus-visible propio (0,2,0) hace que el
+   anillo no dependa del orden del fichero: `all: unset` borra también el outline, y frente a la
+   regla global `:focus-visible` (0,1,0) mandaría la que estuviera más abajo. */
+.link-btn {
+  all: unset;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  -webkit-tap-highlight-color: transparent;
+}
+.link-btn:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
 /* ===== control segmentado (chips de tipo de movimiento, scroll horizontal) ===== */
 .segmented {
   display: flex;

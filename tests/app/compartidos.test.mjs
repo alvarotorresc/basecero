@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { SQL } from "../../app/app/js/sql.js";
 import {
-  sharedFieldsLocked, refundAmountLocked, expenseDeleteLocked, settleAllSharedStmts,
+  sharedFieldsLocked, settlementAmountLocked, expenseDeleteLocked, settleAllSharedStmts,
 } from "../../app/app/js/repo.js";
 import { t } from "../../app/app/js/i18n/index.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
@@ -41,8 +41,8 @@ function ins(db, over = {}) {
   return v.id;
 }
 
-/** Reproduce EXACTAMENTE la secuencia que hace repo.settleShared sobre una fila de dirección
- *  'partner_owes' (un gasto que pagué yo): busca la fila en pendingSettlements (misma fuente de
+/** Reproduce EXACTAMENTE la rama 'partner_owes' de settleAllSharedStmts (repo.js) para UNA sola
+ *  fila (un gasto que pagué yo): busca la fila en pendingSettlements (misma fuente de
  *  verdad para el importe/categoría a liquidar, sin duplicar el cálculo del pct), inserta la
  *  devolución ENTRANTE en el periodo abierto y marca settled=1 en el gasto original — el mismo
  *  execMany([insertStmt, updateSettled]) de repo.addTransaction. La otra dirección ('i_owe', que
@@ -204,7 +204,7 @@ test("recentForRefund no ofrece los gastos que pagó la contraparte", () => {
     "una devolución de tienda sobre lo que pagó ella es dinero que le devuelven a ella, no a mí");
 });
 
-test("settleShared: crea el refund con importe/categoría/comercio de la parte de la contraparte y el original queda settled", () => {
+test("liquidación de un gasto compartido (partner_owes): crea el refund con importe/categoría/comercio de la parte de la contraparte y el original queda settled", () => {
   const db = openDb();
   seedMinimal(db);
   const gastoId = ins(db, {
@@ -272,8 +272,8 @@ function execManyRaw(db, stmts) {
 
 /** Reproduce la ORQUESTACIÓN de repo.settleAllShared (getOpenPeriod, pendingSettlements + filtro
  *  por ids, el guard de "algún id no está pendiente"): repo.settleAllShared en sí no es alcanzable
- *  en Node (depende del Worker vía query/execMany, mismo motivo por el que settleShared/
- *  openNextPeriod de este mismo fichero se reproducen en vez de importarse). El ARRAY de
+ *  en Node (depende del Worker vía query/execMany, mismo motivo por el que la liquidación de una
+ *  sola fila y openNextPeriod de este mismo fichero se reproducen en vez de importarse). El ARRAY de
  *  statements NO se reproduce a mano aquí: se delega en la settleAllSharedStmts REAL importada de
  *  repo.js (arriba) — así un bug en el bind de insertTransaction (orden de los 20 campos) lo
  *  detectaría este test, cosa que una copia manual del bind no podría hacer. "Alex" es el
@@ -299,7 +299,7 @@ test("settleAllShared (reproducido): liquida N pendientes de golpe — N refunds
   // a: per-1 (60/40) sin override → contraparte 4000. b: per-2 (50/50, YA CERRADO) → contraparte
   // 4000 con SU PROPIO pct, no el del periodo abierto. c: per-1 con override=90 → contraparte 1000.
   // El merchant de `c` lleva un prefijo de fórmula a propósito: prueba que bcSanitizeCell se aplica
-  // igual que en settleShared→addTransaction (mismo criterio que categorias.test.mjs:428).
+  // igual que en la liquidación de una sola fila → addTransaction (mismo criterio que categorias.test.mjs:428).
   const a = ins(db, { id: "gasto-a", date: "2026-08-10", period: "per-1", cents: 10000, shared: 1, category: "cat-casa-alquiler", merchant: "IKEA" });
   const b = ins(db, { id: "gasto-b", date: "2026-08-05", period: "per-2", cents: 8000, shared: 1, category: "cat-casa-alquiler", merchant: "Super" });
   const c = ins(db, { id: "gasto-c", date: "2026-08-15", period: "per-1", cents: 10000, shared: 1, override: 90, category: "cat-casa-alquiler", merchant: "=HACK()" });
@@ -413,22 +413,22 @@ test("settleAllShared (reproducido): un id duplicado en `ids` no crea dos refund
 
 // ---- Task 17 ronda 2 (controller ruling, finding A): guard de "gasto liquidado" ---------
 
-test("SQL.hasActiveLinkedRefund: true solo con un refund ACTIVO que apunte por ref_id", () => {
+test("SQL.hasActiveLinkedSettlement: true solo con un refund ACTIVO que apunte por ref_id", () => {
   const db = openDb();
   seedMinimal(db);
   const gastoId = ins(db, { id: "gasto-1", cents: 8000, shared: 1 });
   const otroGastoId = ins(db, { id: "gasto-2", cents: 3000, shared: 1 });
 
   // sin ningún refund todavía
-  assert.equal(db.prepare(SQL.hasActiveLinkedRefund).get(gastoId), undefined);
+  assert.equal(db.prepare(SQL.hasActiveLinkedSettlement).get(gastoId), undefined);
 
   const refundId = settleShared(db, gastoId, "acc-n26", T2);
-  assert.ok(db.prepare(SQL.hasActiveLinkedRefund).get(gastoId), "con el refund activo, debe encontrarlo");
-  assert.equal(db.prepare(SQL.hasActiveLinkedRefund).get(otroGastoId), undefined, "no debe colarse a otro gasto");
+  assert.ok(db.prepare(SQL.hasActiveLinkedSettlement).get(gastoId), "con el refund activo, debe encontrarlo");
+  assert.equal(db.prepare(SQL.hasActiveLinkedSettlement).get(otroGastoId), undefined, "no debe colarse a otro gasto");
 
   db.prepare("UPDATE transactions SET deleted=1 WHERE id=?").run(refundId);
-  assert.equal(db.prepare(SQL.hasActiveLinkedRefund).get(gastoId), undefined,
-    "un refund BORRADO no cuenta como enlace activo (mismo criterio que unsettleIfNoActiveRefunds)");
+  assert.equal(db.prepare(SQL.hasActiveLinkedSettlement).get(gastoId), undefined,
+    "un refund BORRADO no cuenta como enlace activo (mismo criterio que unsettleIfNoActiveSettlements)");
 });
 
 // ---- Task 5 (PR C, contraparte): banner de migración de Inicio ------------------------
@@ -484,31 +484,31 @@ test("sharedFieldsLocked: pura, sin DB — replica exactamente lo que updateTran
 // ---- Task 6 (M5, review de seguridad): bloqueo bilateral de gastos liquidados -------------
 // El guard de arriba (sharedFieldsLocked) solo mira el LADO DEL GASTO: si en vez de tocar el
 // gasto se toca el REFUND enlazado, o se borra el gasto original, nada lo detecta hoy. Los tests
-// de este bloque importan refundAmountLocked/expenseDeleteLocked REALES de repo.js (no una
+// de este bloque importan settlementAmountLocked/expenseDeleteLocked REALES de repo.js (no una
 // reimplementación) — en código pre-fix ni siquiera existen esas exportaciones, así que este
 // import ya falla en rojo (mismo criterio que repo-i18n-guards.test.mjs señala sobre por qué una
 // reproducción manual del guard no habría detectado el bug original).
 
-test("refundAmountLocked: pura — bloquea SOLO un cambio de importe en un refund cuyo gasto enlazado está settled", () => {
+test("settlementAmountLocked: pura — bloquea SOLO un cambio de importe en un refund cuyo gasto enlazado está settled", () => {
   const settledLinked = { settled: 1 };
   const unsettledLinked = { settled: 0 };
 
   // no es un refund (p.ej. el propio gasto) → nunca bloquea, aunque cambie el importe
-  assert.equal(refundAmountLocked(
+  assert.equal(settlementAmountLocked(
     { type: "expense", ref_id: "gasto-1", amount_cents: 3200 },
     { amountCents: 500 },
     settledLinked,
   ), false, "el guard es solo para refunds — el lado del gasto ya lo cubre sharedFieldsLocked");
 
   // refund sin ref_id (refund suelto, no de liquidación) → nunca bloquea
-  assert.equal(refundAmountLocked(
+  assert.equal(settlementAmountLocked(
     { type: "refund", ref_id: "", amount_cents: 3200 },
     { amountCents: 500 },
     null,
   ), false, "un refund sin ref_id no está enlazado a ningún gasto");
 
   // ref_id apunta a un gasto que ya no existe/está borrado (getTransaction lo filtraría) → no bloquea
-  assert.equal(refundAmountLocked(
+  assert.equal(settlementAmountLocked(
     { type: "refund", ref_id: "gasto-borrado", amount_cents: 3200 },
     { amountCents: 500 },
     null,
@@ -516,21 +516,21 @@ test("refundAmountLocked: pura — bloquea SOLO un cambio de importe en un refun
 
   // gasto enlazado existe pero NO está settled → no bloquea (no debería pasar en la práctica, pero
   // el guard no debe asumirlo)
-  assert.equal(refundAmountLocked(
+  assert.equal(settlementAmountLocked(
     { type: "refund", ref_id: "gasto-1", amount_cents: 3200 },
     { amountCents: 500 },
     unsettledLinked,
   ), false);
 
   // gasto enlazado settled + MISMO importe (solo cambia categoría/nota/fecha) → no bloquea
-  assert.equal(refundAmountLocked(
+  assert.equal(settlementAmountLocked(
     { type: "refund", ref_id: "gasto-1", amount_cents: 3200 },
     { amountCents: 3200 },
     settledLinked,
   ), false, "editar campos que no son el importe debe seguir funcionando");
 
   // gasto enlazado settled + importe DISTINTO → bloquea (el caso del hallazgo: 50€ → 5€)
-  assert.equal(refundAmountLocked(
+  assert.equal(settlementAmountLocked(
     { type: "refund", ref_id: "gasto-1", amount_cents: 3200 },
     { amountCents: 500 },
     settledLinked,
@@ -568,7 +568,7 @@ test("expenseDeleteLocked: pura — bloquea borrar un gasto con refund activo, S
 // consistente con que sharedFieldsLocked YA exige type==='expense' && settled sin mirar is_shared.
 // Este test prueba explícitamente el caso NO compartido con datos reales de BD (no solo objetos a
 // mano), para que quede fijado como comportamiento intencional y no una laguna sin cubrir.
-test("refundAmountLocked/expenseDeleteLocked: protegen también un refund NO compartido (p.ej. devolución de producto)", () => {
+test("settlementAmountLocked/expenseDeleteLocked: protegen también un refund NO compartido (p.ej. devolución de producto)", () => {
   const db = openDb();
   seedMinimal(db);
   const gastoId = ins(db, { id: "gasto-zapatillas", cents: 6000, shared: 0 });
@@ -583,12 +583,12 @@ test("refundAmountLocked/expenseDeleteLocked: protegen también un refund NO com
   assert.equal(gasto.is_shared, 0, "control: el gasto NO es compartido");
 
   assert.equal(
-    refundAmountLocked(refund, { amountCents: 1000 }, gasto),
+    settlementAmountLocked(refund, { amountCents: 1000 }, gasto),
     true,
     "bajar el importe de una devolución enlazada a un gasto ya liquidado se bloquea aunque no sea un compartido",
   );
 
-  const hasActiveRefund = !!db.prepare(SQL.hasActiveLinkedRefund).get(gastoId);
+  const hasActiveRefund = !!db.prepare(SQL.hasActiveLinkedSettlement).get(gastoId);
   assert.equal(
     expenseDeleteLocked(gasto, hasActiveRefund),
     true,
@@ -598,7 +598,7 @@ test("refundAmountLocked/expenseDeleteLocked: protegen también un refund NO com
 
 /** Reproduce la secuencia de repo.updateTransaction (resolución de campos + los dos guards +
  *  UPDATE) usando SQL directo, IGUAL que el resto de este fichero — pero llamando a los guards
- *  REALES (sharedFieldsLocked/refundAmountLocked) importados de repo.js, no una reimplementación.
+ *  REALES (sharedFieldsLocked/settlementAmountLocked) importados de repo.js, no una reimplementación.
  *  Necesario porque updateTransaction en sí depende del Worker (query/exec) y no es alcanzable
  *  en Node sin mockearlo (mismo motivo documentado en repo-i18n-guards.test.mjs). */
 function updateTransactionReproduced(db, id, fields) {
@@ -621,12 +621,12 @@ function updateTransactionReproduced(db, id, fields) {
   // Mismo guard nuevo que repo.updateTransaction (repo.js): un gasto que NO lo pagó la contraparte
   // SÍ necesita una cuenta mía.
   if (f.type === "expense" && f.paidBy !== "partner" && !f.accountId) throw new Error(t("common.needAccount"));
-  if (sharedFieldsLocked(cur, f) && db.prepare(SQL.hasActiveLinkedRefund).get(id)) {
+  if (sharedFieldsLocked(cur, f) && db.prepare(SQL.hasActiveLinkedSettlement).get(id)) {
     throw new Error("LOCKED: gasto liquidado");
   }
   const linked = (cur.type === "refund" || cur.type === "adjustment") && cur.ref_id
     ? db.prepare(SQL.getTransaction).get(cur.ref_id) : null;
-  if (refundAmountLocked(cur, f, linked)) {
+  if (settlementAmountLocked(cur, f, linked)) {
     throw new Error("LOCKED: refund de un gasto liquidado");
   }
   db.prepare(SQL.updateTransaction).run(
@@ -641,13 +641,13 @@ function updateTransactionReproduced(db, id, fields) {
  *  el mismo criterio que updateTransactionReproduced de arriba. */
 function softDeleteTransactionReproduced(db, id) {
   const cur = db.prepare(SQL.getTransaction).get(id);
-  const hasActiveRefund = cur?.type === "expense" && !!db.prepare(SQL.hasActiveLinkedRefund).get(id);
+  const hasActiveRefund = cur?.type === "expense" && !!db.prepare(SQL.hasActiveLinkedSettlement).get(id);
   if (expenseDeleteLocked(cur, hasActiveRefund)) {
     throw new Error("LOCKED: gasto liquidado con refund activo");
   }
   if (cur && (cur.type === "refund" || cur.type === "adjustment") && cur.ref_id) {
     db.prepare(SQL.softDeleteTransaction).run(T2, id);
-    db.prepare(SQL.unsettleIfNoActiveRefunds).run(cur.ref_id, id, T2, cur.ref_id);
+    db.prepare(SQL.unsettleIfNoActiveSettlements).run(cur.ref_id, id, T2, cur.ref_id);
   } else {
     db.prepare(SQL.softDeleteTransaction).run(T2, id);
   }
@@ -860,20 +860,20 @@ test("borrar el apunte de SALIDA des-liquida el gasto que pagó la contraparte",
   assert.deepEqual(pending.map((r) => r.id).sort(), [a, b].sort(), "el gasto vuelve a estar pendiente");
 });
 
-test("hasActiveLinkedRefund y expenseDeleteLocked ven el ajuste de liquidación", () => {
+test("hasActiveLinkedSettlement y expenseDeleteLocked ven el ajuste de liquidación", () => {
   const db = openDb();
   seedMinimal(db);
   const { b } = seedDosDirecciones(db);
   settleAllSharedReproduced(db, [b], "acc-n26", T2);
 
-  const hasActiveRefund = !!db.prepare(SQL.hasActiveLinkedRefund).get(b);
+  const hasActiveRefund = !!db.prepare(SQL.hasActiveLinkedSettlement).get(b);
   assert.equal(hasActiveRefund, true, "el ajuste enlazado cuenta como apunte de liquidación vivo");
   const gasto = db.prepare(SQL.getTransaction).get(b);
   assert.equal(expenseDeleteLocked(gasto, hasActiveRefund), true,
     "no se puede borrar el gasto mientras su ajuste siga vivo");
 });
 
-test("refundAmountLocked: pura — cambiar el importe del ajuste de un gasto liquidado se bloquea", () => {
+test("settlementAmountLocked: pura — cambiar el importe del ajuste de un gasto liquidado se bloquea", () => {
   const db = openDb();
   seedMinimal(db);
   const { b } = seedDosDirecciones(db);
@@ -881,8 +881,8 @@ test("refundAmountLocked: pura — cambiar el importe del ajuste de un gasto liq
   const ajuste = db.prepare("SELECT * FROM transactions WHERE ref_id=? AND type='adjustment'").get(b);
   const linked = db.prepare(SQL.getTransaction).get(b);
 
-  assert.equal(refundAmountLocked(ajuste, { amountCents: -1000 }, linked), true);
-  assert.equal(refundAmountLocked(ajuste, { amountCents: ajuste.amount_cents }, linked), false,
+  assert.equal(settlementAmountLocked(ajuste, { amountCents: -1000 }, linked), true);
+  assert.equal(settlementAmountLocked(ajuste, { amountCents: ajuste.amount_cents }, linked), false,
     "editar la nota del ajuste sin tocar el importe sigue funcionando");
 });
 
@@ -896,7 +896,7 @@ test("updateTransaction (reproducido): bajar el importe del AJUSTE de liquidaci�
   // Este test pasa por el CAMINO REAL —la resolución de `linked` incluida—, no por la función pura
   // con el argumento ya resuelto: es justo la línea que se olvidaba. Con repo.js:316 cargando el
   // gasto enlazado solo para type='refund', `linked` sería null para un ajuste, el guard nunca
-  // dispararía y el test de arriba (que llama a refundAmountLocked con `linked` cargado a mano)
+  // dispararía y el test de arriba (que llama a settlementAmountLocked con `linked` cargado a mano)
   // seguiría en verde sobre código roto.
   assert.throws(() => updateTransactionReproduced(db, ajuste.id, { amountCents: -1000 }),
     /LOCKED: refund de un gasto liquidado/);

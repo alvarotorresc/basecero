@@ -211,6 +211,21 @@ export function validateImport(data) {
     }
   });
 
+  // Dos límites VIVOS para la misma (periodo, categoría) no los crea nunca la app: upsertBudget
+  // actualiza la fila que ya hay y deleteBudget hace un borrado lógico. Una hoja editada a mano sí
+  // puede dejarlos, y entonces QUÉ límite manda depende del orden de lectura — la pantalla enseñaría
+  // uno (budgetOfCategory: el de updated_at más reciente) y cualquier total sumaría los dos. Se
+  // rechaza el import en vez de elegir en silencio: sin cambio de esquema ni índice único, esta es la
+  // única puerta por la que ese estado puede entrar. Las filas con deleted=1 NO cuentan: quitar y
+  // volver a poner un límite deja exactamente una borrada y una viva con la misma pareja.
+  const budgetSeen = new Map();
+  (data.budgets ?? []).forEach((row, i) => {
+    if (row.deleted === 1) return;
+    const key = `${row.period_id}|${row.category_id}`;
+    if (budgetSeen.has(key)) errs.push(t("errors.xlsx.budgetDuplicate", { row: i + 2, first: budgetSeen.get(key) }));
+    else budgetSeen.set(key, i + 2);
+  });
+
   // Solo se evalúa >0 cuando amount_cents es un número real: si no es finito (import no
   // numérico, p.ej. "lunes" → NaN vía eurToCents), el check de abajo (numericInvalid en
   // *_cents) ya lo reporta — sin esta guarda, "!(NaN > 0)" es true y se duplica el error
