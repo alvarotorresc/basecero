@@ -703,6 +703,7 @@ export const EN = {
     profileSaved: "Bank profile saved",
   },
   errors: {
+    generic: "Something went wrong. Try again.",
     repo: {
       periodStartTooEarly: "The date must be after the current period’s start",
       settleNotFound: "Shared expense not found or already settled",

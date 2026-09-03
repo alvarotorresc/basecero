@@ -708,6 +708,9 @@ export const ES = {
   // el string ES es el mensaje literal que ya lanzaban esas capas (byte-exacto, lo pinnean los
   // asserts de xlsx.test/patrimonio.test/categorias.test bajo el idioma por defecto).
   errors: {
+    // Lo que ve el usuario cuando el error NO está escrito para él (errors.js#userMessage): el
+    // detalle técnico se va a console.error y aquí queda algo accionable.
+    generic: "Algo no fue bien. Inténtalo de nuevo.",
     repo: {
       periodStartTooEarly: "La fecha debe ser posterior al inicio del periodo actual",
       settleNotFound: "Gasto compartido no encontrado o ya liquidado",

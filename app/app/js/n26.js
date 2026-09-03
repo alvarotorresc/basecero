@@ -11,6 +11,7 @@ import { nowIso } from "./format.js";
 import { getOpenPeriod, n26Existing, importAccountId, getMetaAll } from "./repo.js";
 import { sniffCsv, isN26Headers, applyProfile, parseCsvProfile, profileMatches } from "./csv-generic.js";
 import { t } from "./i18n/index.js";
+import { UserError } from "./errors.js";
 
 /** SHA-256 hex vía Web Crypto (crypto.subtle), asíncrona — sustituye a gasSha256Hex (Apps
  *  Script usa Utilities.computeDigest, síncrona; el navegador no ofrece un SHA-256 síncrono). */
@@ -62,9 +63,9 @@ export function signedAmountCents(type, amountCentsAbs) {
  *  entero (todo el resto de filas del import se perdía con un error SQL crudo). */
 async function runImportPipeline(rows) {
   const period = await getOpenPeriod();
-  if (!period) throw new Error(t("errors.common.noOpenPeriod"));
+  if (!period) throw new UserError(t("errors.common.noOpenPeriod"));
   const accountId = await importAccountId();
-  if (!accountId) throw new Error(t("errors.n26.noAccount"));
+  if (!accountId) throw new UserError(t("errors.n26.noAccount"));
 
   const existing = (await n26Existing(accountId)).map((t) => ({
     id: t.id,
@@ -142,7 +143,7 @@ export async function importCsv(text) {
   // accionable ANTES de llegar al sniff, para que gane siempre sobre "cabecera no reconocida"
   // (runImportPipeline ya repetía esta misma comprobación, pero solo se alcanza en los caminos
   // N26/perfil; needsMapping no pasaba nunca por ahí).
-  if (!(await getOpenPeriod())) throw new Error(t("errors.common.noOpenPeriod"));
+  if (!(await getOpenPeriod())) throw new UserError(t("errors.common.noOpenPeriod"));
   const { headers, sample } = sniffCsv(text, bcParseCsvLine);
   if (isN26Headers(headers)) {
     const res = await importN26Csv(text);

@@ -8,6 +8,7 @@ import { POOL, CURATED_ICONS, CATEGORY_ICONS, parseStyle, initCategoryStyle } fr
 import { SEED_NAMES } from "./seeds.js";
 import { t, monthShort } from "./i18n/index.js";
 import { isValidPct } from "./share-pct.js";
+import { UserError } from "./errors.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -27,7 +28,7 @@ export const periodStartTooEarly = (open, startDate) => !!open && startDate <= o
 export async function openNextPeriod({ name, startDate, sharePct, budgets = [] }) {
   const current = await getOpenPeriod();
   if (periodStartTooEarly(current, startDate))
-    throw new Error(t("errors.repo.periodStartTooEarly"));
+    throw new UserError(t("errors.repo.periodStartTooEarly"));
   const now = nowIso();
   const newId = bcUlid();
   const stmts = [];
@@ -45,7 +46,7 @@ export async function openNextPeriod({ name, startDate, sharePct, budgets = [] }
  *  Antes de aplicar el nuevo pct, congela (freezePeriodShareOverrides) en el MISMO execMany los
  *  compartidos con override NULL en el valor VIGENTE: el cambio afecta solo a los gastos nuevos. */
 export async function updatePeriodSharePct(id, pct) {
-  if (!isValidPct(pct)) throw new Error(t("errors.repo.sharePctInvalid"));
+  if (!isValidPct(pct)) throw new UserError(t("errors.repo.sharePctInvalid"));
   const now = nowIso();
   await execMany([
     { sql: SQL.freezePeriodShareOverrides, bind: [id, now, id] },
@@ -63,14 +64,14 @@ export async function addTransaction({
   // así que un accountId heredado de un formulario a medio cambiar se ignora en silencio en vez de
   // romper el guardado — y nunca puede acabar sumando en accountBalance.
   if (paidBy === "partner") {
-    if (type !== "expense" || !isShared) throw new Error(t("errors.repo.paidByNotShared"));
+    if (type !== "expense" || !isShared) throw new UserError(t("errors.repo.paidByNotShared"));
     accountId = "";
   }
   // Item 2 (final fix wave): el lado contrario del guard de arriba — un gasto que NO lo pagó la
   // contraparte SÍ necesita una cuenta mía, o no hay saldo del que descontarlo.
-  if (type === "expense" && paidBy !== "partner" && !accountId) throw new Error(t("common.needAccount"));
+  if (type === "expense" && paidBy !== "partner" && !accountId) throw new UserError(t("common.needAccount"));
   const p = await getOpenPeriod();
-  if (!p) throw new Error(t("errors.common.noOpenPeriod"));
+  if (!p) throw new UserError(t("errors.common.noOpenPeriod"));
   const now = nowIso();
   const insertStmt = {
     sql: SQL.insertTransaction,
@@ -200,7 +201,7 @@ export const budgetsOfPeriod = (pid) => query(SQL.budgetsOfPeriod, [pid]);
  *  dejaría una categoría con límite fantasma). Si ya hay fila viva la actualiza; si no, inserta
  *  con el mismo generador de id que openNextPeriod. */
 export async function upsertBudget(periodId, categoryId, amountCents) {
-  if (!Number.isInteger(amountCents) || amountCents <= 0) throw new Error(t("errors.repo.budgetInvalid"));
+  if (!Number.isInteger(amountCents) || amountCents <= 0) throw new UserError(t("errors.repo.budgetInvalid"));
   const now = nowIso();
   const existing = (await query(SQL.budgetOfCategory, [periodId, categoryId]))[0];
   if (existing) await exec(SQL.updateBudget, [amountCents, now, existing.id]);
@@ -310,9 +311,9 @@ export async function settleAllShared(ids, accountId) {
   if (!ids || ids.length === 0) return;
   const idSet = new Set(ids);
   const [period, pending, meta] = await Promise.all([getOpenPeriod(), pendingSettlements(), getMetaAll()]);
-  if (!period) throw new Error(t("errors.common.noOpenPeriod"));
+  if (!period) throw new UserError(t("errors.common.noOpenPeriod"));
   const rows = pending.filter((r) => idSet.has(r.id));
-  if (rows.length !== idSet.size) throw new Error(t("errors.repo.settleNotFound"));
+  if (rows.length !== idSet.size) throw new UserError(t("errors.repo.settleNotFound"));
   const now = nowIso();
   await execMany(settleAllSharedStmts(rows, accountId, period.id, hoyISO(), now, (meta.partner_name || "").trim()));
 }
@@ -322,7 +323,7 @@ export async function settleAllShared(ids, accountId) {
  *  no expone `status`, la fila mantiene su status ('pending'/'reconciled') tal cual estaba. */
 export async function updateTransaction(id, fields) {
   const cur = await getTransaction(id);
-  if (!cur) throw new Error(t("errors.repo.txNotFound"));
+  if (!cur) throw new UserError(t("errors.repo.txNotFound"));
   const f = {
     type: fields.type ?? cur.type,
     amountCents: fields.amountCents ?? cur.amount_cents,
@@ -342,19 +343,19 @@ export async function updateTransaction(id, fields) {
   // Misma invariante de columna cruzada que en addTransaction (y que validateImport): solo un gasto
   // compartido puede haberlo pagado la contraparte, y esa fila nunca lleva cuenta.
   if (f.paidBy === "partner") {
-    if (f.type !== "expense" || !f.isShared) throw new Error(t("errors.repo.paidByNotShared"));
+    if (f.type !== "expense" || !f.isShared) throw new UserError(t("errors.repo.paidByNotShared"));
     f.accountId = "";
   }
   // Item 2 (final fix wave): el lado contrario del guard de arriba — un gasto que NO lo pagó la
   // contraparte SÍ necesita una cuenta mía, o no hay saldo del que descontarlo.
-  if (f.type === "expense" && f.paidBy !== "partner" && !f.accountId) throw new Error(t("common.needAccount"));
+  if (f.type === "expense" && f.paidBy !== "partner" && !f.accountId) throw new UserError(t("common.needAccount"));
   // Task 17 ronda 2 (controller ruling, finding A): un gasto ya liquidado (settled=1) con un
   // refund activo enlazado no puede cambiar de importe/compartido/reparto — si no, el refund
   // se queda congelado con el importe viejo y la deuda con la contraparte se pierde en silencio. Guarda
   // server-side (no solo UI, que ya bloquea los campos): un save que NO toca esos campos
   // (solo categoría/fecha/nota/comercio) sigue funcionando con normalidad.
   if (sharedFieldsLocked(cur, f) && (await hasActiveLinkedSettlement(id))) {
-    throw new Error(t("errors.repo.txLockedSettled"));
+    throw new UserError(t("errors.repo.txLockedSettled"));
   }
   // Task 6 (M5): lado del apunte de liquidación del mismo guard — ver settlementAmountLocked.
   // cur.ref_id, si existe, apunta siempre a un gasto (nunca a otro apunte de liquidación), tanto en
@@ -363,7 +364,7 @@ export async function updateTransaction(id, fields) {
   const linkedExpense = (cur.type === "refund" || cur.type === "adjustment") && cur.ref_id
     ? await getTransaction(cur.ref_id) : null;
   if (settlementAmountLocked(cur, f, linkedExpense)) {
-    throw new Error(t("errors.repo.refundLockedSettled"));
+    throw new UserError(t("errors.repo.refundLockedSettled"));
   }
   const now = nowIso();
   await exec(SQL.updateTransaction, [
@@ -392,7 +393,7 @@ export async function softDeleteTransaction(id) {
   // expenseDeleteLocked ya descarta por type sin necesidad del SELECT extra.
   const hasActiveRefund = cur?.type === "expense" && (await hasActiveLinkedSettlement(id));
   if (expenseDeleteLocked(cur, hasActiveRefund)) {
-    throw new Error(t("errors.repo.expenseLockedHasRefund"));
+    throw new UserError(t("errors.repo.expenseLockedHasRefund"));
   }
   const now = nowIso();
   if (cur && (cur.type === "refund" || cur.type === "adjustment") && cur.ref_id) {
@@ -427,7 +428,7 @@ export async function createRule(fields) {
  *  Los campos ausentes conservan el valor actual — mismo criterio que repo.updateTransaction. */
 export async function updateRule(id, fields) {
   const cur = await getRule(id);
-  if (!cur) throw new Error(t("errors.repo.ruleNotFound"));
+  if (!cur) throw new UserError(t("errors.repo.ruleNotFound"));
   const f = {
     name: fields.name ?? cur.name,
     type: fields.type ?? cur.type,
@@ -684,7 +685,7 @@ export async function createAccount({ name, type, openingBalanceCents }) {
  *  repo.updateRule. */
 export async function updateAccount(id, fields) {
   const cur = await getAccount(id);
-  if (!cur) throw new Error(t("errors.repo.accountNotFound"));
+  if (!cur) throw new UserError(t("errors.repo.accountNotFound"));
   const name = fields.name ?? cur.name;
   const type = fields.type ?? cur.type;
   const openingBalanceCents = fields.openingBalanceCents ?? cur.opening_balance_cents;
@@ -770,7 +771,7 @@ export async function createGoal(fields) {
  *  está en el alcance de esta task. */
 export async function updateGoal(id, fields) {
   const cur = await getGoal(id);
-  if (!cur) throw new Error(t("errors.repo.goalNotFound"));
+  if (!cur) throw new UserError(t("errors.repo.goalNotFound"));
   const f = {
     name: fields.name ?? cur.name,
     type: fields.type ?? cur.type,
@@ -803,7 +804,7 @@ export const getCategory = async (id) => (await query(SQL.getCategory, [id]))[0]
 async function assertValidParent(parentId, flow) {
   const parent = await getCategory(parentId);
   if (!parent || parent.parent_id !== "" || parent.flow !== flow) {
-    throw new Error(t("errors.repo.invalidParent"));
+    throw new UserError(t("errors.repo.invalidParent"));
   }
 }
 
@@ -815,7 +816,7 @@ async function assertValidParent(parentId, flow) {
  *  de este PR. */
 export async function createCategory({ name, flow, needType, parentId }) {
   const trimmed = String(name ?? "").trim();
-  if (!trimmed) throw new Error(t("errors.repo.categoryNameEmpty"));
+  if (!trimmed) throw new UserError(t("errors.repo.categoryNameEmpty"));
   const pid = parentId || "";
   if (pid) {
     await assertValidParent(pid, flow);
@@ -825,7 +826,7 @@ export async function createCategory({ name, flow, needType, parentId }) {
     // hoy funciona y debe seguir funcionando) empezaría a lanzar. Solo alta bajo un padre archivado
     // se bloquea aquí.
     const parent = await getCategory(pid);
-    if (parent.is_archived) throw new Error(t("errors.repo.parentArchived"));
+    if (parent.is_archived) throw new UserError(t("errors.repo.parentArchived"));
   }
   const id = bcUlid();
   const now = nowIso();
@@ -848,15 +849,15 @@ export async function createCategory({ name, flow, needType, parentId }) {
  *  cuanto el usuario lo reordena. */
 export async function updateCategory(id, fields) {
   if (fields.flow !== undefined) {
-    throw new Error(t("errors.repo.flowImmutable"));
+    throw new UserError(t("errors.repo.flowImmutable"));
   }
   const cur = await getCategory(id);
-  if (!cur) throw new Error(t("errors.repo.categoryNotFound"));
+  if (!cur) throw new UserError(t("errors.repo.categoryNotFound"));
 
   let name = cur.name;
   if (fields.name !== undefined) {
     const trimmed = String(fields.name).trim();
-    if (!trimmed) throw new Error(t("errors.repo.categoryNameEmpty"));
+    if (!trimmed) throw new UserError(t("errors.repo.categoryNameEmpty"));
     name = bcSanitizeCell(trimmed);
   }
   const needType = fields.needType !== undefined ? fields.needType : cur.need_type;
@@ -870,7 +871,7 @@ export async function updateCategory(id, fields) {
     // es sobre CUALQUIER hija, se refleje o no como tal en la lista (que solo cuenta activas).
     const children = await query(SQL.hasChildren, [id]);
     if (children.length > 0) {
-      throw new Error(t("errors.repo.categoryHasChildren"));
+      throw new UserError(t("errors.repo.categoryHasChildren"));
     }
   }
 
@@ -949,9 +950,9 @@ export { computeReorder } from "./category-order.js";
  *  override". `color`/`icon` ausentes o `undefined` son válidos (sin override para ese campo);
  *  cualquier otro valor fuera de POOL / CURATED_ICONS+CATEGORY_ICONS lanza. */
 export async function setCategoryStyle(rootId, { color, icon } = {}) {
-  if (color !== undefined && !POOL.includes(color)) throw new Error(t("errors.repo.colorUnavailable"));
+  if (color !== undefined && !POOL.includes(color)) throw new UserError(t("errors.repo.colorUnavailable"));
   const iconValid = icon === undefined || CURATED_ICONS.includes(icon) || Object.values(CATEGORY_ICONS).includes(icon);
-  if (!iconValid) throw new Error(t("errors.repo.iconUnavailable"));
+  if (!iconValid) throw new UserError(t("errors.repo.iconUnavailable"));
 
   const meta = await getMetaAll();
   const styleMap = parseStyle(meta.category_style);
