@@ -17,6 +17,16 @@ Versionado según [SemVer](https://semver.org/lang/es/).
 - **El aviso al cambiar el importe de una devolución ya liquidada dice lo que pasa.** Antes hablaba de
   un gasto «compartido» aunque la devolución fuera de un gasto normal; ahora explica que el apunte está
   enlazado a un gasto ya liquidado y que hay que borrarlo o desvincularlo antes de cambiar su importe.
+- **Los errores dejan de hablar en jerga.** Cuando algo falla, la app enseña el motivo si está
+  escrito para ti («No hay ningún periodo abierto», «La contraseña no es correcta») y, si es un
+  fallo técnico, un «Algo no fue bien. Inténtalo de nuevo.» — el detalle se queda en la consola,
+  no en tu pantalla.
+- **El espejo de GitHub Pages redirige en vez de servir una copia rota.** `alvarotorresc.github.io/basecero`
+  publicaba una versión de la app que no funcionaba; ahora lleva a basecero.alvarotc.com conservando
+  la dirección exacta que hubieras guardado.
+- **El README documenta los límites conocidos de la app.** Una transferencia importada por CSV
+  puede duplicarse como gasto sin categoría —hay que borrar la copia a mano—, y los ingresos no se
+  reparten con la contraparte: siempre son de quien los cobra, aunque el gasto sí se reparta.
 
 ### Añadido
 
@@ -29,6 +39,18 @@ Versionado según [SemVer](https://semver.org/lang/es/).
   las columnas de verdad en lugar de una sola.
 - **Avisos de terceros.** Un `THIRD_PARTY_NOTICES.md` con la licencia y la atribución de todo lo que
   viaja dentro del repositorio: SheetJS, la fuente Outfit y SQLite WASM.
+- **Inicio enseña los dos apuntes de una liquidación.** Antes solo se veía el dinero que entraba;
+  el pago a la otra persona no aparecía por ninguna parte de la pantalla principal.
+- **Un periodo nuevo hereda los límites del que cierras.** Vienen puestos y editables: cambias lo
+  que quieras y vacías el campo de lo que ya no quieras limitar, en vez de escribirlo todo otra vez.
+- **Aviso al guardar.** Un mensaje breve confirma lo que antes se guardaba en silencio: el nombre
+  de la contraparte, el reparto del periodo, los límites de una categoría y el perfil de tu banco.
+- **La pantalla ya no arranca en blanco.** Inicio y Movimientos pintan la silueta de sus tarjetas
+  mientras cargan.
+- **«Superado por X».** Una categoría por encima de su límite dice cuánto se ha pasado, sin que
+  tengas que restar.
+- **«Liquidado» en el selector de devoluciones.** Un gasto compartido que ya liquidaste se marca
+  como liquidado, no como devuelto: no son lo mismo.
 
 ### Arreglado
 
@@ -44,6 +66,16 @@ Versionado según [SemVer](https://semver.org/lang/es/).
 - **Una hoja con dos límites vivos para la misma categoría y periodo ya no se importa.** Solo puede
   pasar editando el xlsx a mano, y antes entraba en silencio: la app leía un límite y editaba el otro.
   Ahora la importación lo rechaza y dice qué filas chocan.
+- **El gesto «atrás» vuelve a funcionar tras recargar.** Con una subpantalla abierta, recargar
+  dejaba los primeros toques de «atrás» sin efecto: la app parecía colgada.
+- **«Atrás» desde Movimientos, Patrimonio o Ajustes vuelve a Inicio** en vez de cerrar la app.
+- **El total del donut cuadra con la pantalla que abre.** Una categoría con más devoluciones que
+  gasto se ignoraba en la cifra del centro, que decía un número distinto al de «Gasto por categoría».
+- **Gasto por categoría ya no se queda en blanco si cierras el periodo desde otra pestaña.**
+- **El aviso de un desglose que no carga se lee entero,** ya no medio borrado en las categorías
+  sin gasto — y el editor de límite tampoco.
+- **Los extractos con BOM y los de punto y coma con comas en el concepto se importan bien.** El
+  primero ensuciaba la primera columna; el segundo se troceaba por la coma equivocada.
 
 ## [1.0.0] — 2026-09-02
 
