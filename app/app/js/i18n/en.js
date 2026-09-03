@@ -696,6 +696,12 @@ export const EN = {
       summaryMovements: { one: "{n} transaction", other: "{n} transactions" },
     },
   },
+  toast: {
+    saved: "Saved",
+    limitSaved: "Limit saved",
+    limitRemoved: "Limit removed",
+    profileSaved: "Bank profile saved",
+  },
   errors: {
     repo: {
       periodStartTooEarly: "The date must be after the current period’s start",

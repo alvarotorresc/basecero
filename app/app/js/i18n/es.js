@@ -696,6 +696,14 @@ export const ES = {
       summaryMovements: { one: "{n} movimiento", other: "{n} movimientos" },
     },
   },
+  // Acuses de recibo de toast.js: guardados que antes no decían nada. Frases cortas, en pasado y
+  // sin signos de puntuación finales — se leen de reojo mientras el usuario ya está en otra cosa.
+  toast: {
+    saved: "Guardado",
+    limitSaved: "Límite guardado",
+    limitRemoved: "Límite quitado",
+    profileSaved: "Perfil de banco guardado",
+  },
   // Task 5 (PR i18n): errores de capas no-UI (repo/n26/xlsx/csv-generic/backup-crypto/db-worker) —
   // el string ES es el mensaje literal que ya lanzaban esas capas (byte-exacto, lo pinnean los
   // asserts de xlsx.test/patrimonio.test/categorias.test bajo el idioma por defecto).
