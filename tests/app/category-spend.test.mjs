@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  budgetStatus, pctOf, relativeWidth, limitTotals, sortRootRows, budgetMap,
+  budgetStatus, pctOf, relativeWidth, limitTotals, sortRootRows, budgetMap, inheritedBudgetsRaw,
 } from "../../app/app/js/category-spend.js";
 
 test("budgetStatus: 82% del límite -> ok", () => {
@@ -113,4 +113,46 @@ test("budgetMap: una entrada por categoría, gana la PRIMERA fila (la consulta y
   assert.deepEqual(budgetMap([]), {});
   assert.deepEqual(budgetMap([{ id: "b-x", category_id: "__proto__", amount_cents: 1 }]), {},
     "un category_id «__proto__» (el charset de ids del import admite guiones bajos) se descarta en vez de tocar Object.prototype");
+});
+
+test("inheritedBudgetsRaw: euros exactos como string, con céntimos y sin decimales sobrantes", () => {
+  const rootRows = [
+    { root_id: "cat-casa", name: "Casa", spent_cents: 50000 },
+    { root_id: "cat-ocio", name: "Ocio", spent_cents: 0 },
+    { root_id: "cat-super", name: "Supermercado", spent_cents: 12000 },
+  ];
+  const budgetRows = [
+    { id: "b1", category_id: "cat-casa", amount_cents: 90000 },   // 900 € justos
+    { id: "b2", category_id: "cat-ocio", amount_cents: 12345 },   // 123,45 €
+    { id: "b3", category_id: "cat-super", amount_cents: 5 },      // 0,05 €
+  ];
+  assert.deepEqual(inheritedBudgetsRaw(budgetRows, rootRows), {
+    "cat-casa": "900",
+    "cat-ocio": "123.45",
+    "cat-super": "0.05",
+  }, "punto decimal: es lo único que acepta el value de un input numérico");
+  // Una raíz sin límite no aparece: el campo se queda vacío, que es «sin límite».
+  assert.deepEqual(inheritedBudgetsRaw([], rootRows), {});
+  assert.deepEqual(inheritedBudgetsRaw(budgetRows, []), {});
+});
+
+test("inheritedBudgetsRaw: fuera las categorías que la pantalla no pinta y los importes que no son límite", () => {
+  const rootRows = [{ root_id: "cat-casa", name: "Casa", spent_cents: 0 }];
+  const budgetRows = [
+    { id: "b1", category_id: "cat-casa", amount_cents: 30000 },
+    // Límite de una categoría que NO está en rootRows (una hija, o una raíz que se archivó): si se
+    // heredara, sumaría en «Presupuestado» sin fila donde verlo ni quitarlo.
+    { id: "b2", category_id: "cat-casa-alquiler", amount_cents: 70000 },
+  ];
+  assert.deepEqual(inheritedBudgetsRaw(budgetRows, rootRows), { "cat-casa": "300" }); // 30000 céntimos = 300 €
+  // Un límite a 0 o negativo (solo alcanzable importando una hoja a mano) es «sin límite» para
+  // budgetStatus: tampoco se hereda.
+  assert.deepEqual(inheritedBudgetsRaw([{ id: "b3", category_id: "cat-casa", amount_cents: 0 }], rootRows), {});
+  assert.deepEqual(inheritedBudgetsRaw([{ id: "b4", category_id: "cat-casa", amount_cents: -500 }], rootRows), {});
+  // Duplicados de una hoja editada a mano: manda el mismo criterio que budgetMap (gana la primera,
+  // que la consulta ya deja ordenada por updated_at DESC).
+  assert.deepEqual(inheritedBudgetsRaw([
+    { id: "b5", category_id: "cat-casa", amount_cents: 30000 },
+    { id: "b6", category_id: "cat-casa", amount_cents: 99900 },
+  ], rootRows), { "cat-casa": "300" });
 });

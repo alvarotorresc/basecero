@@ -75,3 +75,26 @@ export function budgetMap(rows) {
   }
   return out;
 }
+
+/** Prefill de los límites de «Periodo nuevo» en modo 'next': mapa rootId → importe en EUROS como
+ *  string, listo para el atributo `value` de un <input type="number" step="0.01">.
+ *
+ *  - Solo raíces que la pantalla PINTA (las de `rootRows`, que vienen de spentByRootCategory y ya
+ *    dejan fuera archivadas y borradas): heredar el límite de una categoría que no sale en la
+ *    lista lo sumaría al «Presupuestado» del pie sin ninguna fila donde verlo, editarlo o quitarlo.
+ *  - Solo importes > 0: una fila a 0 (o negativa), solo alcanzable importando una hoja a mano, ya
+ *    es «sin límite» para budgetStatus — heredarla como «0» sería heredar un límite imposible.
+ *  - Duplicados: el criterio de budgetMap (gana la primera fila, que la consulta entrega por
+ *    updated_at DESC), el mismo que usa el resto de la app.
+ *  - String(cents / 100): euros exactos, con céntimos si los tiene (12345 → "123.45", 90000 →
+ *    "900"). Punto decimal a propósito: es lo único que admite el value de un input numérico, y
+ *    tanto Number() como eurToCents lo leen igual. */
+export function inheritedBudgetsRaw(budgetRows, rootRows) {
+  const byCategory = budgetMap(budgetRows ?? []);
+  const out = {};
+  for (const r of rootRows ?? []) {
+    const cents = byCategory[r.root_id] ?? 0;
+    if (cents > 0) out[r.root_id] = String(cents / 100);
+  }
+  return out;
+}
