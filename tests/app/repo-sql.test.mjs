@@ -57,6 +57,34 @@ test("listByDay: orden descendente, incluye my_amount_cents y excluye borrados",
   assert.equal(rows[0].my_amount_cents, 1800);
 });
 
+test("listByDay: enseña los DOS apuntes de una liquidación y también un ajuste suelto", () => {
+  const d = db();
+  // Gasto compartido que pagó ella: mi parte ya contó el día que lo pagó, y al liquidar sale
+  // de mi cuenta un adjustment NEGATIVO enlazado (repo.js#settleAllSharedStmts).
+  const suyo = tx(d, { date: "2026-08-18", cents: 10000, shared: 1, paidBy: "partner" });
+  // Gasto compartido que pagué yo: al liquidar entra una devolución positiva enlazada.
+  const mio = tx(d, { date: "2026-08-19", cents: 5000, shared: 1, paidBy: "me" });
+  tx(d, { date: "2026-08-20", type: "adjustment", cents: -6000, category: "", merchant: "Liquidación con Ana", ref: suyo });
+  tx(d, { date: "2026-08-20", type: "refund", cents: 2000, merchant: "Mercadona", ref: mio });
+  // Ajuste suelto, sin ref_id: también mueve dinero de una cuenta, también se lista.
+  tx(d, { date: "2026-08-21", type: "adjustment", cents: 300, category: "", merchant: "Cuadre de caja" });
+  // Las transferencias siguen fuera: no son ni gasto ni ingreso del periodo.
+  tx(d, { date: "2026-08-22", type: "transfer", cents: 9999, category: "", account: "acc-n26", counterAccount: "acc-revolut" });
+
+  const rows = d.prepare(SQL.listByDay).all("p1");
+  assert.deepEqual(rows.map((r) => r.type),
+    ["adjustment", "adjustment", "refund", "expense", "expense"],
+    "orden por fecha DESC; el 21 el ajuste suelto, el 20 los dos apuntes de la liquidación");
+  assert.deepEqual(rows.map((r) => r.amount_cents), [300, -6000, 2000, 5000, 10000]);
+  // El ajuste saliente conserva su signo también en my_amount_cents (is_shared=0 → 100 %).
+  assert.equal(rows[1].my_amount_cents, -6000);
+  assert.equal(rows[1].merchant, "Liquidación con Ana");
+  // Ningún total cambia por incluirlos: gasto = 10000*60% + 5000*60% - devolución de un gasto
+  // compartido (que NO resta: REFUND_REDUCES_SPEND la excluye) = 6000 + 3000.
+  assert.equal(d.prepare(SQL.spentOfPeriod).get("p1").spent_cents, 9000);
+  assert.equal(d.prepare(SQL.incomeOfPeriod).get("p1").income_cents, 0);
+});
+
 test("categorías hoja de gasto para los chips (sin raíces con hijas, sin income)", () => {
   const d = db();
   const rows = d.prepare(SQL.listExpenseLeafCategories).all();
