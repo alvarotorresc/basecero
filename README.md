@@ -46,7 +46,8 @@ como una app y funciona sin conexión.
   Las que sobran se archivan sin tocar el historial.
 - **Gastos compartidos en las dos direcciones.** Apuntas quién pagó y qué parte es tuya. Si pagó
   la otra persona, el gasto cuenta como tuyo pero no toca tus cuentas hasta liquidar; «Liquidar»
-  enseña las dos deudas, el neto, y las cierra de golpe.
+  enseña las dos deudas, el neto, y las cierra de golpe. Se reparten los gastos: los ingresos son
+  de quien los cobra.
 - **Recurrentes y previsión.** Reglas para el alquiler, las suscripciones o la nómina. Con ellas
   el inicio calcula lo comprometido que queda por pagar y tu disponible real.
 - **Patrimonio.** Tu neto a día de hoy y su evolución, cuentas corrientes y de ahorro, pasivos
@@ -137,10 +138,21 @@ node --test tests/app/*.test.mjs        # los tests
   `js/i18n/` (es/en) y `vendor/`.
 - [`tests/app/`](tests/app/) — la suite, un fichero por módulo de lógica.
 
+### Límites conocidos
+
+- **Una transferencia importada por CSV puede duplicarse.** El extracto trae el cargo de la
+  transferencia como una línea más, así que entra como un gasto sin categoría además del apunte
+  de transferencia que ya tuvieras. No se reconcilia sola: hay que borrar el duplicado a mano.
+- **Los ingresos no se reparten con la contraparte.** El porcentaje del periodo se aplica a los
+  gastos compartidos; un ingreso es de quien lo cobra, entero.
+
 ### Historia
 
 BaseCero empezó siendo una hoja de Google Sheets con un generador en Python y un script de Apps
-Script; la app sustituyó a los tres.
+Script. La app sustituyó a los tres y esos dos programas ya no están en el repositorio: de aquella
+época solo sobreviven el contrato de datos —el mismo que hoy exporta e importa el `.xlsx`— y la
+lógica pura de import en [`app/app/vendor/pure.js`](app/app/vendor/pure.js), que se escribió con la
+sintaxis de Apps Script y la conserva.
 
 </details>
 
