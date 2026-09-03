@@ -10,6 +10,8 @@ import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { pushBack, goBack } from "../back.js";
+import { userMessage } from "../errors.js";
+import { skeletonHtml } from "../skeleton.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -115,6 +117,13 @@ function movRowHtml(r, byId, accById, partnerName) {
 /** Pantalla Movimientos: selector de periodo, bandeja de sin-categorizar y lista agrupada por día
  *  (los 5 tipos), con subvista de detalle para editar/borrar cada movimiento. */
 export async function renderMovimientos(container) {
+  // Silueta gris mientras llega la primera consulta (mismo criterio que inicio.js): selector de
+  // periodo, fila de chips y lista. Solo en el PRIMER pintado de esta pantalla — el testigo
+  // container.dataset.screen lo escriben SOLO Inicio y Movimientos.
+  if (container.dataset.screen !== "movimientos") {
+    container.dataset.screen = "movimientos";
+    container.innerHTML = skeletonHtml([72, 56, 320]);
+  }
   let periods, expenseCats, incomeCats, accountsAll, byId, meta;
   try {
     [periods, expenseCats, incomeCats, accountsAll, byId, meta] = await Promise.all([
@@ -122,7 +131,7 @@ export async function renderMovimientos(container) {
       getMetaAll(),
     ]);
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("movimientos.error.load", { error: escHtml(e.message) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("movimientos.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
   if (periods.length === 0) {
@@ -203,7 +212,7 @@ export async function renderMovimientos(container) {
     try {
       row = await getTransaction(id);
     } catch (e) {
-      errorMsg = t("movimientos.error.openDetail", { error: e.message });
+      errorMsg = t("movimientos.error.openDetail", { error: userMessage(e) });
       state.opening = false;
       render();
       return;
@@ -547,7 +556,7 @@ export async function renderMovimientos(container) {
         goBack();
       } catch (e) {
         btn.disabled = false;
-        errorMsg = t("common.saveFailed", { error: e.message });
+        errorMsg = t("common.saveFailed", { error: userMessage(e) });
         render();
       }
     };
@@ -566,7 +575,7 @@ export async function renderMovimientos(container) {
         goBack();
       } catch (e) {
         btn.disabled = false;
-        errorMsg = t("movimientos.error.delete", { error: e.message });
+        errorMsg = t("movimientos.error.delete", { error: userMessage(e) });
         state.deleteConfirm = false;
         render();
       }
@@ -686,7 +695,7 @@ export async function renderMovimientos(container) {
       try {
         await loadPeriodData();
       } catch (err) {
-        errorMsg = t("movimientos.error.loadPeriod", { error: err.message });
+        errorMsg = t("movimientos.error.loadPeriod", { error: userMessage(err) });
       }
       render();
     };
@@ -745,7 +754,7 @@ export async function renderMovimientos(container) {
   try {
     await loadPeriodData();
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("movimientos.error.load", { error: escHtml(e.message) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("movimientos.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
   render();
