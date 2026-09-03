@@ -11,6 +11,8 @@ import { buildProfile, applyProfile, detectDateFormat, detectDecimal, parseDateI
 import { encryptBackup, decryptBackup, isEncryptedBackup, WrongPassphraseError, MIN_PASSPHRASE } from "../backup-crypto.js";
 import { t, LANGS, activeLang } from "../i18n/index.js";
 import { loadXlsx } from "../xlsx-loader.js";
+import { userMessage } from "../errors.js";
+import { showToast } from "../toast.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -439,7 +441,7 @@ export async function renderAjustes(container) {
       try {
         await downloadXlsx(await dumpAllTables(), `basecero-${hoyISO()}.xlsx`);
       } catch (e) {
-        state.errors = [t("ajustes.sheet.exportFailed", { error: e.message })];
+        state.errors = [t("ajustes.sheet.exportFailed", { error: userMessage(e) })];
       } finally {
         state.busy = false; render();
       }
@@ -490,7 +492,7 @@ export async function renderAjustes(container) {
           state.n26Result = importResultText(res, partnerName);
         }
       } catch (err) {
-        state.n26Error = err.message;
+        state.n26Error = userMessage(err);
       } finally {
         state.busy = false; render();
       }
@@ -519,7 +521,7 @@ export async function renderAjustes(container) {
         download(new Blob([enc], { type: "application/octet-stream" }), `basecero-cifrado-${hoyISO()}.bce`);
         state.encExport = false;
       } catch (e) {
-        state.errors = [t("ajustes.sheet.exportFailed", { error: e.message })];
+        state.errors = [t("ajustes.sheet.exportFailed", { error: userMessage(e) })];
       } finally {
         state.busy = false; render();
       }
@@ -545,9 +547,12 @@ export async function renderAjustes(container) {
       try {
         await updatePeriodSharePct(openPeriod.id, next);
         state.periodError = "";
+        // El número ya se había pintado antes de guardar (es optimista): sin acuse de recibo no
+        // hay forma de saber si el cambio llegó a la base o se quedó en la pantalla.
+        showToast(t("toast.saved"));
       } catch (e) {
         openPeriod = { ...openPeriod, my_share_pct: cur };
-        state.periodError = t("ajustes.period.shareSaveFailed", { error: e.message });
+        state.periodError = t("ajustes.period.shareSaveFailed", { error: userMessage(e) });
       }
       render();
     };
@@ -570,7 +575,7 @@ export async function renderAjustes(container) {
           await processImportBuffer(buf);
         }
       } catch (err) {
-        state.errors = [t("ajustes.sheet.readFailed", { error: err.message })]; state.pending = null;
+        state.errors = [t("ajustes.sheet.readFailed", { error: userMessage(err) })]; state.pending = null;
       } finally {
         state.busy = false; render();
       }
@@ -605,7 +610,9 @@ export async function renderAjustes(container) {
           return;
         }
         // Error estructural (BackupFormatError) u otro: se cierra el formulario y va al banner normal.
-        state.errors = [err.message]; state.encImport = null;
+        // Los errores de backup-crypto (contraseña incorrecta, fichero dañado, copia de una
+        // versión más nueva) son UserError: userMessage los deja pasar tal cual.
+        state.errors = [userMessage(err)]; state.encImport = null;
       } finally {
         if (state.busy) { state.busy = false; render(); }
       }
@@ -623,7 +630,7 @@ export async function renderAjustes(container) {
           location.reload();
         } catch (err) {
           state.busy = false;
-          state.errors = [t("ajustes.sheet.replaceFailed", { error: err.message })]; state.pending = null;
+          state.errors = [t("ajustes.sheet.replaceFailed", { error: userMessage(err) })]; state.pending = null;
           render();
         }
       };
@@ -651,7 +658,7 @@ export async function renderAjustes(container) {
         location.reload();
       } catch (err) {
         state.busy = false;
-        state.errors = [t("ajustes.prefs.saveFailed", { error: err.message })];
+        state.errors = [t("ajustes.prefs.saveFailed", { error: userMessage(err) })];
         render();
       }
     };
@@ -850,6 +857,10 @@ export async function renderAjustes(container) {
       a.saveBusy = true; a.saveError = null; render();
       try {
         await setMeta("csv_profile", JSON.stringify(profile));
+        // El banner que sale al volver cuenta el IMPORT («N movimientos importados»); que el perfil
+        // quede guardado para la próxima vez —lo que el usuario acaba de configurar, y que ya no
+        // vuelve a ver— no lo dice nadie. Ese es este toast.
+        showToast(t("toast.profileSaved"));
         const res = await importWithProfile(a.text, profile);
         // El resultado se deja en state ANTES de goBack(): backToMain corre luego en el popstate
         // y renderMain() ya lo encuentra puesto, así que el banner del import sigue apareciendo.
@@ -858,7 +869,7 @@ export async function renderAjustes(container) {
         goBack();
       } catch (err) {
         a.saveBusy = false;
-        a.saveError = err.message;
+        a.saveError = userMessage(err);
         render();
       }
     };
