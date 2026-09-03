@@ -27,8 +27,13 @@ export function isN26Headers(headers) {
 
 // Trocea el texto en líneas no vacías (mismo criterio que bcParseN26Csv), cabecera + hasta 5 filas
 // de muestra para el asistente/autodetección — filas en blanco quedan fuera desde el split.
+// El BOM inicial (U+FEFF) se quita antes de nada: Excel en Windows lo escribe al principio del
+// fichero y, sin quitarlo, la PRIMERA cabecera se llama «﻿Fecha» — no casa con las cabeceras
+// del perfil guardado (profileMatches) ni con las de N26 (isN26Headers), así que el asistente
+// pedía remapear las columnas en cada import. Solo el primero y solo al principio: un U+FEFF en
+// mitad de un concepto es dato del usuario.
 function nonEmptyLines(text) {
-  return String(text ?? "").split(/\r?\n/).filter((l) => l.trim() !== "");
+  return String(text ?? "").replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim() !== "");
 }
 
 // Candidatos, EN ORDEN DE PREFERENCIA ante un empate: la coma primero (es el default histórico del
@@ -54,28 +59,36 @@ function countOutsideQuotes(line, delim) {
   return n;
 }
 
-/** Delimitador del fichero: el candidato con MÁS apariciones fuera de comillas, sumadas sobre las 5
- *  primeras líneas no vacías (cabecera incluida — un fichero de una sola línea también decide).
- *  Empate, o ningún candidato presente, → coma: la comparación es estricta (`>`), así que gana el
- *  primero de DELIMITERS que llegue a ese máximo.
+/** Delimitador del fichero, decidido sobre las 5 primeras líneas no vacías (cabecera incluida —
+ *  un fichero de una sola línea también decide).
+ *
+ *  Criterio, en este orden:
+ *   1. CONSISTENCIA: gana el candidato que trocea todas las líneas muestreadas en el MISMO número
+ *      de columnas. Es lo que distingue un fichero de punto y coma cuyos conceptos llevan comas
+ *      («12/09/2026;Compra, super, y más;-45,20»): ahí hay más comas que puntos y coma, pero la
+ *      coma deja un número distinto de columnas en cada línea y el punto y coma no.
+ *      Solo entra el candidato que APARECE al menos una vez: uno ausente da 1 columna en todas las
+ *      líneas —«perfectamente consistente»— y ganaría siempre.
+ *   2. FRECUENCIA: entre los que empatan, el que más veces aparece fuera de comillas.
+ *   3. Empate o ningún candidato presente → coma: la comparación es estricta (`>`), así que gana el
+ *      primero de DELIMITERS que llegue a ese máximo.
  *
  *  NO se guarda en el perfil: meta.csv_profile tiene 6 claves exactas y parseCsvProfile rechaza
  *  cualquier objeto con otro número de claves, así que añadir `delimiter` invalidaría en silencio
  *  todos los perfiles ya guardados. Se redetecta en cada sniff/apply — determinista sobre el mismo
- *  texto y sin migración.
- *
- *  Límite conocido: un fichero con `;` sin comillas cuyas comas (texto + decimales) superen a los
- *  punto y coma en las 5 primeras líneas se detecta como coma (solo con 2-3 columnas y conceptos con
- *  varias comas); un desempate por consistencia del número de columnas queda para más adelante. */
+ *  texto y sin migración. */
 export function detectDelimiter(text) {
   const lines = nonEmptyLines(text).slice(0, 5);
-  let best = ",";
-  let bestCount = 0;
-  for (const d of DELIMITERS) {
-    const n = lines.reduce((sum, l) => sum + countOutsideQuotes(l, d), 0);
-    if (n > bestCount) { best = d; bestCount = n; }
-  }
-  return best;
+  const scored = DELIMITERS.map((d) => {
+    const perLine = lines.map((l) => countOutsideQuotes(l, d));
+    const total = perLine.reduce((sum, n) => sum + n, 0);
+    return { delim: d, total, consistent: total > 0 && perLine.every((n) => n === perLine[0]) };
+  });
+  const consistentes = scored.filter((s) => s.consistent);
+  const pool = consistentes.length > 0 ? consistentes : scored;
+  let best = pool[0];
+  for (const s of pool) if (s.total > best.total) best = s;
+  return best.total > 0 ? best.delim : ",";
 }
 
 export function sniffCsv(text, parseLine) {

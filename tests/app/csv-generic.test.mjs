@@ -362,3 +362,51 @@ test("applyProfile: un CSV de punto y coma entra entero por el mismo perfil que 
     { bookingDate: "2026-09-13", partnerName: "", paymentReference: "Nómina; extra", amountCents: 180000 },
   ]);
 });
+
+// ------------------------------------------------- BOM y desempate del delimitador (backlog)
+
+test("sniffCsv: un export con BOM y CRLF no ensucia la primera cabecera", () => {
+  // Excel en Windows escribe U+FEFF al principio y termina las líneas con \r\n. Sin quitar el BOM,
+  // la primera cabecera se llama «﻿Fecha» y ningún perfil guardado vuelve a casar con ella.
+  const text = "﻿Fecha;Concepto;Importe\r\n12/09/2026;Compra super;-45,20\r\n13/09/2026;Nómina;1.800,00\r\n";
+  const { headers, sample } = sniffCsv(text, bcParseCsvLine);
+  assert.deepEqual(headers, ["Fecha", "Concepto", "Importe"]);
+  assert.deepEqual(sample, [
+    ["12/09/2026", "Compra super", "-45,20"],
+    ["13/09/2026", "Nómina", "1.800,00"],
+  ]);
+  assert.equal(detectDelimiter(text), ";");
+});
+
+test("detectDelimiter: gana el que deja el MISMO número de columnas en todas las líneas, aunque no sea el más frecuente", () => {
+  // Punto y coma sin comillas, con conceptos que llevan comas: 8 puntos y coma (2 por línea, en
+  // las 4) frente a 9 comas (0 + 4 + 2 + 3). Por frecuencia ganaría la coma y el fichero se
+  // trocearía en un número distinto de columnas por línea; por consistencia gana el punto y coma.
+  const text = [
+    "Fecha;Concepto;Importe",
+    "12/09/2026;Compra, super, y más, cena;-45,20",
+    "13/09/2026;Nómina, agosto;1.800,00",
+    "14/09/2026;Bar, cena, propina;-30,00",
+  ].join("\n");
+  assert.equal(detectDelimiter(text), ";");
+  const { headers, sample } = sniffCsv(text, bcParseCsvLine);
+  assert.deepEqual(headers, ["Fecha", "Concepto", "Importe"]);
+  assert.deepEqual(sample[0], ["12/09/2026", "Compra, super, y más, cena", "-45,20"]);
+  assert.ok(sample.every((r) => r.length === 3), "las tres filas, tres columnas");
+});
+
+test("applyProfile: un perfil guardado sigue casando cuando el export trae BOM", () => {
+  const headers = ["Fecha", "Concepto", "Importe"];
+  const sample = [["12/09/2026", "Compra super", "-45,20"], ["13/09/2026", "Nómina", "1.800,00"]];
+  const profile = buildProfile({
+    headers, date: "Fecha", concept: "Concepto", counterparty: null,
+    amountKind: "single", amountCol: "Importe", sample,
+  });
+  const text = "﻿Fecha;Concepto;Importe\r\n12/09/2026;Compra super;-45,20\r\n";
+  assert.equal(profileMatches(profile, sniffCsv(text, bcParseCsvLine).headers), true);
+  const { rows, errors } = applyProfile(text, profile, bcParseCsvLine);
+  assert.deepEqual(errors, []);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].bookingDate, "2026-09-12");
+  assert.equal(rows[0].amountCents, -4520);
+});
