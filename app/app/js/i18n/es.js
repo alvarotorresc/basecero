@@ -263,6 +263,9 @@ export const ES = {
     },
     row: {
       ofLimit: "{spent} de {limit}",
+      // Solo cuando se ha pasado del límite: el exceso, ya calculado, para no tener que restar de
+      // cabeza. Por debajo del límite se sigue usando ofLimit.
+      ofLimitOver: "{spent} de {limit} · superado por {over}",
       noLimit: "{spent} · sin límite",
       noPct: "—",
     },

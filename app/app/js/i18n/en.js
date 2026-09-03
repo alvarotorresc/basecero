@@ -262,6 +262,7 @@ export const EN = {
     },
     row: {
       ofLimit: "{spent} of {limit}",
+      ofLimitOver: "{spent} of {limit} · over by {over}",
       noLimit: "{spent} · no limit",
       noPct: "—",
     },
