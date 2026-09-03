@@ -7,6 +7,7 @@ import { fmtMoney, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
+import { userMessage } from "../errors.js";
 
 // labelKey/SAVE_KEY en vez de texto resuelto: son consts de módulo, evaluadas al importar el
 // fichero (antes de que boot() llame a initI18n con el idioma real) — si guardaran el string ya
@@ -42,7 +43,7 @@ export async function renderRegistro(container, onDone, prefill) {
       getMetaAll(),
     ]);
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("registro.error.load", { error: escHtml(e.message) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso red">${t("registro.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
 
@@ -160,12 +161,20 @@ export async function renderRegistro(container, onDone, prefill) {
             // legítima): solo se atenúa y se etiqueta. El SQL ya lo ha empujado al final de la
             // lista (sql.js#recentForRefund), aquí no se reordena nada.
             const done = r.refunded_cents > 0;
+            // ...pero «ya devuelto» y «liquidado» no son lo mismo: en un gasto COMPARTIDO ya
+            // liquidado lo que volvió es la parte de la contraparte (el refund entrante o el ajuste
+            // saliente que creó Liquidar), no dinero que devolviera la tienda. Los dos campos ya
+            // vienen en la proyección de SQL.recentForRefund, no hace falta ampliarla.
+            const settledShared = !!r.is_shared && !!r.settled;
+            const doneLabel = settledShared
+              ? t("registro.refund.settledLabel", { amount: escHtml(fmtMoney(r.refunded_cents)) })
+              : t("registro.refund.alreadyRefunded", { amount: escHtml(fmtMoney(r.refunded_cents)) });
             return `
             <button type="button" class="refund-row" data-refund-row="${escAttr(r.id)}"${done ? ' style="opacity:.55;"' : ""}>
               <span style="flex:1; min-width:0; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                 ${escHtml(r.merchant || byId[r.category_id]?.name || t("common.type.expense"))}${r.is_shared ? t("registro.refund.sharedSuffix") : ""}
               </span>
-              ${done ? `<span style="font-size:10.5px; color:var(--text-3); white-space:nowrap; flex-shrink:0;">${t("registro.refund.alreadyRefunded", { amount: escHtml(fmtMoney(r.refunded_cents)) })}</span>` : ""}
+              ${done ? `<span style="font-size:10.5px; color:var(--text-3); white-space:nowrap; flex-shrink:0;">${doneLabel}</span>` : ""}
               <span class="num">${fmtMoney(r.amount_cents)}</span>
             </button>`;
           }).join("")}
@@ -472,7 +481,7 @@ export async function renderRegistro(container, onDone, prefill) {
         onDone();
       } catch (e) {
         btn.disabled = false;
-        errorMsg = t("common.saveFailed", { error: e.message });
+        errorMsg = t("common.saveFailed", { error: userMessage(e) });
         render();
       }
     };

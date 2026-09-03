@@ -164,6 +164,7 @@ export const EN = {
       empty: "No recent expenses.",
       sharedSuffix: " · shared",
       alreadyRefunded: "Already refunded · {amount}",
+      settledLabel: "Settled · {amount}",
     },
   },
   movimientos: {

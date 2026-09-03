@@ -165,6 +165,9 @@ export const ES = {
       empty: "No hay gastos recientes.",
       sharedSuffix: " · compartido",
       alreadyRefunded: "Ya devuelto · {amount}",
+      // Un gasto compartido ya liquidado: lo que volvió es la parte de la contraparte, no una
+      // devolución. Se marca distinto de alreadyRefunded para que no se lean como lo mismo.
+      settledLabel: "Liquidado · {amount}",
     },
   },
   movimientos: {
