@@ -28,12 +28,12 @@ export function isN26Headers(headers) {
 // Trocea el texto en líneas no vacías (mismo criterio que bcParseN26Csv), cabecera + hasta 5 filas
 // de muestra para el asistente/autodetección — filas en blanco quedan fuera desde el split.
 // El BOM inicial (U+FEFF) se quita antes de nada: Excel en Windows lo escribe al principio del
-// fichero y, sin quitarlo, la PRIMERA cabecera se llama «﻿Fecha» — no casa con las cabeceras
-// del perfil guardado (profileMatches) ni con las de N26 (isN26Headers), así que el asistente
-// pedía remapear las columnas en cada import. Solo el primero y solo al principio: un U+FEFF en
-// mitad de un concepto es dato del usuario.
+// fichero y, sin quitarlo, la PRIMERA cabecera se llama «U+FEFF seguido de Fecha» — no casa con
+// las cabeceras del perfil guardado (profileMatches) ni con las de N26 (isN26Headers), así que el
+// asistente pedía remapear las columnas en cada import. Solo el primero y solo al principio: un
+// U+FEFF en mitad de un concepto es dato del usuario.
 function nonEmptyLines(text) {
-  return String(text ?? "").replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim() !== "");
+  return String(text ?? "").replace(/^\uFEFF/, "").split(/\r?\n/).filter((l) => l.trim() !== "");
 }
 
 // Candidatos, EN ORDEN DE PREFERENCIA ante un empate: la coma primero (es el default histórico del

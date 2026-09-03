@@ -161,10 +161,11 @@ export async function renderRegistro(container, onDone, prefill) {
             // legítima): solo se atenúa y se etiqueta. El SQL ya lo ha empujado al final de la
             // lista (sql.js#recentForRefund), aquí no se reordena nada.
             const done = r.refunded_cents > 0;
-            // ...pero «ya devuelto» y «liquidado» no son lo mismo: en un gasto COMPARTIDO ya
-            // liquidado lo que volvió es la parte de la contraparte (el refund entrante o el ajuste
-            // saliente que creó Liquidar), no dinero que devolviera la tienda. Los dos campos ya
-            // vienen en la proyección de SQL.recentForRefund, no hace falta ampliarla.
+            // ...pero «ya devuelto» y «liquidado» no son lo mismo: settled lo pone repo.addTransaction
+            // para CUALQUIER devolución o ajuste enlazado por refId (repo.js ~82-83), no solo los
+            // apuntes que crea Liquidar. Por eso un gasto compartido con una devolución de tienda
+            // enlazada y aún sin liquidar también sale aquí como «Liquidado» — límite conocido,
+            // anotado en el backlog; el arreglo real es marcar los apuntes de liquidación.
             const settledShared = !!r.is_shared && !!r.settled;
             const doneLabel = settledShared
               ? t("registro.refund.settledLabel", { amount: escHtml(fmtMoney(r.refunded_cents)) })
