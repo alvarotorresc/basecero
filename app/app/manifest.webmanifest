@@ -15,6 +15,6 @@
     { "src": "/img/app-inicio.webp", "sizes": "780x1688", "type": "image/webp", "form_factor": "narrow" },
     { "src": "/img/app-movimientos.webp", "sizes": "780x1688", "type": "image/webp", "form_factor": "narrow" },
     { "src": "/img/app-patrimonio.webp", "sizes": "780x1688", "type": "image/webp", "form_factor": "narrow" },
-    { "src": "/img/app-presupuesto.webp", "sizes": "780x1688", "type": "image/webp", "form_factor": "narrow" }
+    { "src": "/img/app-categorias.webp", "sizes": "780x1688", "type": "image/webp", "form_factor": "narrow" }
   ]
 }

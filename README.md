@@ -60,7 +60,7 @@ como una app y funciona sin conexión.
 
 | Inicio | Movimientos | Patrimonio | Gasto por categoría |
 | :----: | :---------: | :--------: | :---------: |
-| <img src=".github/readme/app-inicio.webp" alt="Pantalla de inicio con el disponible del periodo" width="190"> | <img src=".github/readme/app-movimientos.webp" alt="Lista de movimientos agrupados por día" width="190"> | <img src=".github/readme/app-patrimonio.webp" alt="Patrimonio neto, cuentas y objetivos" width="190"> | <img src=".github/readme/app-presupuesto.webp" alt="Gasto por categoría, con una barra y un límite por categoría" width="190"> |
+| <img src=".github/readme/app-inicio.webp" alt="Pantalla de inicio con el disponible del periodo" width="190"> | <img src=".github/readme/app-movimientos.webp" alt="Lista de movimientos agrupados por día" width="190"> | <img src=".github/readme/app-patrimonio.webp" alt="Patrimonio neto, cuentas y objetivos" width="190"> | <img src=".github/readme/app-categorias.webp" alt="Gasto por categoría, con una fila y un porcentaje por categoría, y Alimentación desplegada con sus subcategorías" width="190"> |
 
 ## Instalación
 
