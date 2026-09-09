@@ -30,7 +30,13 @@ export function createBackStack(win) {
     // entrada ajena o corrupta (recarga, o un {bc} negativo/NaN): nada que deshacer.
     if (!Number.isInteger(target) || target < 0 || target >= stack.length) return;
     const dropped = stack.splice(target);
-    scrollTop();          // antes del callback: lo que pinte ya se ve desde arriba
+    // dropped[0] (la más baja descartada) es quien pinta la pantalla que queda debajo — es SU
+    // scroll el que importa, no el de las entradas por encima que también se descartan (p. ej. el
+    // modal de confirmación, que no es un cambio de pantalla). No lo simplifiques a un flag global:
+    // el scroll no es una propiedad de la pila entera, es de la entrada que va a pintar.
+    // `!== false` a propósito: las entradas de resetTo() no llevan `scroll` (undefined) y también
+    // deben resetear, como cualquier cambio de pantalla.
+    if (dropped[0].scroll !== false) scrollTop();  // antes del callback: lo que pinte ya se ve arriba
     dropped[0].onBack();
   });
   // Después de registrar el listener: el popstate que provoque este salto tiene que encontrarlo
@@ -39,11 +45,14 @@ export function createBackStack(win) {
   return {
     /** Abre una subpantalla: apunta su callback de vuelta y una entrada de historial.
      *  pushState va ANTES del stack.push: si el navegador lo rechaza (p. ej. límite de
-     *  Safari), la pila no debe registrar una entrada que el historial nunca tuvo. */
-    push(onBack) {
+     *  Safari), la pila no debe registrar una entrada que el historial nunca tuvo.
+     *  { scroll: false } es para quien empuja una entrada que NO es un cambio de pantalla (el
+     *  modal de confirmación, ver modal.js): abrir o cerrar el modal no debe mover la pantalla de
+     *  detrás. Por defecto true: las 15 pantallas que llaman a pushBack() siguen reseteando. */
+    push(onBack, { scroll = true } = {}) {
       win.history.pushState({ bc: stack.length + 1 }, "");
-      stack.push({ onBack });
-      scrollTop();
+      stack.push({ onBack, scroll });
+      if (scroll) scrollTop();
     },
     /** Cierra la subpantalla superior por el historial (no-op sin subpantallas abiertas). */
     back() {
@@ -82,7 +91,7 @@ export function createBackStack(win) {
 }
 
 const instance = typeof window !== "undefined" ? createBackStack(window) : null;
-export const pushBack = (onBack) => instance.push(onBack);
+export const pushBack = (onBack, opts) => instance.push(onBack, opts);
 export const goBack = () => instance.back();
 export const clearBack = () => instance.clear();
 export const resetBack = (onBack) => instance.resetTo(onBack);

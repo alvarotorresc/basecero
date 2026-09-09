@@ -281,3 +281,34 @@ test("back() sin subpantallas: no toca ni el historial ni el scroll", () => {
   back.back();
   assert.equal(win.calls.length, antes, "no hay cambio de pantalla que resetear");
 });
+
+// ------------------------------------------- el modal no es un cambio de pantalla (fix/ux-scroll-borrar)
+
+test("push(cb, {scroll:false}): no manda la pantalla al principio", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  back.push(() => {}, { scroll: false });
+  assert.equal(win.calls.some((c) => c[0] === "scrollTo"), false);
+});
+
+test("popstate de una entrada con {scroll:false}: no resetea el scroll", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  const vistas = [];
+  back.push(() => vistas.push("modal"), { scroll: false });
+  win.listeners.popstate({ state: { bc: 0 } });
+  assert.deepEqual(vistas, ["modal"]);
+  assert.equal(win.calls.some((c) => c[0] === "scrollTo"), false);
+});
+
+test("popstate que descarta una entrada {scroll:false} junto con una de pantalla debajo: sí resetea", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  const vistas = [];
+  back.push(() => vistas.push("pantalla"));                    // scroll por defecto: true
+  back.push(() => vistas.push("modal"), { scroll: false });
+  win.listeners.popstate({ state: { bc: 0 } });
+  // Solo corre el callback de la más baja descartada (back.js:34): la de pantalla, no la del modal.
+  assert.deepEqual(vistas, ["pantalla"]);
+  assert.ok(win.calls.some((c) => c[0] === "scrollTo"));
+});

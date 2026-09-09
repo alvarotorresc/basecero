@@ -54,7 +54,9 @@ export function createModal(doc, { pushBack, goBack }) {
 
       doc.body.appendChild(dlg);                // showModal() sobre un nodo suelto: InvalidStateError
       dlg.showModal();
-      pushBack(() => { byBack = true; dlg.close(); });
+      // {scroll:false}: abrir/cerrar el modal apunta una entrada de historial pero no es un cambio
+      // de pantalla — la pantalla de detrás debe quedarse donde estaba (back.js: push/popstate).
+      pushBack(() => { byBack = true; dlg.close(); }, { scroll: false });
       dlg.querySelector("#modal-cancel").onclick = () => dlg.close();
       dlg.querySelector("#modal-confirm").onclick = () => { confirmed = true; dlg.close(); };
       dlg.querySelector("#modal-cancel").focus();

@@ -28,8 +28,8 @@ test("createScrollTop: sin #screen en el documento, solo mueve el documento", ()
 });
 
 test("createScrollTop: aguanta un win sin scrollTo y sin document", () => {
-  // Es EXACTAMENTE el win falso de back.test.mjs: back.js construye el reset en su fábrica y los
-  // 21 tests que ya existen no le dan ni scrollTo ni document.
+  // El win falso de back.test.mjs SÍ da scrollTo (back.js lo usa para el reset de scroll), pero
+  // nunca document: este literal deja fuera los dos para cubrir igual ambos `?.`.
   const win = { history: {}, addEventListener() {} };
   assert.doesNotThrow(() => createScrollTop(win)());
 });

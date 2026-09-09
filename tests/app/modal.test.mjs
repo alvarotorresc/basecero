@@ -36,12 +36,13 @@ function fakeDoc() {
 function harness() {
   const doc = fakeDoc();
   const backs = [];
+  const backOpts = [];
   const calls = [];
   const modal = createModal(doc, {
-    pushBack: (cb) => { backs.push(cb); calls.push("pushBack"); },
+    pushBack: (cb, opts) => { backs.push(cb); backOpts.push(opts); calls.push("pushBack"); },
     goBack: () => calls.push("goBack"),
   });
-  return { doc, backs, calls, modal };
+  return { doc, backs, backOpts, calls, modal };
 }
 
 const OPTS = { title: "Borrar", message: "Mercadona", cancelText: "Cancelar", confirmText: "Borrar" };
@@ -96,6 +97,12 @@ test("confirm: apunta una entrada en la pila de atras", () => {
   modal.confirm(OPTS);
   assert.equal(backs.length, 1);
   assert.deepEqual(calls, ["pushBack"]);
+});
+
+test("confirm: pushBack recibe {scroll:false} — el modal no es un cambio de pantalla", () => {
+  const { backOpts, modal } = harness();
+  modal.confirm(OPTS);
+  assert.deepEqual(backOpts, [{ scroll: false }]);
 });
 
 test("cancelar: cierra, desmonta, deshace la entrada y NO ejecuta onConfirm", () => {
