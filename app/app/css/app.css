@@ -18,7 +18,7 @@ main#screen {
   min-height: 100dvh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 20px 20px calc(84px + env(safe-area-inset-bottom, 0px) + 24px);
+  padding: 20px var(--pad-screen) calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 24px);
 }
 
 /* ===== componentes base (docs/design/final-v2/SISTEMA.md) =====
@@ -45,16 +45,13 @@ main#screen {
 }
 
 .section-title {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--text-2);
+  font: var(--t-section);
+  color: var(--ink);
 }
 
 .divider {
   height: 1px;
-  background: var(--rule);
+  background: var(--hairline);
   border: 0;
 }
 
@@ -66,14 +63,12 @@ main#screen {
   margin-bottom: 16px;
 }
 .screen-header h1 {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.2;
+  font: var(--t-title);
+  letter-spacing: -.01em;
 }
 .screen-header p {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-2);
+  font: var(--t-label);
+  color: var(--ink-3);
 }
 
 /* ===== botón icono (p.ej. cerrar pantalla) ===== */
@@ -186,14 +181,14 @@ main#screen {
   line-height: 1;
 }
 .amount-display .num {
-  font-size: 56px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font: var(--t-hero);
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
 }
 .amount-display .amount-currency {
-  font-size: 26px;
-  font-weight: 600;
-  color: var(--text-3);
+  font-size: 23px;
+  font-weight: 500;
+  color: var(--ink-3);
 }
 
 /* ===== barra de pestañas + FAB ===== */
@@ -413,15 +408,13 @@ main#screen {
   white-space: nowrap;
 }
 .tx-amount {
-  font-family: var(--font-num);
-  font-size: 15px;
-  font-weight: 600;
+  font: var(--t-figure-m);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   flex-shrink: 0;
 }
-.tx-amount.negative { color: var(--red); }
-.tx-amount.positive { color: var(--green); }
+.tx-amount.negative { color: var(--ink); }   /* §4.4: el gasto NO va en rojo, va en tinta normal */
+.tx-amount.positive { color: var(--pos); }
 .tx-tag {
   font-size: 9px;
   font-weight: 700;
@@ -435,11 +428,8 @@ main#screen {
 
 /* ===== cabecera de grupo por día (lista de movimientos de Inicio) ===== */
 .day-header {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--text-2);
+  font: var(--t-micro);
+  color: var(--ink-3);
 }
 
 /* ===== filas de lista genéricas (ajustes) ===== */
@@ -466,21 +456,28 @@ main#screen {
 .list-row-sub { font-size: 11px; color: var(--text-3); }
 .list-row-chevron { flex-shrink: 0; color: var(--text-3); width: 17px; height: 17px; }
 
-/* ===== campos de formulario ===== */
+/* ===== campos de formulario (SISTEMA.md §4.5): sin caja, filete inferior ===== */
 .field {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  height: 50px;
-  padding: 0 16px;
-  background: var(--card);
+  min-height: 56px;
+  padding: 0;
+  background: transparent;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-bottom: 1px solid var(--hairline-strong);
+  border-radius: var(--r-0);
 }
 .field-label {
-  font-size: 13px;
-  color: var(--text-2);
+  font: var(--t-label);
+  color: var(--ink-3);
+}
+.field:focus-within {
+  border-bottom: 2px solid var(--accent);
+}
+.field:focus-within .field-label {
+  color: var(--accent);
 }
 .field-value {
   display: flex;
@@ -493,24 +490,20 @@ main#screen {
 .field select {
   border: 0;
   background: none;
-  color: var(--text);
-  font: 600 15px var(--font-ui);
+  color: var(--ink);
+  font: 500 16px var(--font-sans);
   text-align: right;
   min-width: 0;
 }
 .field.field-stack {
   flex-direction: column;
   align-items: stretch;
-  height: auto;
-  padding: 12px 16px;
-  gap: 6px;
+  padding: 8px 0 10px;
+  gap: 5px;
 }
 .field.field-stack .field-label {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--text-2);
+  font: var(--t-label);
+  color: var(--ink-3);
 }
 .field.field-stack input,
 .field.field-stack select {
@@ -679,13 +672,9 @@ body.onboarding .fab { display: none; }
   background: var(--cat, var(--text-2));
 }
 
-/* etiqueta versalitas 10.5/700/.09em — misma fórmula que .section-title/.day-header */
 .day-label {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--text-2);
+  font: var(--t-micro);
+  color: var(--ink-3);
 }
 
 /* barra de progreso píldora de 8px; <i> es el relleno — el consumidor fija su ancho (width/%)
@@ -728,17 +717,11 @@ body.onboarding .fab { display: none; }
   font-size: 16px;
 }
 
-/* importe héroe: 34/700 tabular; los céntimos van en un <small> al 60% (principio 3, jerarquía invertida) */
+/* importe héroe de sección (SISTEMA.md §2.3): los céntimos y el símbolo van en .money-cents/.money-cur */
 .amount-hero {
-  font-size: 34px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font: var(--t-figure-xl);
+  letter-spacing: -.015em;
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-}
-.amount-hero small {
-  font-size: 0.6em;
-  font-weight: 600;
 }
 
 /* Anatomía del importe (SISTEMA.md §2.3). En `em`: la MISMA pareja sirve al héroe de 56px, al
