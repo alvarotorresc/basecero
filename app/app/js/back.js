@@ -1,3 +1,5 @@
+import { createScrollTop } from "./viewport.js";
+
 /** Gesto «atrás» del sistema ⇄ subpantallas. La app no tiene rutas: cada subpantalla que se abre
  *  apunta UNA entrada de historial con su callback de vuelta. El popstate (gesto del móvil, botón
  *  atrás del navegador) o goBack() (botón ✕/atrás de la propia pantalla) deshacen la última —
@@ -9,6 +11,9 @@
  *  que es la que pinta la pantalla que quedaba debajo. */
 export function createBackStack(win) {
   const stack = [];
+  // Cambiar de pantalla devuelve la vista al principio: esta pila ES el router de la app (ver la
+  // cabecera), así que el reset vive aquí y no repartido por las 15 llamadas a push().
+  const scrollTop = createScrollTop(win);
   // Recarga (o restauración de la pestaña) con subpantallas abiertas: el historial CONSERVA sus
   // entradas ({bc:1}, {bc:2}…) pero esta pila nace vacía, así que los primeros toques de «atrás»
   // caían en el guard del popstate y no hacían NADA — había que tocar atrás tantas veces como
@@ -25,6 +30,7 @@ export function createBackStack(win) {
     // entrada ajena o corrupta (recarga, o un {bc} negativo/NaN): nada que deshacer.
     if (!Number.isInteger(target) || target < 0 || target >= stack.length) return;
     const dropped = stack.splice(target);
+    scrollTop();          // antes del callback: lo que pinte ya se ve desde arriba
     dropped[0].onBack();
   });
   // Después de registrar el listener: el popstate que provoque este salto tiene que encontrarlo
@@ -37,6 +43,7 @@ export function createBackStack(win) {
     push(onBack) {
       win.history.pushState({ bc: stack.length + 1 }, "");
       stack.push({ onBack });
+      scrollTop();
     },
     /** Cierra la subpantalla superior por el historial (no-op sin subpantallas abiertas). */
     back() {

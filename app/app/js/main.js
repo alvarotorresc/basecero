@@ -12,6 +12,7 @@ import { renderPatrimonio } from "./screens/patrimonio.js";
 import { renderAjustes } from "./screens/ajustes.js";
 import { pushBack, goBack, clearBack, resetBack } from "./back.js";
 import { userMessage } from "./errors.js";
+import { scrollScreenTop } from "./viewport.js";
 
 const screen = document.getElementById("screen");
 const RUTAS = {
@@ -37,6 +38,9 @@ export function nav(tab) {
     if (isActive) b.setAttribute("aria-current", "page");
     else b.removeAttribute("aria-current");
   });
+  // clearBack()/resetBack() no ejecutan callbacks (su history.go cae en el guard del popstate,
+  // back.js:26), así que el cambio de pestaña se resetea aquí.
+  scrollScreenTop();
   RUTAS[tab]();
 }
 
