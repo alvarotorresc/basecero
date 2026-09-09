@@ -1,5 +1,5 @@
 // modalHtml es puro (devuelve un string, como skeletonHtml): el contrato de accesibilidad se
-// verifica sobre el string. createModal(doc, {pushBack, goBack}) recibe sus dependencias por
+// verifica sobre el string. createModal(doc, {pushBack, goBack, win}) recibe sus dependencias por
 // parámetro —mismo patrón que createToaster(doc) en toast.js— para probarlo en Node con un
 // document falso. El fake de <dialog> reproduce lo que importa del elemento nativo: showModal()
 // exige estar en el documento, y close() sobre un diálogo ya cerrado es un no-op que NO vuelve a
@@ -33,16 +33,31 @@ function fakeDoc() {
   return doc;
 }
 
+// win falso que registra listeners de verdad (varios por tipo, con removeEventListener) — no el
+// win de back.test.mjs, que solo guarda uno por tipo y no lo necesita.
+function fakeWin() {
+  const listeners = {};
+  return {
+    listeners,
+    addEventListener(type, fn) { (listeners[type] ??= []).push(fn); },
+    removeEventListener(type, fn) {
+      listeners[type] = (listeners[type] ?? []).filter((l) => l !== fn);
+    },
+  };
+}
+
 function harness() {
   const doc = fakeDoc();
   const backs = [];
   const backOpts = [];
   const calls = [];
+  const win = fakeWin();
   const modal = createModal(doc, {
     pushBack: (cb, opts) => { backs.push(cb); backOpts.push(opts); calls.push("pushBack"); },
     goBack: () => calls.push("goBack"),
+    win,
   });
-  return { doc, backs, backOpts, calls, modal };
+  return { doc, backs, backOpts, calls, modal, win };
 }
 
 const OPTS = { title: "Borrar", message: "Mercadona", cancelText: "Cancelar", confirmText: "Borrar" };
@@ -134,6 +149,28 @@ test("gesto atras del sistema: cierra el modal sin deshacer una segunda entrada"
   assert.equal(doc.body.children.length, 0);
   assert.deepEqual(calls, ["pushBack"], "el historial ya estaba donde toca");
   assert.equal(hecho, 0);
+});
+
+test("salto de varias entradas: cierra el modal aunque el popstate no ejecute su propio callback", () => {
+  const { doc, calls, modal, win } = harness();
+  let hecho = 0;
+  const dlg = modal.confirm({ ...OPTS, onConfirm: () => { hecho += 1; } });
+  // La entrada del modal se descarta sin ser la más baja (back.js: dropped[0]): back.js NO ejecuta
+  // el callback de pushBack (backs[0]), pero el popstate sí llega — es la red de seguridad de
+  // confirm() la que tiene que cerrar el <dialog>.
+  for (const fn of [...win.listeners.popstate]) fn({ state: { bc: 0 } });
+  assert.equal(dlg.open, false);
+  assert.equal(doc.body.children.length, 0);
+  assert.equal(hecho, 0);
+  assert.deepEqual(calls, ["pushBack"], "el historial ya saltó por sí solo: no hay que deshacer nada más");
+});
+
+test("cerrar el modal (cancelar) quita su listener de popstate de seguridad", () => {
+  const { modal, win } = harness();
+  const dlg = modal.confirm(OPTS);
+  assert.equal(win.listeners.popstate.length, 1);
+  dlg.querySelector("#modal-cancel").onclick();
+  assert.equal(win.listeners.popstate.length, 0);
 });
 
 test("Escape: el nodo es un dialog abierto con showModal, que es lo que lo cierra con Escape", () => {

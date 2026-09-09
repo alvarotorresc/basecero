@@ -6,8 +6,9 @@ import { pushBack, goBack } from "./back.js";
  *  escrita a mano para dos botones se rompe en silencio en cuanto alguien añade un tercero.
  *
  *  Dos piezas, como el resto del proyecto: modalHtml() es pura (devuelve un string, como
- *  skeletonHtml) y createModal(doc, {pushBack, goBack}) es una fábrica con dependencias inyectadas
- *  —mismo patrón que createToaster(doc)— para poder probarla en Node con un document falso.
+ *  skeletonHtml) y createModal(doc, {pushBack, goBack, win}) es una fábrica con dependencias
+ *  inyectadas —mismo patrón que createToaster(doc)— para poder probarla en Node con un document
+ *  (y una ventana) falsos.
  *
  *  Cuelga de <body>, no de #screen: mismo motivo que toast.js — las pantallas se repintan enteras
  *  con innerHTML y se lo llevarían por delante. */
@@ -27,7 +28,7 @@ export function modalHtml({ title, message, cancelText, confirmText }) {
     </div>`;
 }
 
-export function createModal(doc, { pushBack, goBack }) {
+export function createModal(doc, { pushBack, goBack, win }) {
   let current = null;
   return {
     confirm({ title, message, cancelText, confirmText, onConfirm }) {
@@ -44,7 +45,20 @@ export function createModal(doc, { pushBack, goBack }) {
 
       let confirmed = false;
       let byBack = false;
+      // Salto de varias entradas de golpe (history.go(-n), o "atrás" del sistema mantenido): el
+      // popstate de back.js solo ejecuta el callback de la entrada MÁS BAJA descartada (back.js:
+      // dropped[0]). Si la del modal se descarta sin ser esa, el pushBack de más abajo nunca corre:
+      // el <dialog> se quedaría abierto en el top layer —con todo lo demás inerte— y `current`
+      // señalando a un modal muerto, así que showConfirm() no volvería a abrir nada nunca más.
+      // Red de seguridad: cualquier popstate mientras el diálogo siga abierto lo cierra, lo haya
+      // ejecutado o no el callback de pushBack de arriba.
+      const onPopstate = () => {
+        if (dlg.open) { byBack = true; dlg.close(); }
+      };
+      win.addEventListener("popstate", onPopstate);
+
       dlg.addEventListener("close", () => {     // ÚNICO embudo de salida
+        win.removeEventListener("popstate", onPopstate);
         current = null;
         dlg.remove();
         if (!byBack) goBack();                  // lo cerramos nosotros: falta deshacer la entrada
@@ -65,5 +79,5 @@ export function createModal(doc, { pushBack, goBack }) {
   };
 }
 
-const instance = typeof document !== "undefined" ? createModal(document, { pushBack, goBack }) : null;
+const instance = typeof document !== "undefined" ? createModal(document, { pushBack, goBack, win: window }) : null;
 export const showConfirm = (opts) => instance?.confirm(opts);
