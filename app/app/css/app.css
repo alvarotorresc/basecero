@@ -741,6 +741,11 @@ body.onboarding .fab { display: none; }
   font-weight: 600;
 }
 
+/* Anatomía del importe (SISTEMA.md §2.3). En `em`: la MISMA pareja sirve al héroe de 56px, al
+   total de 34 y a la fila de 16 sin una sola medida absoluta. */
+.money-cents { font-size: 0.56em; color: var(--ink-2); }
+.money-cur { font-size: 0.42em; font-weight: 500; color: var(--ink-3); margin-left: .06em; }
+
 /* ===== animación de aviso (importe/categoría inválidos al guardar) ===== */
 @keyframes bc-shake {
   10%, 90% { transform: translateX(-1px); }

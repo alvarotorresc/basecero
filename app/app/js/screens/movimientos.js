@@ -5,7 +5,7 @@ import {
 } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory, rootOf } from "../category-colors.js";
 import { matchesFilter, isUncategorized } from "../movimientos-filter.js";
-import { fmtMoney, fmtDiaLargo, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { fmtMoney, moneyPartsHtml, fmtDiaLargo, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
@@ -67,7 +67,7 @@ function movRowHtml(r, byId, accById, partnerName) {
         <div class="tx-title">${escHtml(from)} → ${escHtml(to)}</div>
         <div class="tx-sub">${escHtml(r.merchant || r.note || t("movimientos.type.transfer"))}</div>
       </div>
-      <div class="tx-amount num">${fmtMoney(r.amount_cents)}</div>
+      <div class="tx-amount num">${moneyPartsHtml(r.amount_cents)}</div>
     </button>`;
   }
   if (r.type === "adjustment") {
@@ -79,7 +79,7 @@ function movRowHtml(r, byId, accById, partnerName) {
         <div class="tx-title">${t("common.type.adjustment")}</div>
         <div class="tx-sub">${escHtml(r.merchant || r.note || "")}</div>
       </div>
-      <div class="tx-amount num ${isNeg ? "negative" : "positive"}">${isNeg ? "-" : "+"}${fmtMoney(Math.abs(r.amount_cents))}</div>
+      <div class="tx-amount num ${isNeg ? "negative" : "positive"}">${isNeg ? "-" : "+"}${moneyPartsHtml(Math.abs(r.amount_cents))}</div>
     </button>`;
   }
   const cat = byId[r.category_id];
@@ -111,7 +111,7 @@ function movRowHtml(r, byId, accById, partnerName) {
       <div class="tx-title">${escHtml(title)}</div>
       <div class="tx-sub" style="${uncategorized ? "color:var(--amber);" : ""}">${escHtml(subBase)}${escHtml(shareSuffix)}</div>
     </div>
-    <div class="${amountClasses}"${amountStyle}>${sign}${fmtMoney(r.amount_cents)}</div>
+    <div class="${amountClasses}"${amountStyle}>${sign}${moneyPartsHtml(r.amount_cents)}</div>
   </button>`;
 }
 

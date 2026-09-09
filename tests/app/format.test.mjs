@@ -1,6 +1,6 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { initFormat, fmtMoney, fmtMoneyParts, currencySymbol, currencyCode, appLocale, fmtNum2, fmtNum0, fmtPct, fmtDec1, parseCentsRaw, centsToRaw } from "../../app/app/js/format.js";
+import { initFormat, fmtMoney, fmtMoneyParts, moneyPartsHtml, currencySymbol, currencyCode, appLocale, fmtNum2, fmtNum0, fmtPct, fmtDec1, parseCentsRaw, centsToRaw } from "../../app/app/js/format.js";
 
 // Intl mete espacios no separadores (U+00A0/U+202F): normalizar antes de comparar.
 const norm = (s) => s.replace(/\u00A0|\u202F/g, " ");
@@ -109,4 +109,19 @@ test("centsToRaw: inverso para precargar inputs", () => {
   assert.equal(centsToRaw(125050), "1250,50");
   assert.equal(centsToRaw(-30000), "300,00");
   assert.equal(centsToRaw(0), "");
+});
+
+test("moneyPartsHtml: parte el importe en entero, céntimos y símbolo", () => {
+  const html = moneyPartsHtml(148015);
+  assert.ok(html.includes('<span class="money-cents">'));
+  assert.ok(html.includes('<span class="money-cur">'));
+  // el símbolo va DENTRO de su span, como último elemento del HTML: es lo que el <small> de
+  // antes no hacía (dejaba el sufijo colgando fuera, a tamaño pleno).
+  assert.match(html, /<span class="money-cur">[^<]*<\/span>$/);
+});
+test("moneyPartsHtml: cero y negativos no rompen la anatomía", () => {
+  for (const c of [0, -1850]) assert.equal((moneyPartsHtml(c).match(/<span/g) ?? []).length, 2);
+});
+test("moneyPartsHtml: escapa lo que sale de Intl", () => {
+  assert.ok(!moneyPartsHtml(100).includes("<script"));
 });

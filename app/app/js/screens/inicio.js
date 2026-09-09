@@ -4,7 +4,7 @@ import {
   spentByRootCategory, spentLast7Days, getMetaAll, setMeta, hasSharedData,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtMoneyParts, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtNum2, fmtPct, currencyCode } from "../format.js";
+import { fmtMoney, moneyPartsHtml, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtNum2, fmtPct, currencyCode } from "../format.js";
 import { dayIndexOfPeriod, expectedPeriodDays, paceDeltaCents } from "../prevision.js";
 import { t } from "../i18n/index.js";
 import { budgetStatus, budgetMap } from "../category-spend.js";
@@ -22,14 +22,6 @@ import { skeletonHtml } from "../skeleton.js";
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const centsToStr = (cents) => fmtNum2((cents ?? 0) / 100);
-
-// Compone un importe con los céntimos reducidos en <small> (patrón .amount-hero del design
-// system, ver DesignSystem.dc.html): main + <small>céntimos</small> + sufijo, sin reimplementar
-// el locale — fmtMoneyParts (format.js) ya hace el split posicional sobre formatToParts.
-const moneyPartsHtml = (cents) => {
-  const { main, cents: c, suffix } = fmtMoneyParts(cents);
-  return `${escHtml(main)}<small>${escHtml(c)}</small>${escHtml(suffix)}`;
-};
 
 // Cuántas categorías raíz se listan individualmente en el donut antes de agrupar el resto en
 // "Otras N" — mismo criterio visual que docs/design/material-expresivo/Resumen.dc.html:139-213 (6 + "Otras 3").
@@ -70,7 +62,7 @@ function txRowHtml(r, byId, partnerName) {
         <div class="tx-title">${t("common.type.adjustment")}</div>
         <div class="tx-sub">${escHtml(r.merchant || r.note || "")}</div>
       </div>
-      <div class="tx-amount num ${isNeg ? "negative" : "positive"}">${isNeg ? "-" : "+"}${fmtMoney(Math.abs(r.amount_cents))}</div>
+      <div class="tx-amount num ${isNeg ? "negative" : "positive"}">${isNeg ? "-" : "+"}${moneyPartsHtml(Math.abs(r.amount_cents))}</div>
     </div>`;
   }
   const cat = byId[r.category_id];
@@ -97,7 +89,7 @@ function txRowHtml(r, byId, partnerName) {
         <div class="tx-title">${escHtml(title)}</div>
         <div class="tx-sub">${escHtml(sub)}</div>
       </div>
-      <div class="tx-amount num ${amountClass}">${sign}${fmtMoney(r.amount_cents)}</div>
+      <div class="tx-amount num ${amountClass}">${sign}${moneyPartsHtml(r.amount_cents)}</div>
     </div>`;
 }
 

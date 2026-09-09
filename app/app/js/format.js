@@ -79,6 +79,19 @@ export const fmtMoneyParts = (cents) => {
   }
   return { main, cents: centsOut, suffix };
 };
+// Escape local (patrón del resto del proyecto: cada módulo lleva el suyo, ver modal.js/inicio.js).
+// Solo & y < hacen falta aquí: lo que sale de Intl.NumberFormat nunca trae ninguno de los dos,
+// pero el contrato del repo es que todo lo que entra en un template string va escapado.
+const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+/** Anatomía del importe (SISTEMA.md §2.3): entero pleno, céntimos reducidos, símbolo aún menor.
+ *  Devuelve HTML, no texto: es el ÚNICO helper del proyecto que lo hace, y por eso escapa sus
+ *  tres trozos aunque salgan de Intl.NumberFormat (nunca traen < ni &, pero el contrato del
+ *  repo es que todo lo que entra en un template string va escapado). */
+export const moneyPartsHtml = (cents) => {
+  const { main, cents: c, suffix } = fmtMoneyParts(cents);
+  return `${esc(main)}<span class="money-cents">${esc(c)}</span>` +
+         `<span class="money-cur">${esc(suffix)}</span>`;
+};
 export const fmtNum2 = (n) => num2.format(n);
 export const fmtNum0 = (n) => num0.format(n);
 export const fmtPct = (v) => pct.format(v);
