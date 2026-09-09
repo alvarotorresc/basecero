@@ -227,7 +227,7 @@ export async function renderCategorias(container, onBack) {
 
       <div style="display:flex;flex-direction:column;gap:16px;">
 
-        <div style="background:var(--card2);border-radius:16px;padding:12px 16px;display:flex;align-items:center;gap:12px;">
+        <div style="background:var(--card2);border-radius:0;padding:12px 16px;display:flex;align-items:center;gap:12px;">
           <div id="cf-preview-dot" class="dotico" style="width:40px;height:40px;font-size:18px;flex-shrink:0;--cat:${preview.color};">${preview.icon}</div>
           <input type="text" id="cf-name" value="${escAttr(form.name)}" placeholder="${t("categorias.form.namePlaceholder")}"
             style="flex:1;min-width:0;border:0;background:none;outline:none;color:var(--text);
@@ -288,7 +288,7 @@ export async function renderCategorias(container, onBack) {
             ${POOL.map((c) => {
               const active = form.color === c;
               return `<button type="button" data-cf-color="${c}" aria-label="${t("categorias.form.pickColorAria")}"
-                style="width:100%;aspect-ratio:1;border:0;padding:0;border-radius:12px;background:${c};cursor:pointer;
+                style="width:100%;aspect-ratio:1;border:0;padding:0;border-radius:0;background:${c};cursor:pointer;
                 -webkit-tap-highlight-color:transparent;${active ? "outline:2px solid var(--text);outline-offset:3px;" : ""}"></button>`;
             }).join("")}
           </div>
@@ -301,7 +301,7 @@ export async function renderCategorias(container, onBack) {
             ${form.iconOrder.map((ic) => {
               const active = form.icon === ic;
               return `<button type="button" data-cf-icon="${escAttr(ic)}" aria-label="${t("categorias.form.pickIconAria")}"
-                style="aspect-ratio:1;border:0;padding:0;border-radius:12px;background:var(--card2);font-size:20px;cursor:pointer;
+                style="aspect-ratio:1;border:0;padding:0;border-radius:0;background:var(--card2);font-size:20px;cursor:pointer;
                 display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;
                 ${active ? "outline:2px solid var(--text);outline-offset:2px;" : ""}">${ic}</button>`;
             }).join("")}
@@ -317,7 +317,7 @@ export async function renderCategorias(container, onBack) {
 
         ${state.formError ? `<div class="banner-aviso red">${escHtml(state.formError)}</div>` : ""}
 
-        <button type="button" class="btn-primary" id="cf-save" style="${isRoot ? `background:${form.color};color:#FFF4EC;` : ""}">
+        <button type="button" class="btn-primary" id="cf-save" style="${isRoot ? `background:var(--accent);color:var(--accent-ink);` : ""}">
           ${editing ? t("common.saveChanges") : t("categorias.form.create")}
         </button>
 

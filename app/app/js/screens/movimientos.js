@@ -418,16 +418,16 @@ export async function renderMovimientos(container) {
               <div style="font-size:14px; font-weight:600;">${t("common.split.label")}</div>
               <div style="font-size:11px; color:var(--text-3);">${t("common.split.hint", { name: escHtml(partnerName || t("movimientos.shared.fallbackName")), pct: 100 - d.sharePct })}</div>
             </div>
-            <button type="button" id="mov-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}" ${locked ? "disabled" : ""}>−</button>
+            <button type="button" id="mov-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}" ${locked ? "disabled" : ""}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
             <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${d.sharePct} %</div>
-            <button type="button" id="mov-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}" ${locked ? "disabled" : ""}>+</button>
+            <button type="button" id="mov-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}" ${locked ? "disabled" : ""}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
           </div>
           <div style="display:flex; gap:8px;">
-            <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
+            <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
               <div style="font-size:10px; color:var(--text-3);">${t("common.myShare", { pct: d.sharePct })}</div>
               <div class="num" id="mov-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
             </div>
-            <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
+            <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
               <div style="font-size:10px; color:var(--text-3);">${partnerPaid(d) ? t("common.paidFull", { name: escHtml(partnerName) || t("movimientos.shared.fallbackLabel") }) : `${escHtml(partnerName) || t("movimientos.shared.fallbackLabel")} · ${100 - d.sharePct}%`}</div>
               <div class="num" id="mov-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerPaid(d) ? d.cents : partnerCents)}</div>
             </div>

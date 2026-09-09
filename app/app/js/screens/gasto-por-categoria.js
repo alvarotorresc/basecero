@@ -128,7 +128,7 @@ export async function renderGastoPorCategoria(container, onBack) {
   function expandedHtml(row, limitCents) {
     const subs = subRowsHtml(row.root_id);
     return `
-      <div style="margin:2px 0 4px;background:var(--card2);border-radius:16px;padding:10px 12px;
+      <div style="margin:2px 0 4px;background:var(--card2);border-radius:0;padding:10px 12px;
         display:flex;flex-direction:column;gap:10px;">
         ${subs}
         ${subs ? '<hr class="divider">' : ""}

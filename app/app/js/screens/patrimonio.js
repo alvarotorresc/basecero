@@ -75,15 +75,13 @@ function netWorthCardHtml(netWorthCents, series) {
 // ---- tarjeta "Cuentas" -----------------------------------------------------
 
 // Trazos de los iconos SVG de docs/design/material-expresivo/Patrimonio.dc.html:71-118 (uno por tipo de cuenta, no por
-// cuenta concreta: aquí solo hay 3 tipos). El color entra como --cat en .list-row-icon (mismo
-// mecanismo de tinte que .tx-icon con las categorías, ver app.css). Paleta propia de tipo de
-// cuenta, independiente de category-colors.js (checking/liability no están en la lista de hex
-// viejos de categoría, así que se dejan tal cual; el morado de savings SÍ coincidía por accidente
-// con el hex viejo retirado de cat-suscripciones — migrado al mismo sucesor morado, tarea 9).
+// cuenta concreta: aquí solo hay 3 tipos). SISTEMA.md §2.2 es explícito: una cuenta no tiene ni
+// icono ni color propios — se identifica por su nombre y su tipo escritos — así que los tres
+// entran en --ink-2, no en un hex de tipo (reskin v2, tarea 9).
 const ACCOUNT_ICON = {
-  checking: { color: "#7aa2ff", paths: '<rect x="3" y="5.5" width="18" height="13" rx="3.5"></rect><path d="M3 10.5h18"></path>' },
-  savings: { color: "#9153AB", paths: '<path d="M5 8.5h14a1.6 1.6 0 011.6 1.6v7.3A1.6 1.6 0 0119 19H5a1.6 1.6 0 01-1.6-1.6V6.6A1.6 1.6 0 015 5h10"></path><circle cx="16.5" cy="13.8" r="1.2"></circle>' },
-  liability: { color: "#f87171", paths: '<path d="M4.2 16.2h15.6v-3.8l-1.7-4.1a1.6 1.6 0 00-1.5-1H7.4a1.6 1.6 0 00-1.5 1l-1.7 4.1z"></path><path d="M6 16.2v2.4h2.6v-2.4M15.4 16.2v2.4H18v-2.4"></path>' },
+  checking: { color: "var(--ink-2)", paths: '<rect x="3" y="5.5" width="18" height="13" rx="3.5"></rect><path d="M3 10.5h18"></path>' },
+  savings: { color: "var(--ink-2)", paths: '<path d="M5 8.5h14a1.6 1.6 0 011.6 1.6v7.3A1.6 1.6 0 0119 19H5a1.6 1.6 0 01-1.6-1.6V6.6A1.6 1.6 0 015 5h10"></path><circle cx="16.5" cy="13.8" r="1.2"></circle>' },
+  liability: { color: "var(--ink-2)", paths: '<path d="M4.2 16.2h15.6v-3.8l-1.7-4.1a1.6 1.6 0 00-1.5-1H7.4a1.6 1.6 0 00-1.5 1l-1.7 4.1z"></path><path d="M6 16.2v2.4h2.6v-2.4M15.4 16.2v2.4H18v-2.4"></path>' },
 };
 
 const ACCOUNT_TYPES = [
@@ -121,7 +119,7 @@ function cuentaRowHtml(a, isDefault, accountLoans) {
     <button type="button" class="list-row" data-acc="${a.id}"
       style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
       <div class="list-row-icon" style="--cat:${icon.color};">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${icon.color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icon.paths}</svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="stroke:${icon.color};" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icon.paths}</svg>
       </div>
       <div class="list-row-body">
         <div class="list-row-title">${escHtml(a.name)}</div>

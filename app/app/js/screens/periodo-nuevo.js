@@ -188,7 +188,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
     <div class="card" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
       <div class="section-title">${t("common.name")}</div>
       <input type="text" id="pn-nombre" value="${escAttr(state.name)}"
-        style="height:44px; padding:0 14px; background:var(--card2); border:0; border-radius:16px; color:var(--text);
+        style="height:44px; padding:0 14px; background:var(--card2); border:0; border-radius:0; color:var(--text);
         font:700 15px var(--font-ui); width:100%; outline:none;">
     </div>`;
   }
@@ -202,9 +202,9 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
       <div class="section-title">${t("periodo.date.title")}</div>
       <div style="display:flex; align-items:center; gap:10px;">
         <input type="date" id="pn-fecha" value="${state.startDate}"
-          style="flex:1; height:44px; padding:0 14px; background:var(--card2); border:0; border-radius:14px;
+          style="flex:1; height:44px; padding:0 14px; background:var(--card2); border:0; border-radius:0;
           color:var(--text); font:600 14px var(--font-num); min-width:0;">
-        <div style="width:44px; height:44px; border-radius:14px; background:var(--card2); flex-shrink:0;
+        <div style="width:44px; height:44px; border-radius:0; background:var(--card2); flex-shrink:0;
           display:flex; align-items:center; justify-content:center;" aria-hidden="true">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="stroke:var(--text);" stroke-width="1.6"
             stroke-linecap="round" stroke-linejoin="round">
@@ -230,10 +230,10 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
           <div style="font-size:11px; color:var(--text-3);">${t("periodo.share.partnerPays", { name: escHtml(partnerName), pct: restante })}</div>
         </div>
         <button type="button" id="pn-pct-down" class="stepper-btn lg"
-          aria-label="${t("periodo.share.decreaseAria")}">−</button>
+          aria-label="${t("periodo.share.decreaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
         <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${state.sharePct} %</div>
         <button type="button" id="pn-pct-up" class="stepper-btn lg"
-          aria-label="${t("periodo.share.increaseAria")}">+</button>
+          aria-label="${t("periodo.share.increaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
       </div>
     </div>`;
   }

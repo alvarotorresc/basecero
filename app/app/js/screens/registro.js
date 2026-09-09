@@ -147,7 +147,7 @@ export async function renderRegistro(container, onDone, prefill) {
             ${escHtml(label)} · ${fmtMoney(linked.amount_cents)}
           </div>
         </div>
-        <button type="button" id="reg-refund-unlink" class="icon-btn" aria-label="${t("registro.refund.unlink")}">✕</button>
+        <button type="button" id="reg-refund-unlink" class="icon-btn" aria-label="${t("registro.refund.unlink")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
       </div>`;
     }
     return `
@@ -187,13 +187,13 @@ export async function renderRegistro(container, onDone, prefill) {
   function renderAccountsSection() {
     if (state.tipo === "transfer") {
       return `
-      <div class="card" style="border-radius:16px; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+      <div class="card" style="border-radius:0; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
         <div class="section-title">${t("common.from")}</div>
         <div class="chips">
           ${accounts.map((a) => `<button type="button" class="chip${state.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
         </div>
       </div>
-      <div class="card" style="border-radius:16px; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+      <div class="card" style="border-radius:0; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
         <div class="section-title">${t("common.to")}</div>
         <div class="chips">
           ${accountsAll.filter((a) => a.id !== state.accountId).map((a) => `<button type="button" class="chip${state.counterAccountId === a.id ? " active" : ""}" data-counter-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
@@ -201,7 +201,7 @@ export async function renderRegistro(container, onDone, prefill) {
       </div>`;
     }
     return `
-    <div class="card" style="border-radius:16px; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+    <div class="card" style="border-radius:0; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
       <div class="section-title">${state.tipo === "refund" ? t("common.destAccount") : t("common.account")}</div>
       <div class="chips">
         ${accounts.map((a) => `<button type="button" class="chip${state.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
@@ -215,8 +215,9 @@ export async function renderRegistro(container, onDone, prefill) {
     // Color del display/importe y del botón de guardar: se leen del state en CADA pintado, así
     // que basta con el render() que ya dispara el click de categoría — sin estado nuevo.
     const amountColor = state.categoryId ? textColorForCategory(state.categoryId, byId) : "var(--text)";
+    // §1 principio 2: un solo acento. El CTA es SIEMPRE lima, ya no toma el color de la categoría.
     const saveStyle = needsCategory(state.tipo) && state.categoryId
-      ? `background:${colorForCategory(state.categoryId, byId)};color:#FFF4EC;`
+      ? `background:var(--accent);color:var(--accent-ink);`
       : "";
 
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
@@ -224,7 +225,7 @@ export async function renderRegistro(container, onDone, prefill) {
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
         <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${t("registro.title")}</h1>
-        <button type="button" class="icon-btn" id="reg-close" aria-label="${t("registro.close")}">✕</button>
+        <button type="button" class="icon-btn" id="reg-close" aria-label="${t("registro.close")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
       </div>
 
       <div class="segmented" style="margin-bottom:18px;border-radius:999px;">
@@ -287,7 +288,7 @@ export async function renderRegistro(container, onDone, prefill) {
       </label>
 
       ${needsCategory(state.tipo) && state.tipo !== "income" && partnerName ? `
-      <div class="card" style="border-radius:16px; padding:0 16px; margin-bottom:18px;">
+      <div class="card" style="border-radius:0; padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
           <span style="font-size:15px; font-weight:600;">${t("common.sharedWith", { name: escHtml(partnerName) })}</span>
           <span class="toggle">
@@ -312,16 +313,16 @@ export async function renderRegistro(container, onDone, prefill) {
               <div style="font-size:14px; font-weight:600;">${t("common.split.label")}</div>
               <div style="font-size:11px; color:var(--text-3);">${t("common.split.hint", { name: escHtml(partnerName), pct: 100 - state.sharePct })}</div>
             </div>
-            <button type="button" id="reg-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}">−</button>
+            <button type="button" id="reg-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
             <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${state.sharePct} %</div>
-            <button type="button" id="reg-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}">+</button>
+            <button type="button" id="reg-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
           </div>
           <div style="display:flex; gap:8px;">
-            <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
+            <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
               <div style="font-size:10px; color:var(--text-3);">${t("common.myShare", { pct: state.sharePct })}</div>
               <div class="num" id="reg-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
             </div>
-            <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
+            <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
               <div style="font-size:10px; color:var(--text-3);">${partnerPaid() ? t("common.paidFull", { name: escHtml(partnerName) }) : `${escHtml(partnerName)} · ${100 - state.sharePct}%`}</div>
               <div class="num" id="reg-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerPaid() ? state.cents : partnerCents)}</div>
             </div>

@@ -30,7 +30,7 @@ const ACCOUNT_TYPES = [
 const ACCOUNT_TYPE_LABEL_KEY = Object.fromEntries(ACCOUNT_TYPES.map((at) => [at.id, at.labelKey]));
 // Preview del paso 3: un emoji por color del POOL (decorativo, mismos pares que el artboard).
 const PREVIEW_ICONS = ["🛒", "🎉", "🧾", "📺", "💶", "🚗", "❤️‍🩹", "🍽️", "🚌", "🎁", "🏠", "👕"];
-const BOX = `background:var(--card);border-radius:16px;padding:12px 16px;`;
+const BOX = `background:var(--card);border-radius:0;padding:12px 16px;`;
 // Feature cards del paso 1 (bienvenida): color + path SVG (decorativos) + claves de texto.
 const WELCOME_FEATURES = [
   ["var(--green)", `<rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 018 0v3"></path>`,
@@ -87,7 +87,7 @@ export async function renderOnboarding(container, { onDone }) {
     <div style="margin-top:36px;display:flex;flex-direction:column;gap:20px;">
       ${WELCOME_FEATURES.map(([color, path, titleKey, subtitleKey]) => `
       <div style="display:flex;align-items:flex-start;gap:12px;">
-        <div style="width:36px;height:36px;border-radius:12px;background:var(--card);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <div style="width:36px;height:36px;border-radius:0;background:var(--card);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${path}</svg>
         </div>
         <div><div style="font-size:14px;font-weight:700;">${t(titleKey)}</div>
@@ -122,10 +122,10 @@ export async function renderOnboarding(container, { onDone }) {
       <div style="font-size:13px;color:var(--text-2);margin-top:6px;line-height:1.5;">${t("onboarding.account.subtitle")}</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px;">${rows}</div>
-    <div style="background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:12px;margin-top:14px;">
+    <div style="background:var(--card);border-radius:0;padding:16px;display:flex;flex-direction:column;gap:12px;margin-top:14px;">
       <div class="section-title">${state.accounts.length ? t("onboarding.account.addAnotherTitle") : t("onboarding.account.firstTitle")}</div>
       <input type="text" id="onb-acc-name" value="${escAttr(f.name)}" placeholder="${escAttr(t("onboarding.account.namePlaceholder"))}" autocomplete="off"
-        style="border:0;border-radius:14px;background:var(--card2);padding:12px 14px;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;outline:none;">
+        style="border:0;border-radius:0;background:var(--card2);padding:12px 14px;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;outline:none;">
       <div class="segmented" style="border-radius:999px;">
         ${ACCOUNT_TYPES.map((at) => `
         <button type="button" data-onb-tipo="${at.id}" class="${f.type === at.id ? "active" : ""}"
@@ -157,7 +157,7 @@ export async function renderOnboarding(container, { onDone }) {
       <div style="font-size:13px;color:var(--text-2);margin-top:6px;">${t("onboarding.prefs.subtitle")}</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:13px;margin-top:14px;">
-      <div style="background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;">
+      <div style="background:var(--card);border-radius:0;padding:16px;display:flex;flex-direction:column;gap:10px;">
         <div class="section-title">${t("onboarding.prefs.language")}</div>
         <div class="segmented" style="border-radius:999px;">
           ${LANGS.map(([v, label]) => `
@@ -165,7 +165,7 @@ export async function renderOnboarding(container, { onDone }) {
             style="border-radius:999px;${activeLang() === v ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${escHtml(label)}</button>`).join("")}
         </div>
       </div>
-      <div style="background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;">
+      <div style="background:var(--card);border-radius:0;padding:16px;display:flex;flex-direction:column;gap:10px;">
         <div class="section-title">${t("onboarding.prefs.currencyTitle")}</div>
         <div style="display:flex;gap:8px;">
           <label class="field field-stack" style="flex:1;"><span>${t("onboarding.prefs.currencyLabel")}</span>
@@ -174,14 +174,14 @@ export async function renderOnboarding(container, { onDone }) {
             <select id="onb-locale">${localeOptionsHtml(p.locale)}</select></label>
         </div>
       </div>
-      <div style="background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;">
+      <div style="background:var(--card);border-radius:0;padding:16px;display:flex;flex-direction:column;gap:10px;">
         <div class="section-title">${t("onboarding.prefs.partnerTitle")}</div>
         <input type="text" id="onb-partner" value="${escAttr(p.partner)}" autocomplete="off"
           placeholder="${escAttr(t("onboarding.prefs.partnerPlaceholder"))}"
-          style="border:0;border-radius:14px;background:var(--card2);padding:12px 14px;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;outline:none;">
+          style="border:0;border-radius:0;background:var(--card2);padding:12px 14px;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;outline:none;">
         <div style="font-size:11px;color:var(--text-2);line-height:1.45;">${t("onboarding.prefs.partnerNote")}</div>
       </div>
-      <div style="background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;">
+      <div style="background:var(--card);border-radius:0;padding:16px;display:flex;flex-direction:column;gap:10px;">
         <div class="section-title">${t("onboarding.prefs.categoriesTitle")}</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;">
           ${POOL.map((color, i) => `<span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;font-size:12px;background:${color};">${PREVIEW_ICONS[i]}</span>`).join("")}
@@ -199,7 +199,7 @@ export async function renderOnboarding(container, { onDone }) {
       <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;line-height:1.15;">${t("onboarding.period.titleLine1")}<br>${t("onboarding.period.titleLine2")}</div>
       <div style="font-size:13px;color:var(--text-2);margin-top:8px;line-height:1.5;">${t("onboarding.period.bodyPre")}<b style="color:var(--text);">${t("onboarding.period.bodyBold")}</b>${t("onboarding.period.bodyPost")}</div>
     </div>
-    <div style="background:var(--card);border-radius:22px;padding:16px;margin-top:14px;">
+    <div style="background:var(--card);border-radius:0;padding:16px;margin-top:14px;">
       <div style="display:flex;justify-content:space-between;font-size:10px;font-weight:700;letter-spacing:0.09em;color:var(--text-2);padding:0 2px 8px;"><span>${t("onboarding.period.illustMonth1")}</span><span>${t("onboarding.period.illustMonth2")}</span></div>
       <div style="display:flex;gap:4px;">
         ${["25", "26", "27g", "28s", "…s", "25s", "26s", "27g"].map((d) => {
@@ -351,16 +351,16 @@ export async function renderOnboarding(container, { onDone }) {
           <button type="button" id="onb-imp-clear" class="btn-secondary" style="height:36px;padding:0 14px;border-radius:999px;flex-shrink:0;">${t("onboarding.import.changeBtn")}</button>
         </div>`}
         ${imp.needsPass ? `
-        <div style="background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;margin-top:14px;">
+        <div style="background:var(--card);border-radius:0;padding:16px;display:flex;flex-direction:column;gap:10px;margin-top:14px;">
           <div class="section-title">${t("onboarding.import.encryptedTitle")}</div>
           <input type="password" id="onb-imp-pass" placeholder="${escAttr(t("onboarding.import.passPlaceholder"))}" autocomplete="off"
-            style="border:0;border-radius:14px;background:var(--card2);padding:12px 14px;color:var(--text);font-family:inherit;font-size:14px;outline:none;">
+            style="border:0;border-radius:0;background:var(--card2);padding:12px 14px;color:var(--text);font-family:inherit;font-size:14px;outline:none;">
           <button type="button" class="btn-primary" id="onb-imp-decrypt" style="width:100%;" ${imp.busy ? "disabled" : ""}>${imp.busy ? t("onboarding.import.decrypting") : t("onboarding.import.decryptBtn")}</button>
         </div>` : ""}
         ${imp.errors.length ? `
         <div class="banner-aviso red" style="display:block;margin-top:14px;"><p>${imp.errors.map(escHtml).join("<br>")}</p></div>` : ""}
         ${imp.pending ? `
-        <div style="background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;margin-top:14px;">
+        <div style="background:var(--card);border-radius:0;padding:16px;display:flex;flex-direction:column;gap:10px;margin-top:14px;">
           <div class="section-title">${t("onboarding.import.readyTitle")}</div>
           <div style="font-size:13px;color:var(--text-2);">${escHtml(imp.summary)}</div>
           <button type="button" class="btn-primary" id="onb-imp-go" style="width:100%;" ${imp.busy ? "disabled" : ""}>${imp.busy ? t("onboarding.import.loading") : t("onboarding.import.loadBtn")}</button>
