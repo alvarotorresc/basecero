@@ -653,10 +653,12 @@ body:has(> .banner-aviso) main#screen { margin-top: 46px; }
 }
 .budget-input.is-empty {
   background: var(--bg);
-  /* --hairline-strong (rgba(244,244,242,.18)) ya da >=3:1 sobre --bg y sobre --surface (§2.1),
-     a diferencia del --rule viejo que necesitaba un alpha subido a mano: el filete v2 es más
-     claro y cumple WCAG 1.4.11 sin parche. */
-  border: 1px dashed var(--hairline-strong);
+  /* --hairline-strong (rgba(244,244,242,.18)) da ~1.6:1 sobre --bg: insuficiente para el borde
+     funcional "vacío/sin límite" (WCAG 1.4.11, 3:1), igual que le pasaba al --rule viejo.
+     Alpha subido a mano a 0.4 (mismo tono --ink) → ~3.5:1 sobre --bg, ~3.3:1 sobre --surface.
+     Los --hairline-strong restantes (.field, .btn-secondary) no se tocan: ahí el borde no es
+     la única señal del estado. */
+  border: 1px dashed rgba(244, 244, 242, 0.4);
   color: var(--ink-3);
   font: 500 12px var(--font-sans);
   text-align: center;
