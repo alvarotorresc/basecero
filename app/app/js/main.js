@@ -105,6 +105,6 @@ async function boot() {
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => nav(b.dataset.tab)));
 document.getElementById("btn-registro").onclick = () => {
   pushBack(() => nav("inicio"));
-  renderRegistro(screen, goBack);
+  renderRegistro(screen, goBack, undefined, () => nav("inicio"));
 };
 boot();

@@ -1,14 +1,16 @@
 import {
   addTransaction, getOpenPeriod, listExpenseLeafCategories, listIncomeCategories,
-  listAccounts, allCategoriesById, recentForRefund, getMetaAll,
+  listAccounts, allCategoriesById, recentForRefund, getMetaAll, softDeleteTransaction,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
-import { fmtMoney, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { userMessage } from "../errors.js";
 import { focusInput } from "../viewport.js";
+import { showReceipt } from "../recibo.js";
+import { showToast } from "../toast.js";
 
 // labelKey/SAVE_KEY en vez de texto resuelto: son consts de módulo, evaluadas al importar el
 // fichero (antes de que boot() llame a initI18n con el idioma real) — si guardaran el string ya
@@ -31,8 +33,11 @@ const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt
 
 /** Monta la pantalla completa de registro rápido de un movimiento (5 tipos).
  *  onDone() se llama tanto al cerrar (✕) como tras guardar con éxito.
- *  prefill opcional (Task 11): {type, amountCents, categoryId, accountId, merchant, ruleId, isShared}. */
-export async function renderRegistro(container, onDone, prefill) {
+ *  prefill opcional (Task 11): {type, amountCents, categoryId, accountId, merchant, ruleId, isShared}.
+ *  onUndone opcional (reskin v2, Task 12): refresca la pantalla de detrás cuando se pulsa
+ *  «Deshacer» en el recibo — sin esto, el movimiento borrado se queda pintado hasta la siguiente
+ *  navegación. */
+export async function renderRegistro(container, onDone, prefill, onUndone) {
   let period, expenseCats, incomeCats, accountsAll, byId, meta;
   try {
     [period, expenseCats, incomeCats, accountsAll, byId, meta] = await Promise.all([
@@ -461,13 +466,17 @@ export async function renderRegistro(container, onDone, prefill) {
       btn.disabled = true;
       try {
         const withCategory = needsCategory(state.tipo);
-        await addTransaction({
+        // Mismo guard que sharePctOverride/isShared de abajo: el reparto no se ofrece para
+        // ingresos, así que el recibo tampoco debe imprimir una línea de reparto heredada.
+        const effectiveIsShared = withCategory && state.tipo !== "income" ? state.isShared : false;
+        const effectiveAccountId = partnerPaid() ? "" : state.accountId;
+        const newId = await addTransaction({
           type: state.tipo,
           amountCents: state.tipo === "adjustment" && state.adjustmentSign === "-" ? -state.cents : state.cents,
           date: state.fecha,
           categoryId: withCategory ? state.categoryId : "",
           // Un gasto que pagó la contraparte no toca ninguna cuenta mía hasta liquidar.
-          accountId: partnerPaid() ? "" : state.accountId,
+          accountId: effectiveAccountId,
           counterAccountId: state.tipo === "transfer" ? state.counterAccountId : "",
           merchant: state.merchant,
           note: state.note,
@@ -475,13 +484,38 @@ export async function renderRegistro(container, onDone, prefill) {
           // al 100%, ver sql.js) — este guard evita que un isShared heredado (p.ej. prefill de
           // una regla recurrente marcada compartida, inicio.js) se cuele en el guardado aunque
           // el toggle esté oculto para tipo=income.
-          isShared: withCategory && state.tipo !== "income" ? state.isShared : false,
-          sharePctOverride: withCategory && state.tipo !== "income" && state.isShared ? state.sharePct : null,
+          isShared: effectiveIsShared,
+          sharePctOverride: effectiveIsShared ? state.sharePct : null,
           paidBy: partnerPaid() ? "partner" : "me",
           refId: state.tipo === "refund" ? state.refId : "",
           ruleId: state.ruleId,
         });
-        onDone();
+        onDone();   // primero: el ticket cae sobre la pantalla ya repintada (ReciboGuardado.dc.html)
+        const [y, m, d] = state.fecha.split("-");
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        showReceipt({
+          dateTime: `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}  ${pad(now.getHours())}:${pad(now.getMinutes())}`,
+          lines: [
+            { label: t("common.merchant"), value: state.merchant || "" },
+            { label: t("common.category"), value: withCategory ? (byId[state.categoryId]?.name ?? "") : "" },
+            { label: t("common.account"), value: accountsAll.find((a) => a.id === effectiveAccountId)?.name ?? "" },
+            { label: t("common.date"), value: `${d}/${m}/${y}` },
+            { label: t("common.split.label"), value: effectiveIsShared ? `${partnerName} ${state.sharePct} %` : "" },
+            { label: t("recibo.myPart"), value: effectiveIsShared ? fmtMoney(splitCents(state.cents, state.sharePct).mine) : "" },
+          ],
+          total: fmtMoneyParts(state.cents),
+          stampDate: `${fmtDiaCorto(hoyISO()).toUpperCase()} ${now.getFullYear()}`,
+          labels: { brand: "BaseCero", stamp: t("recibo.stamp"), total: t("recibo.total"), undo: t("recibo.undo") },
+          onUndo: async () => {
+            try {
+              await softDeleteTransaction(newId);
+              onUndone?.();
+            } catch (e) {
+              showToast(t("recibo.undoFailed", { error: userMessage(e) }));
+            }
+          },
+        });
       } catch (e) {
         btn.disabled = false;
         errorMsg = t("common.saveFailed", { error: userMessage(e) });

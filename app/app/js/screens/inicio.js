@@ -561,7 +561,7 @@ export async function renderInicio(container) {
         merchant: rule.name,
         ruleId: rule.id,
         isShared: !!rule.is_shared,
-      });
+      }, () => renderInicio(container));
     };
   });
 

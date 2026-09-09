@@ -73,9 +73,14 @@ export async function addTransaction({
   const p = await getOpenPeriod();
   if (!p) throw new UserError(t("errors.common.noOpenPeriod"));
   const now = nowIso();
+  // Subido a variable (antes generado inline dentro del bind) para poder devolverlo: el recibo de
+  // guardado (recibo.js) necesita el id del movimiento recién creado para que «Deshacer» pueda
+  // borrarlo (softDeleteTransaction(newId)), igual que openNextPeriod/createAccount ya devuelven
+  // el suyo.
+  const newId = bcUlid();
   const insertStmt = {
     sql: SQL.insertTransaction,
-    bind: [bcUlid(), date, p.id, type, amountCents, accountId, counterAccountId,
+    bind: [newId, date, p.id, type, amountCents, accountId, counterAccountId,
       categoryId ?? "", bcSanitizeCell(merchant ?? ""), bcSanitizeCell(note ?? ""),
       isShared ? 1 : 0, sharePctOverride, paidBy, 0, refId, ruleId, externalId, status, now, now],
   };
@@ -84,6 +89,7 @@ export async function addTransaction({
   } else {
     await exec(insertStmt.sql, insertStmt.bind);
   }
+  return newId;
 }
 
 export const spentOfPeriod = async (pid) => (await query(SQL.spentOfPeriod, [pid]))[0].spent_cents;
