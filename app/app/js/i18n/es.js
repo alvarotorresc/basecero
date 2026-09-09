@@ -6,6 +6,7 @@ export const ES = {
     retry: "Reintentar",
     save: "Guardar",
     cancel: "Cancelar",
+    delete: "Borrar",
     saveFailed: "No se pudo guardar: {error}",
     saveChanges: "Guardar cambios",
     confirmDelete: "Sí, borrar",
@@ -199,7 +200,8 @@ export const ES = {
     row: { partnerPaid: " · pagó {name} · tu parte {amount}" },
     delete: {
       button: "Borrar",
-      confirm: "Sí, borrar",
+      title: "¿Borrar este movimiento?",
+      message: "{what}. Desaparecerá de las listas y de los totales del periodo.",
     },
     empty: {
       noUncategorized: "No hay movimientos sin categorizar.",

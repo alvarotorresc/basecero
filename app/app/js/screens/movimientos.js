@@ -12,6 +12,7 @@ import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { skeletonHtml } from "../skeleton.js";
+import { showConfirm } from "../modal.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -158,7 +159,6 @@ export async function renderMovimientos(container) {
     searchOpen: false,
     detailId: null,
     detail: null,
-    deleteConfirm: false,
     opening: false, // apertura de detalle en curso (ver openDetail)
   };
   let errorMsg = "";
@@ -199,7 +199,6 @@ export async function renderMovimientos(container) {
 
   function updateDetail(patch) {
     Object.assign(state.detail, patch);
-    state.deleteConfirm = false;
     render();
   }
 
@@ -219,7 +218,6 @@ export async function renderMovimientos(container) {
     }
     if (!row) { state.opening = false; return; }
     state.detailId = id;
-    state.deleteConfirm = false;
     state.detail = {
       type: row.type,
       raw: centsToRaw(row.amount_cents),
@@ -441,9 +439,9 @@ export async function renderMovimientos(container) {
 
       <button type="button" class="btn-primary" id="mov-save" style="margin-bottom:10px;">${t("common.save")}</button>
       <button type="button" id="mov-delete"
-        style="width:100%;background:${state.deleteConfirm ? "var(--red)" : "transparent"};color:${state.deleteConfirm ? "#fff" : "var(--red)"};
+        style="width:100%;background:transparent;color:var(--red);
           border:1px solid var(--red);border-radius:var(--radius-sm);padding:16px;font:600 16px var(--font-ui);cursor:pointer;">
-        ${state.deleteConfirm ? t("movimientos.delete.confirm") : t("movimientos.delete.button")}
+        ${t("movimientos.delete.button")}
       </button>
     `;
 
@@ -479,7 +477,6 @@ export async function renderMovimientos(container) {
       d.raw = e.target.value;
       d.cents = parseCentsRaw(d.raw);
       errorMsg = "";
-      state.deleteConfirm = false;
       // No se llama a render() aquí (perdería el foco/cursor del input mientras se escribe), pero
       // el preview "Tu parte / contraparte" de un gasto compartido se queda con el importe viejo si no se
       // actualiza a mano — parche puntual de los dos nodos en vez de un re-render completo.
@@ -491,8 +488,8 @@ export async function renderMovimientos(container) {
         partnerEl.textContent = fmtMoney(partnerPaid(d) ? d.cents : partnerCents);
       }
     };
-    container.querySelector("#mov-merchant").oninput = (e) => { d.merchant = e.target.value; state.deleteConfirm = false; };
-    container.querySelector("#mov-note").oninput = (e) => { d.note = e.target.value; state.deleteConfirm = false; };
+    container.querySelector("#mov-merchant").oninput = (e) => { d.merchant = e.target.value; };
+    container.querySelector("#mov-note").oninput = (e) => { d.note = e.target.value; };
     container.querySelector("#mov-fecha").onchange = (e) => updateDetail({ fecha: e.target.value || hoyISO() });
 
     const sharedToggle = container.querySelector("#mov-shared");
@@ -561,24 +558,29 @@ export async function renderMovimientos(container) {
       }
     };
 
-    container.querySelector("#mov-delete").onclick = async () => {
-      if (!state.deleteConfirm) {
-        state.deleteConfirm = true;
-        render();
-        return;
-      }
-      const btn = container.querySelector("#mov-delete");
-      btn.disabled = true;
-      try {
-        await softDeleteTransaction(state.detailId);
-        await loadPeriodData();
-        goBack();
-      } catch (e) {
-        btn.disabled = false;
-        errorMsg = t("movimientos.error.delete", { error: userMessage(e) });
-        state.deleteConfirm = false;
-        render();
-      }
+    container.querySelector("#mov-delete").onclick = () => {
+      const what = `${d.merchant || byId[d.categoryId]?.name || t(TIPO_KEY[d.type])} · ${fmtMoney(d.cents)}`;
+      showConfirm({
+        title: t("movimientos.delete.title"),
+        message: t("movimientos.delete.message", { what }),
+        cancelText: t("common.cancel"),
+        confirmText: t("common.delete"),
+        onConfirm: async () => {
+          // El modal ya se ha desmontado; el botón sigue vivo detrás hasta que goBack() cierre el
+          // detalle, así que se deshabilita para que un segundo toque no abra otro modal.
+          const btn = container.querySelector("#mov-delete");
+          if (btn) btn.disabled = true;
+          try {
+            await softDeleteTransaction(state.detailId);
+            await loadPeriodData();
+            goBack();
+          } catch (e) {
+            if (btn) btn.disabled = false;
+            errorMsg = t("movimientos.error.delete", { error: userMessage(e) });
+            render();
+          }
+        },
+      });
     };
   }
 

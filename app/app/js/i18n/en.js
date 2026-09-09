@@ -6,6 +6,7 @@ export const EN = {
     retry: "Retry",
     save: "Save",
     cancel: "Cancel",
+    delete: "Delete",
     saveFailed: "Couldn’t save: {error}",
     saveChanges: "Save changes",
     confirmDelete: "Yes, delete",
@@ -196,7 +197,8 @@ export const EN = {
     row: { partnerPaid: " · {name} paid · your share {amount}" },
     delete: {
       button: "Delete",
-      confirm: "Yes, delete",
+      title: "Delete this transaction?",
+      message: "{what}. It will disappear from the lists and from the period totals.",
     },
     empty: {
       noUncategorized: "No uncategorized transactions.",
