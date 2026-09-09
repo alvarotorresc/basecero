@@ -3,7 +3,7 @@ import {
   getAccount, createAccount, updateAccount, listExpenseRootCategories, allCategoriesById,
   createGoal, updateGoal, softDeleteGoal, getAccountLoans, setAccountLoan,
 } from "../repo.js";
-import { colorForCategory, iconForCategory } from "../category-colors.js";
+import { colorForCategory, iconForCategory, POOL } from "../category-colors.js";
 import { fmtMoney, moneyPartsHtml, hoyISO, fmtDec1, currencySymbol, currencyCode, parseCentsRaw, centsToRaw } from "../format.js";
 import { netWorthBarsHtml } from "../charts.js";
 import { t } from "../i18n/index.js";
@@ -190,13 +190,10 @@ const GOAL_TYPE_KEY = Object.fromEntries(GOAL_TYPES.map((gt) => [gt.id, gt.label
 // "Tope de Restauración" — spending_cap, sin hucha — lleva barra).
 const HUCHA_GOAL_TYPES = new Set(["emergency_fund", "savings_target", "provision"]);
 
-// Paleta de anillos de Objetivos (brief Task 6): color = paleta[i % 12] sobre el índice del goal
+// Paleta de anillos de Objetivos (brief Task 6): color = POOL[i % 12] sobre el índice del goal
 // en el orden de listado (SQL.listGoals ORDER BY created_at, ya determinista) — no se persiste
-// nada, se deriva en cada render.
-const GOAL_RING_PALETTE = [
-  "#629D3B", "#6B61C2", "#A09600", "#9153AB", "#15AC7D", "#986603",
-  "#12A7A7", "#B45018", "#00A1CB", "#AA4985", "#4F94E9", "#B64656",
-];
+// nada, se deriva en cada render. Reusa el POOL de category-colors.js en vez de una copia propia
+// (cerraba el punto "paleta triplicada" del BACKLOG; reskin v2, tarea 10).
 
 /** savings_rate guarda puntos porcentuales en currentCents/targetCents (ver repo.goalProgress):
  *  se muestran como "%", el resto de tipos como € (fmtMoney). */
@@ -289,7 +286,7 @@ function objetivosCardHtml(goals) {
       ${header}
       <div class="card" style="display:flex;flex-direction:column;gap:18px;">
         ${goals.map((g, i) => HUCHA_GOAL_TYPES.has(g.goal.type)
-          ? goalRingRowHtml(g, GOAL_RING_PALETTE[i % GOAL_RING_PALETTE.length])
+          ? goalRingRowHtml(g, POOL[i % POOL.length])
           : goalBarRowHtml(g)).join("")}
       </div>
     </div>`;

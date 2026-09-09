@@ -206,11 +206,11 @@ export async function renderOnboarding(container, { onDone }) {
           const g = d.endsWith("g"), s = d.endsWith("s");
           const label = g || s ? d.slice(0, -1) : d;
           return `<div style="flex:1;aspect-ratio:1;display:grid;place-items:center;font-size:10px;border-radius:8px;${
-            g ? "background:#15AC7D;color:var(--bg);font-weight:800;" : s ? "background:color-mix(in srgb, #15AC7D 18%, var(--card));color:var(--text-2);" : "color:var(--text-2);"}">${label}</div>`;
+            g ? "background:#22C58B;color:var(--bg);font-weight:800;" : s ? "background:color-mix(in srgb, #22C58B 16%, var(--card));color:var(--text-2);" : "color:var(--text-2);"}">${label}</div>`;
         }).join("")}
       </div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:10px;">
-        <span style="width:9px;height:9px;border-radius:3px;background:#15AC7D;flex-shrink:0;"></span>
+        <span style="width:9px;height:9px;border-radius:3px;background:#22C58B;flex-shrink:0;"></span>
         <span style="font-size:11.5px;color:var(--text-2);">${t("onboarding.period.legend")}</span>
       </div>
     </div>

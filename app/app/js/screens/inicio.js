@@ -3,7 +3,7 @@ import {
   pendingSettlements, pendingSettlementNetCents, budgetsOfPeriod, previsionOfPeriod,
   spentByRootCategory, spentLast7Days, getMetaAll, setMeta, hasSharedData,
 } from "../repo.js";
-import { colorForCategory, iconForCategory } from "../category-colors.js";
+import { colorForCategory, iconForCategory, DEFAULT_COLOR } from "../category-colors.js";
 import { fmtMoney, moneyPartsHtml, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtNum2, fmtPct, currencyCode } from "../format.js";
 import { dayIndexOfPeriod, expectedPeriodDays, paceDeltaCents } from "../prevision.js";
 import { t } from "../i18n/index.js";
@@ -26,9 +26,10 @@ const centsToStr = (cents) => fmtNum2((cents ?? 0) / 100);
 // Cuántas categorías raíz se listan individualmente en el donut antes de agrupar el resto en
 // "Otras N" — mismo criterio visual que docs/design/material-expresivo/Resumen.dc.html:139-213 (6 + "Otras 3").
 const DONUT_TOP_N = 6;
-// Mismo gris que DEFAULT_COLOR en category-colors.js — no se importa porque este módulo no
-// tiene ninguna categoría real que resolver a "sin color", solo el grupo "Otras N".
-const DONUT_OTHERS_COLOR = "#9A99A6";
+// El gris del grupo "Otras N" es el mismo DEFAULT_COLOR de category-colors.js (importado: cierra
+// el punto "paleta triplicada" del BACKLOG, reskin v2 tarea 10), aunque este módulo no tenga
+// ninguna categoría real que resolver a "sin color".
+const DONUT_OTHERS_COLOR = DEFAULT_COLOR;
 
 /** Agrupa las filas de listByDay (ya vienen ordenadas por date DESC) en bloques por día,
  *  preservando el orden de llegada. */
@@ -150,7 +151,7 @@ function partnerBannerHtml() {
 
 function previsionRowHtml(item, byId) {
   const { rule, myCents, paid } = item;
-  const color = rule.type === "transfer" ? "#9A99A6" : colorForCategory(rule.category_id, byId);
+  const color = rule.type === "transfer" ? DEFAULT_COLOR : colorForCategory(rule.category_id, byId);
   const icon = rule.type === "transfer" ? "⇄" : iconForCategory(rule.category_id, byId);
   const amountStyle = paid
     ? "font-size:14px;font-weight:700;flex-shrink:0;color:var(--text-2);text-decoration:line-through;"

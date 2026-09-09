@@ -259,7 +259,7 @@ export async function renderRegistro(container, onDone, prefill) {
             const icon = iconForCategory(c.id, byId);
             const active = state.categoryId === c.id;
             const chipStyle = active
-              ? `--cat:${color};background:color-mix(in srgb, ${color} 18%, transparent);color:${textColor};font-weight:700;`
+              ? `--cat:${color};background:color-mix(in srgb, ${color} 16%, transparent);color:${textColor};font-weight:700;`
               : `--cat:${color};`;
             return `<button type="button" class="chip-v${active ? " active" : ""}" data-cat="${c.id}" style="${chipStyle}">
               <span class="chip-icon">${icon}</span><span>${escHtml(c.name)}</span>
