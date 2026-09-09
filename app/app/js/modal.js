@@ -45,6 +45,7 @@ export function createModal(doc, { pushBack, goBack, win }) {
 
       let confirmed = false;
       let byBack = false;
+      let pushed = false;
       // Salto de varias entradas de golpe (history.go(-n), o "atrás" del sistema mantenido): el
       // popstate de back.js solo ejecuta el callback de la entrada MÁS BAJA descartada (back.js:
       // dropped[0]). Si la del modal se descarta sin ser esa, el pushBack de más abajo nunca corre:
@@ -61,7 +62,10 @@ export function createModal(doc, { pushBack, goBack, win }) {
         win.removeEventListener("popstate", onPopstate);
         current = null;
         dlg.remove();
-        if (!byBack) goBack();                  // lo cerramos nosotros: falta deshacer la entrada
+        // Si pushBack nunca llegó a apuntar una entrada (la lanzó, p. ej. el límite de Safari), no
+        // hay nada que goBack() deba deshacer — llamarlo consumiría una entrada de la PANTALLA de
+        // detrás en su lugar.
+        if (!byBack && pushed) goBack();
         if (confirmed) onConfirm?.();
         else opener?.focus?.();
       });
@@ -70,7 +74,9 @@ export function createModal(doc, { pushBack, goBack, win }) {
       dlg.showModal();
       // {scroll:false}: abrir/cerrar el modal apunta una entrada de historial pero no es un cambio
       // de pantalla — la pantalla de detrás debe quedarse donde estaba (back.js: push/popstate).
-      pushBack(() => { byBack = true; dlg.close(); }, { scroll: false });
+      // showModal() va ANTES que esto: si pushBack lanza, el diálogo ya está abierto y Cancelar
+      // debe poder cerrarlo igual (arriba, con pushed=false, sin tocar goBack()).
+      try { pushBack(() => { byBack = true; dlg.close(); }, { scroll: false }); pushed = true; } catch {}
       dlg.querySelector("#modal-cancel").onclick = () => dlg.close();
       dlg.querySelector("#modal-confirm").onclick = () => { confirmed = true; dlg.close(); };
       dlg.querySelector("#modal-cancel").focus();

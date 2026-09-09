@@ -173,6 +173,20 @@ test("cerrar el modal (cancelar) quita su listener de popstate de seguridad", ()
   assert.equal(win.listeners.popstate.length, 0);
 });
 
+test("cancelar: si pushBack lanzó (pushState rechazado), no deshace la pantalla de detrás", () => {
+  const doc = fakeDoc();
+  const calls = [];
+  const modal = createModal(doc, {
+    pushBack: () => { throw new Error("límite de Safari"); },
+    goBack: () => calls.push("goBack"),
+    win: fakeWin(),
+  });
+  const dlg = modal.confirm(OPTS);
+  dlg.querySelector("#modal-cancel").onclick();
+  assert.equal(dlg.open, false);
+  assert.deepEqual(calls, [], "pushBack nunca aportó una entrada que goBack() pudiera deshacer");
+});
+
 test("Escape: el nodo es un dialog abierto con showModal, que es lo que lo cierra con Escape", () => {
   const { doc, modal } = harness();
   const dlg = modal.confirm(OPTS);
