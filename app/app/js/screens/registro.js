@@ -8,6 +8,7 @@ import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { userMessage } from "../errors.js";
+import { focusInput } from "../viewport.js";
 
 // labelKey/SAVE_KEY en vez de texto resuelto: son consts de módulo, evaluadas al importar el
 // fichero (antes de que boot() llame a initI18n con el idioma real) — si guardaran el string ya
@@ -489,4 +490,13 @@ export async function renderRegistro(container, onDone, prefill) {
   }
 
   render();
+  // Foco en el importe SOLO tras el primer pintado: render() se repite en cada cambio de estado y
+  // enfocar ahí robaría el foco a cada toque de chip.
+  // Siempre, sin olfatear si la pantalla es táctil: en escritorio no hay teclado del sistema que
+  // abrir y las heurísticas de "pointer: coarse" fallan justo donde importa (portátil táctil,
+  // móvil con teclado bluetooth). En el móvil el teclado probablemente NO salte: esto corre tras
+  // seis consultas, muy lejos del gesto que abrió la pantalla, y iOS solo levanta el teclado para
+  // un focus() dentro del contexto de activación del usuario. Lo que arregla "hay que subir para
+  // escribir el importe" es el scroll (Task 2); esto es escritorio y accesibilidad.
+  focusInput(container.querySelector("#reg-raw"));
 }
