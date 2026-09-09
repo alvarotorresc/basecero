@@ -812,3 +812,28 @@ body.onboarding .fab { display: none; }
   .skeleton { animation: none; }
   #toast { transition: none; }
 }
+
+/* ===== modal de confirmación (modal.js) ===== */
+/* <dialog> abierto con showModal(): el navegador lo pinta en la top layer, por encima de la tabbar
+   (z-index 20), el toast (25) y la franja de aviso (30) sin participar en esa escalera.
+   TRAMPA: tokens.css:11 es `* { margin: 0 }` y mata el `margin:auto` con el que el UA centra un
+   diálogo modal — sin la primera línea, el modal aparece pegado arriba a la izquierda. */
+.modal {
+  margin: auto;
+  width: min(360px, calc(100% - 40px));
+  padding: 22px 20px 16px;
+  border: 0;                      /* el UA le pone borde y colores de sistema */
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--text);
+  font-family: var(--font-ui);
+}
+.modal::backdrop { background: rgba(0, 0, 0, 0.55); }
+.modal-title { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.modal-text { margin-top: 8px; font-size: 14px; color: var(--text-2); }
+.modal-actions { display: flex; gap: 10px; margin-top: 22px; }
+.modal-actions button { flex: 1; }
+.modal-danger {
+  background: var(--red); color: var(--bg); border: 0; border-radius: 999px;
+  height: 52px; padding: 0 20px; font: 600 16px var(--font-ui); cursor: pointer;
+}
