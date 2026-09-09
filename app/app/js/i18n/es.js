@@ -825,4 +825,11 @@ export const ES = {
       subtitle: "Tasa de ahorro del periodo abierto",
     },
   },
+  recibo: {
+    stamp: "Guardado",
+    total: "Total",
+    undo: "Deshacer",
+    myPart: "Tu parte",
+    undoFailed: "No se pudo deshacer: {error}",
+  },
 };

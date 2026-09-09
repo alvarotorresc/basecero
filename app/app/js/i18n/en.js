@@ -810,4 +810,11 @@ export const EN = {
       subtitle: "Savings rate for the open period",
     },
   },
+  recibo: {
+    stamp: "Saved",
+    total: "Total",
+    undo: "Undo",
+    myPart: "Your share",
+    undoFailed: "Could not undo: {error}",
+  },
 };
