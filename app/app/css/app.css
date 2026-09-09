@@ -372,17 +372,20 @@ main#screen {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-height: 64px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hairline);
 }
 .tx-icon {
   width: 40px;
   height: 40px;
-  border-radius: 14px;
+  border-radius: var(--r-circle);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--cat, var(--text-3)) 18%, transparent);
-  color: var(--cat, var(--text-3));
+  background: color-mix(in srgb, var(--cat, var(--ink-3)) 16%, transparent);
+  color: var(--cat, var(--ink-3));
   font-size: 19px; /* iconForCategory devuelve emoji, no svg: sin esto se ve diminuto (ver task 4, .chip-icon) */
   line-height: 1;
 }
@@ -395,15 +398,15 @@ main#screen {
   min-width: 0;
 }
 .tx-title {
-  font-size: 14px;
-  font-weight: 600;
+  font: var(--t-body);
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .tx-sub {
-  font-size: 11px;
-  color: var(--text-3);
+  font: var(--t-label);
+  color: var(--ink-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -443,13 +446,13 @@ main#screen {
 .list-row-icon {
   width: 42px;
   height: 42px;
-  border-radius: 15px;
+  border-radius: var(--r-circle);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--cat, var(--text-2)) 18%, transparent);
-  color: var(--cat, var(--text-2));
+  background: color-mix(in srgb, var(--cat, var(--ink-3)) 16%, transparent);
+  color: var(--cat, var(--ink-3));
 }
 .list-row-icon svg { width: 20px; height: 20px; }
 .list-row-body { display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0; }
@@ -561,31 +564,32 @@ main#screen {
   outline-offset: 2px;
 }
 
-/* ===== aviso / banner ===== */
+/* ===== aviso / banner (SISTEMA.md §4.17) ===== */
 .banner-aviso {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  min-height: 44px;
   padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--amber) 14%, var(--card));
-  border: 1px solid color-mix(in srgb, var(--amber) 35%, var(--rule));
+  border-radius: var(--r-0);
+  background: var(--warn-tint);
+  border: 0;
   font-size: 12px;
   line-height: 1.5;
-  color: var(--text-2);
+  color: var(--warn);
 }
 .banner-aviso svg {
   flex-shrink: 0;
   width: 18px;
   height: 18px;
   margin-top: 1px;
-  color: var(--amber);
+  color: var(--warn);
 }
 .banner-aviso.red {
-  background: color-mix(in srgb, var(--red) 14%, var(--card));
-  border-color: color-mix(in srgb, var(--red) 35%, var(--rule));
+  background: var(--danger-tint);
+  color: var(--danger);
 }
-.banner-aviso.red svg { color: var(--red); }
+.banner-aviso.red svg { color: var(--danger); }
 
 /* el aviso de almacenamiento no persistente se antepone a body (fuera de #screen):
    franja roja tenue fija arriba, a todo lo ancho del layout */
@@ -660,18 +664,19 @@ body.onboarding .fab { display: none; }
 
 /* ===== componentes nuevos del sistema (consumidos por las tareas 5-8) ===== */
 
-/* icono redondo de categoría/comercio, color sólido + emoji encima (DesignSystem.dc.html) */
+/* Círculo TINTADO al 16 % con el emoji encima (antes: círculo de color sólido). Es lo que hace
+   que el color de categoría sea señal y no bloque (SISTEMA.md §1 principio 2, §4.3). */
 .dotico {
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   flex-shrink: 0;
-  border-radius: 50%;
+  border-radius: var(--r-circle);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 19px;
   line-height: 1;
-  background: var(--cat, var(--text-2));
+  background: color-mix(in srgb, var(--cat, var(--ink-3)) 16%, transparent);
 }
 
 .day-label {
@@ -683,15 +688,15 @@ body.onboarding .fab { display: none; }
    y opcionalmente --cat para el color (categoría o estado: bien/al límite/excedido) */
 .bar {
   height: 8px;
-  border-radius: 999px;
-  background: var(--card2);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
   overflow: hidden;
 }
 .bar > i {
   display: block;
   height: 100%;
-  border-radius: 999px;
-  background: var(--cat, var(--green));
+  border-radius: var(--r-pill);
+  background: var(--cat, var(--accent));
 }
 
 /* anillo de progreso conic-gradient con hueco central; el consumidor fija --pct (0-100, número)
@@ -704,14 +709,14 @@ body.onboarding .fab { display: none; }
   position: relative;
   display: grid;
   place-items: center;
-  background: conic-gradient(var(--cat, var(--green)) calc(var(--pct, 0) * 1%), var(--card2) 0);
+  background: conic-gradient(var(--cat, var(--green)) calc(var(--pct, 0) * 1%), var(--surface-2) 0);
 }
 .ring::after {
   content: "";
   position: absolute;
   inset: 5px;
   border-radius: 50%;
-  background: var(--card);
+  background: var(--bg);
 }
 .ring > * {
   position: relative;
@@ -742,8 +747,8 @@ body.onboarding .fab { display: none; }
 
 /* ---- Onboarding (PR F): indicador de progreso de 4 pasos ---- */
 .onb-dots { display: flex; gap: 6px; justify-content: center; }
-.onb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--card2); }
-.onb-dot.on { background: var(--text); width: 20px; border-radius: 999px; }
+.onb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--surface-2); }
+.onb-dot.on { background: var(--accent); width: 20px; border-radius: 999px; }
 
 /* ===== accesibilidad (Task 2 P2) ===== */
 /* foco visible global: reemplaza los `outline: none` de .field input/select y .budget-input
@@ -784,8 +789,8 @@ body.onboarding .fab { display: none; }
 /* ===== esqueleto de carga (skeleton.js) ===== */
 /* Misma tinta y mismo radio que las tarjetas para que la silueta prometa lo que va a llegar. */
 .skeleton {
-  background: var(--card2);
-  border-radius: var(--radius);
+  background: var(--surface-2);
+  border-radius: var(--r-0);
   animation: bc-skeleton 1.2s ease-in-out infinite;
 }
 @keyframes bc-skeleton {
