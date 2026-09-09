@@ -237,7 +237,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         ${TIPOS.map((tp) => {
           const active = state.tipo === tp.id;
           const segStyle = active
-            ? "border-radius:999px;background:var(--card2);color:var(--text);font-weight:700;"
+            ? "border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:600;"
             : "border-radius:999px;";
           return `<button type="button" data-tipo="${tp.id}" class="${active ? "active" : ""}" style="${segStyle}">${t(tp.labelKey)}</button>`;
         }).join("")}
@@ -308,9 +308,9 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
             <div class="section-title">${t("common.paidBy.label")}</div>
             <div class="segmented" style="border-radius:999px;">
               <button type="button" data-paidby="me" class="${state.paidBy === "me" ? "active" : ""}"
-                style="flex:1;border-radius:999px;${state.paidBy === "me" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("common.paidBy.me")}</button>
+                style="flex:1;border-radius:999px;${state.paidBy === "me" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("common.paidBy.me")}</button>
               <button type="button" data-paidby="partner" class="${state.paidBy === "partner" ? "active" : ""}"
-                style="flex:1;border-radius:999px;${state.paidBy === "partner" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("common.paidBy.partner", { name: escHtml(partnerName) })}</button>
+                style="flex:1;border-radius:999px;${state.paidBy === "partner" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("common.paidBy.partner", { name: escHtml(partnerName) })}</button>
             </div>
           </div>` : ""}
           <div style="display:flex; align-items:center; gap:10px;">

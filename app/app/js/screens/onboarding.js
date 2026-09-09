@@ -129,7 +129,7 @@ export async function renderOnboarding(container, { onDone }) {
       <div class="segmented" style="border-radius:999px;">
         ${ACCOUNT_TYPES.map((at) => `
         <button type="button" data-onb-tipo="${at.id}" class="${f.type === at.id ? "active" : ""}"
-          style="border-radius:999px;${f.type === at.id ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t(at.labelKey)}</button>`).join("")}
+          style="border-radius:999px;${f.type === at.id ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t(at.labelKey)}</button>`).join("")}
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
         <div style="flex:1;">
@@ -162,7 +162,7 @@ export async function renderOnboarding(container, { onDone }) {
         <div class="segmented" style="border-radius:999px;">
           ${LANGS.map(([v, label]) => `
           <button type="button" data-onb-lang="${v}" class="${activeLang() === v ? "active" : ""}"
-            style="border-radius:999px;${activeLang() === v ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${escHtml(label)}</button>`).join("")}
+            style="border-radius:999px;${activeLang() === v ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${escHtml(label)}</button>`).join("")}
         </div>
       </div>
       <div style="background:var(--card);border-radius:0;padding:16px;display:flex;flex-direction:column;gap:10px;">

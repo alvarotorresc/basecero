@@ -408,9 +408,9 @@ export async function renderMovimientos(container) {
             <div class="section-title">${t("common.paidBy.label")}</div>
             <div class="segmented" style="border-radius:999px;">
               <button type="button" data-paidby="me" class="${d.paidBy === "me" ? "active" : ""}" ${locked ? "disabled" : ""}
-                style="flex:1;border-radius:999px;${d.paidBy === "me" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("common.paidBy.me")}</button>
+                style="flex:1;border-radius:999px;${d.paidBy === "me" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("common.paidBy.me")}</button>
               <button type="button" data-paidby="partner" class="${d.paidBy === "partner" ? "active" : ""}" ${locked ? "disabled" : ""}
-                style="flex:1;border-radius:999px;${d.paidBy === "partner" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("common.paidBy.partner", { name: escHtml(partnerName) || t("movimientos.shared.fallbackName") })}</button>
+                style="flex:1;border-radius:999px;${d.paidBy === "partner" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("common.paidBy.partner", { name: escHtml(partnerName) || t("movimientos.shared.fallbackName") })}</button>
             </div>
           </div>` : ""}
           <div style="display:flex; align-items:center; gap:10px;">

@@ -800,9 +800,9 @@ export async function renderAjustes(container) {
           <div class="section-title" style="margin-bottom:7px;">${t("ajustes.assist.amountTitle")}</div>
           <div class="segmented" style="border-radius:999px;margin-bottom:8px;">
             <button type="button" data-assist-kind="single" class="${a.amountKind === "single" ? "active" : ""}"
-              style="border-radius:999px;${a.amountKind === "single" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("ajustes.assist.amountSingleBtn")}</button>
+              style="border-radius:999px;${a.amountKind === "single" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("ajustes.assist.amountSingleBtn")}</button>
             <button type="button" data-assist-kind="split" class="${a.amountKind === "split" ? "active" : ""}"
-              style="border-radius:999px;${a.amountKind === "split" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("ajustes.assist.amountSplitBtn")}</button>
+              style="border-radius:999px;${a.amountKind === "split" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("ajustes.assist.amountSplitBtn")}</button>
           </div>
           ${a.amountKind === "single" ? chipsRowHtml("amountCol", headerOptions, a.amountCol) : `
           <div class="section-title" style="margin:0 0 6px;">${t("ajustes.assist.debitTitle")}</div>

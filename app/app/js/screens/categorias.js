@@ -240,7 +240,7 @@ export async function renderCategorias(container, onBack) {
             ${[["expense", t("common.type.expense")], ["income", t("common.type.income")]].map(([id, label]) => {
               const active = form.flow === id;
               const segStyle = active
-                ? "border-radius:999px;background:var(--card2);color:var(--text);font-weight:700;"
+                ? "border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:600;"
                 : "border-radius:999px;";
               return `<button type="button" data-cf-flow="${id}" class="${active ? "active" : ""}"
                 style="${segStyle}${editing ? "pointer-events:none;cursor:default;" : ""}">${label}</button>`;
@@ -256,7 +256,7 @@ export async function renderCategorias(container, onBack) {
             ${[["need", t("categorias.needType.need")], ["want", t("categorias.needType.want")]].map(([id, label]) => {
               const active = form.needType === id;
               const segStyle = active
-                ? "border-radius:999px;background:var(--card2);color:var(--text);font-weight:700;"
+                ? "border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:600;"
                 : "border-radius:999px;";
               return `<button type="button" data-cf-need="${id}" class="${active ? "active" : ""}" style="${segStyle}">${label}</button>`;
             }).join("")}
@@ -647,7 +647,7 @@ export async function renderCategorias(container, onBack) {
         ${[["expense", t("categorias.flow.expenseCount", { n: expenseCount })], ["income", t("categorias.flow.incomeCount", { n: incomeCount })]].map(([id, label]) => {
           const active = state.flow === id;
           const segStyle = active
-            ? "border-radius:999px;background:var(--card2);color:var(--text);font-weight:700;"
+            ? "border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:600;"
             : "border-radius:999px;";
           return `<button type="button" data-flow="${id}" class="${active ? "active" : ""}" style="${segStyle}">${label}</button>`;
         }).join("")}
