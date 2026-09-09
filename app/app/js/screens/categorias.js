@@ -55,8 +55,8 @@ function rootSubtitle(root, childCount) {
 // esas asumen un .chip-icon circular a la izquierda que este selector no lleva (el artboard pone
 // el emoji inline, sin círculo) — inline, mismo criterio que el resto de este archivo (Task 5).
 function chipStyle(active) {
-  return `display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:${active ? 700 : 600};
-    background:${active ? "var(--text)" : "var(--card2)"};color:${active ? "var(--bg)" : "var(--text-2)"};
+  return `display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:${active ? 600 : 500};
+    background:${active ? "var(--accent)" : "var(--surface-2)"};color:${active ? "var(--accent-ink)" : "var(--ink-2)"};
     border:0;border-radius:999px;padding:9px 14px;white-space:nowrap;flex-shrink:0;cursor:pointer;
     -webkit-tap-highlight-color:transparent;`;
 }
