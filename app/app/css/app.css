@@ -192,6 +192,7 @@ main#screen {
 }
 
 /* ===== barra de pestañas + FAB ===== */
+/* ===== tab bar + FAB (SISTEMA.md §4.14) ===== */
 .tabbar {
   position: fixed;
   left: 50%;
@@ -199,13 +200,12 @@ main#screen {
   transform: translateX(-50%);
   width: 100%;
   max-width: 480px;
-  height: calc(84px + env(safe-area-inset-bottom, 0px));
-  padding: 0 14px env(safe-area-inset-bottom, 0px);
+  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+  padding: 0 0 env(safe-area-inset-bottom, 0px);
   display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--bg);
-  border-top: 1px solid var(--rule);
+  align-items: stretch;
+  background: var(--surface);
+  border-top: 1px solid var(--hairline);
   z-index: 20;
 }
 
@@ -221,30 +221,34 @@ main#screen {
   background: none;
   border: 0;
   padding: 0;
-  color: var(--text-3);
+  color: var(--ink-3);
   font-size: 10px;
   font-weight: 500;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 .tab svg {
-  width: 21px;
-  height: 21px;
+  width: 24px;
+  height: 24px;
   stroke: currentColor;
   fill: none;
 }
 .tab.active {
-  color: var(--text);
-  font-weight: 700;
+  color: var(--accent);
+  font-weight: 600;
 }
+.tab.active svg { stroke-width: 2; }
 
+/* Sigue siendo hijo de <nav class="tabbar">: body.onboarding .fab { display:none } (más abajo)
+   sigue funcionando sin tocarlo, aunque flote fuera del flujo de la barra. */
 .fab {
+  position: fixed;
   flex-shrink: 0;
   width: 56px;
   height: 56px;
-  border-radius: 19px;
-  background: var(--text);
-  color: var(--bg);
+  border-radius: var(--r-circle);
+  background: var(--accent);
+  color: var(--accent-ink);
   border: 0;
   display: flex;
   align-items: center;
@@ -254,9 +258,13 @@ main#screen {
   font-weight: 400;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-float);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 16px);
+  /* position:fixed se resuelve contra el viewport, no contra el body de 480px: sin el max(),
+     en escritorio el FAB se iría al borde de la ventana en vez de quedarse junto a la columna. */
+  right: max(18px, calc(50% - 240px + 18px));
 }
-.fab:active { background: color-mix(in srgb, var(--text) 88%, var(--bg)); }
+.fab:active { background: color-mix(in srgb, var(--accent) 88%, var(--bg)); }
 
 /* ===== chips de categoría ===== */
 .chips {
@@ -766,7 +774,7 @@ body.onboarding .fab { display: none; }
 #toast {
   position: fixed;
   left: 50%;
-  bottom: calc(84px + env(safe-area-inset-bottom, 0px) + 12px);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 12px);
   z-index: 25;
   max-width: min(calc(100% - 40px), 440px);
   padding: 10px 16px;

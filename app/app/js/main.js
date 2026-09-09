@@ -48,7 +48,9 @@ export function nav(tab) {
 // el tabbar y el FAB están ocultos durante el asistente, así que sin este segundo rotulado
 // quedarían con el idioma del arranque durante toda la sesión.
 function relabelChrome() {
-  document.querySelectorAll(".tab").forEach((b) => { b.lastChild.textContent = " " + t("main.tabs." + b.dataset.tab); });
+  document.querySelectorAll(".tab").forEach((b) => {
+    b.querySelector(".tab-label").textContent = t("main.tabs." + b.dataset.tab);
+  });
   document.getElementById("btn-registro").setAttribute("aria-label", t("main.fab"));
   document.querySelector(".tabbar").setAttribute("aria-label", t("main.tabsNav"));
 }

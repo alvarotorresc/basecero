@@ -74,12 +74,12 @@ export async function renderOnboarding(container, { onDone }) {
     return `
     <div style="margin-top:44px;display:flex;flex-direction:column;align-items:flex-start;gap:14px;">
       <svg width="64" height="64" viewBox="0 0 512 512" aria-hidden="true" style="display:block;flex-shrink:0;">
-        <rect width="512" height="512" rx="112" fill="#4FD99A"></rect>
-        <path d="M193.43 112.79A41 42 0 1 0 166 186A41 42 0 1 1 138.57 259.21" fill="none" stroke="#121214" stroke-width="40" stroke-linecap="round"></path>
-        <rect x="149" y="78" width="34" height="216" rx="17" fill="#121214"></rect>
-        <path d="M373.43 112.79A41 42 0 1 0 346 186A41 42 0 1 1 318.57 259.21" fill="none" stroke="#121214" stroke-width="40" stroke-linecap="round"></path>
-        <rect x="329" y="78" width="34" height="216" rx="17" fill="#121214"></rect>
-        <rect x="138" y="349" width="236" height="50" rx="25" fill="#121214"></rect>
+        <rect width="512" height="512" rx="112" fill="#D4FF3F"></rect>
+        <path d="M193.43 112.79A41 42 0 1 0 166 186A41 42 0 1 1 138.57 259.21" fill="none" stroke="#14180B" stroke-width="40" stroke-linecap="round"></path>
+        <rect x="149" y="78" width="34" height="216" rx="17" fill="#14180B"></rect>
+        <path d="M373.43 112.79A41 42 0 1 0 346 186A41 42 0 1 1 318.57 259.21" fill="none" stroke="#14180B" stroke-width="40" stroke-linecap="round"></path>
+        <rect x="329" y="78" width="34" height="216" rx="17" fill="#14180B"></rect>
+        <rect x="138" y="349" width="236" height="50" rx="25" fill="#14180B"></rect>
       </svg>
       <div style="font-size:32px;font-weight:800;letter-spacing:-0.02em;line-height:1.12;">${t("onboarding.welcome.titleLine1")}<br>${t("onboarding.welcome.titleLine2")}</div>
       <div style="font-size:14px;color:var(--text-2);line-height:1.5;">${t("onboarding.welcome.subtitle")}</div>
