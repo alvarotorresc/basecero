@@ -21,21 +21,18 @@ main#screen {
   padding: 20px 20px calc(84px + env(safe-area-inset-bottom, 0px) + 24px);
 }
 
-/* ===== componentes base (design/material-expresivo/DesignSystem.dc.html) =====
-   .card y .btn-primary viven también en tokens.css (PR A): app.css carga después,
-   misma especificidad → estas reglas ganan por cascada y sobrescriben el look viejo. */
-.card {
-  border: 0; /* principio 4: cards sin borde, elevación tonal */
-}
+/* ===== componentes base (docs/design/final-v2/SISTEMA.md) =====
+   .card ya no es una tarjeta: SISTEMA.md §1 principio 3 — se agrupa con aire y filete, no con caja.
+   Se mantiene la clase (54 markups la emiten) pero deja de pintar nada. */
+.card { background: transparent; border: 0; border-radius: var(--r-0); padding: 0; }
 .btn-primary {
-  background: var(--text);
-  color: var(--bg);
-  border-radius: 999px;
-  height: 52px;
-  padding: 0 28px;
-  /* width:100% se hereda de tokens.css — la mayoría de usos son CTA a todo el ancho
-     al pie de un formulario; el ejemplo aislado del artboard no representa ese contexto. */
+  background: var(--accent); color: var(--accent-ink);
+  border: 0; border-radius: var(--r-pill);
+  height: 52px; padding: 0 28px; width: 100%;
+  font: 600 16px var(--font-sans); cursor: pointer;
 }
+.text-red { color: var(--danger); }
+.text-green { color: var(--pos); }
 .btn-secondary {
   background: var(--card2);
   color: var(--text);
