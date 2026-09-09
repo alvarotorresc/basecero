@@ -6,6 +6,7 @@ import { colorForCategory, iconForCategory, POOL, CURATED_ICONS, hashIndex } fro
 import { t } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
+import { showConfirm } from "../modal.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -98,7 +99,7 @@ export async function renderCategorias(container, onBack) {
 
   const state = {
     flow: "expense", expanded: new Set(),
-    view: "list", form: null, formError: "", deleteConfirm: false,
+    view: "list", form: null, formError: "",
   };
 
   function render() {
@@ -110,7 +111,6 @@ export async function renderCategorias(container, onBack) {
     state.view = "list";
     state.form = null;
     state.formError = "";
-    state.deleteConfirm = false;
     render();
   }
 
@@ -141,7 +141,6 @@ export async function renderCategorias(container, onBack) {
    *  — shape ya fijada por la Task 5 (4 call sites de wireList más abajo). */
   function openForm({ mode, flow, category, parentId }) {
     state.formError = "";
-    state.deleteConfirm = false;
 
     // wasRoot: ¿esta categoría YA era una raíz al abrir el formulario? Gobierna tanto si el color
     // sigue al nombre mientras se teclea (colorTouched) como la lógica de guardado de estilo (ver
@@ -202,11 +201,8 @@ export async function renderCategorias(container, onBack) {
     return { color: "var(--text-2)", icon: "▫️" };
   }
 
-  function archiveButtonLabel(form, armed) {
-    if (form.isArchived) return t("categorias.archive.unarchive");
-    if (!armed) return t("categorias.archive.archive");
-    const n = form.activeChildrenCount;
-    return n > 0 ? t("categorias.archive.confirmWithCount", { count: subcatCount(n) }) : t("categorias.archive.confirm");
+  function archiveButtonLabel(form) {
+    return form.isArchived ? t("categorias.archive.unarchive") : t("categorias.archive.archive");
   }
 
   function renderForm() {
@@ -216,7 +212,6 @@ export async function renderCategorias(container, onBack) {
     const lockedParent = editing && form.childrenCount > 0;
     const preview = previewStyle(form);
     const parents = availableParents(form);
-    const armed = state.deleteConfirm && !form.isArchived;
 
     container.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -329,10 +324,8 @@ export async function renderCategorias(container, onBack) {
         ${editing ? `
         <button type="button" id="cf-archive"
           style="border:0;cursor:pointer;font-size:13px;font-weight:600;text-align:center;
-          ${armed
-            ? "background:var(--red);color:#fff;border-radius:var(--radius-sm);padding:14px;"
-            : "background:none;color:var(--red);padding:4px 0 0;"}">
-          ${archiveButtonLabel(form, armed)}
+          background:none;color:var(--red);padding:4px 0 0;">
+          ${archiveButtonLabel(form)}
         </button>` : ""}
 
       </div>
@@ -414,9 +407,10 @@ export async function renderCategorias(container, onBack) {
 
   async function onArchiveClick() {
     const form = state.form;
-    const btn = container.querySelector("#cf-archive");
 
     if (form.isArchived) {
+      // Desarchivar no es destructivo: sin modal.
+      const btn = container.querySelector("#cf-archive");
       btn.disabled = true;
       try {
         await unarchiveCategory(form.id);
@@ -430,23 +424,28 @@ export async function renderCategorias(container, onBack) {
       return;
     }
 
-    if (!state.deleteConfirm) {
-      state.deleteConfirm = true;
-      renderForm();
-      return;
-    }
-
-    btn.disabled = true;
-    try {
-      await archiveCategory(form.id);
-      await loadData();
-      goBack();
-    } catch (e) {
-      btn.disabled = false;
-      state.formError = userMessage(e);
-      state.deleteConfirm = false;
-      renderForm();
-    }
+    const n = form.activeChildrenCount;
+    showConfirm({
+      title: t("categorias.archive.title"),
+      message: n > 0
+        ? t("categorias.archive.messageWithCount", { name: form.name, count: subcatCount(n) })
+        : t("categorias.archive.message", { name: form.name }),
+      cancelText: t("common.cancel"),
+      confirmText: t("categorias.archive.archive"),
+      onConfirm: async () => {
+        const btn = container.querySelector("#cf-archive");
+        if (btn) btn.disabled = true;
+        try {
+          await archiveCategory(form.id);
+          await loadData();
+          goBack();
+        } catch (e) {
+          if (btn) btn.disabled = false;
+          state.formError = userMessage(e);
+          renderForm();
+        }
+      },
+    });
   }
 
   function wireForm() {
@@ -475,7 +474,6 @@ export async function renderCategorias(container, onBack) {
     nameInput.oninput = (e) => {
       form.name = e.target.value;
       state.formError = "";
-      state.deleteConfirm = false;
       if (form.colorTouched || form.parentId) return; // hija: el circulito no depende del nombre
       const nextColor = POOL[hashIndex(slug(form.name))];
       if (nextColor === form.color) return;
@@ -498,7 +496,6 @@ export async function renderCategorias(container, onBack) {
         // Si la raíz elegida en "Dentro de" ya no pertenece al nuevo flow, vuelve a "Raíz nueva".
         if (form.parentId && !roots.some((r) => r.id === form.parentId && r.flow === form.flow)) form.parentId = "";
         state.formError = "";
-        state.deleteConfirm = false;
         renderForm();
       };
     });
@@ -506,7 +503,6 @@ export async function renderCategorias(container, onBack) {
     container.querySelectorAll("[data-cf-need]").forEach((b) => {
       b.onclick = () => {
         form.needType = b.dataset.cfNeed;
-        state.deleteConfirm = false;
         renderForm();
       };
     });
@@ -514,7 +510,6 @@ export async function renderCategorias(container, onBack) {
     container.querySelectorAll("[data-cf-parent]").forEach((b) => {
       b.onclick = () => {
         form.parentId = b.dataset.cfParent;
-        state.deleteConfirm = false;
         renderForm();
       };
     });
@@ -523,7 +518,6 @@ export async function renderCategorias(container, onBack) {
       b.onclick = () => {
         form.color = b.dataset.cfColor;
         form.colorTouched = true; // fija la elección: deja de seguir al nombre mientras se teclea
-        state.deleteConfirm = false;
         renderForm();
       };
     });
@@ -531,7 +525,6 @@ export async function renderCategorias(container, onBack) {
     container.querySelectorAll("[data-cf-icon]").forEach((b) => {
       b.onclick = () => {
         form.icon = b.dataset.cfIcon;
-        state.deleteConfirm = false;
         renderForm();
       };
     });

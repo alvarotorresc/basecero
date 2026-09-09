@@ -9,6 +9,7 @@ import { netWorthBarsHtml } from "../charts.js";
 import { t } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
+import { showConfirm } from "../modal.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -336,7 +337,6 @@ export async function renderPatrimonio(container) {
     view: "main",
     editingAccountId: null, accountForm: null,
     editingGoalId: null, goalForm: null,
-    deleteConfirm: false,
     opening: false, // apertura de formulario de cuenta en curso (ver openAccountEdit)
   };
   let errorMsg = "";
@@ -345,7 +345,6 @@ export async function renderPatrimonio(container) {
     state.view = "main";
     state.editingAccountId = null; state.accountForm = null;
     state.editingGoalId = null; state.goalForm = null;
-    state.deleteConfirm = false;
     errorMsg = "";
     render();
   }
@@ -528,7 +527,6 @@ export async function renderPatrimonio(container) {
       name: "", type: "emergency_fund", raw: "", cents: 0, months: "", pct: "",
       targetDate: "", categoryId: null, isActive: true, accountName: "",
     };
-    state.deleteConfirm = false;
     errorMsg = "";
     pushBack(backToMain);
     state.view = "goal-form";
@@ -548,7 +546,6 @@ export async function renderPatrimonio(container) {
       isActive: !!goal.is_active,
       accountName: accountNameById()[goal.account_id] ?? "",
     };
-    state.deleteConfirm = false;
     errorMsg = "";
     pushBack(backToMain);
     state.view = "goal-form";
@@ -706,9 +703,9 @@ export async function renderPatrimonio(container) {
       </button>
       ${editing ? `
       <button type="button" id="goal-delete"
-        style="width:100%;background:${state.deleteConfirm ? "var(--red)" : "transparent"};color:${state.deleteConfirm ? "#fff" : "var(--red)"};
+        style="width:100%;background:transparent;color:var(--red);
           border:1px solid var(--red);border-radius:var(--radius-sm);padding:16px;font:600 16px var(--font-ui);cursor:pointer;">
-        ${state.deleteConfirm ? t("common.confirmDelete") : t("patrimonio.goal.delete")}
+        ${t("patrimonio.goal.delete")}
       </button>` : ""}
     `;
 
@@ -723,13 +720,12 @@ export async function renderPatrimonio(container) {
   function wireGoalForm() {
     const f = state.goalForm;
     container.querySelector("#goal-back").onclick = () => goBack();
-    container.querySelector("#goal-name").oninput = (e) => { f.name = e.target.value; state.deleteConfirm = false; };
+    container.querySelector("#goal-name").oninput = (e) => { f.name = e.target.value; };
 
     container.querySelectorAll("[data-goal-tipo]").forEach((b) => {
       b.onclick = () => {
         f.type = b.dataset.goalTipo;
         errorMsg = "";
-        state.deleteConfirm = false;
         render();
       };
     });
@@ -739,20 +735,19 @@ export async function renderPatrimonio(container) {
       f.raw = e.target.value;
       f.cents = parseCentsRaw(f.raw);
       errorMsg = "";
-      state.deleteConfirm = false;
     };
 
     const monthsInput = container.querySelector("#goal-months");
-    if (monthsInput) monthsInput.oninput = (e) => { f.months = e.target.value; errorMsg = ""; state.deleteConfirm = false; };
+    if (monthsInput) monthsInput.oninput = (e) => { f.months = e.target.value; errorMsg = ""; };
 
     const pctInput = container.querySelector("#goal-pct");
-    if (pctInput) pctInput.oninput = (e) => { f.pct = e.target.value; errorMsg = ""; state.deleteConfirm = false; };
+    if (pctInput) pctInput.oninput = (e) => { f.pct = e.target.value; errorMsg = ""; };
 
     const dateInput = container.querySelector("#goal-date");
-    if (dateInput) dateInput.onchange = (e) => { f.targetDate = e.target.value; state.deleteConfirm = false; };
+    if (dateInput) dateInput.onchange = (e) => { f.targetDate = e.target.value; };
 
     container.querySelectorAll("[data-goal-cat]").forEach((b) => {
-      b.onclick = () => { f.categoryId = b.dataset.goalCat; errorMsg = ""; state.deleteConfirm = false; render(); };
+      b.onclick = () => { f.categoryId = b.dataset.goalCat; errorMsg = ""; render(); };
     });
 
     container.querySelector("#goal-active").onchange = (e) => { f.isActive = e.target.checked; };
@@ -783,24 +778,26 @@ export async function renderPatrimonio(container) {
     };
 
     const deleteBtn = container.querySelector("#goal-delete");
-    if (deleteBtn) deleteBtn.onclick = async () => {
-      if (!state.deleteConfirm) {
-        state.deleteConfirm = true;
-        render();
-        return;
-      }
-      const btn = container.querySelector("#goal-delete");
-      btn.disabled = true;
-      try {
-        await softDeleteGoal(state.editingGoalId);
-        await loadData();
-        goBack();
-      } catch (e) {
-        btn.disabled = false;
-        errorMsg = t("common.deleteFailed", { error: userMessage(e) });
-        state.deleteConfirm = false;
-        render();
-      }
+    if (deleteBtn) deleteBtn.onclick = () => {
+      showConfirm({
+        title: t("patrimonio.goal.deleteTitle"),
+        message: t("patrimonio.goal.deleteMessage", { name: f.name }),
+        cancelText: t("common.cancel"),
+        confirmText: t("common.delete"),
+        onConfirm: async () => {
+          const btn = container.querySelector("#goal-delete");
+          if (btn) btn.disabled = true;
+          try {
+            await softDeleteGoal(state.editingGoalId);
+            await loadData();
+            goBack();
+          } catch (e) {
+            if (btn) btn.disabled = false;
+            errorMsg = t("common.deleteFailed", { error: userMessage(e) });
+            render();
+          }
+        },
+      });
     };
   }
 
