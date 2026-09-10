@@ -64,7 +64,7 @@ export function merchantMemory(rows) {
 
 /** Qué campos rellena elegir `entry`, respetando lo que el usuario YA tocó a mano. `touched` es el
  *  Set de campos que el usuario cambió en esta sesión de formulario (`categoryId`, `accountId`,
- *  `isShared`): la memoria nunca pisa una decisión explícita. Devuelve un PARCHE nuevo, sin mutar
+ *  `isShared`, `paidBy`, `sharePct`): la memoria nunca pisa una decisión explícita. Devuelve un PARCHE nuevo, sin mutar
  *  `entry` ni el `touched` recibido — quien llama decide cómo aplicarlo (p.ej. `Object.assign`
  *  sobre `state`). Un campo ausente, vacío o `null` en `entry` no entra en el parche: no tiene
  *  sentido "recordar" un valor que nunca se guardó.

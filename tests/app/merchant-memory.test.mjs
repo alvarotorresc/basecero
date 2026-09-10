@@ -116,3 +116,14 @@ test("memoryPatch: sin lista de categorías válidas (tercer argumento omitido) 
   const patch = memoryPatch(entry, new Set());
   assert.equal(patch.categoryId, "cat-nomina");
 });
+
+test("memoryPatch: no pisa paidBy ni sharePct si ya están en touched", () => {
+  const entry = { categoryId: "cat-restauracion-bares", accountId: "acc-1", isShared: true, paidBy: "partner", sharePct: 30 };
+  const touched = new Set(["paidBy", "sharePct"]);
+  const patch = memoryPatch(entry, touched);
+  assert.ok(!("paidBy" in patch));
+  assert.ok(!("sharePct" in patch));
+  assert.equal(patch.categoryId, "cat-restauracion-bares");
+  assert.equal(patch.accountId, "acc-1");
+  assert.equal(patch.isShared, true);
+});

@@ -127,8 +127,11 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     allCats: false,
     // Registro v2 §5.4: campos que el usuario ya tocó a mano en ESTE formulario — la memoria de
     // comercios nunca vuelve a pisarlos (registro-mode no interviene aquí; es del formulario, no
-    // de la densidad). merchantRemembered pinta la pista «recordado de la última vez».
-    touched: new Set(),
+    // de la densidad). merchantRemembered pinta la pista «recordado de la última vez». Un prefill
+    // (Task 11: regla recurrente, importación…) YA es una decisión explícita para los campos que
+    // trae puestos — se siembra touched con ellos para que escribir el comercio después no los
+    // pise con lo que dice la memoria.
+    touched: new Set(["categoryId", "accountId", "isShared", "paidBy", "sharePct"].filter((f) => prefill && prefill[f] !== undefined)),
     merchantRemembered: false,
   };
   let errorMsg = "";
@@ -147,6 +150,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
   function selectRefundRow(row) {
     state.refId = row.id;
     state.categoryId = row.category_id;
+    state.touched.add("categoryId");
     if (row.is_shared) {
       // Solo precarga categoría + importe de la parte de la contraparte; el refund de
       // liquidación en sí NO se marca compartido (mismo criterio que
@@ -491,6 +495,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       b.onclick = () => {
         // state.accountId NO se borra: volver a «Pagué yo» recupera la cuenta ya seleccionada.
         state.paidBy = b.dataset.paidby;
+        state.touched.add("paidBy");
         errorMsg = "";
         render();
       };
@@ -581,6 +586,10 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         // merchantHistory mezcla expense/income/refund del mismo comercio: la categoría recordada
         // puede ser de un tipo distinto al que se está rellenando ahora (merchant-memory.js#memoryPatch).
         const patch = memoryPatch(entry, state.touched, categoriesFor().map((c) => c.id));
+        // Sin pareja, el toggle de compartido ni se pinta (línea 408): un isShared/paidBy/sharePct
+        // recordado de cuando SÍ había pareja (partnerName cambiado o borrado desde entonces)
+        // colaría un partnerPaid() falso y ocultaría la cuenta como obligatoria sin decirlo.
+        if (!partnerName) { delete patch.isShared; delete patch.paidBy; delete patch.sharePct; }
         Object.assign(state, patch);
         // share_pct_override llega crudo de la BD (REAL, puede venir fuera de rango): se normaliza
         // igual que cualquier otro pct que entra desde fuera del propio stepper.
@@ -625,9 +634,9 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     };
 
     const pctDown = container.querySelector("#reg-pct-down");
-    if (pctDown) pctDown.onclick = () => { state.sharePct = stepPct(state.sharePct, -PCT_STEP); render(); };
+    if (pctDown) pctDown.onclick = () => { state.sharePct = stepPct(state.sharePct, -PCT_STEP); state.touched.add("sharePct"); render(); };
     const pctUp = container.querySelector("#reg-pct-up");
-    if (pctUp) pctUp.onclick = () => { state.sharePct = stepPct(state.sharePct, PCT_STEP); render(); };
+    if (pctUp) pctUp.onclick = () => { state.sharePct = stepPct(state.sharePct, PCT_STEP); state.touched.add("sharePct"); render(); };
 
     container.querySelector("#reg-save").onclick = async () => {
       const btn = container.querySelector("#reg-save");
