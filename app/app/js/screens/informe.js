@@ -4,7 +4,7 @@ import { categoryBarsSvg, comparisonBarsSvg } from "../charts.js";
 import { buildPdfBytes, reportFilename } from "../informe-pdf.js";
 import { loadPdfLib } from "../pdf-loader.js";
 import { download } from "../download.js";
-import { fmtMoney, fmtDiaCorto, fmtPct0 } from "../format.js";
+import { fmtMoney, fmtDiaCorto, fmtPct } from "../format.js";
 import { renderSuscripciones } from "./suscripciones.js";
 import { pushBack, goBack } from "../back.js";
 import { t } from "../i18n/index.js";
@@ -166,7 +166,7 @@ function categoriesHtml(report, prevPeriodName) {
       : "";
     const trend = r.direction === "new" ? "" : `
       <span style="color:${r.direction === "down" ? "var(--pos)" : r.direction === "up" ? "var(--danger)" : "var(--ink-3)"};">
-        ${r.direction === "down" ? "↓" : r.direction === "up" ? "↑" : "·"} ${r.deltaPct != null ? escHtml(fmtPct0(Math.abs(r.deltaPct) / 100)) : ""}
+        ${r.direction === "down" ? "↓" : r.direction === "up" ? "↑" : "·"} ${r.deltaPct != null ? escHtml(fmtPct(Math.abs(r.deltaPct) / 100)) : ""}
       </span>`;
     return `
     <div style="display:flex;flex-direction:column;gap:6px;">
