@@ -1,13 +1,12 @@
 // app/js/screens/onboarding.js
-// Onboarding de primera ejecución (PR F): 4 pasos sobre #screen con el chrome oculto
-// (body.onboarding lo pone el caller, app/js/onboarding.js). Referencia visual: artboards
-// aprobados docs/design/material-expresivo/Onboarding{Bienvenida,Cuentas,Ajustes,Periodo}.
+// Onboarding de primera ejecución: 4 pasos sobre #screen con el chrome oculto (body.onboarding lo
+// pone el caller, app/js/onboarding.js). Referencia visual: docs/design/final-v2/
+// Onboarding{1,2,3,4}.dc.html (SISTEMA.md).
 // Sin estado en borrador: cada cuenta se crea en BD al pulsar «Añadir» y las preferencias
 // se guardan al salir del paso 3 — si se cierra la pestaña a mitad, el gate (0 periodos)
 // reabre el onboarding con lo ya guardado.
-import { fmtMoney, initFormat, hoyISO } from "../format.js";
-import { getMetaAll, setMeta, setMetaMany, balancesAt, createAccount, replaceAll, retranslateSeedNames } from "../repo.js";
-import { POOL } from "../category-colors.js";
+import { fmtMoney, moneyPartsHtml, initFormat, hoyISO } from "../format.js";
+import { getMetaAll, setMeta, setMetaMany, balancesAt, createAccount, deleteEmptyAccount, replaceAll, retranslateSeedNames } from "../repo.js";
 import { canLeaveAccounts, accountDraft } from "../onboarding-steps.js";
 import { currencyOptionsHtml, localeOptionsHtml } from "./ajustes.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
@@ -18,6 +17,8 @@ import { loadXlsx } from "../xlsx-loader.js";
 import { userMessage } from "../errors.js";
 import { icon } from "../icons.js";
 import { subHeaderHtml } from "../ui.js";
+import { showConfirm } from "../modal.js";
+import { showToast } from "../toast.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -30,8 +31,12 @@ const ACCOUNT_TYPES = [
   { id: "liability", labelKey: "onboarding.account.type.liability" },
 ];
 const ACCOUNT_TYPE_LABEL_KEY = Object.fromEntries(ACCOUNT_TYPES.map((at) => [at.id, at.labelKey]));
-// BOX solo la usan ya paso2Html (filas de cuenta / nota informativa): desaparece del todo en la
-// Task 7.4 («fuera las cajas» del paso 2), no antes — paso1Html deja de usarla en esta misma task.
+// BOX (spec §8 punto 2, "fuera las cajas"): DESVIACIÓN respecto al plan, que la da por muerta —
+// paso1/paso2 ya no la usan, y paso4Html (Task 7.6) es su penúltimo consumidor, pero
+// renderImportView (:387, la subvista de import) sigue envolviendo su fila de fichero con este
+// mismo patrón de caja, y esa subvista está fuera del alcance de "los tres primeros pasos" que
+// pide el punto 2 — ninguna task de P7 la rediseña. Se queda declarada mientras siga teniendo
+// consumidores reales.
 const BOX = `background:var(--card);border-radius:0;padding:12px 16px;`;
 // Feature rows del paso 1 (bienvenida): icono monocromo del repertorio §3 + claves de texto.
 // Onboarding1.dc.html:37-59 — lock / download ("hoja de cálculo, exportable e importable") /
@@ -115,46 +120,45 @@ export async function renderOnboarding(container, { onDone }) {
   function paso2Html() {
     const f = state.form;
     const firstCheckingId = state.accounts.find((a) => a.type === "checking")?.id;
+    // Filas planas de 60px con filete (SISTEMA.md, Onboarding2.dc.html:29-46): sin caja ni check
+    // verde de 34px (D14: fuera las cajas de los tres primeros pasos). La tercera línea (11/500)
+    // solo la lleva la primera cuenta corriente — es la que absorbe los imports de CSV.
     const rows = state.accounts.map((a) => `
-      <div style="${BOX}display:flex;align-items:center;gap:12px;">
-        <div style="width:34px;height:34px;border-radius:50%;background:var(--card2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round"><path d="M5 13l4 4L19 7"></path></svg>
+      <div style="display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 0;border-bottom:1px solid var(--hairline);">
+        <div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;">
+          <span style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(a.name)}</span>
+          <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${ACCOUNT_TYPE_LABEL_KEY[a.type] ? escHtml(t(ACCOUNT_TYPE_LABEL_KEY[a.type])) : escHtml(a.type)}</span>
+          ${a.id === firstCheckingId ? `<span style="font-size:11px;font-weight:500;color:var(--ink-3);">${t("onboarding.account.importDefault")}</span>` : ""}
         </div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(a.name)}</div>
-          <div style="font-size:11px;color:var(--text-2);">${escHtml(ACCOUNT_TYPE_LABEL_KEY[a.type] ? t(ACCOUNT_TYPE_LABEL_KEY[a.type]) : a.type)}${a.id === firstCheckingId ? t("onboarding.account.importDefaultSuffix") : ""}</div>
-        </div>
-        <div class="num" style="font-size:13.5px;font-weight:700;">${escHtml(fmtMoney(a.balance_cents))}</div>
+        <div class="num" style="font-size:16px;font-weight:500;flex-shrink:0;">${moneyPartsHtml(a.balance_cents)}</div>
+        <button type="button" class="icon-btn" data-onb-del="${escAttr(a.id)}" aria-label="${escAttr(t("onboarding.account.deleteAria", { name: a.name }))}">${icon("trash")}</button>
       </div>`).join("");
     return `
     <div style="margin-top:8px;">
       <div style="font: var(--t-title); letter-spacing:-.01em;">${t("onboarding.account.title")}</div>
       <div style="font-size:13px;color:var(--text-2);margin-top:6px;line-height:1.5;">${t("onboarding.account.subtitle")}</div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px;">${rows}</div>
-    <div style="background:var(--card);border-radius:0;padding:16px;display:flex;flex-direction:column;gap:12px;margin-top:14px;">
+    <div style="margin-top:14px;">${rows}</div>
+    <div style="display:flex;flex-direction:column;gap:14px;margin-top:30px;">
       <div class="section-title">${state.accounts.length ? t("onboarding.account.addAnotherTitle") : t("onboarding.account.firstTitle")}</div>
-      <input type="text" id="onb-acc-name" value="${escAttr(f.name)}" placeholder="${escAttr(t("onboarding.account.namePlaceholder"))}" autocomplete="off"
-        style="border:0;border-radius:0;background:var(--card2);padding:12px 14px;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;outline:none;">
-      <div class="segmented" style="border-radius:999px;">
+      <label class="field field-stack">
+        <span class="field-label">${t("common.name")}</span>
+        <input type="text" id="onb-acc-name" value="${escAttr(f.name)}" placeholder="${escAttr(t("onboarding.account.namePlaceholder"))}" autocomplete="off">
+      </label>
+      <div class="chips">
         ${ACCOUNT_TYPES.map((at) => `
-        <button type="button" data-onb-tipo="${at.id}" class="${f.type === at.id ? "active" : ""}"
-          style="border-radius:999px;${f.type === at.id ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t(at.labelKey)}</button>`).join("")}
+        <button type="button" data-onb-tipo="${at.id}" class="chip${f.type === at.id ? " active" : ""}">${t(at.labelKey)}</button>`).join("")}
       </div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="flex:1;">
-          <div class="section-title" style="margin-bottom:4px;">${t("onboarding.account.balanceTitle")}</div>
-          <input type="text" id="onb-acc-raw" inputmode="decimal" value="${escAttr(f.raw)}" placeholder="0,00" autocomplete="off"
-            style="border:0;background:none;color:var(--text);font-family:inherit;font-size:22px;font-weight:700;outline:none;width:100%;font-variant-numeric:tabular-nums;">
-        </div>
-        <button type="button" id="onb-acc-add" class="btn-secondary" style="height:44px;padding:0 20px;border-radius:999px;flex-shrink:0;">${t("onboarding.account.addBtn")}</button>
-      </div>
-      ${f.type === "liability" ? `<div style="font-size:11px;color:var(--text-2);">${t("onboarding.account.liabilityNote")}</div>` : ""}
-      ${state.errorMsg ? `<div style="font-size:11.5px;color:var(--red);">${escHtml(state.errorMsg)}</div>` : ""}
+      <label class="field field-stack">
+        <span class="field-label">${t("onboarding.account.balanceTitle")}</span>
+        <input type="text" id="onb-acc-raw" inputmode="decimal" value="${escAttr(f.raw)}" placeholder="0,00" autocomplete="off">
+      </label>
+      ${f.type === "liability" ? `<div style="font-size:11px;color:var(--ink-3);">${t("onboarding.account.liabilityNote")}</div>` : ""}
+      ${state.errorMsg ? `<div style="font-size:11.5px;color:var(--danger);">${escHtml(state.errorMsg)}</div>` : ""}
+      <button type="button" id="onb-acc-add" class="btn-secondary" style="width:100%;">${t("onboarding.account.addBtn")}</button>
     </div>
-    <div style="${BOX}display:flex;align-items:center;gap:10px;margin-top:14px;">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.01"></path></svg>
-      <div style="font-size:11.5px;color:var(--text-2);">${t("onboarding.account.infoNote")}</div>
+    <div style="margin-top:20px;">
+      <div style="font-size:11.5px;color:var(--ink-3);line-height:1.45;">${t("onboarding.account.infoNote")}</div>
     </div>
     ${footHtml(t("onboarding.cta.next"), "onb-next-2")}`;
   }
@@ -267,6 +271,36 @@ export async function renderOnboarding(container, { onDone }) {
       q("#onb-acc-raw").oninput = (e) => { f.raw = e.target.value; state.errorMsg = ""; };
       container.querySelectorAll("[data-onb-tipo]").forEach((b) => (b.onclick = () => {
         f.type = b.dataset.onbTipo; render();
+      }));
+      // Borrar (D9, spec §8 punto 4): solo cuentas SIN movimientos — imposible en el onboarding,
+      // pero el guard vive en deleteEmptyAccount, no aquí. showConfirm ya es el patrón §4.12.
+      container.querySelectorAll("[data-onb-del]").forEach((b) => (b.onclick = () => {
+        if (state.busy) return;
+        const a = state.accounts.find((x) => x.id === b.dataset.onbDel);
+        if (!a) return;
+        showConfirm({
+          title: t("onboarding.account.deleteTitle"),
+          message: t("onboarding.account.deleteBody", { name: a.name, amount: fmtMoney(a.balance_cents) }),
+          cancelText: t("common.cancel"),
+          confirmText: t("common.delete"),
+          onConfirm: async () => {
+            state.busy = true;
+            try {
+              const deleted = await deleteEmptyAccount(a.id);
+              if (deleted) {
+                state.accounts = await balancesAt(hoyISO());
+              } else {
+                // Guard defensivo (D9): la cuenta ya tiene movimientos. No debería poder pasar
+                // desde el onboarding, pero deleteEmptyAccount no lanza — solo avisa.
+                showToast(t("onboarding.account.deleteFailed", { error: t("onboarding.account.deleteHasMovements") }));
+              }
+            } catch (e) {
+              showToast(t("onboarding.account.deleteFailed", { error: userMessage(e) }));
+            }
+            state.busy = false;
+            render();
+          },
+        });
       }));
       q("#onb-acc-add").onclick = async () => {
         if (state.busy) return;

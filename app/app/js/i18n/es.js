@@ -849,11 +849,22 @@ export const ES = {
       addBtn: "Añadir",
       liabilityNote: "El saldo de un pasivo es lo que debes: se guarda en negativo.",
       infoNote: "Aquí no se conecta ningún banco: tú apuntas o importas su CSV. Podrás añadir y renombrar cuentas cuando quieras en Patrimonio.",
-      importDefaultSuffix: ", será la cuenta de tus imports",
+      // importDefault: SEGMENTOS (spec §1.4) — línea propia de 11px bajo la fila, ya no un sufijo
+      // con coma inicial concatenado tras el tipo (Onboarding2.dc.html:44).
+      importDefault: "será la cuenta de tus imports",
       needOne: "Crea al menos una cuenta para seguir.",
       createFailed: "No se pudo crear la cuenta: {error}",
       nameRequired: "Ponle un nombre a la cuenta.",
       type: { checking: "Corriente", savings: "Ahorro", liability: "Pasivo" },
+      // Borrar (D9, spec §8 punto 4): solo desde el paso 2, solo cuentas sin movimientos.
+      deleteAria: "Borrar {name}",
+      deleteTitle: "¿Borrar esta cuenta?",
+      deleteBody: "{name}, {amount}. Todavía no tiene movimientos.",
+      deleteFailed: "No se pudo borrar la cuenta: {error}",
+      // deleteHasMovements: NO está en la tabla de copy de la spec — deleteEmptyAccount no lanza
+      // cuando el guard frena el borrado (D9: "no se lanza"), así que ese camino necesita su
+      // propio texto para rellenar el {error} de deleteFailed en vez de dejarlo literal.
+      deleteHasMovements: "Ya tiene movimientos.",
     },
     prefs: {
       title: "A tu manera",
