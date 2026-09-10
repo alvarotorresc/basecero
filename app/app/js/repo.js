@@ -31,7 +31,7 @@ export const periodStartTooEarly = (open, startDate) => !!open && startDate <= o
 
 /** Statement de la transferencia del barrido (N4). PURO (mismo criterio que settleAllSharedStmts,
  *  arriba): recibe todo resuelto y devuelve {sql, bind}, para que el test pueda verificar el
- *  ORDEN EXACTO de los 20 campos de SQL.insertTransaction llamando a la función REAL.
+ *  ORDEN EXACTO de los 21 campos de SQL.insertTransaction llamando a la función REAL.
  *  bcUlid/bcSanitizeCell son globales (vendor/pure.js), igual que en addTransaction.
  *  `type='transfer'`, `category_id=''`, `merchant` = nombre del objetivo (saneado), `is_shared=0`,
  *  `paid_by='me'`. OJO TDZ: aquí NO puede declararse ningún `const t` local. */
@@ -41,7 +41,7 @@ export function sweepTransferStmt({ periodId, date, amountCents, fromAccountId, 
     bind: [
       bcUlid(), date, periodId, "transfer", amountCents, fromAccountId, toAccountId,
       "", bcSanitizeCell(goalName ?? ""), t("barrido.note"),
-      0, null, "me", 0, "", "", "", "pending", now, now,
+      0, null, "me", 0, "", "", "", "", "pending", now, now,
     ],
   };
 }
@@ -88,7 +88,7 @@ export async function updatePeriodSharePct(id, pct) {
 
 export async function addTransaction({
   type, amountCents, date, categoryId, accountId, merchant, note, isShared,
-  counterAccountId = "", sharePctOverride = null, paidBy = "me", refId = "", ruleId = "", externalId = "", status = "pending",
+  counterAccountId = "", sharePctOverride = null, paidBy = "me", refId = "", ruleId = "", tagId = "", externalId = "", status = "pending",
 }) {
   // Invariante de columna cruzada de paid_by (la misma que validateImport aplica a una hoja,
   // xlsx.js): solo un GASTO COMPARTIDO puede haberlo pagado la contraparte. Se comprueba ANTES de
@@ -114,7 +114,7 @@ export async function addTransaction({
     sql: SQL.insertTransaction,
     bind: [newId, date, p.id, type, amountCents, accountId, counterAccountId,
       categoryId ?? "", bcSanitizeCell(merchant ?? ""), bcSanitizeCell(note ?? ""),
-      isShared ? 1 : 0, sharePctOverride, paidBy, 0, refId, ruleId, externalId, status, now, now],
+      isShared ? 1 : 0, sharePctOverride, paidBy, 0, refId, ruleId, tagId, externalId, status, now, now],
   };
   if (refId) {
     await execMany([insertStmt, { sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [now, refId] }]);
@@ -303,7 +303,10 @@ export function settleAllSharedStmts(rows, accountId, periodId, date, now, partn
         bcSanitizeCell(isOut ? outMerchant : (row.merchant ?? "")),
         note,
         0, null, "me", 0,
-        row.id, "", "", "pending", now, now,
+        // tag_id='' SIEMPRE (el "" tras rule_id): liquidar con la contraparte no forma parte de
+        // ningún proyecto, y aunque lo llevara no movería ninguna cifra (REFUND_REDUCES_SPEND ya
+        // excluye del gasto las devoluciones que liquidan un compartido, sql.js).
+        row.id, "", "", "", "pending", now, now,
       ],
     });
     stmts.push({ sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [now, row.id] });
@@ -359,6 +362,9 @@ export async function updateTransaction(id, fields) {
     paidBy: fields.paidBy ?? cur.paid_by,
     refId: fields.refId ?? cur.ref_id,
     ruleId: fields.ruleId ?? cur.rule_id,
+    // ?? y no ||: "" NO es nullish, así que mandar tagId:"" desde el detalle SÍ quita la etiqueta,
+    // mientras que no mandar la clave (undefined) conserva la que ya tenía la fila.
+    tagId: fields.tagId ?? cur.tag_id,
     status: fields.status ?? cur.status,
   };
   // Misma invariante de columna cruzada que en addTransaction (y que validateImport): solo un gasto
@@ -391,7 +397,7 @@ export async function updateTransaction(id, fields) {
   await exec(SQL.updateTransaction, [
     f.type, f.amountCents, f.date, f.categoryId ?? "", f.accountId, f.counterAccountId ?? "",
     bcSanitizeCell(f.merchant ?? ""), bcSanitizeCell(f.note ?? ""), f.isShared ? 1 : 0,
-    f.sharePctOverride, f.paidBy, f.refId ?? "", f.ruleId ?? "", f.status, now, id,
+    f.sharePctOverride, f.paidBy, f.refId ?? "", f.ruleId ?? "", f.tagId ?? "", f.status, now, id,
   ]);
 }
 
