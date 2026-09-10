@@ -275,7 +275,7 @@ function execManyRaw(db, stmts) {
  *  en Node (depende del Worker vía query/execMany, mismo motivo por el que la liquidación de una
  *  sola fila y openNextPeriod de este mismo fichero se reproducen en vez de importarse). El ARRAY de
  *  statements NO se reproduce a mano aquí: se delega en la settleAllSharedStmts REAL importada de
- *  repo.js (arriba) — así un bug en el bind de insertTransaction (orden de los 21 campos) lo
+ *  repo.js (arriba) — así un bug en el bind de insertTransaction (orden de los 22 campos) lo
  *  detectaría este test, cosa que una copia manual del bind no podría hacer. "Alex" es el
  *  partner_name que repo.settleAllShared saca de meta y pasa como sexto argumento. */
 function settleAllSharedReproduced(db, ids, accountId, now, periodId = "per-1") {
