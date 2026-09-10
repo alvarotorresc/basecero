@@ -530,7 +530,6 @@ export const EN = {
     subcatCount: { one: "{n} subcategory", other: "{n} subcategories" },
     archivedLabel: "Archived",
     addSubcategory: "+ Add subcategory",
-    drag: { aria: "Reorder {name}" },
     empty: {
       expense: "No expense categories yet.",
       income: "No income categories yet.",

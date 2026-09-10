@@ -623,8 +623,7 @@ export async function renderCategorias(container, onBack) {
         <span class="tx-title" style="flex:1;min-width:0;">${escHtml(child.name)}</span>
         ${child.is_archived ? `<span class="day-label" style="flex-shrink:0;">${t("categorias.archivedLabel")}</span>` : ""}
       </button>
-      <span class="cat-drag" data-drag="${escAttr(child.id)}"
-        aria-label="${escAttr(t("categorias.drag.aria", { name: child.name }))}"
+      <span class="cat-drag" data-drag="${escAttr(child.id)}" aria-hidden="true"
         style="color:var(--text-3);flex-shrink:0;opacity:0.6;cursor:grab;touch-action:none;
         -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;
         display:flex;align-items:center;padding:10px 4px 10px 10px;">${icon("drag", { size: 18, stroke: "var(--ink-3)" })}</span>
@@ -671,8 +670,7 @@ export async function renderCategorias(container, onBack) {
         </div>
         ${root.is_archived ? `<span class="day-label" style="flex-shrink:0;">${t("categorias.archivedLabel")}</span>` : ""}
       </button>
-      <span class="cat-drag" data-drag="${escAttr(root.id)}"
-        aria-label="${escAttr(t("categorias.drag.aria", { name: root.name }))}"
+      <span class="cat-drag" data-drag="${escAttr(root.id)}" aria-hidden="true"
         style="color:var(--text-3);flex-shrink:0;opacity:0.6;cursor:grab;touch-action:none;
         -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;
         display:flex;align-items:center;padding:14px 4px 14px 10px;">${icon("drag", { size: 20, stroke: "var(--ink-3)" })}</span>
