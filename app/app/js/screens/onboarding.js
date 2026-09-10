@@ -31,12 +31,11 @@ const ACCOUNT_TYPES = [
   { id: "liability", labelKey: "onboarding.account.type.liability" },
 ];
 const ACCOUNT_TYPE_LABEL_KEY = Object.fromEntries(ACCOUNT_TYPES.map((at) => [at.id, at.labelKey]));
-// BOX (spec §8 punto 2, "fuera las cajas"): DESVIACIÓN respecto al plan, que la da por muerta —
-// paso1/paso2 ya no la usan, y paso4Html (Task 7.6) es su penúltimo consumidor, pero
-// renderImportView (:387, la subvista de import) sigue envolviendo su fila de fichero con este
-// mismo patrón de caja, y esa subvista está fuera del alcance de "los tres primeros pasos" que
-// pide el punto 2 — ninguna task de P7 la rediseña. Se queda declarada mientras siga teniendo
-// consumidores reales.
+// BOX (spec §8 punto 2, "fuera las cajas"): DESVIACIÓN respecto al plan, que la da por muerta tras
+// esta PR — ningún paso (1-4) la usa ya, pero renderImportView (la subvista de import) sigue
+// envolviendo su fila de fichero elegido con este mismo patrón de caja, y esa subvista está fuera
+// del alcance de "los tres primeros pasos" que pide el punto 2: ninguna task de P7 la rediseña.
+// Se queda declarada mientras siga teniendo un consumidor real.
 const BOX = `background:var(--card);border-radius:0;padding:12px 16px;`;
 // Feature rows del paso 1 (bienvenida): icono monocromo del repertorio §3 + claves de texto.
 // Onboarding1.dc.html:37-59 — lock / download ("hoja de cálculo, exportable e importable") /
@@ -212,42 +211,21 @@ export async function renderOnboarding(container, { onDone }) {
     ${footHtml(t("onboarding.cta.next"), "onb-next-3")}`;
   }
 
+  // Paso 4 (D5/D10/D11, spec §8 punto 6): el formulario real de periodo, embebido. Las barras +
+  // título + subtítulo los pinta el paso; renderPeriodoNuevo(embed:true) rellena #onb-periodo SIN
+  // su propia cabecera (bloqueHeader() suprimida por P0) — nombre, fecha, ingresos previstos
+  // (efímero, D11), límites, total y el CTA #pn-submit son el contenido real, sin pantalla
+  // ilustrativa ni salto de pantalla. El «atrás» del paso vive FUERA de #onb-periodo (ese <div> lo
+  // reescribe entero renderPeriodoNuevo en cada uno de sus propios render()).
   function paso4Html() {
     return `
     <div style="margin-top:8px;">
-      <div style="font: var(--t-title); letter-spacing:-.01em;line-height:1.15;">${t("onboarding.period.titleLine1")}<br>${t("onboarding.period.titleLine2")}</div>
-      <div style="font-size:13px;color:var(--text-2);margin-top:8px;line-height:1.5;">${t("onboarding.period.bodyPre")}<b style="color:var(--text);">${t("onboarding.period.bodyBold")}</b>${t("onboarding.period.bodyPost")}</div>
+      <div style="font: var(--t-title); letter-spacing:-.01em;">${t("onboarding.period.title")}</div>
+      <div style="font-size:13px;color:var(--text-2);margin-top:6px;line-height:1.5;">${t("onboarding.period.subtitle")}</div>
     </div>
-    <div style="background:var(--card);border-radius:0;padding:16px;margin-top:14px;">
-      <div style="display:flex;justify-content:space-between;font-size:10px;font-weight:700;letter-spacing:0.09em;color:var(--text-2);padding:0 2px 8px;"><span>${t("onboarding.period.illustMonth1")}</span><span>${t("onboarding.period.illustMonth2")}</span></div>
-      <div style="display:flex;gap:4px;">
-        ${["25", "26", "27g", "28s", "…s", "25s", "26s", "27g"].map((d) => {
-          const g = d.endsWith("g"), s = d.endsWith("s");
-          const label = g || s ? d.slice(0, -1) : d;
-          return `<div style="flex:1;aspect-ratio:1;display:grid;place-items:center;font-size:10px;border-radius:8px;${
-            g ? "background:#22C58B;color:var(--bg);font-weight:800;" : s ? "background:color-mix(in srgb, #22C58B 16%, var(--card));color:var(--text-2);" : "color:var(--text-2);"}">${label}</div>`;
-        }).join("")}
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:10px;">
-        <span style="width:9px;height:9px;border-radius:3px;background:#22C58B;flex-shrink:0;"></span>
-        <span style="font-size:11.5px;color:var(--text-2);">${t("onboarding.period.legend")}</span>
-      </div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px;">
-      <div style="display:flex;align-items:flex-start;gap:12px;${BOX}">
-        <span style="font-size:15px;flex-shrink:0;">✅</span>
-        <div style="font-size:12px;color:var(--text-2);line-height:1.45;"><b style="color:var(--text);">${t("onboarding.period.point1Bold")}</b>${t("onboarding.period.point1After")}</div>
-      </div>
-      <div style="display:flex;align-items:flex-start;gap:12px;${BOX}">
-        <span style="font-size:15px;flex-shrink:0;">📅</span>
-        <div style="font-size:12px;color:var(--text-2);line-height:1.45;"><b style="color:var(--text);">${t("onboarding.period.point2Bold")}</b>${t("onboarding.period.point2After")}</div>
-      </div>
-    </div>
-    <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px;padding-top:24px;">
-      <button type="button" class="btn-primary" id="onb-open-period" style="width:100%;">${t("onboarding.period.openBtn")}</button>
-      <div style="text-align:center;font-size:11.5px;color:var(--text-2);">${t("onboarding.period.openHint")}</div>
-      <button type="button" class="icon-btn" id="onb-back" aria-label="${escAttr(t("common.back"))}"
-        style="width:44px;height:44px;border-radius:999px;background:var(--card);color:var(--text);">${icon("back")}</button>
+    <div id="onb-periodo" style="margin-top:14px;"></div>
+    <div style="margin-top:24px;">
+      <button type="button" class="icon-btn" id="onb-back" aria-label="${escAttr(t("common.back"))}">${icon("back")}</button>
     </div>`;
   }
 
@@ -379,11 +357,10 @@ export async function renderOnboarding(container, { onDone }) {
       };
     }
     if (state.step === 3) {
-      q("#onb-open-period").onclick = () => {
-        // partner_name ya está persistido (paso 3): renderPeriodoNuevo lo lee de meta
-        // al montarse y pinta (o no) el bloque de reparto correctamente.
-        renderPeriodoNuevo(container, { mode: "first", onDone, onBack: () => render() });
-      };
+      // partner_name ya está persistido (paso 3): renderPeriodoNuevo lo lee de meta al montarse y
+      // pinta (o no) el bloque de reparto correctamente. embed:true (D10, P0) suprime su propia
+      // cabecera: el «atrás» de este paso (arriba, #onb-back) es el único que se ve.
+      renderPeriodoNuevo(q("#onb-periodo"), { mode: "first", embed: true, onDone, onBack: () => render() });
     }
   }
 

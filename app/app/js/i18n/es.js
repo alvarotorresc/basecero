@@ -876,21 +876,11 @@ export const ES = {
       partnerPlaceholder: "Su nombre — o déjalo vacío si vas por libre",
       partnerNote: "Con nombre, cada gasto puede marcarse como compartido y la app lleva las cuentas de quién debe qué. Vacío = ni rastro de esa parte de la app.",
     },
+    // Paso 4 (D10/D11, spec §8 punto 6): título + subtítulo del paso — el formulario real vive
+    // embebido debajo (renderPeriodoNuevo, embed:true), sin pantalla ilustrativa.
     period: {
-      titleLine1: "Tu mes no empieza",
-      titleLine2: "el día 1",
-      bodyPre: "Empieza el día que cobras. BaseCero organiza tu dinero en ",
-      bodyBold: "periodos",
-      bodyPost: ": abres uno cuando entra la nómina y lo cierras cuando llega la siguiente.",
-      illustMonth1: "SEPTIEMBRE",
-      illustMonth2: "OCTUBRE",
-      legend: "día de cobro = un periodo se cierra y nace el siguiente",
-      point1Bold: "Ves lo que de verdad te queda",
-      point1After: " entre nómina y nómina — no un mes de calendario partido por la mitad.",
-      point2Bold: "¿Cobras el día 1?",
-      point2After: " Perfecto también: tu periodo irá del 1 al 31. La regla es tuya.",
-      openBtn: "Abrir mi primer periodo",
-      openHint: "Te preguntamos el nombre, la fecha y el presupuesto — 30 segundos.",
+      title: "Tu primer periodo",
+      subtitle: "Va de nómina a nómina: se abre cuando cobras y se cierra con la siguiente.",
     },
     import: {
       title: "Traer tu copia",
