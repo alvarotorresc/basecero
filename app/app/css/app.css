@@ -765,11 +765,6 @@ body.onboarding .fab { display: none; }
 }
 .shake { animation: bc-shake 0.4s; }
 
-/* ---- Onboarding (PR F): indicador de progreso de 4 pasos ---- */
-.onb-dots { display: flex; gap: 6px; justify-content: center; }
-.onb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--surface-2); }
-.onb-dot.on { background: var(--accent); width: 20px; border-radius: 999px; }
-
 /* ===== accesibilidad (Task 2 P2) ===== */
 /* foco visible global: reemplaza los `outline: none` de .field input/select y .budget-input
    eliminados más arriba — todo elemento enfocable por teclado queda con anillo visible. */
@@ -1158,3 +1153,9 @@ body.onboarding .fab { display: none; }
    vez del glifo de texto que llevaban — este modificador es lo único que falta para que
    metaHtml() pueda pintarlas en ese color sin tocar la regla compartida de P0. */
 .meta-row.pos { color: var(--pos); }
+/* ===================== P7 · Onboarding ===================== */
+
+/* ===== progreso del onboarding (Onboarding1-4.dc.html:19-24) ===== */
+.onb-bars { display: flex; align-items: center; gap: 6px; }
+.onb-bar { flex: 1; height: 3px; border-radius: var(--r-pill); background: var(--surface-2); }
+.onb-bar.on { background: var(--accent); }

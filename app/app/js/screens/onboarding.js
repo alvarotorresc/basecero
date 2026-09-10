@@ -57,9 +57,12 @@ export async function renderOnboarding(container, { onDone }) {
   };
   render();
 
-  function dotsHtml() {
-    return `<div class="onb-dots" style="margin-bottom:20px;">${[0, 1, 2, 3]
-      .map((i) => `<span class="onb-dot${i === state.step ? " on" : ""}"></span>`).join("")}</div>`;
+  // Barras acumulativas (SISTEMA.md, Onboarding1-4.dc.html:19-24): lima las completadas Y la
+  // actual (i <= state.step), no solo la actual — los cuatro artboards lo pintan así (p.ej.
+  // Onboarding3 lleva TRES barras en lima, no una).
+  function barsHtml() {
+    return `<div class="onb-bars" style="margin-bottom:20px;">${[0, 1, 2, 3]
+      .map((i) => `<span class="onb-bar${i <= state.step ? " on" : ""}"></span>`).join("")}</div>`;
   }
 
   function footHtml(ctaLabel, ctaId) {
@@ -239,7 +242,7 @@ export async function renderOnboarding(container, { onDone }) {
     const cuerpo = [paso1Html, paso2Html, paso3Html, paso4Html][state.step]();
     container.innerHTML = `
       <div style="display:flex;flex-direction:column;min-height:calc(100vh - 48px);padding-top:8px;">
-        ${dotsHtml()}
+        ${barsHtml()}
         ${cuerpo}
       </div>`;
     wire();
