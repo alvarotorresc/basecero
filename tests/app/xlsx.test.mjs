@@ -89,7 +89,7 @@ test("import: fila totalmente vacía en una pestaña de datos (no meta) se desca
 const parse = (mutate) => workbookToRows(X, wbFromSeed(mutate)).data;
 
 test("validate: base semilla válida", () => { assert.deepEqual(validateImport(parse()), []); });
-test("validate: schema_version distinta de 1, 2 o 3", () => {
+test("validate: schema_version distinta de 1, 2, 3 o 4", () => {
   const d = parse((x) => { x.meta.find((m) => m.key === "schema_version").value = "9"; });
   assert.match(validateImport(d)[0], /schema_version/);
 });
@@ -224,7 +224,7 @@ test("import: replaceAll NO importa el schema_version de la hoja", () => {
   };
   for (const s of replaceAllStmts(data)) db.prepare(s.sql).run(...(s.bind ?? []));
   const meta = Object.fromEntries(db.prepare("SELECT key, value FROM meta").all().map((r) => [r.key, r.value]));
-  assert.equal(meta.schema_version, "3", "la versión es propiedad de ESTA BD, no de la hoja");
+  assert.equal(meta.schema_version, "4", "la versión es propiedad de ESTA BD, no de la hoja");
   assert.equal(meta.currency, "USD", "el resto de claves de la hoja sí se aplican");
 });
 test("validate: created_with dual — acepta hoja y pwa, rechaza otros", () => {
@@ -737,9 +737,10 @@ test("ROUND-TRIP: export → import → mismos datos", () => {
   assert.deepEqual(dumpAll(db2), original);
 });
 
-test("ROUND-TRIP sobre una BD MIGRADA (paid_by físicamente la última): los dumps coinciden", () => {
-  // El ALTER TABLE del runner deja paid_by al FINAL de la tabla; schema.sql la declara en medio.
-  // Nada del código depende del orden físico (todo nombra columnas), y esto lo demuestra.
+test("ROUND-TRIP sobre una BD MIGRADA (tag_id físicamente la última): los dumps coinciden", () => {
+  // El ALTER TABLE del runner deja tag_id al FINAL de la tabla (la última migración en aplicarse
+  // sobre esta BD v1: paid_by y luego tag_id); schema.sql las declara en medio. Nada del código
+  // depende del orden físico (todo nombra columnas), y esto lo demuestra.
   // La BD de partida se construye creando PRIMERO la tabla vieja (el DDL literal de helpers.mjs,
   // el MISMO que usa migraciones.test.mjs) y ejecutando schema.sql DESPUÉS: sus CREATE TABLE IF
   // NOT EXISTS dejan intacta la transactions que ya existe —justo el motivo por el que migrations.js
@@ -760,7 +761,7 @@ test("ROUND-TRIP sobre una BD MIGRADA (paid_by físicamente la última): los dum
     recurring_rules: db.prepare("PRAGMA table_info(recurring_rules)").all().map((c) => c.name),
   }))
     (s.bind?.length ? db.prepare(s.sql).run(...s.bind) : db.exec(s.sql));
-  assert.equal(db.prepare("PRAGMA table_info(transactions)").all().at(-1).name, "paid_by");
+  assert.equal(db.prepare("PRAGMA table_info(transactions)").all().at(-1).name, "tag_id");
   seedMinimal(db);
   db.prepare(insertSql("transactions")).run(...CONTRACT.transactions.cols.map((c) =>
     ({ id: "tx-mig", date: "2026-08-02", period_id: "per-1", type: "expense", amount_cents: 10000,

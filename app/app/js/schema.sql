@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 -- subscription_ignored/renewal_snoozed (Suscripciones, N6): CONFIG-IN-META igual que
 -- account_loans/category_style — sin migración de esquema, repo.js:697. subscription_ignored es
 -- un array JSON de comercios normalizados ignorados; renewal_snoozed es un objeto {ruleId: fecha}.
-INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version','3'),('currency','EUR'),('created_with','basecero-pwa'),('locale','es-ES'),('import_account_id',''),('default_account_id',''),('partner_name',''),('category_style','{}'),('csv_profile',''),('lang',''),('account_loans','{}'),('quick_register','1'),('subscription_ignored','[]'),('renewal_snoozed','{}');
+INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version','4'),('currency','EUR'),('created_with','basecero-pwa'),('locale','es-ES'),('import_account_id',''),('default_account_id',''),('partner_name',''),('category_style','{}'),('csv_profile',''),('lang',''),('account_loans','{}'),('quick_register','1'),('subscription_ignored','[]'),('renewal_snoozed','{}');
 
 CREATE TABLE IF NOT EXISTS accounts (
   id TEXT PRIMARY KEY, name TEXT NOT NULL,
@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   paid_by TEXT NOT NULL DEFAULT 'me' CHECK (paid_by IN ('me','partner')),
   settled INTEGER NOT NULL DEFAULT 0,
   ref_id TEXT NOT NULL DEFAULT '', rule_id TEXT NOT NULL DEFAULT '',
+  tag_id TEXT NOT NULL DEFAULT '',             -- '' = sin etiqueta (Etiquetas, N11)
   external_id TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','reconciled')),
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0);
@@ -58,6 +59,12 @@ CREATE INDEX IF NOT EXISTS tx_category ON transactions (category_id);
 -- Lo consultan hasActiveLinkedSettlement, unsettleIfNoActiveSettlements, recentForRefund (el
 -- subselect de refunded_cents) y REFUND_REDUCES_SPEND, que corre en CADA suma de gasto.
 CREATE INDEX IF NOT EXISTS tx_ref ON transactions (ref_id);
+-- tx_tag NO va aquí, a diferencia de tx_ref: ref_id existe desde la v1, así que un CREATE INDEX
+-- sobre él en schema.sql siempre encuentra la columna. tag_id es NUEVA en esta misma PR, y
+-- schema.sql corre en CADA arranque ANTES que las migraciones (db-worker.js:20): en una BD
+-- anterior a esta PR, un CREATE INDEX aquí sobre tag_id reventaría "no such column" antes de que
+-- el ALTER de migrations.js tuviera ocasión de correr. Vive como statement incondicional al final
+-- de pendingMigrations (migrations.js), después de cualquier ALTER pendiente.
 
 CREATE TABLE IF NOT EXISTS recurring_rules (
   id TEXT PRIMARY KEY, name TEXT NOT NULL,
@@ -86,4 +93,14 @@ CREATE TABLE IF NOT EXISTS goals (
 CREATE TABLE IF NOT EXISTS budgets (
   id TEXT PRIMARY KEY, period_id TEXT NOT NULL, category_id TEXT NOT NULL,
   amount_cents INTEGER NOT NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0);
+
+-- Etiquetas de proyecto (N11): una dimensión transversal a las categorías («Viaje Japón», «Reforma
+-- baño»). Sin flow, sin parent_id, sin color, sin icono — un nombre, un límite opcional y un
+-- interruptor de archivado (D3, D14 en etiquetas-design.md). Hoja OPCIONAL en el contrato xlsx
+-- (contract.js): la primera tabla nueva desde que el contrato existe.
+CREATE TABLE IF NOT EXISTS tags (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL,
+  budget_cents INTEGER,                        -- NULL = sin límite (D4 y NULLABLE_NUM en contract.js)
+  is_archived INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0);
