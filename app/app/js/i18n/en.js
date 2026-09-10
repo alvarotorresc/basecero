@@ -451,7 +451,12 @@ export const EN = {
       delete: "Delete rule",
       deleteTitle: "Delete this rule?",
       deleteMessage: "{name}. It will stop being suggested each period; transactions already recorded are untouched.",
+      subscriptionLabel: "It's a subscription",
+      subscriptionHint: "Shows up in the subscription radar, with its renewal and its yearly cost.",
+      perYear: "a year",
+      cancelSubscription: "Cancel the subscription",
     },
+    badge: { subscription: "subscription" },
   },
   categorias: {
     error: { load: "Couldn’t load categories: {error}" },
@@ -762,6 +767,14 @@ export const EN = {
     limitSaved: "Limit saved",
     limitRemoved: "Limit removed",
     profileSaved: "Bank profile saved",
+    subscriptionCancelled: "Subscription cancelled",
+  },
+  suscripciones: {
+    cancel: {
+      title: "Cancel the subscription?",
+      message: "{name}. It will stop counting as pending and we'll start counting what you save. You can turn it back on whenever you want.",
+      confirm: "Cancel",
+    },
   },
   errors: {
     generic: "Something went wrong. Try again.",

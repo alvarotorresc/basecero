@@ -459,7 +459,12 @@ export const ES = {
       delete: "Borrar regla",
       deleteTitle: "¿Borrar la regla?",
       deleteMessage: "{name}. Dejará de proponerse cada periodo; los movimientos ya registrados no se tocan.",
+      subscriptionLabel: "Es una suscripción",
+      subscriptionHint: "Entra en el radar de suscripciones, con su renovación y su coste anual.",
+      perYear: "al año",
+      cancelSubscription: "Cancelar la suscripción",
     },
+    badge: { subscription: "suscripción" },
   },
   categorias: {
     error: { load: "No se pudieron cargar las categorías: {error}" },
@@ -772,6 +777,16 @@ export const ES = {
     limitSaved: "Límite guardado",
     limitRemoved: "Límite quitado",
     profileSaved: "Perfil de banco guardado",
+    subscriptionCancelled: "Suscripción cancelada",
+  },
+  // Suscripciones (N6, «el radar»): cancelar desde el formulario de Recurrentes O desde la propia
+  // pantalla del radar comparten este mismo modal — mismas claves para las dos entradas.
+  suscripciones: {
+    cancel: {
+      title: "¿Cancelar la suscripción?",
+      message: "{name}. Dejará de contar como pendiente y empezaremos a contar lo que te ahorras. Puedes volver a activarla cuando quieras.",
+      confirm: "Cancelar",
+    },
   },
   // Task 5 (PR i18n): errores de capas no-UI (repo/n26/xlsx/csv-generic/backup-crypto/db-worker) —
   // el string ES es el mensaje literal que ya lanzaban esas capas (byte-exacto, lo pinnean los
