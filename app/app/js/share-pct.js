@@ -22,3 +22,13 @@ export function splitCents(amountCents, pct) {
   const mine = Math.round((amountCents * pct) / 100);
   return { mine, partner: amountCents - mine };
 }
+
+/** Neto de una liquidación sobre las filas ELEGIDAS: lo que la contraparte me debe menos lo que
+ *  yo le debo, en céntimos. Positivo = a mi favor. `selectedIds` es un Set (o cualquier cosa con
+ *  .has); `rows` es el shape de repo.pendingSettlements (direction 'partner_owes' | 'i_owe').
+ *  Puro y aparte del render porque es el ÚNICO cambio de comportamiento del rediseño: la pantalla
+ *  pasa de liquidar todo lo pendiente a liquidar un subconjunto, y eso hay que poder probarlo en
+ *  Node — el render no se puede. */
+export const netOfSelected = (rows, selectedIds) => (rows ?? [])
+  .filter((r) => selectedIds.has(r.id))
+  .reduce((s, r) => s + (r.direction === "i_owe" ? -r.settle_cents : r.settle_cents), 0);

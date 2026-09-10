@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isValidPct, normalizePct, stepPct, splitCents } from "../../app/app/js/share-pct.js";
+import { isValidPct, normalizePct, stepPct, splitCents, netOfSelected } from "../../app/app/js/share-pct.js";
 
 test("isValidPct: número finito en [0, 100], rechaza fuera de rango, NaN y no-números", () => {
   assert.equal(isValidPct(0), true);
@@ -45,4 +45,37 @@ test("splitCents: mi parte redondeada al céntimo, la contraparte es el resto (m
     assert.deepEqual(r, expected);
     assert.equal(r.mine + r.partner, amountCents);
   }
+});
+
+// netOfSelected: Liquidar (P3) pasa de "liquidar todo lo pendiente" a "liquidar lo elegido" —
+// el único cambio de comportamiento de la PR (SISTEMA.md spec §4). Fixture con las dos
+// direcciones de repo.pendingSettlements.
+const ROWS = [
+  { id: "a", direction: "partner_owes", settle_cents: 4215 },
+  { id: "b", direction: "partner_owes", settle_cents: 1900 },
+  { id: "c", direction: "i_owe", settle_cents: 1200 },
+  { id: "d", direction: "i_owe", settle_cents: 2655 },
+];
+
+test("netOfSelected: con TODOS los ids seleccionados, el neto es exactamente el de hoy (invariante decisión 3: por defecto, nada cambia)", () => {
+  const selected = new Set(ROWS.map((r) => r.id));
+  const legacyNet = ROWS.reduce((s, r) => s + (r.direction === "i_owe" ? -r.settle_cents : r.settle_cents), 0);
+  assert.equal(netOfSelected(ROWS, selected), legacyNet);
+});
+
+test("netOfSelected: sin ninguno seleccionado, 0", () => {
+  assert.equal(netOfSelected(ROWS, new Set()), 0);
+});
+
+test("netOfSelected: solo filas 'partner_owes' seleccionadas da un neto positivo", () => {
+  assert.equal(netOfSelected(ROWS, new Set(["a", "b"])), 4215 + 1900);
+});
+
+test("netOfSelected: solo filas 'i_owe' seleccionadas da un neto negativo", () => {
+  assert.equal(netOfSelected(ROWS, new Set(["c", "d"])), -(1200 + 2655));
+});
+
+test("netOfSelected: un id del Set que no está en rows se ignora sin lanzar", () => {
+  assert.doesNotThrow(() => netOfSelected(ROWS, new Set(["a", "ghost-id"])));
+  assert.equal(netOfSelected(ROWS, new Set(["a", "ghost-id"])), 4215);
 });
