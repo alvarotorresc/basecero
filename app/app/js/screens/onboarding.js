@@ -163,6 +163,18 @@ export async function renderOnboarding(container, { onDone }) {
     ${footHtml(t("onboarding.cta.next"), "onb-next-2")}`;
   }
 
+  // Convierte las <option> de currencyOptionsHtml/localeOptionsHtml (ajustes.js, única fuente de
+  // verdad de las listas de monedas/locales) en chips (SISTEMA.md §4.5bis, Onboarding3.dc.html):
+  // NO se duplica CURRENCIES/LOCALES aquí (no son exports de ajustes.js, que P7 no edita), así que
+  // se reaprovechan las funciones ya importadas y se relee su HTML. value/label ya llegan
+  // escAttr/escHtml-escapados desde ajustes.js: se reinsertan tal cual, sin volver a escapar.
+  function chipsFromOptions(optionsHtml, dataAttr) {
+    return [...optionsHtml.matchAll(/<option value="([^"]*)"([^>]*)>([^<]*)<\/option>/g)]
+      .map(([, value, attrs, label]) =>
+        `<button type="button" data-${dataAttr}="${value}" class="chip${attrs.includes("selected") ? " active" : ""}">${label}</button>`)
+      .join("");
+  }
+
   function paso3Html() {
     const p = state.prefs;
     return `
@@ -170,39 +182,32 @@ export async function renderOnboarding(container, { onDone }) {
       <div style="font: var(--t-title); letter-spacing:-.01em;">${t("onboarding.prefs.title")}</div>
       <div style="font-size:13px;color:var(--text-2);margin-top:6px;">${t("onboarding.prefs.subtitle")}</div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:13px;margin-top:14px;">
-      <div style="background:var(--card);border-radius:0;padding:16px;display:flex;flex-direction:column;gap:10px;">
+    <div style="display:flex;flex-direction:column;gap:30px;margin-top:26px;">
+      <div style="display:flex;flex-direction:column;gap:12px;">
         <div class="section-title">${t("onboarding.prefs.language")}</div>
-        <div class="segmented" style="border-radius:999px;">
+        <div class="chips">
           ${LANGS.map(([v, label]) => `
-          <button type="button" data-onb-lang="${v}" class="${activeLang() === v ? "active" : ""}"
-            style="border-radius:999px;${activeLang() === v ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${escHtml(label)}</button>`).join("")}
+          <button type="button" data-onb-lang="${v}" class="chip${activeLang() === v ? " active" : ""}">${escHtml(label)}</button>`).join("")}
         </div>
       </div>
-      <div style="background:var(--card);border-radius:0;padding:16px;display:flex;flex-direction:column;gap:10px;">
-        <div class="section-title">${t("onboarding.prefs.currencyTitle")}</div>
-        <div style="display:flex;gap:8px;">
-          <label class="field field-stack" style="flex:1;"><span>${t("onboarding.prefs.currencyLabel")}</span>
-            <select id="onb-currency">${currencyOptionsHtml(p.currency)}</select></label>
-          <label class="field field-stack" style="flex:1;"><span>${t("onboarding.prefs.formatLabel")}</span>
-            <select id="onb-locale">${localeOptionsHtml(p.locale)}</select></label>
-        </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="section-title">${t("onboarding.prefs.currencyLabel")}</div>
+        <div class="chips">${chipsFromOptions(currencyOptionsHtml(p.currency), "onb-currency")}</div>
       </div>
-      <div style="background:var(--card);border-radius:0;padding:16px;display:flex;flex-direction:column;gap:10px;">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="section-title">${t("onboarding.prefs.formatLabel")}</div>
+        <div class="chips">${chipsFromOptions(localeOptionsHtml(p.locale), "onb-locale")}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
         <div class="section-title">${t("onboarding.prefs.partnerTitle")}</div>
-        <input type="text" id="onb-partner" value="${escAttr(p.partner)}" autocomplete="off"
-          placeholder="${escAttr(t("onboarding.prefs.partnerPlaceholder"))}"
-          style="border:0;border-radius:0;background:var(--card2);padding:12px 14px;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;outline:none;">
-        <div style="font-size:11px;color:var(--text-2);line-height:1.45;">${t("onboarding.prefs.partnerNote")}</div>
+        <label class="field field-stack">
+          <span class="field-label">${t("common.name")}</span>
+          <input type="text" id="onb-partner" value="${escAttr(p.partner)}" autocomplete="off"
+            placeholder="${escAttr(t("onboarding.prefs.partnerPlaceholder"))}">
+        </label>
+        <div style="font-size:12px;color:var(--ink-3);line-height:1.4;">${t("onboarding.prefs.partnerNote")}</div>
       </div>
-      <div style="background:var(--card);border-radius:0;padding:16px;display:flex;flex-direction:column;gap:10px;">
-        <div class="section-title">${t("onboarding.prefs.categoriesTitle")}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;">
-          ${POOL.map((color, i) => `<span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;font-size:12px;background:${color};">${PREVIEW_ICONS[i]}</span>`).join("")}
-        </div>
-        <div style="font-size:11.5px;color:var(--text-2);line-height:1.45;">${t("onboarding.prefs.categoriesNote")}</div>
-      </div>
-      ${state.errorMsg ? `<div style="font-size:11.5px;color:var(--red);">${escHtml(state.errorMsg)}</div>` : ""}
+      ${state.errorMsg ? `<div style="font-size:11.5px;color:var(--danger);">${escHtml(state.errorMsg)}</div>` : ""}
     </div>
     ${footHtml(t("onboarding.cta.next"), "onb-next-3")}`;
   }
@@ -340,15 +345,21 @@ export async function renderOnboarding(container, { onDone }) {
         state.busy = false;
         render();
       }));
-      q("#onb-currency").onchange = (e) => { state.prefs.currency = e.target.value; };
-      q("#onb-locale").onchange = (e) => { state.prefs.locale = e.target.value; };
+      // Moneda/Formato: chips, no <select> (Task 7.5) — el valor se guarda en state.prefs al
+      // vuelo, así que #onb-next-3 ya no necesita leerlo de ningún input.
+      container.querySelectorAll("[data-onb-currency]").forEach((b) => (b.onclick = () => {
+        state.prefs.currency = b.dataset.onbCurrency; render();
+      }));
+      container.querySelectorAll("[data-onb-locale]").forEach((b) => (b.onclick = () => {
+        state.prefs.locale = b.dataset.onbLocale; render();
+      }));
       q("#onb-partner").oninput = (e) => { state.prefs.partner = e.target.value; state.errorMsg = ""; };
       q("#onb-next-3").onclick = async () => {
         if (state.busy) return;
         state.busy = true;
-        // Se leen los inputs ANTES de re-renderizar (el render reconstruye el DOM).
-        const currency = q("#onb-currency").value;
-        const locale = q("#onb-locale").value;
+        // El importe de moneda/formato ya vive en state.prefs (chips); el nombre de la
+        // contraparte se lee del input ANTES de re-renderizar (el render reconstruye el DOM).
+        const { currency, locale } = state.prefs;
         const partner = q("#onb-partner").value.trim();
         try {
           await setMetaMany([["currency", currency], ["locale", locale], ["partner_name", partner]]);
