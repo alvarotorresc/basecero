@@ -6,7 +6,7 @@ import {
 import { colorForCategory, iconForCategory, textColorForCategory, rootOf } from "../category-colors.js";
 import { budgetStatus } from "../category-spend.js";
 import { matchesFilter, isUncategorized } from "../movimientos-filter.js";
-import { fmtMoney, moneyPartsHtml, fmtDiaLargo, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { fmtMoney, moneyPartsHtml, fmtDiaLargo, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw, appLocale } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { metaHtml, subHeaderHtml } from "../ui.js";
@@ -500,6 +500,22 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     </div>`;
   }
 
+  /** Caja de fecha de solo lectura APARENTE (MovimientoDetalle.dc.html:97-101): icono calendario +
+   *  fecha en dd/mm/aaaa mono. El `<input type="date">` real sigue ahí — mismo id `mov-fecha`,
+   *  mismo onchange de wireDetail() — pero transparente y a sangre sobre la caja: tocar CUALQUIER
+   *  punto de la caja abre el selector nativo, en vez de solo el pequeño icono de calendario que
+   *  pinta el navegador. `.field-date:focus-within` (bloque P1 de app.css) le da el anillo de foco
+   *  que un input con opacity:0 no puede pintarse a sí mismo. */
+  function fechaBoxHtml(d) {
+    const display = new Date(d.fecha + "T12:00:00").toLocaleDateString(appLocale(), { day: "2-digit", month: "2-digit", year: "numeric" });
+    return `
+    <label class="field-date">
+      ${icon("calendar", { size: 18, stroke: "var(--ink-3)" })}
+      <span class="num" style="font-size:13px;font-weight:500;">${escHtml(display)}</span>
+      <input type="date" id="mov-fecha" value="${escAttr(d.fecha)}" aria-label="${escAttr(t("common.date"))}">
+    </label>`;
+  }
+
   function renderDetail() {
     const d = state.detail;
     const cats = categoriesFor(d.type);
@@ -553,23 +569,16 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       ${d.type === "refund" && state.linkedExpense ? `
       <div class="card" style="padding:12px 14px; margin-bottom:18px;">
         <div style="font-size:10px; color:var(--text-3);">${t("common.linkedTo")}</div>
-        <div style="font-size:14px; font-weight:600;">
-          ${escHtml(state.linkedExpense.merchant || byId[state.linkedExpense.category_id]?.name || t("common.type.expense"))} · ${fmtMoney(state.linkedExpense.amount_cents)}
-        </div>
+        ${metaHtml([state.linkedExpense.merchant || byId[state.linkedExpense.category_id]?.name || t("common.type.expense"), fmtMoney(state.linkedExpense.amount_cents)])}
       </div>` : ""}
 
-      <div style="display:flex; gap:8px; margin-bottom:12px;">
-        <label class="field field-stack" style="flex:1;">
-          <span class="field-label">${t("common.merchant")}</span>
-          <input type="text" id="mov-merchant" value="${escAttr(d.merchant)}" placeholder="${t("common.optional")}">
-        </label>
-        <label class="field field-stack" style="flex:1;">
-          <span class="field-label">${t("common.date")}</span>
-          <input type="date" id="mov-fecha" value="${escAttr(d.fecha)}">
-        </label>
-      </div>
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">${t("movimientos.detail.tagLabel")}</div>
+      <label class="field field-stack" style="margin-bottom:12px;">
+        <span class="field-label">${t("common.merchant")}</span>
+        <input type="text" id="mov-merchant" value="${escAttr(d.merchant)}" placeholder="${t("common.optional")}">
+      </label>
+
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
+        ${fechaBoxHtml(d)}
         ${renderTagControl(d)}
       </div>
 
@@ -579,7 +588,7 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       </label>
 
       ${needsCategory(d.type) && d.type !== "income" && (d.wasShared || partnerName) ? `
-      <div class="card" style="padding:0 16px; margin-bottom:18px;">
+      <div class="card" style="background:var(--surface); padding:14px 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:${locked ? "default" : "pointer"};${locked ? "opacity:.5;" : ""}">
           <span style="font-size:15px; font-weight:600;">${t("common.sharedWith", { name: escHtml(partnerName) || t("movimientos.shared.fallbackName") })}</span>
           <span class="toggle">
@@ -614,7 +623,7 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
               <div class="num" id="mov-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
             </div>
             <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
-              <div style="font-size:10px; color:var(--text-3);">${partnerPaid(d) ? metaHtml([t("common.paidByName", { name: partnerName || t("movimientos.shared.fallbackLabel") }), t("common.paidTotal")]) : `${escHtml(partnerName) || t("movimientos.shared.fallbackLabel")} · ${100 - d.sharePct}%`}</div>
+              <div style="font-size:10px; color:var(--text-3);">${partnerPaid(d) ? metaHtml([t("common.paidByName", { name: partnerName || t("movimientos.shared.fallbackLabel") }), t("common.paidTotal")]) : metaHtml([partnerName || t("movimientos.shared.fallbackLabel"), t("common.pctValue", { pct: 100 - d.sharePct })])}</div>
               <div class="num" id="mov-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerPaid(d) ? d.cents : partnerCents)}</div>
             </div>
           </div>
@@ -624,11 +633,7 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
       <button type="button" class="btn-primary" id="mov-save" style="margin-bottom:10px;">${t("common.save")}</button>
-      <button type="button" id="mov-delete"
-        style="width:100%;background:transparent;color:var(--red);
-          border:1px solid var(--red);border-radius:var(--radius-sm);padding:16px;font:600 16px var(--font-ui);cursor:pointer;">
-        ${t("movimientos.delete.button")}
-      </button>
+      <button type="button" class="btn-danger" id="mov-delete">${t("movimientos.delete.button")}</button>
     `;
 
     wireDetail();
@@ -774,7 +779,11 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     };
 
     container.querySelector("#mov-delete").onclick = () => {
-      const what = `${d.merchant || byId[d.categoryId]?.name || t(TIPO_KEY[d.type])} · ${fmtMoney(d.cents)}`;
+      const what = t("movimientos.delete.what", {
+        merchant: d.merchant || byId[d.categoryId]?.name || t(TIPO_KEY[d.type]),
+        amount: fmtMoney(d.cents),
+        date: fmtDiaLargo(d.fecha),
+      });
       showConfirm({
         title: t("movimientos.delete.title"),
         message: t("movimientos.delete.message", { what }),

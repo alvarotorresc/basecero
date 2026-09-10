@@ -258,7 +258,6 @@ export const EN = {
     detail: {
       lockedNote: "It has a linked settlement entry (refund or adjustment): delete it first to change the amount or the split.",
       typeLabel: "Type",
-      tagLabel: "Tag",
       noTag: "No tag",
       newTag: "New tag",
     },
@@ -288,6 +287,9 @@ export const EN = {
       button: "Delete",
       title: "Delete this transaction?",
       message: "{what}. It will disappear from the lists and from the period totals.",
+      // Replaces the "·" concatenation in movimientos.js (ModalBorrar.dc.html:137: "Bar La
+      // Plaza, 18.50 € on September 9"). fmtDiaLargo for the day, per spec §2.2.
+      what: "{merchant}, {amount} on {date}",
     },
     empty: {
       noUncategorized: "No uncategorized transactions.",

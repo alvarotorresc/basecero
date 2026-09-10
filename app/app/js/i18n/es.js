@@ -266,7 +266,6 @@ export const ES = {
     detail: {
       lockedNote: "Tiene un apunte de liquidación enlazado (devolución o ajuste): para cambiar el importe o el reparto, bórralo antes.",
       typeLabel: "Tipo",
-      tagLabel: "Etiqueta",
       noTag: "Sin etiqueta",
       newTag: "Nueva etiqueta",
     },
@@ -296,6 +295,9 @@ export const ES = {
       button: "Borrar",
       title: "¿Borrar este movimiento?",
       message: "{what}. Desaparecerá de las listas y de los totales del periodo.",
+      // Sustituye a la concatenación con · de movimientos.js (ModalBorrar.dc.html:137: «Bar La
+      // Plaza, 18,50 € del 9 de septiembre»). fmtDiaLargo para el día, como pide la spec §2.2.
+      what: "{merchant}, {amount} del {date}",
     },
     empty: {
       noUncategorized: "No hay movimientos sin categorizar.",

@@ -1117,3 +1117,34 @@ body.onboarding .fab { display: none; }
   color: var(--ink);
   font-weight: 600;
 }
+
+/* ===== caja de fecha con input nativo transparente (MovimientoDetalle.dc.html:97-101) ===== */
+/* El <input type="date"> real queda a sangre encima de la caja (opacity 0, cubre todo el filete)
+   para que tocar cualquier punto abra el selector nativo, no solo el diminuto icono de calendario
+   del navegador. Como el input queda invisible, :focus-within pinta el anillo en su lugar — el
+   :focus-visible global (app.css) nunca llegaría a verse en un elemento con opacity:0. */
+.field-date {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-0);
+  padding: 0 13px;
+  box-sizing: border-box;
+}
+.field-date input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+.field-date:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
