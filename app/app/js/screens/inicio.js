@@ -15,6 +15,7 @@ import {
 } from "../inicio-logic.js";
 import { weekRange, daysWithCategories, maxDayTotal, weekTotals } from "../semana-logic.js";
 import { resolveAccountId } from "../account-defaults.js";
+import { icon } from "../icons.js";
 import { t } from "../i18n/index.js";
 import { budgetMap, pctOf, relativeWidth } from "../category-spend.js";
 import { renderLiquidar } from "./liquidar.js";
@@ -55,9 +56,9 @@ let selectedAccountId = null;
 // closure perdería el descarte.
 const huchaDismissed = new Set();
 
-// SVG «chevron abajo»/«chevron derecha» del repertorio (SISTEMA §3).
-const CHEVRON_DOWN_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9.5 12 16l7-6.5"></path></svg>`;
-const CHEVRON_RIGHT_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 5 16 12l-6.5 7"></path></svg>`;
+// «chevron abajo»/«chevron derecha» del repertorio (icons.js, SISTEMA §3).
+const CHEVRON_DOWN_SVG = icon("chevronDown", { size: 16 });
+const CHEVRON_RIGHT_SVG = icon("chevronRight", { size: 16, width: 2 });
 
 /** Fila de movimiento plegado (I4/I5, Main.dc.html:90-102): SIEMPRE un <button> de 64px que abre
  *  el detalle real vía open-tx.js — antes era un <div> estático. Se conserva ENTERA la rama de

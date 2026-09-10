@@ -138,7 +138,7 @@ export async function renderSemana(container, onBack, { openDay } = {}) {
         <div class="spine-node" style="${nodeStyle}"></div>
       </div>`;
     const dayNameHtml = `
-      <span style="font-size:14px;font-weight:${hoy ? "600" : "500"};color:${hoy ? "var(--accent)" : (hasMovs ? "var(--ink)" : "var(--ink-3)")};">${hoy ? t("semana.today") : escHtml(weekdayLong(day.date))}</span>
+      <span class="week-day-name" style="font-size:14px;font-weight:${hoy ? "600" : "500"};color:${hoy ? "var(--accent)" : (hasMovs ? "var(--ink)" : "var(--ink-3)")};">${hoy ? t("semana.today") : escHtml(weekdayLong(day.date))}</span>
       <span class="num" style="font-size:12px;font-weight:500;color:var(--ink-3);">${escHtml(fmtDiaCorto(day.date))}</span>`;
 
     // Día sin NINGÚN movimiento: no se despliega, sin barra — «sin gastos» (decisión de la spec).

@@ -118,7 +118,7 @@ function activeRowHtml(rule, byId, todayIso) {
         <span>${escHtml(rule.name)}</span>
         ${rule.is_shared ? sharedPillHtml() : ""}
       </div>
-      <div class="tx-sub" style="${warn ? "color:var(--warn);font-weight:600;" : ""}">${text}</div>
+      <div class="tx-sub wrap" style="${warn ? "color:var(--warn);font-weight:600;" : ""}">${text}</div>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">
       <div class="tx-amount">${moneyPartsHtml(rule.amount_cents)}</div>
