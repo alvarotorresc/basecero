@@ -814,6 +814,11 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
   function renderList() {
     const rootCats = presentRootCats();
     const allActive = !state.filter.rootCatId && !state.filter.uncat;
+    // Índice de state.periodId en `periods` (ORDER BY start_date DESC, sql.js#listPeriods): el
+    // índice 0 es el más reciente. "Periodo anterior" (icon back, izquierda) avanza el índice
+    // hacia atrás en el tiempo → +1; "Periodo siguiente" (chevronRight, derecha) → -1.
+    const periodIdx = periods.findIndex((p) => p.id === state.periodId);
+    const currentPeriod = periods[periodIdx] ?? periods[0];
 
     // Chips por categoría raíz (artboard Movimientos.dc.html:32-35): activa = tinta invertida
     // (.chip.active del sistema). Un color inline SIEMPRE gana sobre una regla de clase, así que
@@ -853,12 +858,14 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
         <input type="text" id="mov-search-input" value="${escAttr(state.filter.query)}" placeholder="${t("movimientos.search.placeholder")}">
       </label>` : ""}
 
-      <label class="field field-stack" style="margin-bottom:14px;">
-        <span class="field-label">${t("movimientos.periodLabel")}</span>
-        <select id="mov-period">
-          ${periods.map((p) => `<option value="${p.id}" ${p.id === state.periodId ? "selected" : ""}>${escHtml(p.name)}</option>`).join("")}
-        </select>
-      </label>
+      <div class="period-picker">
+        <button type="button" id="mov-period-prev" aria-label="${t("movimientos.period.prev")}" ${periodIdx >= periods.length - 1 ? "disabled" : ""}>${icon("back", { size: 18 })}</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${icon("calendar", { size: 17, stroke: "var(--ink-3)" })}
+          <span style="font-size:15px;font-weight:600;color:var(--ink);">${escHtml(currentPeriod.name)}</span>
+        </div>
+        <button type="button" id="mov-period-next" aria-label="${t("movimientos.period.next")}" ${periodIdx <= 0 ? "disabled" : ""}>${icon("chevronRight", { size: 18 })}</button>
+      </div>
 
       <div class="chips-row" style="margin-bottom:14px;">
         <button type="button" data-chip-all class="chip${allActive ? " active" : ""}" style="padding:0 14px;">${t("movimientos.chipAll")}</button>
@@ -876,19 +883,30 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     wireList();
   }
 
+  async function changePeriod(id) {
+    state.periodId = id;
+    // D13: tagId sobrevive a un cambio de periodo (una etiqueta es transversal, D7) — el resto
+    // del filtro sí es intrínseco al periodo que se deja atrás y se resetea como siempre.
+    state.filter = { query: "", rootCatId: null, uncat: false, tagId: state.filter.tagId };
+    state.searchOpen = false;
+    try {
+      await loadPeriodData();
+    } catch (err) {
+      errorMsg = t("movimientos.error.loadPeriod", { error: userMessage(err) });
+    }
+    render();
+  }
+
   function wireList() {
-    container.querySelector("#mov-period").onchange = async (e) => {
-      state.periodId = e.target.value;
-      // D13: tagId sobrevive a un cambio de periodo (una etiqueta es transversal, D7) — el resto
-      // del filtro sí es intrínseco al periodo que se deja atrás y se resetea como siempre.
-      state.filter = { query: "", rootCatId: null, uncat: false, tagId: state.filter.tagId };
-      state.searchOpen = false;
-      try {
-        await loadPeriodData();
-      } catch (err) {
-        errorMsg = t("movimientos.error.loadPeriod", { error: userMessage(err) });
-      }
-      render();
+    // Los botones ya llegan `disabled` en el extremo correspondiente (ver renderList): un botón
+    // disabled no dispara click, así que no hace falta repetir aquí la comprobación de índice.
+    container.querySelector("#mov-period-prev").onclick = () => {
+      const idx = periods.findIndex((p) => p.id === state.periodId);
+      if (idx < periods.length - 1) changePeriod(periods[idx + 1].id);
+    };
+    container.querySelector("#mov-period-next").onclick = () => {
+      const idx = periods.findIndex((p) => p.id === state.periodId);
+      if (idx > 0) changePeriod(periods[idx - 1].id);
     };
 
     const searchToggle = container.querySelector("#mov-search-toggle");

@@ -1061,3 +1061,37 @@ body.onboarding .fab { display: none; }
 }
 .state-pill.warn { background: var(--warn-tint); color: var(--warn); }
 .state-pill.pos { background: var(--pos-tint); color: var(--pos); }
+
+/* ===================== P1 · Movimientos ===================== */
+
+/* ===== selector de periodo con flechas (Movimientos.dc.html:29-40) ===== */
+/* Sustituye a <select id="mov-period">: caja de 48px con filete, SIN radio (SISTEMA.md §1 no
+   deja nada aquí que parezca .chip/.field), con dos botones circulares de 40px a los lados del
+   nombre del periodo. Los botones no llevan borde propio: el filete ya lo pone la caja. */
+.period-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  height: 48px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-0);
+  padding: 0 6px;
+  margin-bottom: 14px;
+  box-sizing: border-box;
+}
+.period-picker button {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-circle);
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.period-picker button:disabled { opacity: .5; cursor: default; }

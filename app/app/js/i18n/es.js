@@ -244,7 +244,6 @@ export const ES = {
       delete: "No se pudo borrar: {error}",
     },
     noPeriods: "No hay ningún periodo todavía.",
-    periodLabel: "Periodo",
     uncategorized: "Sin categorizar",
     tapToCategorize: "toca para categorizar",
     uncategorizedChip: "Sin categoría {n}",
@@ -252,6 +251,9 @@ export const ES = {
     // filter.toggle sustituye a search.toggle (embudo en vez de lupa, Movimientos.dc.html:24):
     // search.toggle se queda sin consumidor, no se borra — ver comentario junto a su valor.
     filter: { toggle: "Filtrar" },
+    // Sustituyen al <select id="mov-period"> (Movimientos.dc.html:30-40): aria-label de los dos
+    // botones circulares de 40px que mueven state.periodId por índice sobre `periods`.
+    period: { prev: "Periodo anterior", next: "Periodo siguiente" },
     search: {
       // Sin consumidor desde que la cabecera pasa a icon("filter"): el botón que abre este mismo
       // buscador usa movimientos.filter.toggle como aria-label. No se borra: no está en la lista

@@ -236,7 +236,6 @@ export const EN = {
       delete: "Couldn’t delete: {error}",
     },
     noPeriods: "No periods yet.",
-    periodLabel: "Period",
     uncategorized: "Uncategorized",
     tapToCategorize: "tap to categorize",
     uncategorizedChip: "No category {n}",
@@ -244,6 +243,9 @@ export const EN = {
     // filter.toggle replaces search.toggle (funnel instead of magnifier, Movimientos.dc.html:24):
     // search.toggle is left without a consumer, not deleted — see the comment by its value.
     filter: { toggle: "Filter" },
+    // Replace <select id="mov-period"> (Movimientos.dc.html:30-40): aria-label of the two 40px
+    // circular buttons that move state.periodId by index over `periods`.
+    period: { prev: "Previous period", next: "Next period" },
     search: {
       // No consumer since the header switched to icon("filter"): the button that opens this same
       // search box now uses movimientos.filter.toggle as its aria-label. Not deleted: it isn't on
