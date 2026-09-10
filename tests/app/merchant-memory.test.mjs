@@ -24,6 +24,14 @@ test("normalizeMerchant: cadena vacía o nula da cadena vacía", () => {
   assert.equal(normalizeMerchant(undefined), "");
 });
 
+// bcSanitizeCell (vendor/pure.js) antepone un apóstrofo a los comerciantes que empiezan por
+// =, + o @ antes de guardarlos (guard de inyección de fórmulas al exportar a xlsx/csv). Sin
+// quitarlo aquí, un "@Home" guardado como "'@Home" nunca casaría con "@Home" tecleado de nuevo.
+test("normalizeMerchant: quita el apóstrofo de bcSanitizeCell antes de casar", () => {
+  assert.equal(normalizeMerchant("'@Home"), normalizeMerchant("@Home"));
+  assert.equal(normalizeMerchant("'@Home"), "@home");
+});
+
 test("merchantMemory: gana la PRIMERA fila de cada comercio (rows de más reciente a más antigua)", () => {
   const rows = [
     { merchant: "Mercadona", category_id: "cat-alimentacion-super", account_id: "acc-1", is_shared: 0, share_pct_override: null, paid_by: "me", date: "2026-09-05", type: "expense" },

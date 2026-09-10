@@ -14,11 +14,17 @@
  *  algún día molesta, subirla sea una línea. */
 export const MEMORY_WINDOW = 500;
 
-/** trim → minúsculas → sin diacríticos → espacios colapsados, para que «Bar la plaza» y
- *  «BAR LA PLAZA  » casen como el mismo comercio. Es solo la CLAVE de casado: `display` (abajo)
- *  conserva la escritura original. */
+/** Apóstrofo inicial → trim → minúsculas → sin diacríticos → espacios colapsados, para que «Bar la
+ *  plaza» y «BAR LA PLAZA  » casen como el mismo comercio. Es solo la CLAVE de casado: `display`
+ *  (abajo) conserva la escritura original.
+ *
+ *  El apóstrofo inicial es cosa de bcSanitizeCell (vendor/pure.js): antepone uno a los comercios
+ *  que empiezan por «=», «+» o «@» antes de guardarlos (guard de inyección de fórmulas al abrir el
+ *  xlsx exportado en Excel/Sheets). Sin quitarlo aquí, un «@Home» guardado como «'@Home» nunca
+ *  casaría con «@Home» tecleado de nuevo — la memoria vería dos comercios donde solo hay uno. */
 export function normalizeMerchant(s) {
   return String(s ?? "")
+    .replace(/^'/, "")
     .trim()
     .toLowerCase()
     .normalize("NFD")
