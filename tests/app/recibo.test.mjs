@@ -26,8 +26,9 @@ function fakeDoc({ reducedMotion = false } = {}) {
   function node() {
     const clases = new Set();
     const kids = {};
+    const listeners = {};
     const self = {
-      id: "", innerHTML: "", attrs: {}, onclick: null,
+      id: "", innerHTML: "", attrs: {}, onclick: null, onkeydown: null,
       classList: {
         add: (c) => clases.add(c),
         remove: (c) => clases.delete(c),
@@ -36,6 +37,11 @@ function fakeDoc({ reducedMotion = false } = {}) {
       setAttribute(k, v) { self.attrs[k] = v; },
       querySelector(sel) { return (kids[sel] ??= node()); },
       remove() { body.children = body.children.filter((c) => c !== self); },
+      // focusin/focusout no son propiedades on* estándar en todos los navegadores (Firefox no las
+      // expone), así que recibo.js los engancha con addEventListener — el fake los simula con este
+      // registro mínimo en vez de un onfocusin/onfocusout que no reproduciría el bug real.
+      addEventListener(type, fn) { (listeners[type] ??= []).push(fn); },
+      fire(type, ev) { for (const fn of listeners[type] ?? []) fn(ev); },
     };
     return self;
   }
@@ -164,6 +170,33 @@ test("dos show() seguidos: solo queda un ticket en el body", () => {
   assert.equal(doc.body.children.length, 1, "el primero se quita sin animación");
   assert.notEqual(doc.body.children[0], first);
   assert.equal(doc.body.children[0].classList.contains("is-leaving"), false);
+});
+
+test("focusin: el foco dentro del recibo congela el auto-cierre", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const doc = fakeDoc();
+  const receipt = createReceipt(doc, { holdMs: 900 });
+  receipt.show(DATA);
+  const el = doc.body.children[0];
+
+  el.fire("focusin");
+  t.mock.timers.tick(ENTER_MS + 900 + 10000);
+  assert.equal(el.classList.contains("is-leaving"), false, "un usuario de teclado dentro del recibo no debe verlo cerrarse solo");
+});
+
+test("Escape: cierra el recibo sin deshacer", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const doc = fakeDoc();
+  let hecho = 0;
+  const receipt = createReceipt(doc, { holdMs: 900 });
+  receipt.show({ ...DATA, onUndo: () => { hecho += 1; } });
+  const el = doc.body.children[0];
+
+  el.onkeydown({ key: "Escape" });
+  assert.ok(el.classList.contains("is-leaving"));
+  assert.equal(hecho, 0, "Escape no llama a onUndo");
+  t.mock.timers.tick(EXIT_MS);
+  assert.equal(doc.body.children.length, 0);
 });
 
 test("prefers-reduced-motion: el reposo baja a 600 ms", (t) => {

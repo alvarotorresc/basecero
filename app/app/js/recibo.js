@@ -127,12 +127,32 @@ export function createReceipt(doc, { holdMs } = {}) {
         leave(true);
       };
 
+      function getHold() {
+        const reduced = doc.defaultView?.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+        return holdMs ?? (reduced ? HOLD_REDUCED_MS : HOLD_MS);
+      }
+
+      // «Deshacer» solo se alcanza con Tab: quien haya llegado ahí no puede permitirse que el
+      // recibo se cierre solo a mitad de decidir. focusin (llega también desde el hijo: el evento
+      // burbujea) congela el cierre automático; si el foco se va y no queda ya un temporizador
+      // corriendo, se reanuda por el resto de HOLD_MS — no ENTER_MS de nuevo, el ticket ya está
+      // dentro. focusin/focusout no son propiedades on* estándar (Firefox no las expone como IDL),
+      // así que van por addEventListener, a diferencia del resto de handlers de este fichero.
+      el.addEventListener("focusin", () => clearTimers());
+      el.addEventListener("focusout", () => {
+        if (node === el && !timers.length) timers.push(setTimeout(() => leave(false), getHold()));
+      });
+      // Escape cierra sin deshacer, igual que un toque en el velo: es la vía de teclado para lo
+      // mismo, así que no hace falta parar la propagación (a diferencia de onclick, no hay un hijo
+      // que la corte primero).
+      el.onkeydown = (e) => {
+        if (e?.key === "Escape") leave(false);
+      };
+
       doc.body.appendChild(el);
       node = el;
 
-      const reduced = doc.defaultView?.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-      const hold = holdMs ?? (reduced ? HOLD_REDUCED_MS : HOLD_MS);
-      timers.push(setTimeout(() => leave(false), ENTER_MS + hold));
+      timers.push(setTimeout(() => leave(false), ENTER_MS + getHold()));
     },
   };
 }
