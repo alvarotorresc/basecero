@@ -38,12 +38,13 @@ test("sparklineSvg: un único punto no revienta (sin división por cero)", () =>
 
 // ---- netWorthBarsHtml -----------------------------------------------------
 
-test("netWorthBarsHtml: hasta 6 barras, la última en verde, etiquetas en mayúsculas", () => {
+test("netWorthBarsHtml: hasta 6 barras planas, la última en lima, etiquetas capitalizadas (no mayúsculas)", () => {
   const series = ["mar", "abr", "may", "jun", "jul", "ago", "sep"].map((label, i) => ({ label, cents: (i + 1) * 100000 }));
   const html = netWorthBarsHtml(series);
-  assert.equal((html.match(/border-radius:5px 5px 2px 2px/g) || []).length, 6); // 7 puntos → 6 barras
-  assert.ok(html.includes("var(--green)"));
-  assert.ok(html.includes("SEP") && !html.includes("MAR")); // slice(-6) descarta el más viejo
+  assert.equal((html.match(/border-radius:var\(--r-0\)/g) || []).length, 6); // 7 puntos → 6 barras
+  assert.ok(html.includes("var(--accent)"));
+  assert.ok(html.includes(">Sep<") && !html.includes(">SEP<"), "la etiqueta capitaliza, no grita");
+  assert.ok(!html.includes(">Mar<") && !html.includes(">mar<")); // slice(-6) descarta el más viejo
 });
 
 test("netWorthBarsHtml: oculto con menos de 2 puntos", () => {

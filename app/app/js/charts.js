@@ -48,8 +48,9 @@ export function sparklineSvg(points, labels = []) {
 // ---- netWorthBarsHtml -----------------------------------------------------
 
 // Evolución del patrimonio en barras (artboard Patrimonio.dc.html:31-39): últimas ≤6,
-// alturas relativas al máximo absoluto, la actual en verde, etiquetas MAYÚSCULAS con la
-// actual resaltada. Sin eje Y ni valores sobre las barras, como el artboard. "" con <2 puntos.
+// alturas relativas al máximo absoluto, planas (--r-0) con la actual en lima (--accent),
+// etiquetas de mes capitalizadas normales (Sep, no SEP) con la actual resaltada. Sin eje Y ni
+// valores sobre las barras, como el artboard. "" con <2 puntos.
 export function netWorthBarsHtml(series) {
   const pts = series.slice(-6);
   if (pts.length < 2) return "";
@@ -57,13 +58,16 @@ export function netWorthBarsHtml(series) {
   const bars = pts.map((p, i) => {
     const h = Math.max(6, Math.round((Math.abs(p.cents) / max) * 100));
     const last = i === pts.length - 1;
-    // Task 7 (5a): un cierre negativo se tiñe de rojo con prioridad sobre el verde de "última
+    // Task 7 (5a): un cierre negativo se tiñe de rojo con prioridad sobre el lima de "última
     // barra" — un patrimonio negativo es la señal más urgente, aunque sea el punto más reciente.
-    const fill = p.cents < 0 ? "var(--red)" : (last ? "var(--green)" : "var(--card2)");
-    return `<div style="flex:1;height:${h}%;border-radius:5px 5px 2px 2px;background:${fill};"></div>`;
+    const fill = p.cents < 0 ? "var(--red)" : (last ? "var(--accent)" : "var(--card2)");
+    return `<div style="flex:1;height:${h}%;border-radius:var(--r-0);background:${fill};"></div>`;
   }).join("");
-  const labels = pts.map((p, i) =>
-    `<span style="${i === pts.length - 1 ? "color:var(--text);font-weight:700;" : ""}">${String(p.label).toUpperCase()}</span>`).join("");
+  const labels = pts.map((p, i) => {
+    const label = String(p.label);
+    const cap = label ? label[0].toUpperCase() + label.slice(1) : label;
+    return `<span style="${i === pts.length - 1 ? "color:var(--text);font-weight:700;" : ""}">${cap}</span>`;
+  }).join("");
   return `
   <div style="display:flex;align-items:flex-end;gap:5px;height:44px;margin-top:10px;">${bars}</div>
   <div class="num" style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--text-2);margin-top:6px;">${labels}</div>`;
