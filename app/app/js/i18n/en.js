@@ -142,6 +142,11 @@ export const EN = {
     prevision: {
       manage: "Recurring",
     },
+    renewal: {
+      phrase: "{name} renews on {when} for {amount}. Still using it?",
+      see: "View subscriptions",
+      notNow: "Not now",
+    },
     available: {
       title: "Available this period",
       days: { one: "{n} day", other: "{n} days" },
@@ -772,6 +777,7 @@ export const EN = {
     subscriptionCancelled: "Subscription cancelled",
     subscriptionAdded: "Subscription added",
     subscriptionIgnored: "Merchant ignored",
+    renewalSnoozed: "Reminder snoozed until the next renewal",
   },
   suscripciones: {
     title: "Subscriptions",

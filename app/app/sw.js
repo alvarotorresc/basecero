@@ -8,7 +8,7 @@ const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon.svg", "ic
   "js/account-defaults.js", "js/onboarding-steps.js", "js/contract.js", "js/xlsx.js", "js/xlsx-loader.js", "js/prevision.js", "js/inicio-logic.js", "js/semana-logic.js", "js/charts.js", "js/n26.js", "js/csv-generic.js", "js/backup-crypto.js",
   "js/onboarding.js", "js/screens/registro.js", "js/screens/inicio.js", "js/screens/semana.js",
   "js/movimientos-filter.js", "js/open-tx.js", "js/screens/movimientos.js", "js/screens/liquidar.js", "js/screens/periodo-nuevo.js", "js/subscriptions.js", "js/subscription-detect.js",
-  "js/screens/gasto-por-categoria.js", "js/screens/recurrentes.js", "js/screens/patrimonio.js", "js/screens/suscripciones.js",
+  "js/screens/gasto-por-categoria.js", "js/screens/recurrentes.js", "js/screens/patrimonio.js", "js/screens/suscripciones.js", "js/inicio-renewal.js",
   "js/screens/ajustes.js", "js/screens/categorias.js", "js/screens/onboarding.js",
   "vendor/sqlite-wasm/jswasm/sqlite3.mjs", "vendor/sqlite-wasm/jswasm/sqlite3.wasm"];
 self.addEventListener("install", (e) => {

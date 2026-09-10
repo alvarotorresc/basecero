@@ -147,6 +147,11 @@ export const ES = {
     prevision: {
       manage: "Recurrentes",
     },
+    renewal: {
+      phrase: "{name} se renueva el {when} por {amount}. ¿Lo sigues usando?",
+      see: "Ver suscripciones",
+      notNow: "Ahora no",
+    },
     available: {
       title: "Disponible del periodo",
       days: { one: "{n} día", other: "{n} días" },
@@ -782,6 +787,7 @@ export const ES = {
     subscriptionCancelled: "Suscripción cancelada",
     subscriptionAdded: "Suscripción añadida",
     subscriptionIgnored: "Comercio ignorado",
+    renewalSnoozed: "Aviso silenciado hasta la próxima renovación",
   },
   // Suscripciones (N6, «el radar»): cancelar desde el formulario de Recurrentes O desde la propia
   // pantalla del radar comparten este mismo modal — mismas claves para las dos entradas.
