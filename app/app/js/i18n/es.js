@@ -7,7 +7,6 @@ export const ES = {
     save: "Guardar",
     cancel: "Cancelar",
     delete: "Borrar",
-    edit: "Editar",
     saveFailed: "No se pudo guardar: {error}",
     saveChanges: "Guardar cambios",
     deleteFailed: "No se pudo borrar: {error}",
@@ -36,10 +35,8 @@ export const ES = {
     dateValue: "{date}",
     amountValue: "{amount}",
     // myPartSuffix se queda en prosa (con su separador ya sin punto medio): lo siguen concatenando tal cual
-    // inicio.js y semana.js, que esta PR no toca (spec §9.1/§9.2). myPart es el mismo segmento SIN
-    // el prefijo, para el sub de movRowHtml (§2.1 bloque 7) cuando ese bloque pase a metaHtml.
+    // inicio.js y semana.js, que esta PR no toca (spec §9.1/§9.2).
     myPartSuffix: ", tu parte {amount}",
-    myPart: "tu parte {amount}",
     sharedWith: "Compartido con {name}",
     settlement: {
       theyOwe: "{name} te debe",
@@ -253,17 +250,12 @@ export const ES = {
     tapToCategorize: "toca para categorizar",
     uncategorizedChip: "Sin categoría {n}",
     chipAll: "Todos",
-    // filter.toggle sustituye a search.toggle (embudo en vez de lupa, Movimientos.dc.html:24):
-    // search.toggle se queda sin consumidor, no se borra — ver comentario junto a su valor.
+    // filter.toggle sustituye a search.toggle (embudo en vez de lupa, Movimientos.dc.html:24).
     filter: { toggle: "Filtrar" },
     // Sustituyen al <select id="mov-period"> (Movimientos.dc.html:30-40): aria-label de los dos
     // botones circulares de 40px que mueven state.periodId por índice sobre `periods`.
     period: { prev: "Periodo anterior", next: "Periodo siguiente" },
     search: {
-      // Sin consumidor desde que la cabecera pasa a icon("filter"): el botón que abre este mismo
-      // buscador usa movimientos.filter.toggle como aria-label. No se borra: no está en la lista
-      // cerrada de claves que P0 autoriza a eliminar en el barrido del punto medio (spec §1.4/§2.1).
-      toggle: "Buscar",
       label: "Buscar",
       placeholder: "Comercio o nota",
     },
@@ -369,7 +361,6 @@ export const ES = {
     },
     byCategory: {
       title: "Por categoría",
-      hint: "Toca una categoría para ver el detalle o poner un límite",
       empty: "No tienes ninguna categoría de gasto activa.",
     },
     // N3 (Task 14): línea de comparativa con el periodo anterior, a la izquierda de la mini
@@ -385,11 +376,6 @@ export const ES = {
       // Solo cuando se ha pasado del límite: el exceso, ya calculado, para no tener que restar de
       // cabeza. Sustituye a la línea ofLimit entera (no se pintan las dos a la vez).
       overBy: "superado por {over}",
-      // ofLimitOver/noLimit/noPct (con {spent} en la plantilla, o pensados para el hueco de un %
-      // sin límite que ya no se pinta) se quedan sin consumidor: repetirían la cifra de la cabecera.
-      ofLimitOver: "{spent} de {limit}, superado por {over}",
-      noLimit: "{spent}, sin límite",
-      noPct: "—",
     },
     detail: {
       noSubcategory: "Sin subcategoría",
@@ -560,7 +546,6 @@ export const ES = {
       archiveInfo: "Archivar oculta la categoría de los selectores sin tocar tu historial: los periodos cerrados siguen sumando igual. Nada se borra si algo lo usa.",
     },
     archive: {
-      unarchive: "Desarchivar",
       archive: "Archivar categoría",
       title: "¿Archivar la categoría?",
       message: "{name}. Se ocultará de los selectores; tu historial y los periodos cerrados no cambian.",
@@ -641,7 +626,6 @@ export const ES = {
       income: "Ingresos",
       spent: "Gastado",
       saved: "Ahorrado",
-      savingsRate: "Tasa de ahorro",
       savingsSentence: "Ahorras el {pct} de lo que ingresas",
     },
     date: { title: "Empieza el" },

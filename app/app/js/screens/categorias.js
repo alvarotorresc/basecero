@@ -233,10 +233,9 @@ export async function renderCategorias(container, onBack) {
   }
 
   // Copy propio del botón (decisión 2: sigue archivando, con el patrón destructivo §4.7) —
-  // categorias.archive.archive/.unarchive se quedan solo para el título/confirmText del modal de
-  // onArchiveClick: "Archivar categoría" coincide con categorias.archive.archive, pero
-  // "Desarchivar categoría" NO es categorias.archive.unarchive ("Desarchivar" a secas) — de ahí
-  // las dos claves nuevas del namespace form.
+  // categorias.archive.archive se queda solo para el título/confirmText del modal de
+  // onArchiveClick: "Archivar categoría" coincide con esa clave, pero "Desarchivar categoría" es
+  // "Desarchivar" a secas — de ahí las dos claves del namespace form, ninguna del namespace archive.
   function archiveButtonLabel(form) {
     return form.isArchived ? t("categorias.form.unarchiveBtn") : t("categorias.form.archiveBtn");
   }

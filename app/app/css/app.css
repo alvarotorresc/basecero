@@ -477,7 +477,6 @@ main#screen {
 .list-row-icon svg { width: 20px; height: 20px; }
 .list-row-body { display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0; }
 .list-row-title { font-size: 15px; font-weight: 600; }
-.list-row-sub { font-size: 11px; color: var(--text-3); }
 .list-row-chevron { flex-shrink: 0; color: var(--text-3); width: 17px; height: 17px; }
 
 /* ===== campos de formulario (SISTEMA.md §4.5): sin caja, filete inferior ===== */

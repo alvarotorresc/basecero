@@ -7,7 +7,6 @@ export const EN = {
     save: "Save",
     cancel: "Cancel",
     delete: "Delete",
-    edit: "Edit",
     saveFailed: "Couldn’t save: {error}",
     saveChanges: "Save changes",
     deleteFailed: "Couldn’t delete: {error}",
@@ -36,10 +35,8 @@ export const EN = {
     dateValue: "{date}",
     amountValue: "{amount}",
     // myPartSuffix stays prose (dot-free separator): inicio.js/semana.js keep concatenating it
-    // as-is (§9.1/§9.2 don't touch it). myPart is the same segment WITHOUT the prefix, for
-    // movRowHtml's sub (§2.1 block 7) once that block moves to metaHtml.
+    // as-is (§9.1/§9.2 don't touch it).
     myPartSuffix: ", your share {amount}",
-    myPart: "your share {amount}",
     sharedWith: "Shared with {name}",
     settlement: {
       theyOwe: "{name} owes you",
@@ -245,17 +242,12 @@ export const EN = {
     tapToCategorize: "tap to categorize",
     uncategorizedChip: "No category {n}",
     chipAll: "All",
-    // filter.toggle replaces search.toggle (funnel instead of magnifier, Movimientos.dc.html:24):
-    // search.toggle is left without a consumer, not deleted — see the comment by its value.
+    // filter.toggle replaces search.toggle (funnel instead of magnifier, Movimientos.dc.html:24).
     filter: { toggle: "Filter" },
     // Replace <select id="mov-period"> (Movimientos.dc.html:30-40): aria-label of the two 40px
     // circular buttons that move state.periodId by index over `periods`.
     period: { prev: "Previous period", next: "Next period" },
     search: {
-      // No consumer since the header switched to icon("filter"): the button that opens this same
-      // search box now uses movimientos.filter.toggle as its aria-label. Not deleted: it isn't on
-      // the closed list of keys P0 is authorized to remove in the midpoint sweep (spec §1.4/§2.1).
-      toggle: "Search",
       label: "Search",
       placeholder: "Merchant or note",
     },
@@ -357,7 +349,6 @@ export const EN = {
     },
     byCategory: {
       title: "By category",
-      hint: "Tap a category to see the detail or set a limit",
       empty: "You have no active expense categories.",
     },
     compare: {
@@ -366,9 +357,6 @@ export const EN = {
     row: {
       ofLimit: "of {limit}",
       overBy: "over by {over}",
-      ofLimitOver: "{spent} of {limit}, over by {over}",
-      noLimit: "{spent}, no limit",
-      noPct: "—",
     },
     detail: {
       noSubcategory: "No subcategory",
@@ -539,7 +527,6 @@ export const EN = {
       archiveInfo: "Archiving hides the category from pickers without touching your history: closed periods still add up the same. Nothing is deleted if something uses it.",
     },
     archive: {
-      unarchive: "Unarchive",
       archive: "Archive category",
       title: "Archive this category?",
       message: "{name}. It will be hidden from the pickers; your history and closed periods stay the same.",
@@ -620,7 +607,6 @@ export const EN = {
       income: "Income",
       spent: "Spent",
       saved: "Saved",
-      savingsRate: "Savings rate",
       savingsSentence: "You save {pct} of what you earn",
     },
     date: { title: "Starts on" },
