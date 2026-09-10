@@ -744,31 +744,6 @@ body.onboarding .fab { display: none; }
   background: var(--cat, var(--accent));
 }
 
-/* anillo de progreso conic-gradient con hueco central; el consumidor fija --pct (0-100, número)
-   y opcionalmente --cat para el color; el contenido (icono/span) se centra sobre el hueco */
-.ring {
-  width: 46px;
-  height: 46px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  position: relative;
-  display: grid;
-  place-items: center;
-  background: conic-gradient(var(--cat, var(--green)) calc(var(--pct, 0) * 1%), var(--surface-2) 0);
-}
-.ring::after {
-  content: "";
-  position: absolute;
-  inset: 5px;
-  border-radius: 50%;
-  background: var(--bg);
-}
-.ring > * {
-  position: relative;
-  z-index: 1;
-  font-size: 16px;
-}
-
 /* importe héroe de sección (SISTEMA.md §2.3): los céntimos y el símbolo van en .money-cents/.money-cur */
 .amount-hero {
   font: var(--t-figure-xl);

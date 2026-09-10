@@ -442,7 +442,8 @@ export const ES = {
       countActive: { one: "{n} activo", other: "{n} activos" },
       new: "Nuevo objetivo",
       empty: "Todavía no tienes ningún objetivo activo.",
-      ringSub: "{current} de {target}, {subtitle}",
+      ofTarget: "{current} de {target}",
+      kind: { savings: "Hucha", cap: "Límite de gasto" },
     },
     goalType: {
       emergency_fund: "Fondo de emergencia",

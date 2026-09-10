@@ -159,7 +159,7 @@ function cuentasCardHtml(accounts, accountLoans) {
 
 // ---- tarjeta "Objetivos" ---------------------------------------------------
 
-const LEVEL_COLOR = { ok: "var(--green)", warn: "var(--amber)", over: "var(--red)" };
+const LEVEL_COLOR = { ok: "var(--pos)", warn: "var(--warn)", over: "var(--danger)" };
 
 const GOAL_TYPES = [
   { id: "emergency_fund", labelKey: "patrimonio.goalType.emergency_fund" },
@@ -171,16 +171,11 @@ const GOAL_TYPES = [
 const GOAL_TYPE_KEY = Object.fromEntries(GOAL_TYPES.map((gt) => [gt.id, gt.labelKey]));
 
 // Tipos con hucha propia (mismo criterio que repo.js#HUCHA_GOAL_TYPES): al crearlos sin cuenta
-// se les crea una savings dedicada — la UI usa este set para saber cuándo mostrar la nota y el
-// bloque de "hucha vinculada" al editar, Y (Task 6) para decidir el layout de anillo vs. barra
-// en la tarjeta Objetivos (artboard Patrimonio.dc.html: los 2 goals con hucha llevan anillo,
-// "Tope de Restauración" — spending_cap, sin hucha — lleva barra).
+// se les crea una savings dedicada — el formulario (renderGoalForm) usa este set para saber
+// cuándo mostrar la nota/bloque de "hucha vinculada" al editar. Ya NO decide el layout de la
+// fila en la tarjeta Objetivos (Task 6, P2): los tres tipos de goal se pintan igual, en barra —
+// spec §3.1.9, "barra para los tres, nunca anillo".
 const HUCHA_GOAL_TYPES = new Set(["emergency_fund", "savings_target", "provision"]);
-
-// Paleta de anillos de Objetivos (brief Task 6): color = POOL[i % 12] sobre el índice del goal
-// en el orden de listado (SQL.listGoals ORDER BY created_at, ya determinista) — no se persiste
-// nada, se deriva en cada render. Reusa el POOL de category-colors.js en vez de una copia propia
-// (cerraba el punto "paleta triplicada" del BACKLOG; reskin v2, tarea 10).
 
 /** savings_rate guarda puntos porcentuales en currentCents/targetCents (ver repo.goalProgress):
  *  se muestran como "%", el resto de tipos como € (fmtMoney). */
@@ -188,68 +183,52 @@ function fmtGoalAmount(goal, cents) {
   return goal.type === "savings_rate" ? `${fmtDec1(cents)} %` : fmtMoney(cents);
 }
 
-/** Fila de un goal SIN hucha (spending_cap/savings_rate): título + "actual / objetivo", barra
- *  .bar de 8px, subtítulo contextual a la izquierda + % en negrita a la derecha — réplica de
- *  docs/design/material-expresivo/Patrimonio.dc.html:104-112 (fila "Tope de Restauración"). El color (verde/ámbar/rojo)
- *  sigue el `level` de repo.goalProgress: solo se colorea texto (número grande, subtítulo, %)
- *  cuando level≠'ok' — en 'ok' se queda en los tonos neutros del resto de la pantalla, la barra
- *  es la única que lleva siempre su color de estado. La fila entera es un botón (Task 14): abre
- *  la subvista de edición. */
-function goalBarRowHtml(g) {
-  const { goal, currentCents, targetCents, pct, level, subtitle } = g;
+/** Fila de un goal, SIEMPRE en barra (§3.1.9 — nunca anillo, ya no hay ring): título + "actual /
+ *  objetivo", barra .bar de 8px, y al pie "{current} de {target}" + la etiqueta corta del tipo
+ *  (Hucha / Límite de gasto, D15 — las frases largas de repo.goalProgress se quedan donde ya
+ *  estaban, p.ej. PeriodoNuevo) unidos con el divisor de metaHtml, y el porcentaje a la derecha —
+ *  réplica de Patrimonio.dc.html:138-190. El color (verde/ámbar/rojo) sigue el `level` de
+ *  repo.goalProgress: solo se colorea texto cuando level≠'ok'; la barra es la única que lleva
+ *  siempre su color de estado. Solo la fila SIN hucha (spending_cap) lleva `.dotico.sm` con el
+ *  emoji de su categoría, delante del nombre. La fila entera es un botón: abre la subvista de
+ *  edición. */
+function goalBarRowHtml(g, byId) {
+  const { goal, currentCents, targetCents, pct, level } = g;
   const barColor = LEVEL_COLOR[level];
   const stateColor = level === "ok" ? null : LEVEL_COLOR[level];
   const barPct = Math.min(100, Math.max(0, pct));
+  const isCap = goal.type === "spending_cap";
+  const doticoHtml = isCap
+    ? `<div class="dotico sm" style="--cat:${colorForCategory(goal.category_id, byId)};" aria-hidden="true">${iconForCategory(goal.category_id, byId)}</div>`
+    : "";
+  const kindLabel = t(isCap ? "patrimonio.goals.kind.cap" : "patrimonio.goals.kind.savings");
 
   return `
     <button type="button" data-goal="${goal.id}"
       style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;gap:9px;">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
-        <div style="font-size:14px;font-weight:600;">${escHtml(goal.name)}</div>
-        <div class="num" style="font-size:13px;font-weight:600;color:${stateColor ?? "var(--text)"};white-space:nowrap;">
-          ${fmtGoalAmount(goal, currentCents)} <span style="color:var(--text-3);">/ ${fmtGoalAmount(goal, targetCents)}</span>
+        <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+          ${doticoHtml}
+          <span style="font-size:15px;font-weight:600;color:var(--ink);">${escHtml(goal.name)}</span>
+        </div>
+        <div class="num" style="font-size:15px;font-weight:600;color:${stateColor ?? "var(--ink)"};white-space:nowrap;flex-shrink:0;">
+          ${fmtGoalAmount(goal, currentCents)} <span style="color:var(--ink-3);">/ ${fmtGoalAmount(goal, targetCents)}</span>
         </div>
       </div>
       <div class="bar" style="--cat:${barColor};">
         <i style="width:${barPct}%;"></i>
       </div>
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
-        <div style="font-size:11px;color:${stateColor ?? "var(--text-3)"};">${escHtml(subtitle)}</div>
-        <div style="font-size:11px;font-weight:700;color:${stateColor ?? "var(--text-2)"};white-space:nowrap;">${Math.round(pct)} %</div>
+        ${metaHtml([t("patrimonio.goals.ofTarget", { current: fmtGoalAmount(goal, currentCents), target: fmtGoalAmount(goal, targetCents) }), kindLabel])}
+        <span class="num" style="font-size:12px;font-weight:700;color:${stateColor ?? "var(--ink-2)"};white-space:nowrap;flex-shrink:0;">${Math.round(pct)} %</span>
       </div>
     </button>`;
 }
 
-/** Fila de un goal CON hucha (emergency_fund/savings_target/provision): anillo .ring de 52px
- *  (el artboard usa 52px, más grande que el .ring base de 46px — override inline por instancia,
- *  ver app.css#.ring) con el % en el centro, nombre + subtítulo real de repo.goalProgress a la
- *  derecha (con el progreso en importes delante, mismo dato que goalBarRowHtml muestra en su fila
- *  de cabecera) — réplica de docs/design/material-expresivo/Patrimonio.dc.html:84-103. Color = paleta[i % 12] por el
- *  índice del goal en el orden de listado (determinista, sin persistir nada). Fila-botón, igual
- *  criterio que goalBarRowHtml. */
-function goalRingRowHtml(g, color) {
-  const { goal, currentCents, targetCents, pct, subtitle } = g;
-  const ringPct = Math.min(100, Math.max(0, pct));
-
-  return `
-    <button type="button" data-goal="${goal.id}"
-      style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;gap:14px;">
-      <div class="ring" style="width:52px;height:52px;--pct:${ringPct};--cat:${color};">
-        <span class="num" style="font-size:12px;font-weight:700;">${Math.round(pct)}%</span>
-      </div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13.5px;font-weight:600;">${escHtml(goal.name)}</div>
-        <div style="font-size:11px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-          ${t("patrimonio.goals.ringSub", { current: escHtml(fmtGoalAmount(goal, currentCents)), target: escHtml(fmtGoalAmount(goal, targetCents)), subtitle: escHtml(subtitle) })}
-        </div>
-      </div>
-    </button>`;
-}
-
-/** Tarjeta "Objetivos": una fila por goal activo, anillo (hucha) o barra (sin hucha) según
- *  HUCHA_GOAL_TYPES — réplica de docs/design/material-expresivo/Patrimonio.dc.html:123-189, + botón "Nuevo objetivo" en
- *  la cabecera. Cada fila abre la subvista de edición (Task 14). */
-function objetivosCardHtml(goals) {
+/** Tarjeta "Objetivos": una fila por goal activo, siempre en barra — réplica de
+ *  Patrimonio.dc.html:127-190, + botón "Nuevo objetivo" en la cabecera. Cada fila abre la
+ *  subvista de edición. */
+function objetivosCardHtml(goals, byId) {
   const n = goals.length;
   const header = sectionHeaderHtml({
     title: t("patrimonio.goals.title"),
@@ -268,10 +247,8 @@ function objetivosCardHtml(goals) {
   return `
     <div style="display:flex;flex-direction:column;gap:10px;">
       ${header}
-      <div class="card" style="display:flex;flex-direction:column;gap:18px;">
-        ${goals.map((g, i) => HUCHA_GOAL_TYPES.has(g.goal.type)
-          ? goalRingRowHtml(g, POOL[i % POOL.length])
-          : goalBarRowHtml(g)).join("")}
+      <div style="display:flex;flex-direction:column;gap:24px;">
+        ${goals.map((g) => goalBarRowHtml(g, byId)).join("")}
       </div>
     </div>`;
 }
@@ -777,7 +754,7 @@ export async function renderPatrimonio(container) {
 
       ${netWorthCardHtml(netWorthOfBalances(accounts), series, accounts)}
       ${cuentasCardHtml(accounts, accountLoans)}
-      ${objetivosCardHtml(goals)}
+      ${objetivosCardHtml(goals, byId)}
     `;
     wireMain();
   }
