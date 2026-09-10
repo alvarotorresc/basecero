@@ -11,6 +11,7 @@ import { userMessage } from "../errors.js";
 import { showConfirm } from "../modal.js";
 import { showToast } from "../toast.js";
 import { renderSuscripciones } from "./suscripciones.js";
+import { subHeaderHtml } from "../ui.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -200,14 +201,7 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
 
   function renderList() {
     container.innerHTML = `
-      <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="rec-back" aria-label="${t("common.goBack")}"
-          style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
-        <h1 style="flex:1; font-size:20px; font-weight:700; letter-spacing:-0.015em;">${t("recurrentes.title")}</h1>
-        <button type="button" id="rec-new"
-          style="height:44px;padding:0 18px;border-radius:999px;background:var(--text);color:var(--bg);border:0;
-          font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">${t("common.addNew")}</button>
-      </div>
+      ${subHeaderHtml({ id: "rec-back", title: t("recurrentes.title"), action: { id: "rec-new", icon: "plus", label: t("common.addNew") } })}
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
@@ -258,12 +252,7 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
 
     container.innerHTML = `
-      <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="rec-form-back" aria-label="${t("common.goBack")}"
-          style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
-        <h1 style="flex:1; font-size:20px; font-weight:700; letter-spacing:-0.015em;">${state.editId ? t("recurrentes.form.title.edit") : t("recurrentes.form.title.new")}</h1>
-        <span style="width:44px;"></span>
-      </div>
+      ${subHeaderHtml({ id: "rec-form-back", title: state.editId ? t("recurrentes.form.title.edit") : t("recurrentes.form.title.new") })}
 
       <label class="field field-stack" style="margin-bottom:18px;">
         <span class="field-label">${t("common.name")}</span>

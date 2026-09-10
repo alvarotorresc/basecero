@@ -9,6 +9,7 @@ import { renderSuscripciones } from "./suscripciones.js";
 import { pushBack, goBack } from "../back.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
+import { subHeaderHtml } from "../ui.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -32,7 +33,6 @@ function renderInformeError(container, onBack, message, retry) {
   container.querySelector("#informe-error-back").onclick = () => onBack();
 }
 
-const BACK_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg>`;
 const CHEVRON_SVG = (deg) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${deg}deg);"><path d="M9 5l7 7-7 7"></path></svg>`;
 const DOWNLOAD_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-4px;margin-right:6px;"><path d="M12 3v13m0 0-5-5m5 5 5-5M4 21h16"></path></svg>`;
 
@@ -44,11 +44,7 @@ function headerHtml(report, periods) {
   const now = new Date();
   const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
   return `
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-    <button type="button" class="icon-btn" id="informe-back" aria-label="${t("common.goBack")}"
-      style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">${BACK_SVG}</button>
-    <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">${t("informe.title")}</div>
-  </div>
+  ${subHeaderHtml({ id: "informe-back", title: t("informe.title") })}
   <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;">
     <div style="font-size:17px;font-weight:700;">${escHtml(m.name)}</div>
     <div style="font-size:13px;">${statusHtml}</div>

@@ -11,6 +11,7 @@ import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 import { showToast } from "../toast.js";
+import { subHeaderHtml } from "../ui.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -281,14 +282,7 @@ export async function renderGastoPorCategoria(container, onBack) {
     const overSpan = `<span class="num" style="color:var(--red);font-weight:700;">${escHtml(fmtMoney(-remaining))}</span>`;
 
     container.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-        <button type="button" class="icon-btn" id="gc-back" aria-label="${t("common.goBack")}"
-          style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
-        <div style="display:flex;flex-direction:column;gap:2px;">
-          <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">${t("gastoCategoria.title")}</div>
-          <div style="font-size:11px;color:var(--text-3);">${t("gastoCategoria.header.dayOf", { period: escHtml(period.name), day: dayIndexOfPeriod(period.start_date, hoyISO()), total: expectedPeriodDays(period.start_date) })}</div>
-        </div>
-      </div>
+      ${subHeaderHtml({ id: "gc-back", title: t("gastoCategoria.title"), subtitle: t("gastoCategoria.header.dayOf", { period: period.name, day: dayIndexOfPeriod(period.start_date, hoyISO()), total: expectedPeriodDays(period.start_date) }) })}
 
       <div class="card" style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px;">
         <div style="display:flex;flex-direction:column;gap:5px;">

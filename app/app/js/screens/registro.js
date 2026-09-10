@@ -9,7 +9,7 @@ import { limitWarning } from "../limit-warning.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
-import { metaHtml } from "../ui.js";
+import { metaHtml, subHeaderHtml } from "../ui.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { userMessage } from "../errors.js";
 import { focusInput } from "../viewport.js";
@@ -373,10 +373,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       : null;
 
     container.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${t("registro.title")}</h1>
-        <button type="button" class="icon-btn" id="reg-close" aria-label="${t("registro.close")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
-      </div>
+      ${subHeaderHtml({ id: null, title: t("registro.title"), action: { id: "reg-close", icon: "close", label: t("registro.close") } })}
 
       <div class="segmented" style="margin-bottom:18px;border-radius:999px;">
         ${TIPOS.map((tp) => {

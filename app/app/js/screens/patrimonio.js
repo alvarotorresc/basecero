@@ -10,6 +10,7 @@ import { t } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { showConfirm } from "../modal.js";
+import { subHeaderHtml } from "../ui.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -385,11 +386,7 @@ export async function renderPatrimonio(container) {
     const editing = !!state.editingAccountId;
 
     container.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="acc-back" aria-label="${t("common.goBack")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
-        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${editing ? t("patrimonio.account.title.edit") : t("patrimonio.accounts.new")}</h1>
-        <span style="width:36px;"></span>
-      </div>
+      ${subHeaderHtml({ id: "acc-back", title: editing ? t("patrimonio.account.title.edit") : t("patrimonio.accounts.new") })}
 
       <label class="field field-stack" style="margin-bottom:18px;">
         <span class="field-label">${t("common.name")}</span>
@@ -642,11 +639,7 @@ export async function renderPatrimonio(container) {
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
 
     container.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="goal-back" aria-label="${t("common.goBack")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
-        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${editing ? t("patrimonio.goal.title.edit") : t("patrimonio.goals.new")}</h1>
-        <span style="width:36px;"></span>
-      </div>
+      ${subHeaderHtml({ id: "goal-back", title: editing ? t("patrimonio.goal.title.edit") : t("patrimonio.goals.new") })}
 
       <label class="field field-stack" style="margin-bottom:18px;">
         <span class="field-label">${t("common.name")}</span>

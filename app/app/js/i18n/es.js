@@ -587,7 +587,6 @@ export const ES = {
       closing: "Cierras {name} y abres el siguiente",
       first: "Primer periodo",
       title: "Nuevo periodo",
-      subtitle: "Paso único, se guarda al abrirlo",
     },
     closing: {
       title: "Cierras {name}",
@@ -724,7 +723,6 @@ export const ES = {
     },
     assist: {
       title: "Configura tu banco",
-      closeAria: "Cerrar",
       rows: {
         one: "{n} fila, formato no reconocido — dinos qué es cada columna, solo esta vez",
         other: "{n} filas, formato no reconocido — dinos qué es cada columna, solo esta vez",

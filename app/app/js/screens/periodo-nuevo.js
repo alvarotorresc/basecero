@@ -11,6 +11,7 @@ import { inheritedBudgetsRaw, budgetMap } from "../category-spend.js";
 import { remainderCents, sweepDestinations, sweepPlan } from "../barrido.js";
 import { renderInforme } from "./informe.js";
 import { userMessage } from "../errors.js";
+import { subHeaderHtml } from "../ui.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -39,7 +40,7 @@ function renderAsistenteError(container, mode, onDone, message) {
  *  spentByRootCategory('' ) en modo 'first' no matchea ningún period_id → devuelve todas las
  *  raíces con spent_cents=0 (mismo LEFT JOIN, sin fila cerrada de la que tirar "mes pasado").
  *  onDone() se llama tanto al abrir con éxito como al cancelar con la flecha atrás (modo 'next'). */
-export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
+export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embed = false }) {
   let closingPeriod = null, closingSpent = 0, closingIncome = 0, closingCount = 0, rootRows = [], meta = {};
   let closingBudgets = [];
   // Barrido (N4): goals con progreso, cuentas vivas y la cuenta de origen por defecto — solo hace
@@ -197,24 +198,19 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
     }
   }
 
-  // Kicker versalitas verde (.day-label, misma fórmula que .section-title, --green del sistema):
-  // en modo 'next' compone "Cierra {periodo real} · abre el siguiente" con el nombre YA cargado
-  // (closingPeriod.name, el mismo dato que bloqueCierre usa debajo); en 'first' no hay periodo que
-  // cerrar, así que no hay dato del que derivar la frase del artboard — "Primer periodo" es la
-  // única etiqueta que no inventa nada. El sub "Paso único..." (copy real, ya existía en ambos
-  // modos) se conserva tal cual en vez del texto nuevo del artboard para esa línea.
+  // Cabecera de asistente (§4.2, subHeaderHtml align:"start"): el kicker verde desaparece y su
+  // frase pasa a ser el subtítulo del propio helper — en modo 'next' con el copy nuevo del
+  // artboard (periodo.header.closing, con el nombre YA cargado en closingPeriod.name); en 'first'
+  // no hay periodo que cerrar, así que se conserva "Primer periodo" (periodo.header.first), que no
+  // inventa ningún dato.
   function bloqueHeader() {
-    const kicker = mode === "next" ? t("periodo.header.closing", { name: escHtml(closingPeriod.name) }) : t("periodo.header.first");
-    return `
-    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
-      ${mode === "next" || onBack ? `<button type="button" class="icon-btn" id="pn-back" aria-label="${t("common.goBack")}"
-        style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>` : ""}
-      <div style="display:flex; flex-direction:column; gap:4px;">
-        <div class="day-label" style="color:var(--green);">${kicker}</div>
-        <div style="font-size:24px; font-weight:800; letter-spacing:-0.02em;">${t("periodo.header.title")}</div>
-        <div style="font-size:11px; color:var(--text-3);">${t("periodo.header.subtitle")}</div>
-      </div>
-    </div>`;
+    const subtitle = mode === "next" ? t("periodo.header.closing", { name: closingPeriod.name }) : t("periodo.header.first");
+    return subHeaderHtml({
+      id: mode === "next" || onBack ? "pn-back" : null,
+      title: t("periodo.header.title"),
+      subtitle,
+      align: "start",
+    });
   }
 
   function bloqueCierre() {
@@ -485,7 +481,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
 
   function render() {
     container.innerHTML = `
-      ${bloqueHeader()}
+      ${embed ? "" : bloqueHeader()}
       ${bloqueCierre()}
       ${bloqueBarrido()}
       ${bloqueNombre()}

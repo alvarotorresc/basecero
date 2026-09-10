@@ -9,11 +9,11 @@ import { fmtMoney, moneyPartsHtml, fmtDiaCorto, hoyISO } from "../format.js";
 import { t, monthLong } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 import { openTxDetail } from "../open-tx.js";
+import { subHeaderHtml } from "../ui.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
-const ICON_BACK = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"></path></svg>`;
 const chevronSvg = (open, color) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="${color}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${open ? "M19 14.5 12 8l-7 6.5" : "M5 9.5 12 16l7-6.5"}"></path></svg>`;
 
 // Nombre largo del día de semana vía i18n.weekdaysLong (mismo índice 0=domingo que getDay()).
@@ -195,11 +195,7 @@ export async function renderSemana(container, onBack, { openDay } = {}) {
     const weekEmpty = [...movsByDate.values()].every((m) => m.length === 0);
     const emptyMsg = hasHistory ? t("semana.emptyPeriod") : t("semana.empty");
     container.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
-        <button type="button" class="icon-btn" id="semana-back" aria-label="${escAttr(t("common.goBack"))}">${ICON_BACK}</button>
-        <span style="flex:1;text-align:center;font-size:17px;font-weight:600;color:var(--ink);">${t("semana.title")}</span>
-        <div style="width:44px;height:44px;flex-shrink:0;"></div>
-      </div>
+      ${subHeaderHtml({ id: "semana-back", title: t("semana.title") })}
 
       ${weekEmpty ? `<div class="banner-aviso" style="margin-bottom:20px;">${emptyMsg}</div>` : ""}
 

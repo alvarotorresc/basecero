@@ -214,16 +214,7 @@ export async function renderCategorias(container, onBack) {
     const parents = availableParents(form);
 
     container.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-        <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">${t(form.titleKey)}</div>
-        <button type="button" id="cf-close" aria-label="${t("categorias.form.closeAria")}"
-          style="width:44px;height:44px;border-radius:50%;background:var(--card2);border:0;color:var(--text);
-          display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M6 6l12 12M18 6L6 18"></path>
-          </svg>
-        </button>
-      </div>
+      ${subHeaderHtml({ id: "cf-back", title: t(form.titleKey) })}
 
       <div style="display:flex;flex-direction:column;gap:16px;">
 
@@ -451,7 +442,7 @@ export async function renderCategorias(container, onBack) {
   function wireForm() {
     const form = state.form;
 
-    container.querySelector("#cf-close").onclick = () => goBack();
+    container.querySelector("#cf-back").onclick = () => goBack();
 
     // El nombre NO repinta en cada tecla (perdería el foco/cursor del input, como el resto de
     // pantallas de la app — ver acc-name/goal-name en patrimonio.js): el estado (y la sugerencia
@@ -634,14 +625,7 @@ export async function renderCategorias(container, onBack) {
     const incomeCount = activeRootCount("income");
 
     container.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-        <button type="button" class="icon-btn" id="cat-back" aria-label="${t("common.goBack")}"
-          style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
-        <h1 style="flex:1;font-size:20px;font-weight:700;letter-spacing:-0.015em;">${t("categorias.title")}</h1>
-        <button type="button" id="cat-new"
-          style="height:44px;padding:0 18px;border-radius:999px;background:var(--text);color:var(--bg);border:0;
-          font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">${t("common.addNew")}</button>
-      </div>
+      ${subHeaderHtml({ id: "cat-back", title: t("categorias.title"), action: { id: "cat-new", icon: "plus", label: t("common.addNew") } })}
 
       <div class="segmented" style="margin-bottom:10px;border-radius:999px;">
         ${[["expense", t("categorias.flow.expenseCount", { n: expenseCount })], ["income", t("categorias.flow.incomeCount", { n: incomeCount })]].map(([id, label]) => {

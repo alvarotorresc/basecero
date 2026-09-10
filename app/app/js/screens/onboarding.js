@@ -16,6 +16,8 @@ import { workbookToRows, validateImport } from "../xlsx.js";
 import { t, LANGS, activeLang, initI18n } from "../i18n/index.js";
 import { loadXlsx } from "../xlsx-loader.js";
 import { userMessage } from "../errors.js";
+import { icon } from "../icons.js";
+import { subHeaderHtml } from "../ui.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -65,7 +67,7 @@ export async function renderOnboarding(container, { onDone }) {
     return `
     <div style="display:flex;gap:10px;margin-top:24px;">
       <button type="button" class="icon-btn" id="onb-back" aria-label="${escAttr(t("common.back"))}"
-        style="width:52px;height:52px;border-radius:999px;background:var(--card);color:var(--text);font-size:18px;flex-shrink:0;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
+        style="width:44px;height:44px;border-radius:999px;background:var(--card);color:var(--text);flex-shrink:0;">${icon("back")}</button>
       <button type="button" class="btn-primary" id="${ctaId}" style="flex:1;">${ctaLabel}</button>
     </div>`;
   }
@@ -118,7 +120,7 @@ export async function renderOnboarding(container, { onDone }) {
       </div>`).join("");
     return `
     <div style="margin-top:8px;">
-      <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;">${t("onboarding.account.title")}</div>
+      <div style="font: var(--t-title); letter-spacing:-.01em;">${t("onboarding.account.title")}</div>
       <div style="font-size:13px;color:var(--text-2);margin-top:6px;line-height:1.5;">${t("onboarding.account.subtitle")}</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px;">${rows}</div>
@@ -153,7 +155,7 @@ export async function renderOnboarding(container, { onDone }) {
     const p = state.prefs;
     return `
     <div style="margin-top:8px;">
-      <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;">${t("onboarding.prefs.title")}</div>
+      <div style="font: var(--t-title); letter-spacing:-.01em;">${t("onboarding.prefs.title")}</div>
       <div style="font-size:13px;color:var(--text-2);margin-top:6px;">${t("onboarding.prefs.subtitle")}</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:13px;margin-top:14px;">
@@ -196,7 +198,7 @@ export async function renderOnboarding(container, { onDone }) {
   function paso4Html() {
     return `
     <div style="margin-top:8px;">
-      <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;line-height:1.15;">${t("onboarding.period.titleLine1")}<br>${t("onboarding.period.titleLine2")}</div>
+      <div style="font: var(--t-title); letter-spacing:-.01em;line-height:1.15;">${t("onboarding.period.titleLine1")}<br>${t("onboarding.period.titleLine2")}</div>
       <div style="font-size:13px;color:var(--text-2);margin-top:8px;line-height:1.5;">${t("onboarding.period.bodyPre")}<b style="color:var(--text);">${t("onboarding.period.bodyBold")}</b>${t("onboarding.period.bodyPost")}</div>
     </div>
     <div style="background:var(--card);border-radius:0;padding:16px;margin-top:14px;">
@@ -228,7 +230,7 @@ export async function renderOnboarding(container, { onDone }) {
       <button type="button" class="btn-primary" id="onb-open-period" style="width:100%;">${t("onboarding.period.openBtn")}</button>
       <div style="text-align:center;font-size:11.5px;color:var(--text-2);">${t("onboarding.period.openHint")}</div>
       <button type="button" class="icon-btn" id="onb-back" aria-label="${escAttr(t("common.back"))}"
-        style="width:44px;height:44px;border-radius:999px;background:var(--card);color:var(--text);font-size:16px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
+        style="width:44px;height:44px;border-radius:999px;background:var(--card);color:var(--text);">${icon("back")}</button>
     </div>`;
   }
 
@@ -336,11 +338,7 @@ export async function renderOnboarding(container, { onDone }) {
     const imp = state.imp ?? (state.imp = { fileName: "", needsPass: false, pass: "", errors: [], pending: null, summary: "", busy: false });
     container.innerHTML = `
       <div style="display:flex;flex-direction:column;min-height:calc(100vh - 48px);padding-top:8px;">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-          <button type="button" class="icon-btn" id="onb-imp-back" aria-label="${escAttr(t("common.goBack"))}"
-            style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
-          <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">${t("onboarding.import.title")}</div>
-        </div>
+        ${subHeaderHtml({ id: "onb-imp-back", title: t("onboarding.import.title") })}
         <div style="font-size:13px;color:var(--text-2);line-height:1.5;margin-bottom:14px;">${t("onboarding.import.introPre")}<b style="color:var(--text);">.xlsx</b>${t("onboarding.import.introMid")}<b style="color:var(--text);">.bce</b>${t("onboarding.import.introPost")}</div>
         ${!imp.fileName ? `
         <label class="btn-primary" style="width:100%;text-align:center;cursor:pointer;">${t("onboarding.import.chooseFileBtn")}

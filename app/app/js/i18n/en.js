@@ -575,7 +575,6 @@ export const EN = {
       closing: "Closing {name} and opening the next one",
       first: "First period",
       title: "New period",
-      subtitle: "One step, saves when opened",
     },
     closing: {
       title: "Closing {name}",
@@ -710,7 +709,6 @@ export const EN = {
     },
     assist: {
       title: "Set up your bank",
-      closeAria: "Close",
       rows: {
         one: "{n} row, format not recognized — tell us what each column is, just this once",
         other: "{n} rows, format not recognized — tell us what each column is, just this once",

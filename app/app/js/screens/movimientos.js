@@ -9,7 +9,7 @@ import { matchesFilter, isUncategorized } from "../movimientos-filter.js";
 import { fmtMoney, moneyPartsHtml, fmtDiaLargo, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
-import { metaHtml } from "../ui.js";
+import { metaHtml, subHeaderHtml } from "../ui.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
@@ -160,7 +160,7 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     return;
   }
   if (periods.length === 0) {
-    container.innerHTML = `<header class="screen-header"><h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">${t("common.movements")}</h1></header>
+    container.innerHTML = `<header class="screen-header"><h1 style="font: var(--t-title); letter-spacing:-.01em;">${t("common.movements")}</h1></header>
       <div class="banner-aviso red">${t("movimientos.noPeriods")}</div>`;
     return;
   }
@@ -482,11 +482,7 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
 
     container.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="mov-back" aria-label="${t("common.goBack")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
-        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${t(TIPO_KEY[d.type])}</h1>
-        <span style="width:36px;"></span>
-      </div>
+      ${subHeaderHtml({ id: "mov-back", title: t(TIPO_KEY[d.type]) })}
 
       ${locked ? `
       <div class="banner-aviso" style="margin-bottom:18px;">
@@ -848,7 +844,7 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
 
     container.innerHTML = `
       <header class="screen-header" style="flex-direction:row;align-items:center;justify-content:space-between;">
-        <h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">${t("common.movements")}</h1>
+        <h1 style="font: var(--t-title); letter-spacing:-.01em;">${t("common.movements")}</h1>
         <button type="button" class="icon-btn" id="mov-search-toggle" aria-label="${t("movimientos.search.toggle")}">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4.2-4.2"></path></svg>
         </button>

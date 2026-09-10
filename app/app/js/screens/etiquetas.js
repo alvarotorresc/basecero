@@ -6,6 +6,7 @@ import { t } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { goToTab } from "../tabs.js";
+import { subHeaderHtml } from "../ui.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -265,13 +266,7 @@ export async function renderEtiquetas(container, onBack) {
 
   function renderList() {
     container.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-        <button type="button" class="icon-btn" id="et-back" aria-label="${t("common.goBack")}"
-          style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
-        <h1 style="flex:1;font-size:20px;font-weight:700;letter-spacing:-0.015em;">${t("etiquetas.title")}</h1>
-        <button type="button" class="icon-btn" id="et-add" aria-label="${t("etiquetas.new")}"
-          style="width:44px;height:44px;">${ICON_PLUS}</button>
-      </div>
+      ${subHeaderHtml({ id: "et-back", title: t("etiquetas.title"), action: { id: "et-add", icon: "plus", label: t("etiquetas.new") } })}
 
       ${loadError ? `<div class="banner-aviso red">${escHtml(loadError)}</div>` : rows.length === 0 ? `
       <div class="card" style="text-align:center;color:var(--text-3);margin-bottom:14px;">

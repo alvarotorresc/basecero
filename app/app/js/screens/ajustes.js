@@ -18,6 +18,7 @@ import { loadXlsx } from "../xlsx-loader.js";
 import { userMessage } from "../errors.js";
 import { showToast } from "../toast.js";
 import { download } from "../download.js";
+import { subHeaderHtml } from "../ui.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -313,7 +314,7 @@ export async function renderAjustes(container) {
 
   function renderMain() {
     container.innerHTML = `
-      <header class="screen-header"><h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">${t("ajustes.title")}</h1></header>
+      <header class="screen-header"><h1>${t("ajustes.title")}</h1></header>
 
       <div class="card" style="margin-bottom:12px">
         <p style="font-weight:600;margin-bottom:4px">${t("ajustes.sheet.title")}</p>
@@ -856,16 +857,7 @@ export async function renderAjustes(container) {
     const ctaDisabled = !profileValid || a.saveBusy || readableCount === 0;
 
     container.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-        <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">${t("ajustes.assist.title")}</div>
-        <button type="button" id="assist-close" aria-label="${escAttr(t("ajustes.assist.closeAria"))}" ${a.saveBusy ? "disabled" : ""}
-          style="width:44px;height:44px;border-radius:50%;background:var(--card2);border:0;color:var(--text);
-          display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M6 6l12 12M18 6L6 18"></path>
-          </svg>
-        </button>
-      </div>
+      ${subHeaderHtml({ id: "assist-close", title: t("ajustes.assist.title") })}
 
       <div style="display:flex;flex-direction:column;gap:16px;">
 
@@ -929,6 +921,7 @@ export async function renderAjustes(container) {
   function wireAssistant(profile, profileValid) {
     const a = state.assistant;
 
+    container.querySelector("#assist-close").disabled = a.saveBusy;
     container.querySelector("#assist-close").onclick = () => goBack();
 
     // Delegación uniforme para las 6 filas de chips (fecha/concepto/contraparte/importe-única/
