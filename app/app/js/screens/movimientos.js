@@ -10,6 +10,8 @@ import { fmtMoney, moneyPartsHtml, fmtDiaLargo, hoyISO, currencySymbol, parseCen
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { metaHtml, subHeaderHtml } from "../ui.js";
+import { icon } from "../icons.js";
+import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
@@ -166,6 +168,10 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
   }
   const accById = Object.fromEntries(accountsAll.map((a) => [a.id, a]));
   const partnerName = (meta.partner_name || "").trim();
+  // Cabecera §4.1: el subtítulo «día N de M» siempre describe el periodo ABIERTO, no el que se
+  // esté navegando con el selector de flechas — dayIndexOfPeriod cuenta días desde hoy, así que
+  // solo tiene sentido para el periodo en curso (un periodo cerrado daría un "día 47 de 31").
+  const openPeriod = periods.find((p) => p.status === "open") ?? null;
 
   const state = {
     view: "list",
@@ -843,11 +849,12 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       : "";
 
     container.innerHTML = `
-      <header class="screen-header" style="flex-direction:row;align-items:center;justify-content:space-between;">
-        <h1 style="font: var(--t-title); letter-spacing:-.01em;">${t("common.movements")}</h1>
-        <button type="button" class="icon-btn" id="mov-search-toggle" aria-label="${t("movimientos.search.toggle")}">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4.2-4.2"></path></svg>
-        </button>
+      <header class="screen-header" style="flex-direction:row;align-items:flex-start;justify-content:space-between;">
+        <div style="display:flex;flex-direction:column;gap:3px;">
+          <h1 style="font: var(--t-title); letter-spacing:-.01em;">${t("common.movements")}</h1>
+          ${openPeriod ? `<span style="font:var(--t-label);color:var(--ink-3);">${t("inicio.header.dayOf", { period: escHtml(openPeriod.name), day: dayIndexOfPeriod(openPeriod.start_date, hoyISO()), total: expectedPeriodDays(openPeriod.start_date) })}</span>` : ""}
+        </div>
+        <button type="button" class="icon-btn" id="mov-search-toggle" aria-label="${t("movimientos.filter.toggle")}">${icon("filter")}</button>
       </header>
 
       ${state.searchOpen ? `

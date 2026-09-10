@@ -249,7 +249,13 @@ export const ES = {
     tapToCategorize: "toca para categorizar",
     uncategorizedChip: "Sin categoría {n}",
     chipAll: "Todos",
+    // filter.toggle sustituye a search.toggle (embudo en vez de lupa, Movimientos.dc.html:24):
+    // search.toggle se queda sin consumidor, no se borra — ver comentario junto a su valor.
+    filter: { toggle: "Filtrar" },
     search: {
+      // Sin consumidor desde que la cabecera pasa a icon("filter"): el botón que abre este mismo
+      // buscador usa movimientos.filter.toggle como aria-label. No se borra: no está en la lista
+      // cerrada de claves que P0 autoriza a eliminar en el barrido del punto medio (spec §1.4/§2.1).
       toggle: "Buscar",
       label: "Buscar",
       placeholder: "Comercio o nota",

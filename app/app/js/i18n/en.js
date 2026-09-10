@@ -241,7 +241,13 @@ export const EN = {
     tapToCategorize: "tap to categorize",
     uncategorizedChip: "No category {n}",
     chipAll: "All",
+    // filter.toggle replaces search.toggle (funnel instead of magnifier, Movimientos.dc.html:24):
+    // search.toggle is left without a consumer, not deleted — see the comment by its value.
+    filter: { toggle: "Filter" },
     search: {
+      // No consumer since the header switched to icon("filter"): the button that opens this same
+      // search box now uses movimientos.filter.toggle as its aria-label. Not deleted: it isn't on
+      // the closed list of keys P0 is authorized to remove in the midpoint sweep (spec §1.4/§2.1).
       toggle: "Search",
       label: "Search",
       placeholder: "Merchant or note",
