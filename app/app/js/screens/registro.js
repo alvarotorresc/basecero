@@ -349,13 +349,15 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     </button>`;
   }
 
-  /** Selector de tipo (Registro v2 §9.3): en modo rápido NO se pinta — el formulario queda fijo a
-   *  gasto. En modo completo, dos píldoras siempre visibles (Gasto/Ingreso) + un botón circular de
+  /** Selector de tipo (Registro v2 §9.3): en modo rápido, CON el bloque plegable cerrado, NO se
+   *  pinta — el formulario queda fijo a gasto. En cuanto el bloque está abierto (modo completo, o
+   *  modo rápido tras tocar «Más» — detailsOpen() es el mismo criterio que gatea cuenta/comercio/
+   *  fecha/nota) aparecen dos píldoras siempre visibles (Gasto/Ingreso) + un botón circular de
    *  30px que despliega los otros tres tipos (transferencia/devolución/ajuste). La rejilla extra se
    *  enseña si el usuario la ha abierto a mano O si el tipo activo ya es uno de esos tres — así un
    *  prefill de transferencia no aterriza con su propio tipo escondido. */
-  function typeSelectorHtml() {
-    if (state.quick) return "";
+  function typeSelectorHtml(formOpen) {
+    if (!formOpen) return "";
     const mainTipos = TIPOS.filter((tp) => tp.id === "expense" || tp.id === "income");
     const extraTipos = TIPOS.filter((tp) => tp.id !== "expense" && tp.id !== "income");
     const extraOpen = state.typeMoreOpen || extraTipos.some((tp) => tp.id === state.tipo);
@@ -397,18 +399,22 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     const warning = state.tipo === "expense"
       ? limitWarning({ categoryId: state.categoryId, amountCents: myCents, byId, spentByRoot, budgetByCategory })
       : null;
+    // D13: el héroe de 56px es solo el registro rápido "de verdad" (bloque plegable cerrado); en
+    // cuanto se ve el resto del formulario —modo completo, o modo rápido tras tocar «Más»— la
+    // pantalla ya es visualmente RegistroCompleto.dc.html, con el importe a 36px.
+    const formOpen = detailsOpen({ quick: state.quick, expanded: state.expanded, tipo: state.tipo });
 
     container.innerHTML = `
       ${subHeaderHtml({ id: null, title: t("registro.title"), action: { id: "reg-close", icon: "close", label: t("registro.close") } })}
 
-      ${typeSelectorHtml()}
+      ${typeSelectorHtml(formOpen)}
 
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px; padding-bottom:10px; border-bottom:2px solid var(--accent);">
         <span style="font-size:13px; font-weight:500; color:var(--accent);">${t("common.amount")}</span>
         <div class="amount-display" style="align-items:center;">
           ${state.tipo === "adjustment" ? `<button type="button" class="icon-btn" id="reg-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;">${state.adjustmentSign}</button>` : ""}
           <input type="text" inputmode="decimal" id="reg-raw" value="${escAttr(state.raw)}" placeholder="0" autocomplete="off"
-            style="border:0;background:none;color:var(--ink);font:600 ${state.quick ? "56" : "36"}px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
+            style="border:0;background:none;color:var(--ink);font:600 ${formOpen ? "36" : "56"}px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
           <span class="amount-currency">${escHtml(currencySymbol())}</span>
         </div>
       </div>
