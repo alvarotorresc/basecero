@@ -175,6 +175,11 @@ function importResultText(res, partnerName) {
   if (res.omitted) {
     text += t("ajustes.importResult.omitted", { n: res.omitted });
   }
+  // Registro v2 §5.5: solo cuenta las filas CREADAS que la memoria de comercios pudo categorizar
+  // (n26.js#runImportPipeline); una conciliación nunca toca la categoría de la fila existente.
+  if (res.categorized) {
+    text += t("ajustes.importResult.categorized", { n: res.categorized });
+  }
   text += t("ajustes.importResult.tail");
   if (partnerName && res.via === "n26") {
     text += t("ajustes.importResult.bizumHint");

@@ -637,6 +637,7 @@ export const ES = {
     importResult: {
       summary: "Nuevas: {created} · Conciliadas: {reconciled} · Duplicadas (saltadas): {skipped}",
       omitted: { one: " · 1 fila ilegible omitida", other: " · {n} filas ilegibles omitidas" },
+      categorized: { one: " · 1 categorizado por el comercio", other: " · {n} categorizados por el comercio" },
       tail: ". Revisa la bandeja «sin categorizar» en Movimientos.",
       bizumHint: " Liquida en Inicio antes de importar: el Bizum que recibes se concilia solo; el que envías entra como movimiento nuevo.",
     },

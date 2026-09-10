@@ -8,10 +8,20 @@
 import { SQL } from "./sql.js";
 import { execMany } from "./db.js";
 import { nowIso } from "./format.js";
-import { getOpenPeriod, n26Existing, importAccountId, getMetaAll } from "./repo.js";
+import { getOpenPeriod, n26Existing, importAccountId, getMetaAll, loadMerchantMemory } from "./repo.js";
 import { sniffCsv, isN26Headers, applyProfile, parseCsvProfile, profileMatches } from "./csv-generic.js";
+import { normalizeMerchant } from "./merchant-memory.js";
 import { t } from "./i18n/index.js";
 import { UserError } from "./errors.js";
+
+/** Registro v2 §5.5: categoría con la que entra una fila NUEVA del import — la de la memoria del
+ *  comercio si se conoce, o "" si no. PURA: no toca cuenta (ya es la del import,
+ *  `importAccountId()`) ni compartido (marcar sola una fila importada como compartida cambiaría en
+ *  silencio lo que la contraparte debe y lo que sale en «Liquidar»; eso lo decide una persona, no
+ *  un heurístico). `memory` es el mapa de merchant-memory.js#merchantMemory. */
+export function categoryForImportedRow(row, memory) {
+  return memory?.[normalizeMerchant(row.partnerName)]?.categoryId || "";
+}
 
 /** SHA-256 hex vía Web Crypto (crypto.subtle), asíncrona — sustituye a gasSha256Hex (Apps
  *  Script usa Utilities.computeDigest, síncrona; el navegador no ofrece un SHA-256 síncrono). */
@@ -75,8 +85,11 @@ async function runImportPipeline(rows) {
     externalId: t.external_id,
     status: t.status,
   }));
+  // Cargada UNA vez antes del bucle (Registro v2 §5.5), no por fila: es la misma ventana de 500
+  // movimientos que usa Registro, y no cambia mientras dure este import.
+  const memory = await loadMerchantMemory();
 
-  const res = { created: 0, reconciled: 0, skipped: 0, omitted: 0 };
+  const res = { created: 0, reconciled: 0, skipped: 0, omitted: 0, categorized: 0 };
   const now = nowIso();
   const stmts = [];
 
@@ -95,10 +108,13 @@ async function runImportPipeline(rows) {
     } else {
       const id = bcUlid();
       const type = r.amountCents < 0 ? "expense" : "income";
+      // Solo categoría (§5.5): ni cuenta ni compartido — ver el comentario de categoryForImportedRow.
+      const categoryId = categoryForImportedRow(r, memory);
+      if (categoryId) res.categorized++;
       stmts.push({
         sql: SQL.insertTransaction,
         bind: [id, r.bookingDate, period.id, type, Math.abs(r.amountCents), accountId, "",
-          "", bcSanitizeCell(r.partnerName), bcSanitizeCell(r.paymentReference),
+          categoryId, bcSanitizeCell(r.partnerName), bcSanitizeCell(r.paymentReference),
           0, null, "me", 0, "", "", r.externalId, "reconciled", now, now],
       });
       existing.push({ id, dateIso: r.bookingDate, type, amountCents: r.amountCents,

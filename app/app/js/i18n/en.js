@@ -629,6 +629,7 @@ export const EN = {
     importResult: {
       summary: "New: {created} · Reconciled: {reconciled} · Duplicates (skipped): {skipped}",
       omitted: { one: " · 1 unreadable row skipped", other: " · {n} unreadable rows skipped" },
+      categorized: { one: " · 1 categorized from the merchant", other: " · {n} categorized from the merchant" },
       tail: ". Check the “uncategorized” tray in Transactions.",
       bizumHint: " Settle up in Home before importing: an incoming Bizum reconciles itself; one you send comes in as a new transaction.",
     },

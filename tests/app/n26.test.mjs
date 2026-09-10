@@ -6,8 +6,9 @@ import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 import { SQL } from "../../app/app/js/sql.js";
 import { seedStatements } from "../../app/app/js/seeds.js";
-import { sha256Hex, externalIdFor, signedAmountCents } from "../../app/app/js/n26.js";
+import { sha256Hex, externalIdFor, signedAmountCents, categoryForImportedRow } from "../../app/app/js/n26.js";
 import { sniffCsv, isN26Headers, applyProfile, parseCsvProfile, profileMatches } from "../../app/app/js/csv-generic.js";
+import { merchantMemory } from "../../app/app/js/merchant-memory.js";
 
 const require = createRequire(import.meta.url);
 const pure = require("../../app/app/vendor/pure.js");
@@ -78,7 +79,10 @@ async function runPipeline(d, rows, hashFn = sha256hex) {
     amountCents: signedAmountCents(t.type, t.amount_cents),
     externalId: t.external_id, status: t.status,
   }));
-  const res = { created: 0, reconciled: 0, skipped: 0, omitted: 0 };
+  // Registro v2 §5.5: memoria de comercios cargada UNA vez, igual que en n26.js real —
+  // merchantHistory() + merchantMemory() puros contra la MISMA base de test.
+  const memory = merchantMemory(d.prepare(SQL.merchantHistory).all(500));
+  const res = { created: 0, reconciled: 0, skipped: 0, omitted: 0, categorized: 0 };
   const stmts = [];
   for (const r of rows) {
     // M4: fila de 0,00 (verificación de tarjeta) o importe no numérico (CSV corrupto) — se
@@ -96,8 +100,10 @@ async function runPipeline(d, rows, hashFn = sha256hex) {
     } else {
       const id = "tx" + Math.floor(Math.random() * 1e9);
       const type = r.amountCents < 0 ? "expense" : "income";
+      const categoryId = categoryForImportedRow(r, memory);
+      if (categoryId) res.categorized++;
       stmts.push({ sql: SQL.insertTransaction, bind: [id, r.bookingDate, "p1", type, Math.abs(r.amountCents),
-        "acc-n26", "", "", pure.bcSanitizeCell(r.partnerName), pure.bcSanitizeCell(r.paymentReference),
+        "acc-n26", "", categoryId, pure.bcSanitizeCell(r.partnerName), pure.bcSanitizeCell(r.paymentReference),
         0, null, "me", 0, "", "", r.externalId, "reconciled", NOW, NOW] });
       existing.push({ id, dateIso: r.bookingDate, type, amountCents: r.amountCents,
         externalId: r.externalId, status: "reconciled" });
@@ -154,7 +160,7 @@ const txCount = (d) => d.prepare(`SELECT COUNT(*) c FROM transactions`).get().c;
 test("import CSV de 2 filas sobre base vacía: 2 creadas reconciled sin categoría, signo/tipo correctos", async () => {
   const d = db();
   const res = await runImport(d, CSV_2ROWS);
-  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, omitted: 0 });
+  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, omitted: 0, categorized: 0 });
 
   const rows = n26Rows(d);
   assert.equal(rows.length, 2);
@@ -175,11 +181,55 @@ test("import CSV de 2 filas sobre base vacía: 2 creadas reconciled sin categor�
   assert.equal(ingreso.status, "reconciled");
 });
 
+// Registro v2 §5.5: categoryForImportedRow es PURA — se testea directamente, sin pasar por el
+// pipeline entero (mismo criterio que pide la spec de la tarea).
+test("categoryForImportedRow: comercio conocido en la memoria entra con su categoría", () => {
+  const memory = merchantMemory([
+    { merchant: "Mercadona", category_id: "cat-alimentacion-supermercado", account_id: "acc-1", is_shared: 0, share_pct_override: null, paid_by: "me", date: "2026-08-01", type: "expense" },
+  ]);
+  assert.equal(categoryForImportedRow({ partnerName: "MERCADONA" }, memory), "cat-alimentacion-supermercado");
+});
+
+test("categoryForImportedRow: comercio desconocido entra con category_id vacío", () => {
+  const memory = merchantMemory([]);
+  assert.equal(categoryForImportedRow({ partnerName: "BANCO DESCONOCIDO" }, memory), "");
+});
+
+test("import CSV: fila de un comercio conocido entra CATEGORIZADA por la memoria de comercios", async () => {
+  const d = db();
+  // Historial previo del mismo comercio, ya reconciliado — no es candidato de dedupe (external_id
+  // distinto) ni de conciliación manual (status≠'pending', importe distinto): la única razón por
+  // la que puede influir en el import de CSV_2ROWS es la memoria de comercios.
+  d.prepare(SQL.insertTransaction).run(
+    "hist1", "2026-07-01", "p1", "expense", 3000, "acc-n26", "",
+    "cat-alimentacion-supermercado", "MERCADONA", "", 0, null, "me", 0, "", "", "hist-ext-1", "reconciled", T, T);
+
+  const res = await runImport(d, CSV_2ROWS);
+  assert.equal(res.categorized, 1);
+  const gasto = n26Rows(d).find((r) => r.merchant === "MERCADONA" && r.id !== "hist1");
+  assert.equal(gasto.category_id, "cat-alimentacion-supermercado");
+  // MARTA G. (fila 2) no tiene historial: entra sin categoría, y no cuenta en categorized.
+  const ingreso = n26Rows(d).find((r) => r.merchant === "MARTA G.");
+  assert.equal(ingreso.category_id, "");
+});
+
+test("import CSV: la fila que se CONCILIA no toca la categoría de la fila existente", async () => {
+  const d = db();
+  d.prepare(SQL.insertTransaction).run(
+    "manual1", "2026-08-19", "p1", "expense", 4520, "acc-n26", "",
+    "cat-alimentacion-supermercado", "Compra en tienda", "", 0, null, "me", 0, "", "", "", "pending", T, T);
+  const before = d.prepare(`SELECT category_id FROM transactions WHERE id='manual1'`).get().category_id;
+
+  await runImport(d, CSV_2ROWS); // fila 1 (MERCADONA, -45.20, 1 día de diferencia) concilia con manual1
+  const after = d.prepare(`SELECT category_id FROM transactions WHERE id='manual1'`).get().category_id;
+  assert.equal(after, before);
+});
+
 test("re-import del mismo CSV: 2 duplicadas (saltadas), sin filas nuevas", async () => {
   const d = db();
   await runImport(d, CSV_2ROWS);
   const res = await runImport(d, CSV_2ROWS);
-  assert.deepEqual(res, { created: 0, reconciled: 0, skipped: 2, omitted: 0 });
+  assert.deepEqual(res, { created: 0, reconciled: 0, skipped: 2, omitted: 0, categorized: 0 });
   assert.equal(n26Rows(d).length, 2);
 });
 
@@ -193,7 +243,7 @@ test("fila que casa con un pending manual ≤3 días: reconciled, conserva categ
   const res = await runImport(d, CSV_2ROWS);
   // Fila 1 (MERCADONA, -45.20, 2026-08-20) casa con manual1 (mismo importe, expense, 1 día de
   // diferencia); fila 2 (MARTA G., +360.00) no tiene con qué casar -> create.
-  assert.deepEqual(res, { created: 1, reconciled: 1, skipped: 0, omitted: 0 });
+  assert.deepEqual(res, { created: 1, reconciled: 1, skipped: 0, omitted: 0, categorized: 0 });
   assert.equal(n26Rows(d).length, 2);
 
   const manual = d.prepare(`SELECT * FROM transactions WHERE id='manual1'`).get();
@@ -227,7 +277,7 @@ test("A2: transferencia pendiente NO se traga un abono ajeno, y su propio cargo 
   const res = await runImport(d, text);
   // Con el fix: NINGUNA fila reconcilia contra transfer1 (excluida de candidatura por tipo) —
   // ambas se crean como filas nuevas independientes.
-  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, omitted: 0 });
+  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, omitted: 0, categorized: 0 });
 
   const transfer = d.prepare(`SELECT * FROM transactions WHERE id='transfer1'`).get();
   assert.equal(transfer.status, "pending"); // intacta: ninguna fila del CSV la ha tocado
@@ -263,7 +313,7 @@ test("import CSV con una fila de 0,00 (verificación de tarjeta, M4): se omite y
       type: "MoneyBeam", ref: "Bizum alquiler", amount: "360.00" }),
   ].join("\n");
   const res = await runImport(d, text);
-  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, omitted: 1 });
+  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, omitted: 1, categorized: 0 });
   assert.equal(n26Rows(d).length, 2); // las 2 filas válidas SÍ entran — antes revertía el import entero
 });
 
@@ -275,7 +325,7 @@ test("import CSV con una fila de importe no numérico (M4, ruta N26): se omite y
       type: "MoneyBeam", ref: "Bizum alquiler", amount: "360.00" }),
   ].join("\n");
   const res = await runImport(d, text);
-  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, omitted: 1 });
+  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, omitted: 1, categorized: 0 });
   assert.equal(n26Rows(d).length, 2);
 });
 
@@ -318,7 +368,7 @@ const GENERIC_2ROWS = [GENERIC_HEADER, genericRow(),
 test("importCsv (router): cabeceras N26 -> mismo resultado que importN26Csv, via:'n26'", async () => {
   const d = db();
   const res = await runImportRouter(d, CSV_2ROWS);
-  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, omitted: 0, via: "n26" });
+  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, omitted: 0, categorized: 0, via: "n26" });
   assert.equal(n26Rows(d).length, 2);
 });
 
@@ -355,7 +405,7 @@ test("importCsv (router): perfil que matchea -> crea y concilia por el pipeline 
   const res = await runImportRouter(d, GENERIC_2ROWS);
   // Fila 1 (Compra super, -45,20, 2026-08-20) casa con manual1 (mismo importe, expense, 1 día de
   // diferencia); fila 2 (Nomina, +1500,00) no tiene con qué casar -> create.
-  assert.deepEqual(res, { created: 1, reconciled: 1, skipped: 0, via: "profile", omitted: 0 });
+  assert.deepEqual(res, { created: 1, reconciled: 1, skipped: 0, via: "profile", omitted: 0, categorized: 0 });
   assert.equal(n26Rows(d).length, 2);
 
   const manual = d.prepare(`SELECT * FROM transactions WHERE id='manual1'`).get();
@@ -368,10 +418,10 @@ test("importCsv (router): reimportar el MISMO texto -> dedupe por external_id, t
   const d = db();
   setMetaValue(d, "csv_profile", JSON.stringify(PROFILE));
   const first = await runImportRouter(d, GENERIC_2ROWS);
-  assert.deepEqual(first, { created: 2, reconciled: 0, skipped: 0, via: "profile", omitted: 0 });
+  assert.deepEqual(first, { created: 2, reconciled: 0, skipped: 0, via: "profile", omitted: 0, categorized: 0 });
 
   const second = await runImportRouter(d, GENERIC_2ROWS);
-  assert.deepEqual(second, { created: 0, reconciled: 0, skipped: 2, via: "profile", omitted: 0 });
+  assert.deepEqual(second, { created: 0, reconciled: 0, skipped: 2, via: "profile", omitted: 0, categorized: 0 });
   assert.equal(n26Rows(d).length, 2);
 });
 
@@ -391,6 +441,6 @@ test("importCsv (router): filas con fecha/importe inválidos van a omitted, el r
     genericRow({ date: "2026-08-21", concept: "Nomina", amount: "1500,00" })].join("\n");
 
   const res = await runImportRouter(d, text);
-  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, via: "profile", omitted: 2 });
+  assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, via: "profile", omitted: 2, categorized: 0 });
   assert.equal(n26Rows(d).length, 2);
 });
