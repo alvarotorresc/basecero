@@ -49,8 +49,13 @@ function sortActive(rules, todayIso) {
 // Insignia de la fila = la categoría de la REGLA, nunca un logo de marca (SISTEMA.md §2.2):
 // reutiliza .dotico (recurrentes.js), el mismo círculo tintado al 16 % del resto de la app.
 function badgeHtml(rule, byId) {
-  const color = colorForCategory(rule.category_id, byId);
-  const icon = iconForCategory(rule.category_id, byId);
+  // Se llama con dos formas distintas: una regla real (category_id, snake_case, como el resto
+  // del esquema) y una candidata de subscription-detect.js (categoryId, camelCase — ver su
+  // acceptSubscriptionCandidateStmts/detectSubscriptions). Sin el fallback, una candidata siempre
+  // pintaba la insignia neutra de "sin categoría" aunque su cargo sí tuviera una detectada.
+  const categoryId = rule.category_id ?? rule.categoryId;
+  const color = colorForCategory(categoryId, byId);
+  const icon = iconForCategory(categoryId, byId);
   return `<div class="dotico" style="--cat:${color};">${icon}</div>`;
 }
 
@@ -88,8 +93,8 @@ function noticeHtml(notice) {
     <div style="display:flex;flex-direction:column;gap:10px;flex:1;min-width:0;">
       <span style="font-size:14px;line-height:1.45;">${t("suscripciones.notice.question", { name: escHtml(notice.name), when: escHtml(fmtDiaLargo(notice.dueIso)), amount: escHtml(fmtMoney(notice.amountCents)) })}</span>
       <div style="display:flex;align-items:center;gap:18px;">
-        <button type="button" id="notice-keep" style="border:0;background:transparent;color:var(--accent);font-size:14px;font-weight:600;padding:0;height:24px;cursor:pointer;">${t("suscripciones.notice.keep")}</button>
-        <button type="button" id="notice-cancel" style="border:0;background:transparent;color:var(--danger);font-size:14px;font-weight:600;padding:0;height:24px;cursor:pointer;">${t("suscripciones.notice.cancel")}</button>
+        <button type="button" id="notice-keep" style="border:0;background:transparent;color:var(--accent);font-size:14px;font-weight:600;padding:12px 0;margin:-12px 0;cursor:pointer;">${t("suscripciones.notice.keep")}</button>
+        <button type="button" id="notice-cancel" style="border:0;background:transparent;color:var(--danger);font-size:14px;font-weight:600;padding:12px 0;margin:-12px 0;cursor:pointer;">${t("suscripciones.notice.cancel")}</button>
       </div>
     </div>
   </div>`;
@@ -177,7 +182,11 @@ export async function renderSuscripciones(container, onBack) {
   const inactives = inactiveSubscriptions(rules);
   const candidates = detectSubscriptions(charges, rules, { todayIso: today, ignored });
   const notice = renewalNotice(rules, today, snoozed);
-  const isEmpty = actives.length === 0 && candidates.length === 0;
+  // El bloque «Canceladas» (inactives) tiene su PROPIO if más abajo y se pinta igual dentro y
+  // fuera de isEmpty — pero solo si el árbol `else` llega a evaluarse: sin esta condición, con
+  // 0 activas y 0 candidatas pero ALGUNA cancelada, se entraba en la rama isEmpty (la tarjeta de
+  // "todavía no hay ninguna suscripción") y las canceladas desaparecían de la pantalla.
+  const isEmpty = actives.length === 0 && candidates.length === 0 && inactives.length === 0;
 
   container.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
