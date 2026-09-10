@@ -549,8 +549,17 @@ export async function renderInicio(container) {
   // respeta lo silenciado con «Ahora no» (snoozeRenewal). huchaMessage sigue decidiendo la
   // prioridad entre esta y las demás reglas; aquí solo se adapta la forma de su única candidata.
   const notice = renewalNotice(rules, hoy, snoozedRenewals);
-  const renewals = notice
-    ? [{ id: notice.ruleId, name: notice.name, amountCents: notice.amountCents, dueDateIso: notice.dueIso }]
+  // La hucha no puede reñir por un cargo que "Queda por pagar" (pendingHtml, de prevision.items)
+  // ya da por resuelto: si la regla de `notice` tiene un item en prevision.items y ese item está
+  // `paid` (ya se registró el cargo este periodo), se descarta el aviso entero. Si tiene item y
+  // no está pagado, se usa su `myCents` — el importe YA prorrateado por my_share_pct, el mismo
+  // que enseña "Queda por pagar" — en vez del importe ÍNTEGRO de notice.amountCents (D3 de
+  // subscriptions.js es correcto para el radar, pero aquí la hucha y la lista de pendientes
+  // tienen que coincidir en la misma cifra). notice.amountCents queda solo de reserva por si la
+  // regla no aparece en prevision.items (p. ej. no aplica este mes por algún borde de ruleApplies).
+  const noticeItem = notice ? prevision.items.find((it) => it.rule.id === notice.ruleId) : null;
+  const renewals = notice && !noticeItem?.paid
+    ? [{ id: notice.ruleId, name: notice.name, amountCents: noticeItem ? noticeItem.myCents : notice.amountCents, dueDateIso: notice.dueIso }]
     : [];
   const huchaCategories = rootRows
     .filter((r) => (budgetByCategory[r.root_id] ?? 0) > 0)
