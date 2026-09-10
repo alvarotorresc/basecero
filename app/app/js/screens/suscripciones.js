@@ -131,7 +131,7 @@ function activeRowHtml(rule, byId, todayIso) {
 function candidateHtml(candidate, byId) {
   const dates = [...candidate.lastDates].reverse().map((d) => fmtDiaCorto(d)).join(", ");
   return `
-  <div data-candidate="${escAttr(candidate.merchantKey)}" style="display:flex;flex-direction:column;gap:14px;padding:16px;background:var(--surface);margin-bottom:14px;">
+  <div style="display:flex;flex-direction:column;gap:14px;padding:16px;background:var(--surface);margin-bottom:14px;">
     <div style="display:flex;align-items:center;gap:12px;">
       ${badgeHtml(candidate, byId)}
       <div class="tx-body">

@@ -967,6 +967,10 @@ export async function createGoal(fields) {
   let accountId = fields.accountId || "";
   if (HUCHA_GOAL_TYPES.has(fields.type) && !accountId) {
     accountId = bcUlid();
+    // El "·" aquí es una excepción deliberada a la prohibición de SISTEMA.md §1: no es chrome de
+    // pantalla, es el NOMBRE de una cuenta que se persiste en la BD — cambiarlo dejaría a las
+    // huchas ya creadas con un separador distinto al de las nuevas sin una migración de datos,
+    // que está fuera de alcance de este paquete.
     stmts.push({
       sql: SQL.insertAccount,
       bind: [accountId, bcSanitizeCell(`Hucha · ${fields.name}`), "savings", 0, now, now],
