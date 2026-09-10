@@ -23,3 +23,7 @@ test("sw: los woff2 de las dos familias están en el SHELL", () => {
   assert.ok(shell.includes("vendor/fonts/jetbrains-mono-latin.woff2"));
   assert.ok(!sw.includes("QGYvz"), "Outfit ya no se sirve");
 });
+
+test("sw: pdf-lib está vendorizado y en el SHELL", () => {
+  assert.ok(shell.includes("vendor/pdf-lib/pdf-lib.min.js"));
+});
