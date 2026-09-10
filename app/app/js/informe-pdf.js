@@ -142,8 +142,13 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
   text("summary", `${t("informe.pdf.spent")}  ${fmtMoney(report.summary.spentCents)}`, { mono: true });
   text("summary", `${t("informe.pdf.saved")}  ${fmtMoney(report.summary.savedCents)}`, { mono: true });
   text("summary", `${t("informe.pdf.available")}  ${fmtMoney(report.summary.availableCents)}`, { mono: true });
+  // Gastos por encima de ingresos -> savingsRatePct negativo ("Tasa de ahorro -146%" no dice
+  // nada): mismo criterio que la pantalla (screens/informe.js#summaryHtml), un mensaje fijo en
+  // vez del número.
   if (report.summary.savingsRatePct != null) {
-    text("summary", t("informe.pdf.savingsRate", { pct: report.summary.savingsRatePct }));
+    text("summary", report.summary.savingsRatePct >= 0
+      ? t("informe.pdf.savingsRate", { pct: report.summary.savingsRatePct })
+      : t("informe.pdf.savingsRateNegative"));
   }
   rule("summary");
 

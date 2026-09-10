@@ -1006,6 +1006,8 @@ export const EN = {
       saved: "Saved",
       available: "Available",
       savingsRate: "Savings rate {pct}%",
+      savingsRateNegative: "You spend more than you earn",
+      savingsRateVsPrev: "In {name}, {pct}%",
       accounts: "Your accounts",
       accountsTotal: "Operating total {amount}",
       categories: "Spending by category",

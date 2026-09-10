@@ -1029,6 +1029,8 @@ export const ES = {
       saved: "Ahorrado",
       available: "Disponible",
       savingsRate: "Tasa de ahorro {pct}%",
+      savingsRateNegative: "Gastas más de lo que ingresas",
+      savingsRateVsPrev: "En {name}, el {pct} %",
       accounts: "Tus cuentas",
       accountsTotal: "Total operativo {amount}",
       categories: "Gasto por categoría",

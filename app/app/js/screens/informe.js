@@ -75,10 +75,15 @@ function downloadHtml(state) {
 
 function summaryHtml(report, prevPeriodName) {
   const s = report.summary;
-  // Segunda mitad («En agosto, el 43 %.») solo si hay tasa del periodo anterior Y nombre de ese
-  // periodo — sin uno de los dos, se queda solo la primera frase, nunca "el X% / null%".
-  let sentence = s.savingsRatePct != null ? t("informe.summary.savingsRate", { pct: s.savingsRatePct }) : "";
-  if (sentence && s.prevSavingsRatePct != null && prevPeriodName) {
+  // Gastos > ingresos -> savingsRatePct negativo ("Ahorras el −146 %" no dice nada): mismo
+  // criterio que Inicio (inicio-logic.js#savingsSentence), reutilizando su misma clave. Segunda
+  // mitad («En agosto, el 43 %.») solo si hay tasa del periodo anterior, ES POSITIVA (no hay "el
+  // -12 %" con el que comparar tampoco) Y nombre de ese periodo — sin alguno de los tres, se
+  // queda solo la primera frase, nunca "el X% / null%".
+  let sentence = s.savedCents < 0 ? t("inicio.savings.negative")
+    : s.savingsRatePct != null ? t("informe.summary.savingsRate", { pct: s.savingsRatePct })
+    : "";
+  if (sentence && s.prevSavingsRatePct != null && s.prevSavingsRatePct >= 0 && prevPeriodName) {
     sentence += t("informe.summary.savingsRateVsPrev", { name: escHtml(prevPeriodName), pct: s.prevSavingsRatePct });
   }
   return `

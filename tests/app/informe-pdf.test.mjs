@@ -6,6 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { winAnsiSafe, layoutReport, A4, buildPdfBytes, reportFilename } from "../../app/app/js/informe-pdf.js";
 import { barRowsGeometry } from "../../app/app/js/charts.js";
+import { t } from "../../app/app/js/i18n/index.js";
 import { createRequire } from "node:module";
 
 test("winAnsiSafe: conserva lo que WinAnsi si codifica", () => {
@@ -150,6 +151,21 @@ test("layoutReport: cada pagina lleva su pie numerado {n}/{total}", () => {
     assert.ok(footer, `la pagina ${i + 1} debe llevar pie`);
     assert.equal(footer.text, `${i + 1}/${total}`);
   });
+});
+
+// Con gastos por encima de ingresos, savingsRatePct sale negativo (p.ej. -146): "Tasa de ahorro
+// -146%" no dice nada util. La regla es la misma que Inicio (screens/informe.js, task 1): por
+// debajo de 0, un mensaje fijo en vez del numero.
+test("layoutReport: con tasa de ahorro negativa, imprime el mensaje fijo en vez del numero", () => {
+  const report = { ...smallReport(), summary: { ...smallReport().summary, savingsRatePct: -146, prevSavingsRatePct: null } };
+  const summaryLines = layoutReport(report).pages[0].blocks.filter((b) => b.section === "summary" && b.kind === "text").map((b) => b.text);
+  assert.ok(summaryLines.includes(t("informe.pdf.savingsRateNegative")));
+  assert.ok(!summaryLines.some((l) => l.includes("-146")), "nunca debe imprimir el porcentaje negativo en crudo");
+});
+
+test("layoutReport: con tasa de ahorro >= 0, imprime el numero como siempre", () => {
+  const summaryLines = layoutReport(smallReport()).pages[0].blocks.filter((b) => b.section === "summary" && b.kind === "text").map((b) => b.text);
+  assert.ok(summaryLines.includes(t("informe.pdf.savingsRate", { pct: 54 })));
 });
 
 test("layoutReport: los rects de las barras salen de barRowsGeometry", () => {
