@@ -121,3 +121,76 @@ export function savedSinceCancelCents(rule, todayIso) {
   const months = wholeMonthsBetween(rule.cancelled_at, todayIso);
   return Math.round((annualCents(rule) * months) / 12);
 }
+
+/** Días de antelación con los que el radar avisa de una renovación próxima. */
+export const RENEWAL_SOON_DAYS = 7;
+
+/** La renovación que toca avisar, o null si no hay ninguna. Elige, entre las suscripciones
+ *  ACTIVAS, la que renueva ANTES dentro de los próximos RENEWAL_SOON_DAYS días (hoy incluido).
+ *  Empate: el importe mayor primero (duele más), y luego el nombre, para que el resultado sea
+ *  determinista. `snoozed` es {ruleId: dueIso}: silencia ESA renovación, no la suscripción — la
+ *  del mes que viene tiene otra fecha y vuelve a avisar sola, sin que nadie reactive nada.
+ *  Las semanales quedan fuera: nextRenewal ya devuelve "" para ellas (§3 D5).
+ *  PURA y SIN TEXTOS: devuelve datos, nunca una frase — la compone quien pinta, con sus i18n. */
+export function renewalNotice(rules, todayIso, snoozed = {}) {
+  const candidates = [];
+  for (const r of activeSubscriptions(rules)) {
+    const dueIso = nextRenewal(r, todayIso);
+    if (!dueIso) continue;
+    const days = daysUntil(dueIso, todayIso);
+    if (days < 0 || days > RENEWAL_SOON_DAYS) continue;
+    if (snoozed?.[r.id] === dueIso) continue;
+    candidates.push({ ruleId: r.id, name: r.name, amountCents: r.amount_cents, dueIso, days });
+  }
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => a.days - b.days || b.amountCents - a.amountCents || a.name.localeCompare(b.name));
+  return candidates[0];
+}
+
+/** Tope de entradas de las dos listas de meta (§5.3): son listas de descartes/silencios, no un
+ *  archivo — un valor generoso pero acotado, para que un JSON corrupto o manipulado a mano no
+ *  crezca sin límite. */
+export const IGNORED_MAX = 200;
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Comercios (clave NORMALIZADA) que el usuario mandó ignorar — parseo SEGURO de
+ *  meta.subscription_ignored: JSON roto, no-array, o cualquier entrada que no sea un string se
+ *  descarta en SILENCIO (última línea de defensa, mismo criterio que sanitizeLoanMap). Guard
+ *  `__proto__` explícito por claridad, aunque un array nunca dispara el setter especial de
+ *  Object.prototype al iterarlo (solo `obj[k]=` con objetos lo hace). Tope IGNORED_MAX, las
+ *  primeras del array (repo.ignoreSubscriptionMerchant escribe siempre las MÁS RECIENTES al
+ *  final, así que truncar por aquí solo importa si el JSON llegó ya corrupto o manipulado). */
+export function parseIgnored(raw) {
+  let arr;
+  try { arr = JSON.parse(raw); } catch { return []; }
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  for (const v of arr) {
+    if (typeof v !== "string" || v === "__proto__") continue;
+    out.push(v);
+    if (out.length >= IGNORED_MAX) break;
+  }
+  return out;
+}
+
+/** Mapa saneado {ruleId: dueIso} de meta.renewal_snoozed. Mismo criterio de defensa en
+ *  profundidad que parseIgnored: JSON roto, no-objeto, o una entrada cuyo valor no es una fecha
+ *  ISO con forma válida se descarta en silencio. Guard `__proto__`: `out[k]=` SÍ dispara el
+ *  setter especial de Object.prototype si `k` fuera esa cadena (a diferencia de parseIgnored, que
+ *  solo empuja a un array), así que aquí el guard es imprescindible, no solo por claridad. */
+export function parseSnoozed(raw) {
+  let obj;
+  try { obj = JSON.parse(raw); } catch { return {}; }
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return {};
+  const out = {};
+  let count = 0;
+  for (const [key, value] of Object.entries(obj)) {
+    if (key === "__proto__") continue;
+    if (typeof value !== "string" || !ISO_DATE_RE.test(value)) continue;
+    if (count >= IGNORED_MAX) break;
+    out[key] = value;
+    count += 1;
+  }
+  return out;
+}

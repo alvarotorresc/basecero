@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   annualCents, monthlyCents, activeSubscriptions, inactiveSubscriptions,
   annualTotalCents, monthlyTotalCents, nextRenewal, daysUntil, wholeMonthsBetween, savedSinceCancelCents,
+  RENEWAL_SOON_DAYS, renewalNotice, parseIgnored, parseSnoozed, IGNORED_MAX,
 } from "../../app/app/js/subscriptions.js";
 
 /** Regla mínima con la forma de una fila real de recurring_rules — solo los campos que estos
@@ -184,4 +185,99 @@ test("savedSinceCancelCents: una anual de 99,99 € a los 5 meses redondea UNA s
   const r = rule({ amount_cents: 9999, frequency: "yearly", is_active: 0, cancelled_at: "2026-04-09" });
   // round(9999 * 5 / 12) = round(4166.25) = 4166 — distinto de round(9999/12)*5 = 833*5 = 4165.
   assert.equal(savedSinceCancelCents(r, "2026-09-09"), 4166);
+});
+
+// ---- renewalNotice --------------------------------------------------------------------------
+
+const TODAY = "2026-09-09";
+const subRule = (over = {}) => rule({ id: "r-" + Math.floor(Math.random() * 1e9), name: "Spotify",
+  frequency: "monthly", due_day: 14, due_month: null, ...over });
+
+test("renewalNotice: elige la que renueva ANTES dentro de los próximos 7 días", () => {
+  const pronto = subRule({ name: "Spotify", due_day: 11 }); // 2 días
+  const lejos = subRule({ name: "Gimnasio", due_day: 25 }); // más de 7 días
+  const notice = renewalNotice([pronto, lejos], TODAY);
+  assert.equal(notice.ruleId, pronto.id);
+  assert.equal(notice.name, "Spotify");
+  assert.equal(notice.dueIso, "2026-09-11");
+  assert.equal(notice.days, 2);
+});
+
+test("renewalNotice: a 8 días → null", () => {
+  const r = subRule({ due_day: 17 }); // 2026-09-17, 8 días
+  assert.equal(renewalNotice([r], TODAY), null);
+});
+
+test("renewalNotice: hoy → days=0", () => {
+  const r = subRule({ due_day: 9 });
+  const notice = renewalNotice([r], TODAY);
+  assert.equal(notice.days, 0);
+  assert.equal(notice.dueIso, TODAY);
+});
+
+test("renewalNotice: cancelada, pausada o no marcada → nunca avisa", () => {
+  const cancelada = subRule({ due_day: 10, is_active: 0, cancelled_at: "2026-06-01" });
+  const pausada = subRule({ due_day: 10, is_active: 0 });
+  const noMarcada = subRule({ due_day: 10, is_subscription: 0 });
+  assert.equal(renewalNotice([cancelada, pausada, noMarcada], TODAY), null);
+});
+
+test("renewalNotice: semanal → nunca (sin fecha de renovación, D5)", () => {
+  const r = subRule({ frequency: "weekly", due_day: 10 });
+  assert.equal(renewalNotice([r], TODAY), null);
+});
+
+test("renewalNotice: snoozed con la fecha exacta → null; con la del mes anterior → sí avisa", () => {
+  const r = subRule({ due_day: 11 }); // due 2026-09-11
+  assert.equal(renewalNotice([r], TODAY, { [r.id]: "2026-09-11" }), null,
+    "silencia ESA fecha exacta");
+  const notice = renewalNotice([r], TODAY, { [r.id]: "2026-08-11" });
+  assert.ok(notice, "una fecha DISTINTA (la del mes pasado) no la silencia: vuelve a avisar sola");
+  assert.equal(notice.dueIso, "2026-09-11");
+});
+
+test("renewalNotice: empate por importe (mayor primero) y luego por nombre", () => {
+  const a = subRule({ name: "Zeta", due_day: 12, amount_cents: 1000 });
+  const b = subRule({ name: "Alpha", due_day: 12, amount_cents: 2000 });
+  const c = subRule({ name: "Beta", due_day: 12, amount_cents: 2000 });
+  const notice = renewalNotice([a, b, c], TODAY);
+  assert.equal(notice.name, "Alpha", "mismo importe que Beta: gana el nombre alfabéticamente antes");
+});
+
+test("renewalNotice: lista vacía → null", () => {
+  assert.equal(renewalNotice([], TODAY), null);
+});
+
+test("RENEWAL_SOON_DAYS es 7", () => {
+  assert.equal(RENEWAL_SOON_DAYS, 7);
+});
+
+// ---- parseIgnored / parseSnoozed -------------------------------------------------------------
+
+test("parseIgnored: JSON roto → vacío; entradas no-string fuera; __proto__ no contamina; tope IGNORED_MAX", () => {
+  assert.deepEqual(parseIgnored("{no es json"), []);
+  assert.deepEqual(parseIgnored(undefined), []);
+  assert.deepEqual(parseIgnored(JSON.stringify({ not: "an array" })), []);
+  assert.deepEqual(parseIgnored(JSON.stringify(["netflix", 42, null, "spotify"])), ["netflix", "spotify"]);
+
+  const withProto = parseIgnored(JSON.stringify(["netflix", "__proto__"]));
+  assert.deepEqual(withProto, ["netflix"]);
+  assert.equal(({}).polluted, undefined);
+
+  const many = JSON.stringify(Array.from({ length: IGNORED_MAX + 50 }, (_, i) => "m" + i));
+  assert.equal(parseIgnored(many).length, IGNORED_MAX);
+});
+
+test("parseSnoozed: JSON roto → vacío; entradas no-string/fechas mal formadas fuera; __proto__ no contamina", () => {
+  assert.deepEqual(parseSnoozed("{no es json"), {});
+  assert.deepEqual(parseSnoozed(undefined), {});
+  assert.deepEqual(parseSnoozed(JSON.stringify(["not", "an", "object"])), {});
+  assert.deepEqual(
+    parseSnoozed(JSON.stringify({ "rule-1": "2026-09-14", "rule-2": 12345, "rule-3": "no-es-fecha" })),
+    { "rule-1": "2026-09-14" },
+  );
+
+  const withProto = parseSnoozed(JSON.stringify({ "rule-1": "2026-09-14", "__proto__": "2026-09-14" }));
+  assert.deepEqual(withProto, { "rule-1": "2026-09-14" });
+  assert.equal(({}).polluted, undefined);
 });

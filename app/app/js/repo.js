@@ -10,6 +10,7 @@ import { t, monthShort } from "./i18n/index.js";
 import { isValidPct } from "./share-pct.js";
 import { UserError } from "./errors.js";
 import { MEMORY_WINDOW, merchantMemory } from "./merchant-memory.js";
+import { IGNORED_MAX, parseIgnored, parseSnoozed } from "./subscriptions.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -459,6 +460,39 @@ export const softDeleteRule = (id) => exec(SQL.softDeleteRule, [nowIso(), id]);
  *  `todayIso` se inyecta (determinismo, mismo criterio que workbookToRows). Reactivar se hace
  *  desde updateRule, que limpia cancelled_at cuando isActive vuelve a true. */
 export const cancelSubscription = (id, todayIso) => exec(SQL.cancelRule, [todayIso, nowIso(), id]);
+
+/** Comercios (clave NORMALIZADA) que el usuario mandó ignorar. Read-modify-write sobre meta,
+ *  mismo patrón exacto que setCategoryStyle/setAccountLoan (repo.js#setAccountLoan). Se guarda la
+ *  clave normalizada y no el texto: «NETFLIX.COM» y «Netflix» son el mismo comercio y deben
+ *  ignorarse juntos. Tope de IGNORED_MAX entradas, las MÁS RECIENTES: es una lista de descartes,
+ *  no un archivo — `key` se quita de donde estuviera y se vuelve a añadir al final. */
+export async function ignoreSubscriptionMerchant(key) {
+  const meta = await getMetaAll();
+  const list = parseIgnored(meta.subscription_ignored).filter((k) => k !== key);
+  list.push(key);
+  await setMeta("subscription_ignored", JSON.stringify(list.slice(-IGNORED_MAX)));
+}
+export async function getIgnoredMerchants() {
+  const meta = await getMetaAll();
+  return parseIgnored(meta.subscription_ignored);
+}
+
+/** Silencia UNA renovación concreta: {ruleId: "YYYY-MM-DD"}. La fecha es la clave del asunto —
+ *  «Ahora no» calla la del 14 de septiembre, no la suscripción; la del 14 de octubre vuelve a
+ *  avisar sola, sin que nadie tenga que reactivar nada (renewalNotice compara la fecha exacta).
+ *  Al escribir se podan las entradas cuya fecha ya pasó: el mapa se limpia solo y nunca crece. */
+export async function snoozeRenewal(ruleId, dueIso, todayIso) {
+  const meta = await getMetaAll();
+  const map = parseSnoozed(meta.renewal_snoozed);
+  map[ruleId] = dueIso;
+  const pruned = {};
+  for (const [id, iso] of Object.entries(map)) if (iso >= todayIso) pruned[id] = iso;
+  await setMeta("renewal_snoozed", JSON.stringify(pruned));
+}
+export async function getSnoozedRenewals() {
+  const meta = await getMetaAll();
+  return parseSnoozed(meta.renewal_snoozed);
+}
 
 export const accountBalanceCents = async (accountId, atDateIso) =>
   (await query(SQL.accountBalance, [atDateIso, accountId]))[0].balance_cents;
