@@ -465,6 +465,7 @@ export const ES = {
       cancelSubscription: "Cancelar la suscripción",
     },
     badge: { subscription: "suscripción" },
+    radarLink: "Ver el radar de suscripciones",
   },
   categorias: {
     error: { load: "No se pudieron cargar las categorías: {error}" },
@@ -606,6 +607,7 @@ export const ES = {
       closeNote: "Al cerrar fijarás la fecha final. Ábrelo el día que entre la nómina.",
     },
     recurring: { title: "Gastos e ingresos recurrentes" },
+    subscriptions: { title: "Suscripciones", sub: "El coste anual de lo que pagas cada mes" },
     categories: {
       title: "Categorías",
       subtitleWithCount: "{n} categorías · colores e iconos",

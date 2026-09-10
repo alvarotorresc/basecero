@@ -10,6 +10,7 @@ import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { showConfirm } from "../modal.js";
 import { showToast } from "../toast.js";
+import { renderSuscripciones } from "./suscripciones.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -35,7 +36,7 @@ const needsMonth = (freq) => freq === "quarterly" || freq === "yearly";
 /** Pantalla "Recurrentes": lista de reglas (Task 11 la consume para generar movimientos de
  *  previsión) + formulario de alta/edición con borrado en dos toques (mismo patrón que
  *  movimientos.js openDetail/backToList). onBack vuelve a quien la haya abierto (Ajustes). */
-export async function renderRecurrentes(container, onBack) {
+export async function renderRecurrentes(container, onBack, opts = {}) {
   let rules, expenseCats, incomeCats, accountsAll, byId, meta;
   try {
     [rules, expenseCats, incomeCats, accountsAll, byId, meta] = await Promise.all([
@@ -210,11 +211,18 @@ export async function renderRecurrentes(container, onBack) {
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
-      ${state.rules.length === 0
-        ? `<div class="card" style="text-align:center;color:var(--text-3)"><p>${t("recurrentes.empty")}</p></div>`
-        : `<div class="card" style="padding:4px 16px; display:flex; flex-direction:column;">
-            ${state.rules.map((r, i) => ruleRowHtml(r, i > 0)).join("")}
-          </div>`}
+      <div class="card" style="padding:4px 16px; display:flex; flex-direction:column;">
+        ${state.rules.length === 0
+          ? `<p style="text-align:center;color:var(--text-3);padding:16px 0;">${t("recurrentes.empty")}</p>`
+          : state.rules.map((r, i) => ruleRowHtml(r, i > 0)).join("")}
+        <hr class="divider">
+        <button type="button" id="rec-radar-link"
+          style="width:100%;display:flex;align-items:center;gap:12px;padding:16px 0;min-height:56px;
+          background:transparent;border:0;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+          <span style="flex:1;font-size:14px;font-weight:600;color:var(--accent);">${t("recurrentes.radarLink")}</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M9.5 5 16 12l-6.5 7"/></svg>
+        </button>
+      </div>
     `;
     wireList();
   }
@@ -228,6 +236,10 @@ export async function renderRecurrentes(container, onBack) {
         if (r) openEdit(r);
       };
     });
+    container.querySelector("#rec-radar-link").onclick = () => {
+      pushBack(() => render());
+      renderSuscripciones(container, goBack);
+    };
   }
 
   function renderForm() {
@@ -516,5 +528,10 @@ export async function renderRecurrentes(container, onBack) {
     else renderList();
   }
 
-  render();
+  // Radar → formulario (Task 10): si el llamador pide abrir una regla concreta (Suscripciones,
+  // fila de Activas) y esa regla sigue entre las cargadas, el primer pintado va directo al
+  // formulario en vez de a la lista — sin reimplementar un formulario de once campos aparte.
+  const editRule = opts.editRuleId && rules.find((r) => r.id === opts.editRuleId);
+  if (editRule) openEdit(editRule);
+  else render();
 }

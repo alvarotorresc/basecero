@@ -457,6 +457,7 @@ export const EN = {
       cancelSubscription: "Cancel the subscription",
     },
     badge: { subscription: "subscription" },
+    radarLink: "View the subscription radar",
   },
   categorias: {
     error: { load: "Couldn’t load categories: {error}" },
@@ -598,6 +599,7 @@ export const EN = {
       closeNote: "Closing it sets the end date. Open it the day your paycheck arrives.",
     },
     recurring: { title: "Recurring expenses and income" },
+    subscriptions: { title: "Subscriptions", sub: "The yearly cost of what you pay each month" },
     categories: {
       title: "Categories",
       subtitleWithCount: "{n} categories · colors and icons",
