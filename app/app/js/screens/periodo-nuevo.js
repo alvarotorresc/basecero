@@ -4,14 +4,14 @@ import {
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { eurToCents } from "../contract.js";
-import { fmtMoney, moneyPartsHtml, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol, centsToRaw } from "../format.js";
+import { fmtMoney, moneyPartsHtml, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol, centsToRaw, parseCentsRaw } from "../format.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, stepPct } from "../share-pct.js";
 import { inheritedBudgetsRaw, budgetMap } from "../category-spend.js";
 import { remainderCents, sweepDestinations, sweepPlan } from "../barrido.js";
 import { renderInforme } from "./informe.js";
 import { userMessage } from "../errors.js";
-import { subHeaderHtml } from "../ui.js";
+import { subHeaderHtml, metaHtml } from "../ui.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -136,6 +136,9 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     sweepAmountRaw: centsToRaw(remainder.cents),
     sourceAccountId,
     sourceBalanceCents,
+    // D11: "Ingresos previstos" del primer periodo — efímero, solo en modo 'first'. Misma
+    // anatomía que #pn-sweep-amount (texto + parseCentsRaw), nunca se manda a openNextPeriod.
+    expectedIncomeRaw: "",
   };
   let errorMsg = "";
 
@@ -147,6 +150,15 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
       if (Number.isFinite(n) && n > 0) sum += eurToCents(raw);
     }
     return sum;
+  }
+
+  /** Ingresos que alimentan la barra/nota de "Presupuestado" (D11): en modo 'next' es
+   *  closingIncome, ya conocido; en 'first' es el importe efímero que el usuario teclea —
+   *  null mientras esté vacío o a 0, que es lo que hoy ya apaga la barra y la nota. */
+  function currentIngresos() {
+    if (mode === "next") return closingIncome;
+    const cents = parseCentsRaw(state.expectedIncomeRaw);
+    return cents > 0 ? cents : null;
   }
 
   function notaSinAsignarHtml(sinAsignar) {
@@ -164,13 +176,26 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     // innerHTML (no textContent): #pn-presupuestado ahora lleva moneyPartsHtml (main + <small>
     // céntimos</small> + sufijo) — un textContent aquí borraría el <small> en el primer tecleo.
     if (presupEl) presupEl.innerHTML = moneyPartsHtml(presupuestado);
-    if (mode === "next") {
-      const pctBarra = closingIncome > 0 ? Math.min(100, Math.round((presupuestado / closingIncome) * 100)) : 0;
-      const sinAsignar = closingIncome - presupuestado;
-      const barEl = container.querySelector("#pn-bar");
-      if (barEl) barEl.style.width = pctBarra + "%";
-      const notaEl = container.querySelector("#pn-nota");
-      if (notaEl) notaEl.innerHTML = notaSinAsignarHtml(sinAsignar);
+    // D11: en modo 'first' la barra/nota nacen ocultas con display:none (bloqueTotal) porque
+    // ingresos empieza a null — pero el <div> SIGUE en el DOM, para que teclear el primer dígito
+    // de "Ingresos previstos" pueda mostrarlas con un patch, sin el render() completo que le
+    // robaría el foco al campo que se está tecleando.
+    const ingresos = currentIngresos();
+    const barWrapEl = container.querySelector("#pn-total-bar-wrap");
+    const notaEl = container.querySelector("#pn-nota");
+    if (barWrapEl && notaEl) {
+      if (ingresos != null) {
+        const pctBarra = ingresos > 0 ? Math.min(100, Math.round((presupuestado / ingresos) * 100)) : 0;
+        const sinAsignar = ingresos - presupuestado;
+        barWrapEl.style.display = "";
+        const barEl = container.querySelector("#pn-bar");
+        if (barEl) barEl.style.width = pctBarra + "%";
+        notaEl.style.display = "";
+        notaEl.innerHTML = notaSinAsignarHtml(sinAsignar);
+      } else {
+        barWrapEl.style.display = "none";
+        notaEl.style.display = "none";
+      }
     }
   }
 
@@ -194,7 +219,9 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     const liveDestinations = sweepDestinations(goalsProgress, accountsById, plan.amountCents, state.sourceAccountId);
     for (const d of liveDestinations) {
       const line = container.querySelector(`[data-sweep-afterline="${d.goalId}"]`);
-      if (line) line.textContent = sweepAfterLineText(d);
+      // innerHTML, no textContent: sweepAfterLineText ahora devuelve el HTML de metaHtml (el
+      // divisor de 1px), no una cadena plana con "·".
+      if (line) line.innerHTML = sweepAfterLineText(d);
     }
   }
 
@@ -213,32 +240,38 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     });
   }
 
+  // Rejilla 2×2 (§9.5): Ingresos, Gastado, Ahorrado y, en la cuarta celda, la frase de ahorro en
+  // vez de la etiqueta "Tasa de ahorro" + su cifra — .stat-grid ya es el componente que informe.js
+  // usa para su propia rejilla de 2×2 (income/spent/saved/available), así que se reutiliza tal
+  // cual en vez de reinventar una rejilla ad hoc.
   function bloqueCierre() {
     if (mode !== "next") return "";
     const ahorrado = closingIncome - closingSpent;
     const tasa = closingIncome > 0 ? fmtPct(ahorrado / closingIncome) : "—";
     const rangeEnd = prevDayIso(state.startDate || hoyISO());
+    const rangeLabel = `${fmtDiaCorto(closingPeriod.start_date)} – ${fmtDiaCorto(rangeEnd)}`;
     return `
-    <div class="card" style="display:flex; flex-direction:column; gap:14px; margin-bottom:16px;">
+    <div class="card" style="display:flex; flex-direction:column; gap:14px;">
       <div style="display:flex; flex-direction:column; gap:3px;">
         <div style="font-size:15px; font-weight:700;">${t("periodo.closing.title", { name: escHtml(closingPeriod.name) })}</div>
-        <div style="font-size:11px; color:var(--text-3);">
-          ${fmtDiaCorto(closingPeriod.start_date)} – ${fmtDiaCorto(rangeEnd)} · ${t("periodo.closing.movementCount", { n: closingCount })}
-        </div>
+        ${metaHtml([rangeLabel, t("periodo.closing.movementCount", { n: closingCount })])}
       </div>
       <hr class="divider">
-      <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px;">
-        <div style="display:flex; flex-direction:column; gap:5px;">
-          <div style="font-size:11px; color:var(--text-3);">${t("periodo.closing.spent")}</div>
-          <div class="num" style="font-size:15px; font-weight:600;">${fmtMoney(closingSpent)}</div>
+      <div class="stat-grid" style="grid-template-columns:repeat(2,1fr); margin-top:0;">
+        <div>
+          <span style="font-size:11px; color:var(--text-3);">${t("periodo.closing.income")}</span>
+          <span class="num" style="font-size:15px; font-weight:600;">${escHtml(fmtMoney(closingIncome))}</span>
         </div>
-        <div style="display:flex; flex-direction:column; gap:5px;">
-          <div style="font-size:11px; color:var(--text-3);">${t("periodo.closing.saved")}</div>
-          <div class="num ${ahorrado >= 0 ? "text-green" : "text-red"}" style="font-size:15px; font-weight:600;">${fmtMoney(ahorrado)}</div>
+        <div>
+          <span style="font-size:11px; color:var(--text-3);">${t("periodo.closing.spent")}</span>
+          <span class="num" style="font-size:15px; font-weight:600;">${escHtml(fmtMoney(closingSpent))}</span>
         </div>
-        <div style="display:flex; flex-direction:column; gap:5px;">
-          <div style="font-size:11px; color:var(--text-3);">${t("periodo.closing.savingsRate")}</div>
-          <div class="num" style="font-size:15px; font-weight:600;">${tasa}</div>
+        <div>
+          <span style="font-size:11px; color:var(--text-3);">${t("periodo.closing.saved")}</span>
+          <span class="num ${ahorrado >= 0 ? "text-green" : "text-red"}" style="font-size:15px; font-weight:600;">${escHtml(fmtMoney(ahorrado))}</span>
+        </div>
+        <div style="justify-content:center;">
+          <span style="font-size:12px; color:var(--text-2); line-height:1.4;">${t("periodo.closing.savingsSentence", { pct: tasa })}</span>
         </div>
       </div>
     </div>`;
@@ -272,8 +305,11 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     </label>`;
   }
 
+  // metaHtml (no prosa): esta línea se pinta tanto interpolada en barridoDestinoHtml() como
+  // reescrita por patchSweepPreview() vía innerHTML — las dos rutas quedan consistentes porque
+  // metaHtml es lo único que se llama en los dos sitios (ver el comentario de patchSweepPreview).
   function sweepAfterLineText(d) {
-    return t("barrido.wouldBe", { amount: escHtml(fmtMoney(d.afterCents)) }) + (d.completes ? " · " + t("barrido.completes") : "");
+    return metaHtml([t("barrido.wouldBe", { amount: fmtMoney(d.afterCents) }), d.completes ? t("barrido.completes") : ""]);
   }
 
   /** El paso «Barrido» del cierre (N4, spec §9.4): entre el resumen del periodo que se cierra y el
@@ -286,7 +322,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     const plan = sweepPlan({ rawAmount: state.sweepAmountRaw, sourceBalanceCents: state.sourceBalanceCents });
     const sourceAccountName = accountsById[state.sourceAccountId]?.name ?? "";
     return `
-    <div class="card" style="display:flex; flex-direction:column; gap:14px; margin-bottom:16px;">
+    <div class="card" style="display:flex; flex-direction:column; gap:14px;">
       <div style="display:flex; flex-direction:column; gap:3px;">
         <div style="font-size:15px; font-weight:700;">${t(titleKey, { amount: escHtml(fmtMoney(remainder.cents)) })}</div>
         <div style="font-size:11px; color:var(--text-3);">${t("barrido.question")}</div>
@@ -319,7 +355,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
   // solo re-vestidos como tile --card2 (antes hex #1b1e21 suelto).
   function bloqueNombre() {
     return `
-    <div class="card" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
+    <div class="card" style="display:flex; flex-direction:column; gap:8px;">
       <div class="section-title">${t("common.name")}</div>
       <input type="text" id="pn-nombre" value="${escAttr(state.name)}"
         style="height:44px; padding:0 14px; background:var(--card2); border:0; border-radius:0; color:var(--text);
@@ -332,7 +368,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
   // nada nuevo, y sería la única pieza de "lógica" de esta tarjeta que no viene ya del navegador.
   function bloqueFecha() {
     return `
-    <div class="card" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
+    <div class="card" style="display:flex; flex-direction:column; gap:8px;">
       <div class="section-title">${t("periodo.date.title")}</div>
       <div style="display:flex; align-items:center; gap:10px;">
         <input type="date" id="pn-fecha" value="${state.startDate}"
@@ -356,7 +392,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     if (!partnerName) return "";
     const restante = 100 - state.sharePct;
     return `
-    <div class="card" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
+    <div class="card" style="display:flex; flex-direction:column; gap:8px;">
       <div class="section-title">${t("periodo.share.title")}</div>
       <div style="display:flex; align-items:center; gap:10px;">
         <div style="flex:1; min-width:0;">
@@ -399,12 +435,12 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     const hiddenRows = rootRows.filter((r) => !state.visible.has(r.root_id));
     if (rootRows.length === 0) {
       return `
-      <div class="card" style="text-align:center; color:var(--text-3); margin-bottom:16px;">
+      <div class="card" style="text-align:center; color:var(--text-3);">
         <p>${t("periodo.budget.noCategories")}</p>
       </div>`;
     }
     return `
-    <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+    <div style="display:flex; flex-direction:column; gap:10px;">
       <div style="display:flex; flex-direction:column; gap:4px;">
         <div style="font-size:15px; font-weight:700;">${t("periodo.budget.question")}</div>
         <div style="font-size:11px; color:var(--text-3); line-height:1.5;">
@@ -448,48 +484,69 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
   // patchTotal() sin re-render completo (ver su comentario más abajo).
   function bloqueTotal() {
     const presupuestado = totalPresupuestadoCents();
-    const ingresos = mode === "next" ? closingIncome : null;
+    const ingresos = currentIngresos();
     const pctBarra = ingresos > 0 ? Math.min(100, Math.round((presupuestado / ingresos) * 100)) : 0;
     const sinAsignar = ingresos != null ? ingresos - presupuestado : null;
+    // D11: en modo 'first' "Ingresos previstos" es un <input> efímero (no se manda a
+    // openNextPeriod), con la misma anatomía type=text/inputmode=decimal que #pn-sweep-amount —
+    // en modo 'next' sigue siendo la cifra ya conocida, solo lectura.
+    const incomeSlotHtml = mode === "next"
+      ? `
+        <div style="font-size:11px; color:var(--text-3);">${t("periodo.total.expectedIncome")}</div>
+        <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${escHtml(fmtMoney(ingresos))}</div>`
+      : `
+        <span style="font-size:11px; color:var(--text-3);">${t("periodo.first.expectedIncome")}</span>
+        <div class="amount-display" style="align-items:center; justify-content:flex-end;">
+          <input type="text" inputmode="decimal" id="pn-expected-income" value="${escAttr(state.expectedIncomeRaw)}" placeholder="0" autocomplete="off"
+            style="border:0; background:none; color:var(--text); font:600 30px var(--font-num); letter-spacing:-0.02em; width:130px; text-align:right; outline:none;">
+          <span class="amount-currency">${escHtml(currencySymbol())}</span>
+        </div>`;
     return `
-    <div class="card" style="display:flex; flex-direction:column; gap:14px; margin-bottom:16px;">
+    <div class="card" style="display:flex; flex-direction:column; gap:14px;">
       <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
         <div style="display:flex; flex-direction:column; gap:5px;">
           <div class="section-title">${t("periodo.total.budgetedTitle")}</div>
           <div class="amount-hero num" id="pn-presupuestado">${moneyPartsHtml(presupuestado)}</div>
         </div>
-        ${ingresos != null ? `
-        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;">
-          <div style="font-size:11px; color:var(--text-3);">${t("periodo.total.expectedIncome")}</div>
-          <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(ingresos)}</div>
-        </div>` : ""}
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;">${incomeSlotHtml}</div>
       </div>
-      ${ingresos != null ? `
-      <div class="bar" style="--cat:var(--text);"><i id="pn-bar" style="width:${pctBarra}%;"></i></div>
-      <div id="pn-nota" style="font-size:11px; color:var(--text-3); line-height:1.5;">${notaSinAsignarHtml(sinAsignar)}</div>` : ""}
+      <div id="pn-total-bar-wrap" class="bar" style="--cat:var(--text); ${ingresos == null ? "display:none;" : ""}"><i id="pn-bar" style="width:${pctBarra}%;"></i></div>
+      <div id="pn-nota" style="font-size:11px; color:var(--text-3); line-height:1.5; ${ingresos == null ? "display:none;" : ""}">${ingresos != null ? notaSinAsignarHtml(sinAsignar) : ""}</div>
     </div>`;
   }
 
   // CTA final, fuera de la card del total (como en el artboard): mismo id/label EXISTENTE
   // ("Abrir periodo"/"Abriendo…" — no el "Abrir Septiembre 2026" fijo del artboard, que fabricaría
-  // un texto con el nombre siempre en mayúscula fija en vez del state.name real).
+  // un texto con el nombre siempre en mayúscula fija en vez del state.name real). La nota del
+  // informe y el enlace "Ver el informe" (bloque 6 del artboard) suben aquí, DEBAJO del botón —
+  // antes solo vivían en el panel de éxito posterior (renderClosedPanel), que se queda con el
+  // acuse de recibo real sin repetir la nota (ver su comentario).
   function bloqueCTA() {
     return `
-    ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
-    <button type="button" class="btn-primary" id="pn-submit" ${state.saving ? "disabled" : ""}>${state.saving ? t("periodo.cta.saving") : t("periodo.cta.submit")}</button>`;
+    <div style="display:flex; flex-direction:column; gap:16px;">
+      ${errorMsg ? `<div class="banner-aviso red">${escHtml(errorMsg)}</div>` : ""}
+      <button type="button" class="btn-primary" id="pn-submit" ${state.saving ? "disabled" : ""}>${state.saving ? t("periodo.cta.saving") : t("periodo.cta.submit")}</button>
+      ${mode === "next" ? `
+      <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+        <span style="font-size:12px; font-weight:500; color:var(--text-3); line-height:1.5; text-align:center;">${t("periodo.cta.reportNote")}</span>
+        <button type="button" id="pn-preview-informe" style="border:0; background:transparent; color:var(--accent); font-size:14px; font-weight:600; padding:0; height:44px; cursor:pointer;">${t("periodo.finish.seeReport")}</button>
+      </div>` : ""}
+    </div>`;
   }
 
   function render() {
     container.innerHTML = `
       ${embed ? "" : bloqueHeader()}
-      ${bloqueCierre()}
-      ${bloqueBarrido()}
-      ${bloqueNombre()}
-      ${bloqueFecha()}
-      ${bloqueReparto()}
-      ${bloqueLimites()}
-      ${bloqueTotal()}
-      ${bloqueCTA()}
+      <div style="display:flex; flex-direction:column; gap:var(--gap-section);">
+        ${bloqueCierre()}
+        ${bloqueBarrido()}
+        ${bloqueNombre()}
+        ${bloqueFecha()}
+        ${bloqueReparto()}
+        ${bloqueLimites()}
+        ${bloqueTotal()}
+        ${bloqueCTA()}
+      </div>
     `;
     wire();
   }
@@ -509,6 +566,24 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
       render();
     };
     container.querySelector("#pn-nombre").oninput = (e) => { state.name = e.target.value; };
+
+    // D11: solo existe en modo 'first' (bloqueTotal). oninput + patchTotal(), nunca render()
+    // completo — perdería el foco a cada dígito, igual que #pn-sweep-amount.
+    const expectedIncomeInput = container.querySelector("#pn-expected-income");
+    if (expectedIncomeInput) {
+      expectedIncomeInput.oninput = (e) => {
+        state.expectedIncomeRaw = e.target.value;
+        patchTotal();
+      };
+    }
+
+    // Bloque 6 ANTES de guardar (§9.5): previsualiza el informe del periodo que se está a punto de
+    // cerrar. El onBack es el propio render() de esta pantalla (no goBack/pushBack): el asistente
+    // sigue sin cablear al historial global, igual que renderClosedPanel más abajo.
+    const previewInformeBtn = container.querySelector("#pn-preview-informe");
+    if (previewInformeBtn) previewInformeBtn.onclick = () => {
+      renderInforme(container, () => render(), { periodId: closingPeriod.id });
+    };
 
     container.querySelectorAll("[data-sweep-radio]").forEach((r) => {
       r.onchange = () => { state.sweepChoice = r.value; render(); };
@@ -599,9 +674,11 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
    *  oculto y nav() bloqueado, main.js:28) — volver desde ahí repinta este mismo panel, nunca sale
    *  del asistente por sorpresa. «Hecho» es la única salida real. */
   function renderClosedPanel() {
+    // Sin la nota "Al cerrar se genera el informe…" (periodo.finish.autoReport): ya la dice
+    // bloqueCTA() ANTES de guardar (periodo.cta.reportNote, §9.5) — este panel es el acuse de
+    // recibo real, no un segundo aviso. La clave se queda en el diccionario sin consumidor.
     container.innerHTML = `
     <div style="display:flex; flex-direction:column; gap:18px; align-items:center; text-align:center; padding-top:40px;">
-      <div style="font-size:20px; font-weight:800; letter-spacing:-0.02em;">${t("periodo.finish.autoReport", { name: escHtml(closingPeriod.name) })}</div>
       <button type="button" class="btn-primary" id="pn-ver-informe" style="width:100%;">${t("periodo.finish.seeReport")}</button>
       <button type="button" id="pn-hecho" style="${BTN_SECONDARY}">${t("periodo.finish.done")}</button>
     </div>`;

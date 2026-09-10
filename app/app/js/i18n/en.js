@@ -628,9 +628,11 @@ export const EN = {
     closing: {
       title: "Closing {name}",
       movementCount: { one: "{n} transaction", other: "{n} transactions" },
+      income: "Income",
       spent: "Spent",
       saved: "Saved",
       savingsRate: "Savings rate",
+      savingsSentence: "You save {pct} of what you earn",
     },
     date: { title: "Starts on" },
     share: {
@@ -654,9 +656,15 @@ export const EN = {
       remaining: "{amount} left unassigned: that covers the car payment, provisions, and whatever you save.",
       over: "You’re {amount} over your expected income.",
     },
+    // First period (D11): ephemeral "Expected income" field that only exists while the wizard is
+    // open — it has no column in `periods` and is never persisted.
+    first: {
+      expectedIncome: "Expected income",
+    },
     cta: {
       submit: "Open period",
       saving: "Opening…",
+      reportNote: "Opening the period saves the report of the one being closed.",
     },
     finish: {
       autoReport: "Closing generates the report for {name} automatically.",

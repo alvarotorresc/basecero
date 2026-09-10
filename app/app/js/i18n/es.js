@@ -641,9 +641,11 @@ export const ES = {
     closing: {
       title: "Cierras {name}",
       movementCount: { one: "{n} movimiento", other: "{n} movimientos" },
+      income: "Ingresos",
       spent: "Gastado",
       saved: "Ahorrado",
       savingsRate: "Tasa de ahorro",
+      savingsSentence: "Ahorras el {pct} de lo que ingresas",
     },
     date: { title: "Empieza el" },
     share: {
@@ -667,9 +669,15 @@ export const ES = {
       remaining: "Quedan {amount} sin asignar: de ahí salen la cuota del coche, las provisiones y lo que ahorres.",
       over: "Te pasas por {amount} de los ingresos previstos.",
     },
+    // Primer periodo (D11): campo efímero de "Ingresos previstos" que solo existe mientras el
+    // asistente está abierto — no tiene columna en `periods` y no se persiste al guardar.
+    first: {
+      expectedIncome: "Ingresos previstos",
+    },
     cta: {
       submit: "Abrir periodo",
       saving: "Abriendo…",
+      reportNote: "Al abrir el periodo se guarda el informe del que se cierra.",
     },
     // El panel final del asistente de cierre (Task 15, plan 2026-09-10): tras abrir el periodo
     // nuevo, en vez de salir directo, ofrece ver el informe del que se acaba de cerrar.
