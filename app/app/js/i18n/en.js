@@ -555,6 +555,11 @@ export const EN = {
       submit: "Open period",
       saving: "Opening…",
     },
+    finish: {
+      autoReport: "Closing generates the report for {name} automatically.",
+      seeReport: "See the report and download the PDF",
+      done: "Done",
+    },
   },
   ajustes: {
     title: "Settings",
@@ -1014,8 +1019,18 @@ export const EN = {
       others: "Other",
     },
   },
-  // The sweep (N4, plan 2026-09-10): the note left on the leftover's transfer.
+  // The sweep (N4, plan 2026-09-10): closing wizard step.
   barrido: {
+    title: "You have {amount} left over from your budget",
+    titleIncome: "You have {amount} left over",
+    question: "What should we do with it?",
+    toGoal: "To {name}",
+    wouldBe: "would be {amount}",
+    completes: "Completes it!",
+    leaveIt: "Leave it in the account",
+    amount: "Amount to sweep",
+    capped: "You can sweep at most {amount}: that's what's in {account}",
     note: "End-of-period sweep",
+    done: "Sweep confirmed",
   },
 };

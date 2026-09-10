@@ -563,6 +563,13 @@ export const ES = {
       submit: "Abrir periodo",
       saving: "Abriendo…",
     },
+    // El panel final del asistente de cierre (Task 15, plan 2026-09-10): tras abrir el periodo
+    // nuevo, en vez de salir directo, ofrece ver el informe del que se acaba de cerrar.
+    finish: {
+      autoReport: "Al cerrar se genera el informe de {name} automáticamente.",
+      seeReport: "Ver el informe y descargar el PDF",
+      done: "Hecho",
+    },
   },
   ajustes: {
     title: "Ajustes",
@@ -1035,8 +1042,18 @@ export const ES = {
       others: "Otros",
     },
   },
-  // El barrido (N4, plan 2026-09-10): la nota que queda en la transferencia del remanente.
+  // El barrido (N4, plan 2026-09-10): paso del asistente de cierre.
   barrido: {
+    title: "Te sobran {amount} del presupuesto",
+    titleIncome: "Te sobran {amount}",
+    question: "¿Qué hacemos con ellos?",
+    toGoal: "Al {name}",
+    wouldBe: "quedaría en {amount}",
+    completes: "¡Lo completa!",
+    leaveIt: "Dejarlo en la cuenta",
+    amount: "Cantidad a barrer",
+    capped: "Como mucho puedes barrer {amount}: es lo que hay en {account}",
     note: "Barrido de fin de periodo",
+    done: "Barrido confirmado",
   },
 };
