@@ -7,6 +7,7 @@ import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 import { renderRecurrentes } from "./recurrentes.js";
 import { renderSuscripciones } from "./suscripciones.js";
 import { renderCategorias } from "./categorias.js";
+import { renderInforme } from "./informe.js";
 import { pushBack, goBack } from "../back.js";
 import { importCsv, importWithProfile } from "../n26.js";
 import { buildProfile, applyProfile, detectDateFormat, detectDecimal, parseDateIso, parseAmountCents } from "../csv-generic.js";
@@ -219,6 +220,18 @@ function periodoCardHtml(period, partnerName, periodError) {
         <button type="button" id="aj-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
       </div>
       ${periodError ? `<div class="banner-aviso red">${escHtml(periodError)}</div>` : ""}` : ""}
+      <button type="button" id="btn-informe" class="list-row"
+        style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+        <div class="list-row-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19V10M12 19V5M20 19v-7"></path>
+          </svg>
+        </div>
+        <div class="list-row-body">
+          <div class="list-row-title">${t("informe.entry.fromSettings")}</div>
+        </div>
+        <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
+      </button>
       <button type="button" class="btn-secondary" id="btn-cerrar-periodo" style="width:100%">${t("ajustes.period.closeBtn")}</button>
       <div style="font-size:11px;color:var(--text-3);line-height:1.5">
         ${partnerName
@@ -559,6 +572,14 @@ export async function renderAjustes(container) {
       } finally {
         state.busy = false; render();
       }
+    };
+
+    const informeBtn = container.querySelector("#btn-informe");
+    if (informeBtn) informeBtn.onclick = () => {
+      // Sin body.onboarding (a diferencia de #btn-cerrar-periodo): esto NO es un asistente que
+      // cierra nada, es una pantalla de consulta — el tabbar sigue disponible.
+      pushBack(() => renderAjustes(container));
+      renderInforme(container, goBack);
     };
 
     const cerrarBtn = container.querySelector("#btn-cerrar-periodo");

@@ -24,6 +24,7 @@ import { renderRecurrentes } from "./recurrentes.js";
 import { renderSuscripciones } from "./suscripciones.js";
 import { renderRegistro } from "./registro.js";
 import { renderSemana } from "./semana.js";
+import { renderInforme } from "./informe.js";
 import { pushBack, goBack } from "../back.js";
 import { openTxDetail } from "../open-tx.js";
 import { goToTab } from "../tabs.js";
@@ -406,36 +407,47 @@ function categoriaPorCategoriaHtml(rootRows, byId, budgetByCategory) {
 }
 
 /** Gastado / Ingresos / Ahorrado (I1, Main.dc.html:293-306): grid de 3 columnas separadas por un
- *  filete de 1px. Ingresos en --pos, Ahorrado en --danger si es negativo. */
-function statGridHtml(spent, income, ahorrado) {
+ *  filete de 1px. Ingresos en --pos, Ahorrado en --danger si es negativo. Envuelto en un <button>
+ *  (Task 12, plan 2026-09-10: entrada al Informe) — es el mismo Resumen del informe, así que
+ *  tocarlo para verlo entero es la afordancia más obvia; el <div class="stat-grid"> interior no
+ *  cambia de clase ni de estructura, solo gana un padre. */
+function statGridHtml(spent, income, ahorrado, periodName) {
   return `
-  <div class="stat-grid">
-    <div>
-      <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("inicio.spent.title")}</span>
-      <span class="num" style="font:600 15px var(--font-mono);letter-spacing:-.02em;color:var(--ink);">${escHtml(fmtMoney(spent))}</span>
+  <button type="button" id="inicio-informe-link" aria-label="${escAttr(t("informe.entry.fromHome", { name: periodName }))}"
+    style="display:block;width:100%;background:none;border:0;padding:0;margin:0;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+    <div class="stat-grid">
+      <div>
+        <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("inicio.spent.title")}</span>
+        <span class="num" style="font:600 15px var(--font-mono);letter-spacing:-.02em;color:var(--ink);">${escHtml(fmtMoney(spent))}</span>
+      </div>
+      <div>
+        <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("inicio.spent.income")}</span>
+        <span class="num" style="font:600 15px var(--font-mono);letter-spacing:-.02em;color:var(--pos);">${escHtml(fmtMoney(income))}</span>
+      </div>
+      <div>
+        <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("inicio.spent.saved")}</span>
+        <span class="num" style="font:600 15px var(--font-mono);letter-spacing:-.02em;color:${ahorrado < 0 ? "var(--danger)" : "var(--ink)"};">${escHtml(fmtMoney(ahorrado))}</span>
+      </div>
     </div>
-    <div>
-      <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("inicio.spent.income")}</span>
-      <span class="num" style="font:600 15px var(--font-mono);letter-spacing:-.02em;color:var(--pos);">${escHtml(fmtMoney(income))}</span>
-    </div>
-    <div>
-      <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("inicio.spent.saved")}</span>
-      <span class="num" style="font:600 15px var(--font-mono);letter-spacing:-.02em;color:${ahorrado < 0 ? "var(--danger)" : "var(--ink)"};">${escHtml(fmtMoney(ahorrado))}</span>
-    </div>
-  </div>`;
+  </button>`;
 }
 
 /** «Ahorras el X % de lo que ingresas» (I1, Main.dc.html:307-309): savingsSentence decide el
  *  kind; sin ingresos, null → no se pinta nada. fmtPct0 (Task 10, sin decimales: «54 %») en vez
  *  de fmtPct (que mete un decimal, «54,2 %») — coherente con el resto de cifras de la pantalla,
- *  que van a un vistazo, no a precisión contable. */
+ *  que van a un vistazo, no a precisión contable. Chevron discreto al final (Task 12): la frase
+ *  no es tocable por sí sola (el botón de arriba ya cubre la entrada al informe, D2 más pequeño),
+ *  el chevron solo anuncia que hay más detrás. */
 function savingsLineHtml(income, spent) {
   const s = savingsSentence(income, spent);
   if (!s) return "";
   const text = s.kind === "saves"
     ? t("inicio.savings.rate", { pct: fmtPct0(s.ratio) })
     : t("inicio.savings.negative");
-  return `<div style="padding-top:10px;"><span style="font-size:13px;font-weight:500;color:var(--ink-3);">${text}</span></div>`;
+  return `<div style="padding-top:10px;display:flex;align-items:center;gap:4px;">
+    <span style="font-size:13px;font-weight:500;color:var(--ink-3);">${text}</span>
+    <span style="display:inline-flex;color:var(--ink-3);" aria-hidden="true">${CHEVRON_RIGHT_SVG}</span>
+  </div>`;
 }
 
 /** «Queda por pagar» + «Te quedarán» (Main.dc.html:323-344): una fila por recurrente PENDIENTE
@@ -600,7 +612,7 @@ export async function renderInicio(container) {
 
     ${categoriaPorCategoriaHtml(rootRows, byId, budgetByCategory)}
 
-    ${statGridHtml(spent, income, ahorrado)}
+    ${statGridHtml(spent, income, ahorrado, period.name)}
     ${savingsLineHtml(income, spent)}
 
     ${sharedBlockHtml(sharedRows, netCents, partnerName)}
@@ -711,6 +723,15 @@ export async function renderInicio(container) {
       renderSemana(container, goBack);
     };
   }
+
+  // Task 12 (plan 2026-09-10): entrada al Informe del periodo desde el bloque Gastado/Ingresos/
+  // Ahorrado — ese bloque ES el Resumen del informe, tocarlo para verlo entero es la afordancia
+  // más directa.
+  const informeLink = container.querySelector("#inicio-informe-link");
+  if (informeLink) informeLink.onclick = () => {
+    pushBack(() => renderInicio(container));
+    renderInforme(container, goBack);
+  };
 
   // Task 7 (6f): único botón Liquidar — un solo id, un solo listener.
   const liquidarBtn = container.querySelector("#shared-liquidar");
