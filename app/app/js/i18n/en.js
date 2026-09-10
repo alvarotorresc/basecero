@@ -479,6 +479,10 @@ export const EN = {
     error: { load: "Couldn’t load Recurring: {error}" },
     title: "Recurring",
     empty: "You don’t have any recurring rules yet.",
+    hero: {
+      pending: "Pending this period",
+      perMonth: "per month",
+    },
     type: { transfer: "Transfer" },
     freq: {
       weekly: "Weekly",

@@ -1,10 +1,11 @@
 import {
   listRules, listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById,
   createRule, updateRule, softDeleteRule, cancelSubscription, getMetaAll,
+  getOpenPeriod, previsionOfPeriod,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, moneyPartsHtml, currencySymbol, parseCentsRaw, centsToRaw, hoyISO } from "../format.js";
-import { annualCents } from "../subscriptions.js";
+import { annualCents, monthlyCommitmentCents } from "../subscriptions.js";
 import { t, monthLong } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
@@ -38,12 +39,17 @@ const needsMonth = (freq) => freq === "quarterly" || freq === "yearly";
  *  previsión) + formulario de alta/edición con borrado en dos toques (mismo patrón que
  *  movimientos.js openDetail/backToList). onBack vuelve a quien la haya abierto (Ajustes). */
 export async function renderRecurrentes(container, onBack, opts = {}) {
-  let rules, expenseCats, incomeCats, accountsAll, byId, meta;
+  let rules, expenseCats, incomeCats, accountsAll, byId, meta, period, prevision;
   try {
-    [rules, expenseCats, incomeCats, accountsAll, byId, meta] = await Promise.all([
+    [rules, expenseCats, incomeCats, accountsAll, byId, meta, period] = await Promise.all([
       listRules(), listExpenseLeafCategories(), listIncomeCategories(), listAccounts(), allCategoriesById(),
-      getMetaAll(),
+      getMetaAll(), getOpenPeriod(),
     ]);
+    // previsionOfPeriod necesita `period` ya resuelto (start_date/end_date/my_share_pct): no puede
+    // entrar en el Promise.all de arriba, que es justo lo que lo resuelve. Sin periodo abierto no
+    // hay nada que prever: el héroe y las etiquetas de estado de la fila se ocultan (mismo
+    // criterio que el resto de la app, spec §5.1 bloque 2).
+    prevision = period ? await previsionOfPeriod(period) : null;
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">${t("recurrentes.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
@@ -53,6 +59,15 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
 
   const state = { view: "list", rules, editId: null, form: null };
   let errorMsg = "";
+
+  // Recarga reglas + previsión juntas: cualquier alta/edición/borrado/toggle puede cambiar tanto
+  // la lista como lo que el héroe da por pendiente este periodo (un cargo que pasa a activo, por
+  // ejemplo). `period` no cambia en la vida de esta pantalla (no hay forma de cerrar el periodo
+  // desde aquí), así que solo se vuelve a pedir la previsión, no el periodo.
+  async function reloadRules() {
+    state.rules = await listRules();
+    if (period) prevision = await previsionOfPeriod(period);
+  }
 
   const categoriesFor = (tipo) => (tipo === "income" ? incomeCats : tipo === "expense" ? expenseCats : []);
 
@@ -199,11 +214,30 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
     </div>`;
   }
 
+  // Héroe "Pendiente este periodo" (spec §5.1 bloque 2): el mismo número que Inicio ya enseña en
+  // "Queda por pagar" (repo.previsionOfPeriod#comprometidoCents), con el compromiso mensual del
+  // conjunto de reglas como segunda línea (subscriptions.js#monthlyCommitmentCents). Sin periodo
+  // abierto no hay nada que prever — ni héroe ni etiquetas de estado en las filas.
+  function heroHtml() {
+    if (!period) return "";
+    return `
+    <div style="display:flex;flex-direction:column;gap:7px;padding-bottom:22px;">
+      <span style="font-size:13px;font-weight:500;color:var(--ink-3);">${t("recurrentes.hero.pending")}</span>
+      <div class="amount-hero lg num">${moneyPartsHtml(prevision.comprometidoCents)}</div>
+      <div style="display:flex;align-items:center;gap:10px;padding-top:4px;">
+        <span class="num" style="font-size:14px;font-weight:600;">${escHtml(fmtMoney(monthlyCommitmentCents(state.rules)))}</span>
+        <span style="font-size:14px;font-weight:500;color:var(--ink-2);">${t("recurrentes.hero.perMonth")}</span>
+      </div>
+    </div>`;
+  }
+
   function renderList() {
     container.innerHTML = `
       ${subHeaderHtml({ id: "rec-back", title: t("recurrentes.title"), action: { id: "rec-new", icon: "plus", label: t("common.addNew") } })}
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
+
+      ${heroHtml()}
 
       <div class="card" style="padding:4px 16px; display:flex; flex-direction:column;">
         ${state.rules.length === 0
@@ -461,7 +495,7 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
         };
         if (state.editId) await updateRule(state.editId, fields);
         else await createRule(fields);
-        state.rules = await listRules();
+        await reloadRules();
         goBack();
       } catch (e) {
         btn.disabled = false;
@@ -484,7 +518,7 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
           if (btn) btn.disabled = true;
           try {
             await cancelSubscription(state.editId, hoyISO());
-            state.rules = await listRules();
+            await reloadRules();
             showToast(t("toast.subscriptionCancelled"));
             goBack();
           } catch (e) {
@@ -508,7 +542,7 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
           if (btn) btn.disabled = true;
           try {
             await softDeleteRule(state.editId);
-            state.rules = await listRules();
+            await reloadRules();
             goBack();
           } catch (e) {
             if (btn) btn.disabled = false;

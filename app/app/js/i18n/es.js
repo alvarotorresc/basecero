@@ -492,6 +492,10 @@ export const ES = {
     error: { load: "No se pudo cargar Recurrentes: {error}" },
     title: "Recurrentes",
     empty: "Todavía no hay ninguna regla recurrente.",
+    hero: {
+      pending: "Pendiente este periodo",
+      perMonth: "al mes",
+    },
     type: { transfer: "Transfer." },
     freq: {
       weekly: "Semanal",
