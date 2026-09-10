@@ -1,5 +1,6 @@
 import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta, setMetaMany, allCategoriesById, retranslateSeedNames, updatePeriodSharePct } from "../repo.js";
 import { PCT_STEP, normalizePct, stepPct } from "../share-pct.js";
+import { quickRegisterEnabled } from "../registro-mode.js";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
 import { hoyISO, fmtDiaCorto, fmtMoney } from "../format.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
@@ -392,6 +393,16 @@ export async function renderAjustes(container) {
         <p style="font-weight:600;margin-bottom:4px">${t("ajustes.prefs.title")}</p>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
           ${t("ajustes.prefs.body")}</p>
+        <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;cursor:pointer;margin-bottom:4px;">
+          <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+            <span style="font-size:15px;font-weight:600;">${t("ajustes.prefs.quickRegisterLabel")}</span>
+            <span style="font-size:12px;color:var(--text-3);">${t("ajustes.prefs.quickRegisterHint")}</span>
+          </div>
+          <span class="toggle">
+            <input type="checkbox" id="pref-quick-register" ${quickRegisterEnabled(metaCfg.quick_register) ? "checked" : ""}>
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+          </span>
+        </label>
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <div style="flex:1;background:var(--card2);border-radius:0;padding:8px 12px;">
             <div class="section-title" style="margin-bottom:2px;">${t("ajustes.prefs.currency")}</div>
@@ -635,6 +646,23 @@ export async function renderAjustes(container) {
         }
       };
     }
+
+    // Un interruptor no es un formulario: guarda AL INSTANTE con setMeta, sin esperar al botón
+    // «Guardar preferencias» de la tarjeta (mismo criterio que el toggle de compartido de
+    // Registro) — y no recarga la página: currency/locale/lang si tocan textos ya resueltos en la
+    // pantalla, esto no cambia nada visible fuera de Ajustes.
+    container.querySelector("#pref-quick-register").onchange = async (e) => {
+      const value = e.target.checked ? "1" : "0";
+      try {
+        await setMeta("quick_register", value);
+        metaCfg.quick_register = value;
+        showToast(t("toast.saved"));
+      } catch (err) {
+        e.target.checked = !e.target.checked;
+        state.errors = [t("ajustes.prefs.saveFailed", { error: userMessage(err) })];
+        render();
+      }
+    };
 
     container.querySelector("#btn-prefs-save").onclick = async () => {
       // Leer los inputs ANTES de render(): reconstruye el DOM desde metaCfg (el valor

@@ -77,6 +77,14 @@ test("meta: semillas incluyen locale es-ES y currency EUR", () => {
   assert.equal(meta.currency, "EUR");
 });
 
+// Registro v2 §4.1: una BD nueva trae el modo «Registro rápido» activado por defecto. El
+// INSERT OR IGNORE corre en cada arranque (db-worker.js:20), así que esto también alcanza a las
+// BD que ya existen: en el siguiente arranque reciben la clave con valor "1" sin migración.
+test("meta: semillas incluyen quick_register a \"1\" (Registro rápido activado por defecto)", () => {
+  const db = freshDb();
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='quick_register'").get().value, "1");
+});
+
 test("meta: las claves de cuenta entran vacías con INSERT OR IGNORE", () => {
   const db = freshDb();
   assert.equal(db.prepare("SELECT value FROM meta WHERE key='import_account_id'").get().value, "");

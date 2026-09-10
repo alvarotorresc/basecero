@@ -588,6 +588,8 @@ export const EN = {
     prefs: {
       title: "Currency and format",
       body: "Currency for amounts, and number and date format. Applied on save (reloads the app).",
+      quickRegisterLabel: "Quick register",
+      quickRegisterHint: "Opening Register only asks for the amount and category. Everything else folds behind “More”.",
       currency: "Currency",
       format: "Format",
       language: "Language",

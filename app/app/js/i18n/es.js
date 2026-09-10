@@ -596,6 +596,8 @@ export const ES = {
     prefs: {
       title: "Moneda y formato",
       body: "Divisa de los importes y formato de números y fechas. Se aplican al guardar (recarga la app).",
+      quickRegisterLabel: "Registro rápido",
+      quickRegisterHint: "Al abrir Registro solo pide importe y categoría. El resto queda plegado tras «Más».",
       currency: "Moneda",
       format: "Formato",
       language: "Idioma",

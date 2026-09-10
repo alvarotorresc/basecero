@@ -1,5 +1,9 @@
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version','2'),('currency','EUR'),('created_with','basecero-pwa'),('locale','es-ES'),('import_account_id',''),('default_account_id',''),('partner_name',''),('category_style','{}'),('csv_profile',''),('lang',''),('account_loans','{}');
+-- quick_register (Registro v2 §4.1): "1" activa el modo «Registro rápido» — ES el default de
+-- producto. El INSERT OR IGNORE inserta las filas que no chocan y salta las que ya existen, y
+-- corre en CADA arranque (db-worker.js:20): una BD que ya existe recibe la clave en el siguiente
+-- arranque, con valor "1", sin necesidad de migración.
+INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version','2'),('currency','EUR'),('created_with','basecero-pwa'),('locale','es-ES'),('import_account_id',''),('default_account_id',''),('partner_name',''),('category_style','{}'),('csv_profile',''),('lang',''),('account_loans','{}'),('quick_register','1');
 
 CREATE TABLE IF NOT EXISTS accounts (
   id TEXT PRIMARY KEY, name TEXT NOT NULL,

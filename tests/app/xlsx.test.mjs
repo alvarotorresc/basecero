@@ -256,8 +256,9 @@ test("validate: id con caracteres no válidos se rechaza — en meta.key y en ca
 });
 test("validate: PK duplicada (dentro de la misma pestaña, meta usa key)", () => {
   const d = parse((x) => { x.meta.push({ key: "schema_version", value: "1" }); });
-  // el duplicado se reporta en la fila de la SEGUNDA aparición (fila 13: las 11 semillas + esta)
-  assert.match(validateImport(d).join("\n"), /pestaña «meta» fila 13: id duplicado \(«schema_version»\)/);
+  // el duplicado se reporta en la fila de la SEGUNDA aparición (fila 14: las 12 semillas —incluida
+  // quick_register, Registro v2 §4.1— + esta)
+  assert.match(validateImport(d).join("\n"), /pestaña «meta» fila 14: id duplicado \(«schema_version»\)/);
 });
 test("validate: dos periodos open", () => {
   const d = parse((x) => { x.periods.push({ ...x.periods[0], id: "per-2", name: "Otro" }); });
