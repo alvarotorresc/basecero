@@ -898,6 +898,37 @@ body.onboarding .fab { display: none; }
 .hero-account .balance.is-negative .money-cents,
 .hero-account .balance.is-negative .money-cur { color: var(--danger); }
 
+/* ===== Línea de tiempo semanal (SISTEMA §4.11): la espina compacta de Inicio y la desplegable de
+   Semana comparten estas mismas clases (Task 8/9). ===== */
+.spine { display: flex; flex-direction: column; }
+.spine-row { display: flex; align-items: stretch; gap: 12px; }
+/* El rail es el propio contenedor: el filete es un hijo normal (no un pseudo-elemento) para poder
+   acortarlo inline en la última fila sin una clase modificadora aparte. */
+.spine-rail { width: 12px; flex-shrink: 0; position: relative; display: flex; justify-content: center; }
+.spine-line { width: 2px; height: 100%; background: var(--hairline-strong); }
+.spine-node { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; }
+
+/* Barra apilada por categoría de un día (decisión 8: apila, no "color dominante") — mismo patrón
+   que .bar/.bar>i pero SIN radio por segmento (los tramos van a hueso, solo la pista es píldora). */
+.day-bar { flex: 1; height: 8px; border-radius: var(--r-pill); background: var(--surface-2); overflow: hidden; display: flex; }
+.day-seg { height: 100%; background: var(--cat, var(--accent)); }
+
+/* Chip de categoría de «Dónde se ha ido esta semana» (Semana): tinte al 16% del color, mismo
+   patrón que .chip-icon/.chip-v.active. */
+.week-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--cat, var(--ink-2)) 16%, transparent);
+  padding: 0 13px;
+  color: var(--cat, var(--ink-2));
+  font-size: 13px;
+  font-weight: 500;
+}
+.week-chip .num { font-weight: 600; }
+
 /* La hucha (SISTEMA §4.15): franja tintada al acento con filete izquierdo, una sola frase y como
    mucho dos acciones de texto — nunca un botón primario. */
 .hucha {
