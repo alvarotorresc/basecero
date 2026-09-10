@@ -86,6 +86,10 @@ function summaryHtml(report, prevPeriodName) {
   if (sentence && s.prevSavingsRatePct != null && s.prevSavingsRatePct >= 0 && prevPeriodName) {
     sentence += t("informe.summary.savingsRateVsPrev", { name: escHtml(prevPeriodName), pct: s.prevSavingsRatePct });
   }
+  // "Disponible" es presupuestado − gastado (D2 arriba, buildSummary): sin ningún límite puesto
+  // eso es 0 − gastado, un número negativo sin sentido ("Disponible −245,60 €"). Mismo criterio
+  // que Inicio (screens/inicio.js:605, `budgetTotal ? disponibleHtml(...) : ""`): la celda entera
+  // se omite en vez de mostrar la resta.
   return `
   <div style="margin-bottom:24px;">
     <div class="section-title" style="margin-bottom:10px;">${t("informe.summary.title")}</div>
@@ -102,10 +106,11 @@ function summaryHtml(report, prevPeriodName) {
         <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("informe.summary.saved")}</span>
         <span class="num" style="font:600 15px var(--font-mono);color:${s.savedCents < 0 ? "var(--danger)" : "var(--ink)"};">${escHtml(fmtMoney(s.savedCents))}</span>
       </div>
+      ${s.budgetTotalCents > 0 ? `
       <div>
         <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("informe.summary.available")}</span>
         <span class="num" style="font:600 15px var(--font-mono);color:var(--ink);">${escHtml(fmtMoney(s.availableCents))}</span>
-      </div>
+      </div>` : ""}
     </div>
     ${sentence ? `<div style="padding-top:10px;font-size:13px;color:var(--ink-3);">${sentence}</div>` : ""}
   </div>`;

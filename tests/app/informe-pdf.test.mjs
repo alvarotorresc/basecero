@@ -168,6 +168,19 @@ test("layoutReport: con tasa de ahorro >= 0, imprime el numero como siempre", ()
   assert.ok(summaryLines.includes(t("informe.pdf.savingsRate", { pct: 54 })));
 });
 
+// Sin ningun limite puesto, budgetTotalCents es 0: "Disponible" saldria en negativo (0 - gastado)
+// y no dice nada. Mismo criterio que la pantalla (screens/informe.js#summaryHtml).
+test("layoutReport: sin presupuesto puesto, omite la linea de Disponible", () => {
+  const report = { ...smallReport(), summary: { ...smallReport().summary, budgetTotalCents: 0 } };
+  const summaryLines = layoutReport(report).pages[0].blocks.filter((b) => b.section === "summary" && b.kind === "text").map((b) => b.text);
+  assert.ok(!summaryLines.some((l) => l.startsWith(t("informe.pdf.available"))));
+});
+
+test("layoutReport: con presupuesto puesto, imprime Disponible como siempre", () => {
+  const summaryLines = layoutReport(smallReport()).pages[0].blocks.filter((b) => b.section === "summary" && b.kind === "text").map((b) => b.text);
+  assert.ok(summaryLines.some((l) => l.startsWith(t("informe.pdf.available"))));
+});
+
 test("layoutReport: los rects de las barras salen de barRowsGeometry", () => {
   const report = smallReport();
   const { pageSize, margin, pages } = layoutReport(report);

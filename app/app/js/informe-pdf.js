@@ -141,7 +141,11 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
   text("summary", `${t("informe.pdf.income")}  ${fmtMoney(report.summary.incomeCents)}`, { mono: true });
   text("summary", `${t("informe.pdf.spent")}  ${fmtMoney(report.summary.spentCents)}`, { mono: true });
   text("summary", `${t("informe.pdf.saved")}  ${fmtMoney(report.summary.savedCents)}`, { mono: true });
-  text("summary", `${t("informe.pdf.available")}  ${fmtMoney(report.summary.availableCents)}`, { mono: true });
+  // Sin ningún límite puesto, budgetTotalCents es 0 y "Disponible" saldría en negativo (0 −
+  // gastado, sin sentido): mismo criterio que la pantalla (screens/informe.js#summaryHtml).
+  if (report.summary.budgetTotalCents > 0) {
+    text("summary", `${t("informe.pdf.available")}  ${fmtMoney(report.summary.availableCents)}`, { mono: true });
+  }
   // Gastos por encima de ingresos -> savingsRatePct negativo ("Tasa de ahorro -146%" no dice
   // nada): mismo criterio que la pantalla (screens/informe.js#summaryHtml), un mensaje fijo en
   // vez del número.
