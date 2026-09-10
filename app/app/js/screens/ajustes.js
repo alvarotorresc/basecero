@@ -73,9 +73,9 @@ async function downloadXlsx(dump, filename) {
 // chipStyle() local de categorias.js (Task 6 PR D); no hay módulo de UI compartido entre
 // pantallas para esta variante de pastilla de solo texto.
 function assistChipStyle(active) {
-  return `display:inline-flex;align-items:center;font-size:12px;font-weight:${active ? 700 : 600};
-    background:${active ? "var(--text)" : "var(--card)"};color:${active ? "var(--bg)" : "var(--text-2)"};
-    border:0;border-radius:999px;padding:8px 13px;white-space:nowrap;cursor:pointer;
+  return `display:inline-flex;align-items:center;font-size:13px;font-weight:${active ? 600 : 500};
+    background:${active ? "var(--accent)" : "var(--surface-2)"};color:${active ? "var(--accent-ink)" : "var(--ink-2)"};
+    border:0;border-radius:999px;padding:12px 14px;white-space:nowrap;cursor:pointer;
     -webkit-tap-highlight-color:transparent;`;
 }
 
@@ -413,9 +413,7 @@ export async function renderAjustes(container) {
       </section>
 
       <section style="margin-bottom:var(--gap-section)">
-        <div class="section-title" style="margin-bottom:4px">${t("ajustes.prefs.title")}</div>
-        <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
-          ${t("ajustes.prefs.body")}</p>
+        <div class="section-title" style="margin-bottom:20px">${t("ajustes.prefs.title")}</div>
         <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;cursor:pointer;margin-bottom:4px;">
           <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
             <span style="font-size:15px;font-weight:600;">${t("ajustes.prefs.quickRegisterLabel")}</span>
@@ -426,15 +424,15 @@ export async function renderAjustes(container) {
             <span class="toggle-track"><span class="toggle-knob"></span></span>
           </span>
         </label>
-        <div style="display:flex;gap:8px;margin-bottom:12px">
-          <div style="flex:1;background:var(--card2);border-radius:0;padding:8px 12px;">
-            <div class="section-title" style="margin-bottom:2px;">${t("ajustes.prefs.currency")}</div>
-            <select id="pref-currency" style="background:none;border:0;color:var(--text);font:700 14px var(--font-ui);width:100%;padding:2px 0;outline:none;">${currencyOptionsHtml(metaCfg.currency)}</select>
-          </div>
-          <div style="flex:1;background:var(--card2);border-radius:0;padding:8px 12px;">
-            <div class="section-title" style="margin-bottom:2px;">${t("ajustes.prefs.format")}</div>
-            <select id="pref-locale" style="background:none;border:0;color:var(--text);font:700 14px var(--font-ui);width:100%;padding:2px 0;outline:none;">${localeOptionsHtml(metaCfg.locale)}</select>
-          </div>
+        <div style="display:flex;gap:16px;margin-top:12px">
+          <label class="field field-stack" style="flex:1;min-width:0;">
+            <span class="field-label">${t("ajustes.prefs.currency")}</span>
+            <select id="pref-currency">${currencyOptionsHtml(metaCfg.currency)}</select>
+          </label>
+          <label class="field field-stack" style="flex:1;min-width:0;">
+            <span class="field-label">${t("ajustes.prefs.format")}</span>
+            <select id="pref-locale">${localeOptionsHtml(metaCfg.locale)}</select>
+          </label>
         </div>
         <label class="field field-stack" style="margin-top:12px;">
           <span class="field-label">${t("ajustes.prefs.language")}</span>

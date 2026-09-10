@@ -745,9 +745,11 @@ export const ES = {
       title: "Banco",
       importBtn: "Importar CSV",
     },
+    // title/body: el cuerpo descriptivo se borra al migrar a <section> (Task 6.2) — el artboard
+    // (Ajustes.dc.html:60) titula el bloque entero "Preferencias" y no lleva párrafo, y currency/
+    // format ya quedan claros con sus propias etiquetas de campo.
     prefs: {
-      title: "Moneda y formato",
-      body: "Divisa de los importes y formato de números y fechas. Se aplican al guardar (recarga la app).",
+      title: "Preferencias",
       quickRegisterLabel: "Registro rápido",
       quickRegisterHint: "Al abrir Registro solo pide importe y categoría. El resto queda plegado tras «Más».",
       currency: "Moneda",

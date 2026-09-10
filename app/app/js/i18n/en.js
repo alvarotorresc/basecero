@@ -725,8 +725,7 @@ export const EN = {
       importBtn: "Import CSV",
     },
     prefs: {
-      title: "Currency and format",
-      body: "Currency for amounts, and number and date format. Applied on save (reloads the app).",
+      title: "Preferences",
       quickRegisterLabel: "Quick register",
       quickRegisterHint: "Opening Register only asks for the amount and category. Everything else folds behind “More”.",
       currency: "Currency",
