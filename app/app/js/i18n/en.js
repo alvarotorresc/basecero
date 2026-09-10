@@ -930,10 +930,68 @@ export const EN = {
     myPart: "Your share",
     undoFailed: "Could not undo: {error}",
   },
-  // Period report (F1): PDF labels (informe-pdf.js). Lands here before informe.* (the screen,
-  // plan Task 11) because the PDF ships first — Task 11 adds the rest of the informe.*
-  // namespace on top of this same root.
+  // Period report (F1). screens/informe.js.
   informe: {
+    title: "Period report",
+    openPeriod: "Period under way, day {n} of {m}",
+    closedPeriod: "Closed, {start} to {end}",
+    generatedAt: "Generated today at {time}",
+    download: "Download the PDF",
+    downloading: "Generating…",
+    downloadHint: "Generated on your phone, with the same charts, without leaving this screen.",
+    selector: { label: "Period" },
+    summary: {
+      title: "Summary",
+      income: "Income",
+      spent: "Spent",
+      saved: "Saved",
+      available: "Available",
+      savingsRate: "You save {pct}% of what you earn.",
+      savingsRateVsPrev: " In {name}, {pct}%.",
+    },
+    accounts: {
+      title: "Your accounts",
+      opening: "Opening",
+      closing: "Closing",
+      total: "Operating total",
+    },
+    categories: {
+      title: "Spending by category",
+      vsPrev: "vs. {name}",
+      total: "Total",
+      orientativo: "{prev} is closed and {current} is on day {day} of {total}, so the comparison is only indicative until it closes.",
+      noPrev: "No previous period to compare against.",
+    },
+    shared: {
+      title: "With {name}",
+      myPart: "Your share",
+      net: {
+        theyOwe: "{name} owes you",
+        youOwe: "You owe {name}",
+        even: "You're even",
+      },
+    },
+    subscriptions: {
+      title: "Subscriptions",
+      active: "{n} active, per month",
+      yearly: "What they add up to per year",
+      link: "The radar",
+    },
+    movements: {
+      title: "Movements by category",
+      count: "{n} total",
+      andMore: "and {n} more movements",
+      others: "Other",
+    },
+    footer: "The PDF carries all of this plus the full list of the {n} movements, and looks the same on any phone.",
+    error: {
+      load: "Could not load the report: {error}",
+      pdf: "Could not generate the PDF: {error}",
+    },
+    entry: {
+      fromHome: "See the report for {name}",
+      fromSettings: "Period report",
+    },
     pdf: {
       summary: "Summary",
       income: "Income",

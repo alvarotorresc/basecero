@@ -951,10 +951,68 @@ export const ES = {
     myPart: "Tu parte",
     undoFailed: "No se pudo deshacer: {error}",
   },
-  // Informe del periodo (F1): etiquetas del PDF (informe-pdf.js). Nace aquí, antes que
-  // informe.* (la pantalla, Task 11 del plan) porque el PDF se implementa primero — Task 11
-  // añade el resto del espacio de nombres informe.* sobre esta misma raíz.
+  // Informe del periodo (F1). screens/informe.js.
   informe: {
+    title: "Informe del periodo",
+    openPeriod: "Periodo en curso, día {n} de {m}",
+    closedPeriod: "Cerrado, del {start} al {end}",
+    generatedAt: "Generado hoy {time}",
+    download: "Descargar el PDF",
+    downloading: "Generando…",
+    downloadHint: "Se genera en tu móvil, con las mismas gráficas y sin salir de aquí.",
+    selector: { label: "Periodo" },
+    summary: {
+      title: "Resumen",
+      income: "Ingresos",
+      spent: "Gastado",
+      saved: "Ahorrado",
+      available: "Disponible",
+      savingsRate: "Ahorras el {pct} % de lo que ingresas.",
+      savingsRateVsPrev: " En {name}, el {pct} %.",
+    },
+    accounts: {
+      title: "Tus cuentas",
+      opening: "Apertura",
+      closing: "Cierre",
+      total: "Total operativo",
+    },
+    categories: {
+      title: "Gasto por categoría",
+      vsPrev: "frente a {name}",
+      total: "Total",
+      orientativo: "{prev} está cerrado y {current} va por el día {day} de {total}, así que la comparación es orientativa hasta el cierre.",
+      noPrev: "Sin periodo anterior con el que comparar.",
+    },
+    shared: {
+      title: "Con {name}",
+      myPart: "Tu parte",
+      net: {
+        theyOwe: "{name} te debe",
+        youOwe: "Debes a {name}",
+        even: "Estáis en paz",
+      },
+    },
+    subscriptions: {
+      title: "Suscripciones",
+      active: "{n} activas, al mes",
+      yearly: "Lo que suman al año",
+      link: "El radar",
+    },
+    movements: {
+      title: "Movimientos por categoría",
+      count: "{n} en total",
+      andMore: "y {n} movimientos más",
+      others: "Otros",
+    },
+    footer: "El PDF lleva todo esto más la lista completa de los {n} movimientos, y se guarda igual en cualquier móvil.",
+    error: {
+      load: "No se pudo cargar el informe: {error}",
+      pdf: "No se pudo generar el PDF: {error}",
+    },
+    entry: {
+      fromHome: "Ver el informe de {name}",
+      fromSettings: "Informe del periodo",
+    },
     pdf: {
       summary: "Resumen",
       income: "Ingresos",
