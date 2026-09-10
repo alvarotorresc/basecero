@@ -4,7 +4,7 @@ import {
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { eurToCents } from "../contract.js";
-import { fmtMoney, moneyPartsHtml, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol } from "../format.js";
+import { fmtMoney, moneyPartsHtml, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol, centsToRaw } from "../format.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, stepPct } from "../share-pct.js";
 import { inheritedBudgetsRaw, budgetMap } from "../category-spend.js";
@@ -129,10 +129,10 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
     // remanente entero. sourceAccountId/sourceBalanceCents viven en el state porque la fecha de
     // inicio (#pn-fecha) puede cambiar el saldo de origen (la transferencia lleva esa fecha).
     sweepChoice: initialDestinations[0]?.goalId ?? "keep",
-    // Punto decimal a propósito, NO centsToRaw (coma): es lo único que admite el value de un
-    // <input type="number"> — mismo criterio que category-spend.js#inheritedBudgetsRaw. Con coma
-    // el navegador rechaza el valor en silencio y el campo se ve vacío.
-    sweepAmountRaw: remainder.cents ? String(remainder.cents / 100) : "",
+    // La anatomía de importe del sistema (SISTEMA §2.3) es SIEMPRE `type="text" inputmode="decimal"`
+    // + parseCentsRaw (registro.js:342), nunca `type="number"`: con coma decimal, un <input
+    // type="number"> rechaza el valor en silencio y el campo se ve vacío.
+    sweepAmountRaw: centsToRaw(remainder.cents),
     sourceAccountId,
     sourceBalanceCents,
   };
@@ -254,9 +254,12 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
   function barridoDestinoHtml(d, withDivider) {
     const checked = state.sweepChoice === d.goalId;
     const pct = Math.min(100, Math.max(0, d.pct));
+    // Tarjeta con borde resaltado cuando está elegida (artboard PeriodoNuevo.dc.html): el margen
+    // negativo compensa el padding para que el borde no desplace el contenido de las demás filas.
     return `
     ${withDivider ? '<hr class="divider">' : ""}
-    <label style="display:flex; align-items:center; gap:12px; padding:12px 0; cursor:pointer; -webkit-tap-highlight-color:transparent;">
+    <label style="display:flex; align-items:center; gap:12px; padding:12px; margin:2px -12px;
+      border-radius:12px; border:1.5px solid ${checked ? "var(--accent)" : "transparent"}; cursor:pointer; -webkit-tap-highlight-color:transparent;">
       <input type="radio" name="pn-sweep-dest" value="${escAttr(d.goalId)}" data-sweep-radio ${checked ? "checked" : ""} style="width:20px; height:20px; flex-shrink:0;">
       <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:5px;">
         <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px;">
@@ -298,9 +301,13 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
       </div>
       <div style="display:flex; flex-direction:column; gap:6px; ${state.sweepChoice === "keep" ? "opacity:.5;" : ""}">
         <div class="section-title">${t("barrido.amount")}</div>
-        <input type="number" min="0" step="0.01" inputmode="decimal" id="pn-sweep-amount" value="${escAttr(state.sweepAmountRaw)}"
-          ${state.sweepChoice === "keep" ? "disabled" : ""}
-          style="height:44px; padding:0 14px; background:var(--card2); border:0; border-radius:0; color:var(--text); font:600 15px var(--font-num); width:100%; outline:none;">
+        <div class="amount-display" style="align-items:center;">
+          <input type="text" inputmode="decimal" id="pn-sweep-amount" value="${escAttr(state.sweepAmountRaw)}" placeholder="0" autocomplete="off"
+            ${state.sweepChoice === "keep" ? "disabled" : ""}
+            style="border:0; background:none; color:var(--text); font:600 32px var(--font-num); letter-spacing:-0.02em; width:100%; outline:none;">
+          <span class="amount-currency">${escHtml(currencySymbol())}</span>
+        </div>
+        <hr class="divider" style="margin-top:2px;">
         <div id="pn-sweep-capped" class="num" style="font-size:11px; color:var(--amber, var(--text-3)); ${plan.capped ? "" : "display:none;"}">${plan.capped ? escHtml(t("barrido.capped", { amount: fmtMoney(plan.amountCents), account: escHtml(sourceAccountName) })) : ""}</div>
       </div>
     </div>`;
