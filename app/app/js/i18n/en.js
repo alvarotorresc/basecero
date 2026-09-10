@@ -175,6 +175,7 @@ export const EN = {
     uncategorized: "Uncategorized",
     where: { title: "Where it went this week" },
     empty: "Nothing logged yet this week.",
+    emptyPeriod: "Nothing logged yet this week in this period.",
     error: { load: "Couldn’t load the week: {error}" },
   },
   registro: {

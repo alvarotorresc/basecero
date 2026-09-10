@@ -180,6 +180,7 @@ export const ES = {
     uncategorized: "Sin categoría",
     where: { title: "Dónde se ha ido esta semana" },
     empty: "Esta semana no hay nada apuntado todavía.",
+    emptyPeriod: "En este periodo aún no hay nada apuntado esta semana.",
     error: { load: "No se pudo cargar la semana: {error}" },
   },
   registro: {

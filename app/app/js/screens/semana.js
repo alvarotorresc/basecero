@@ -1,4 +1,4 @@
-import { getOpenPeriod, spentByDayAndRootCategory, listByDay, allCategoriesById, getMetaAll } from "../repo.js";
+import { getOpenPeriod, spentByDayAndRootCategory, listByDay, allCategoriesById, getMetaAll, recentTxDates } from "../repo.js";
 import {
   weekRange, daysWithCategories, maxDayTotal, weekTotals, categoryTotals, movementsOfDay,
   rangeLabelParts,
@@ -85,6 +85,7 @@ export async function renderSemana(container, onBack) {
   let byId = {};
   let partnerName = "";
   let rangeLabel = "";
+  let hasHistory = false;
 
   async function load() {
     period = await getOpenPeriod();
@@ -92,11 +93,12 @@ export async function renderSemana(container, onBack) {
     // MISMA ventana que usa Inicio (semana-logic.js#weekRange): la espina de las dos pantallas no
     // puede leer fechas distintas.
     const week = weekRange(hoyISO());
-    const [rootRows, rows, cats, meta] = await Promise.all([
+    const [rootRows, rows, cats, meta, recentDates] = await Promise.all([
       spentByDayAndRootCategory(period.id, week.start, week.end),
       listByDay(period.id),
       allCategoriesById(),
       getMetaAll(),
+      recentTxDates(),
     ]);
     days = daysWithCategories(rootRows, week.dates);
     total = weekTotals(days);
@@ -104,6 +106,9 @@ export async function renderSemana(container, onBack) {
     movsByDate = new Map(days.map((d) => [d.date, movementsOfDay(rows, d.date)]));
     byId = cats;
     partnerName = (meta.partner_name || "").trim();
+    // SIN filtro de periodo (mismo criterio que inicio.js#hasHistory): distingue un periodo recién
+    // abierto de un usuario que nunca ha apuntado nada, para no repetir aquí el "empty" genérico.
+    hasHistory = recentDates.length > 0;
     const parts = rangeLabelParts(week.start, week.end);
     rangeLabel = parts.sameMonth
       ? t("semana.range.sameMonth", { from: parts.fromDay, to: parts.toDay, month: monthLong(parts.fromMonth) })
@@ -177,7 +182,15 @@ export async function renderSemana(container, onBack) {
   }
 
   function render() {
-    const empty = [...movsByDate.values()].every((m) => m.length === 0);
+    // Sin ningún movimiento en la ventana de 7 días de ESTE periodo (día 1-2 de un periodo nuevo
+    // incluido): antes esto colapsaba la pantalla entera al banner de vacío, perdiendo la espina,
+    // el total y la media aunque hubiera historial de periodos anteriores. Ahora se pinta SIEMPRE
+    // el bloque completo (con ceros — cada día sin movimientos ya se pinta "sin gastos" vía
+    // dayRowHtml, y sin gasto categorizado los chips simplemente no aparecen) y el banner se añade
+    // ENCIMA solo para explicar el porqué: `semana.emptyPeriod` con historial en otro periodo,
+    // `semana.empty` (el genérico de siempre) para quien no ha apuntado nada nunca.
+    const weekEmpty = [...movsByDate.values()].every((m) => m.length === 0);
+    const emptyMsg = hasHistory ? t("semana.emptyPeriod") : t("semana.empty");
     container.innerHTML = `
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
         <button type="button" class="icon-btn" id="semana-back" aria-label="${escAttr(t("common.goBack"))}">${ICON_BACK}</button>
@@ -185,7 +198,8 @@ export async function renderSemana(container, onBack) {
         <div style="width:44px;height:44px;flex-shrink:0;"></div>
       </div>
 
-      ${empty ? `<div class="banner-aviso">${t("semana.empty")}</div>` : `
+      ${weekEmpty ? `<div class="banner-aviso" style="margin-bottom:20px;">${emptyMsg}</div>` : ""}
+
       <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:26px;">
         <div style="display:flex;flex-direction:column;gap:5px;">
           <span style="font-size:13px;font-weight:500;color:var(--ink-3);">${rangeLabel}</span>
@@ -208,7 +222,6 @@ export async function renderSemana(container, onBack) {
       <div style="display:flex;flex-wrap:wrap;gap:8px;">
         ${chips.map((c) => chipHtml(c, byId)).join("")}
       </div>` : ""}
-      `}
     `;
     wire();
   }
