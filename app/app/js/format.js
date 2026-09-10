@@ -7,26 +7,20 @@ import { weekdayInitial } from "./i18n/index.js";
 let locale = "es-ES";
 let currency = "EUR";
 let money = buildMoney();
-let num2 = buildNum2();
-let num0 = buildNum0();
 let pct = buildPct();
+let pct0 = buildPct0();
 let dec1 = buildDec1();
 function buildMoney() {
   return new Intl.NumberFormat(locale, { style: "currency", currency, useGrouping: "always" });
 }
-// Sin useGrouping a propósito (a diferencia de money): paridad con los formateadores locales
-// que sustituyen — 1800 -> "1800,00", no "1.800,00" (ver tests/app/format.test.mjs).
-function buildNum2() {
-  return new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-// A diferencia de num2, SÍ lleva useGrouping:"always" (como money): sin decimales que separen
-// los importes de columnas estrechas, un 4 cifras sin agrupar ("1200") se confunde fácil con
-// otro vecino — ver el uso en charts.js (barChartSvg).
-function buildNum0() {
-  return new Intl.NumberFormat(locale, { minimumFractionDigits: 0, maximumFractionDigits: 0, useGrouping: "always" });
-}
 function buildPct() {
   return new Intl.NumberFormat(locale, { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+// Porcentaje SIN decimales («54 %», no «54,2 %»): la frase de ahorro de Inicio v2 y la de la
+// hucha («va por el X % de su límite») — un color de estado ya dice si preocupa o no, así que la
+// cifra no necesita más precisión que la de un vistazo.
+function buildPct0() {
+  return new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 });
 }
 function buildDec1() {
   return new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -37,17 +31,15 @@ export function initFormat(meta) {
   currency = meta?.currency || "EUR";
   try {
     money = buildMoney();
-    num2 = buildNum2();
-    num0 = buildNum0();
     pct = buildPct();
+    pct0 = buildPct0();
     dec1 = buildDec1();
   } catch {
     // currency/locale corruptos en meta: la app arranca igual, con los valores anteriores
     ({ locale, currency } = prev);
     money = buildMoney();
-    num2 = buildNum2();
-    num0 = buildNum0();
     pct = buildPct();
+    pct0 = buildPct0();
     dec1 = buildDec1();
   }
 }
@@ -92,9 +84,8 @@ export const moneyPartsHtml = (cents) => {
   return `${esc(main)}<span class="money-cents">${esc(c)}</span>` +
          `<span class="money-cur">${esc(suffix)}</span>`;
 };
-export const fmtNum2 = (n) => num2.format(n);
-export const fmtNum0 = (n) => num0.format(n);
 export const fmtPct = (v) => pct.format(v);
+export const fmtPct0 = (v) => pct0.format(v);
 export const fmtDec1 = (n) => dec1.format(n);
 export const currencySymbol = () => money.formatToParts(0).find((p) => p.type === "currency").value;
 export const currencyCode = () => currency;

@@ -1,13 +1,13 @@
-const CACHE = "bc-v37";
+const CACHE = "bc-v38";
 // sqlite3-opfs-async-proxy.js queda fuera a propósito: solo lo usa el VFS "opfs" clásico (requiere COOP/COEP), no el sahpool que usamos.
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon.svg", "icons/icon-maskable.svg",
   "css/tokens.css", "css/app.css", "vendor/pure.js", "vendor/xlsx/xlsx.full.min.js", "vendor/fonts/fonts.css",
   "vendor/fonts/schibsted-grotesk-latin.woff2", "vendor/fonts/jetbrains-mono-latin.woff2",
-  "js/main.js", "js/back.js", "js/errors.js", "js/toast.js", "js/recibo.js", "js/skeleton.js", "js/viewport.js", "js/modal.js", "js/format.js", "js/share-pct.js", "js/migrations.js", "js/i18n/index.js", "js/i18n/es.js", "js/i18n/en.js", "js/db.js", "js/db-worker.js", "js/schema.sql",
+  "js/main.js", "js/tabs.js", "js/back.js", "js/errors.js", "js/toast.js", "js/recibo.js", "js/skeleton.js", "js/viewport.js", "js/modal.js", "js/format.js", "js/share-pct.js", "js/migrations.js", "js/i18n/index.js", "js/i18n/es.js", "js/i18n/en.js", "js/db.js", "js/db-worker.js", "js/schema.sql",
   "js/sql.js", "js/seeds.js", "js/category-colors.js", "js/category-order.js", "js/category-spend.js", "js/repo.js",
-  "js/account-defaults.js", "js/onboarding-steps.js", "js/contract.js", "js/xlsx.js", "js/xlsx-loader.js", "js/prevision.js", "js/charts.js", "js/n26.js", "js/csv-generic.js", "js/backup-crypto.js",
-  "js/onboarding.js", "js/screens/registro.js", "js/screens/inicio.js",
-  "js/movimientos-filter.js", "js/screens/movimientos.js", "js/screens/liquidar.js", "js/screens/periodo-nuevo.js",
+  "js/account-defaults.js", "js/onboarding-steps.js", "js/contract.js", "js/xlsx.js", "js/xlsx-loader.js", "js/prevision.js", "js/inicio-logic.js", "js/semana-logic.js", "js/charts.js", "js/n26.js", "js/csv-generic.js", "js/backup-crypto.js",
+  "js/onboarding.js", "js/screens/registro.js", "js/screens/inicio.js", "js/screens/semana.js",
+  "js/movimientos-filter.js", "js/open-tx.js", "js/screens/movimientos.js", "js/screens/liquidar.js", "js/screens/periodo-nuevo.js",
   "js/screens/gasto-por-categoria.js", "js/screens/recurrentes.js", "js/screens/patrimonio.js",
   "js/screens/ajustes.js", "js/screens/categorias.js", "js/screens/onboarding.js",
   "vendor/sqlite-wasm/jswasm/sqlite3.mjs", "vendor/sqlite-wasm/jswasm/sqlite3.wasm"];
