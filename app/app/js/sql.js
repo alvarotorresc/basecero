@@ -104,6 +104,16 @@ export const SQL = {
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.period_id=? AND t.deleted=0
     ORDER BY t.date DESC, t.created_at DESC`,
+  // Ventana de la memoria de comercios (merchant-memory.js). Solo gastos/ingresos/devoluciones:
+  // una transferencia o un ajuste no tienen comercio que recordar. `LIMIT ?` lo pone el repo con
+  // MEMORY_WINDOW. Sirve el índice tx_date (schema.sql:48): no hace falta uno nuevo sobre merchant
+  // — la app es de un único usuario, y 500 filas ordenadas por fecha se resuelven de sobra con el
+  // índice que ya existe.
+  merchantHistory: `SELECT merchant, category_id, account_id, is_shared, share_pct_override,
+      paid_by, date, type
+    FROM transactions
+    WHERE deleted=0 AND merchant<>'' AND type IN ('expense','income','refund')
+    ORDER BY date DESC, id DESC LIMIT ?`,
   getTransaction: `SELECT * FROM transactions WHERE id=? AND deleted=0`,
   updateTransaction: `UPDATE transactions SET type=?, amount_cents=?, date=?, category_id=?, account_id=?,
     counter_account_id=?, merchant=?, note=?, is_shared=?, share_pct_override=?, paid_by=?, ref_id=?, rule_id=?, status=?,

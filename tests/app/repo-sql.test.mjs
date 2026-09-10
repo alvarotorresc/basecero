@@ -148,4 +148,38 @@ test("recentTxDates: fechas distintas, DESC, sin borradas ni transfer/adjustment
   tx(d, { date: "2026-08-23", type: "adjustment", cents: 50, category: "" });
   const rows = d.prepare(SQL.recentTxDates).all();
   assert.deepEqual(rows.map((r) => r.date), ["2026-08-20", "2026-08-18"]);
+// Registro v2 §5.3: SQL.merchantHistory, la ventana que merchant-memory.js pliega en memoria.
+test("merchantHistory: excluye las filas borradas", () => {
+  const d = db();
+  const borrar = tx(d, { merchant: "Mercadona" });
+  tx(d, { merchant: "Carrefour" });
+  d.prepare("UPDATE transactions SET deleted=1 WHERE id=?").run(borrar);
+  const merchants = d.prepare(SQL.merchantHistory).all(10).map((r) => r.merchant);
+  assert.deepEqual(merchants, ["Carrefour"]);
+});
+
+test("merchantHistory: excluye transfer y adjustment (no tienen comercio que recordar)", () => {
+  const d = db();
+  tx(d, { merchant: "Mercadona" });
+  tx(d, { type: "transfer", merchant: "Traspaso", category: "", account: "acc-n26", counterAccount: "acc-revolut" });
+  tx(d, { type: "adjustment", merchant: "Cuadre", category: "" });
+  const merchants = d.prepare(SQL.merchantHistory).all(10).map((r) => r.merchant);
+  assert.deepEqual(merchants, ["Mercadona"]);
+});
+
+test("merchantHistory: excluye comercio vacío", () => {
+  const d = db();
+  tx(d, { merchant: "" });
+  tx(d, { merchant: "Mercadona" });
+  const merchants = d.prepare(SQL.merchantHistory).all(10).map((r) => r.merchant);
+  assert.deepEqual(merchants, ["Mercadona"]);
+});
+
+test("merchantHistory: ORDER BY date DESC, id DESC y respeta el LIMIT", () => {
+  const d = db();
+  tx(d, { date: "2026-08-18", merchant: "Antiguo" });
+  tx(d, { date: "2026-08-20", merchant: "Reciente" });
+  tx(d, { date: "2026-08-19", merchant: "Intermedio" });
+  const merchants = d.prepare(SQL.merchantHistory).all(2).map((r) => r.merchant);
+  assert.deepEqual(merchants, ["Reciente", "Intermedio"]);
 });

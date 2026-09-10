@@ -9,6 +9,7 @@ import { SEED_NAMES } from "./seeds.js";
 import { t, monthShort } from "./i18n/index.js";
 import { isValidPct } from "./share-pct.js";
 import { UserError } from "./errors.js";
+import { MEMORY_WINDOW, merchantMemory } from "./merchant-memory.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -199,6 +200,12 @@ export const spentByRootCategory = (pid) => query(SQL.spentByRootCategory, [pid]
  *  directamente en ella. Incluye las filas a 0; quien consume las descarta. */
 export const spentByChildCategory = (periodId, rootId) => query(SQL.spentByChildCategory, [periodId, rootId, rootId]);
 export const budgetsOfPeriod = (pid) => query(SQL.budgetsOfPeriod, [pid]);
+
+// Registro v2 §5.3: la ventana de comercios recientes y su plegado en memoria (merchant-memory.js).
+// Dos funciones y no una: merchantHistory() sirve también por si algún día hace falta la lista
+// cruda (p.ej. depuración); loadMerchantMemory() es lo que consume Registro.
+export const merchantHistory = () => query(SQL.merchantHistory, [MEMORY_WINDOW]);
+export const loadMerchantMemory = async () => merchantMemory(await merchantHistory());
 
 /** Pone o cambia el límite de una categoría en un periodo (pantalla «Gasto por categoría»).
  *  Guard PURO antes de tocar la BD (mismo patrón que periodStartTooEarly/updatePeriodSharePct):
