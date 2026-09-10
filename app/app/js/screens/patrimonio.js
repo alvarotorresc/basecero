@@ -4,7 +4,7 @@ import {
   createGoal, updateGoal, softDeleteGoal, getAccountLoans, setAccountLoan,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtMoneyParts, moneyPartsHtml, hoyISO, fmtDec1, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { fmtMoney, fmtMoneyParts, moneyPartsHtml, hoyISO, fmtDec1, currencySymbol, parseCentsRaw, centsToRaw, appLocale } from "../format.js";
 import { netWorthBarsHtml } from "../charts.js";
 import { t } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
@@ -568,12 +568,20 @@ export async function renderPatrimonio(container) {
       </div>`;
 
     if (f.type === "savings_target") {
+      // Misma caja + input nativo transparente que mov-fecha (movimientos.js#fechaBoxHtml,
+      // .field-date en app.css): el input real queda a sangre encima (opacity:0) de una caja que
+      // muestra dd/mm/aaaa en mono con el icono del sistema, en vez del <input type="date"> nativo
+      // desnudo — mismo componente reutilizado, sin CSS nuevo.
+      const display = f.targetDate
+        ? new Date(f.targetDate + "T12:00:00").toLocaleDateString(appLocale(), { day: "2-digit", month: "2-digit", year: "numeric" })
+        : "";
       return `${amountHtml}
       <label class="field field-stack" style="margin-bottom:18px;">
         <span class="field-label">${t("patrimonio.goal.dateLabel")}</span>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span style="color:var(--ink-3);flex-shrink:0;display:flex;">${icon("calendar", { size: 18 })}</span>
-          <input type="date" id="goal-date" value="${escAttr(f.targetDate)}" style="flex:1;">
+        <div class="field-date">
+          ${icon("calendar", { size: 18, stroke: "var(--ink-3)" })}
+          <span class="num" style="font-size:13px;font-weight:500;">${escHtml(display)}</span>
+          <input type="date" id="goal-date" value="${escAttr(f.targetDate)}" aria-label="${escAttr(t("patrimonio.goal.dateLabel"))}">
         </div>
       </label>`;
     }
@@ -703,7 +711,10 @@ export async function renderPatrimonio(container) {
     if (pctInput) pctInput.oninput = (e) => { f.pct = e.target.value; errorMsg = ""; };
 
     const dateInput = container.querySelector("#goal-date");
-    if (dateInput) dateInput.onchange = (e) => { f.targetDate = e.target.value; };
+    // A diferencia de goal-raw/goal-months (oninput, sin render — perderían el foco en cada
+    // dígito), goal-date es onchange: solo dispara una vez elegida la fecha, así que puede
+    // re-renderizar para refrescar el texto dd/mm/aaaa de la caja (mismo criterio que mov-fecha).
+    if (dateInput) dateInput.onchange = (e) => { f.targetDate = e.target.value; render(); };
 
     container.querySelectorAll("[data-goal-cat]").forEach((b) => {
       b.onclick = () => { f.categoryId = b.dataset.goalCat; errorMsg = ""; render(); };
