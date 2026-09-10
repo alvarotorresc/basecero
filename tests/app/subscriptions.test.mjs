@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   annualCents, monthlyCents, activeSubscriptions, inactiveSubscriptions,
-  annualTotalCents, monthlyTotalCents,
+  annualTotalCents, monthlyTotalCents, nextRenewal, daysUntil, wholeMonthsBetween, savedSinceCancelCents,
 } from "../../app/app/js/subscriptions.js";
 
 /** Regla mínima con la forma de una fila real de recurring_rules — solo los campos que estos
@@ -72,4 +72,116 @@ test("annualTotalCents/monthlyTotalCents: solo suman las activas, y una lista va
   const rows = [rule({ id: "activa", amount_cents: 1000, frequency: "monthly" }),
     rule({ id: "cancelada", amount_cents: 999999, frequency: "yearly", is_active: 0, cancelled_at: "2026-01-01" })];
   assert.equal(annualTotalCents(rows), 12000, "la cancelada no cuenta aunque sea enorme");
+});
+
+// ---- nextRenewal --------------------------------------------------------------------------
+
+test("nextRenewal: mensual con el día aún por llegar este mes", () => {
+  const r = rule({ frequency: "monthly", due_day: 20 });
+  assert.equal(nextRenewal(r, "2026-09-09"), "2026-09-20");
+});
+
+test("nextRenewal: mensual con el día ya pasado → el mes siguiente", () => {
+  const r = rule({ frequency: "monthly", due_day: 2 });
+  assert.equal(nextRenewal(r, "2026-09-09"), "2026-10-02");
+});
+
+test("nextRenewal: mensual, el día de hoy cuenta como 'todavía por llegar' (no se salta al mes siguiente)", () => {
+  const r = rule({ frequency: "monthly", due_day: 9 });
+  assert.equal(nextRenewal(r, "2026-09-09"), "2026-09-09");
+});
+
+test("nextRenewal: mensual, día 31 se recorta al último día del mes — 28 en febrero normal, 29 en bisiesto", () => {
+  const normal = rule({ frequency: "monthly", due_day: 31 });
+  assert.equal(nextRenewal(normal, "2026-02-01"), "2026-02-28", "2026 no es bisiesto");
+  const bisiesto = rule({ frequency: "monthly", due_day: 31 });
+  assert.equal(nextRenewal(bisiesto, "2028-02-01"), "2028-02-29", "2028 sí es bisiesto");
+});
+
+test("nextRenewal: anual con el mes ya pasado este año → el año que viene", () => {
+  const r = rule({ frequency: "yearly", due_day: 14, due_month: 3 });
+  assert.equal(nextRenewal(r, "2026-09-09"), "2027-03-14");
+});
+
+test("nextRenewal: anual con el mes aún por llegar este año", () => {
+  const r = rule({ frequency: "yearly", due_day: 14, due_month: 12 });
+  assert.equal(nextRenewal(r, "2026-09-09"), "2026-12-14");
+});
+
+test("nextRenewal: trimestral avanza de tres en tres meses desde due_month hasta alcanzar hoy", () => {
+  const r = rule({ frequency: "quarterly", due_day: 15, due_month: 3 }); // ciclo: mar, jun, sep, dic
+  assert.equal(nextRenewal(r, "2026-09-09"), "2026-09-15");
+  assert.equal(nextRenewal(r, "2026-09-20"), "2026-12-15");
+});
+
+test("nextRenewal: semanal siempre \"\" — el esquema no tiene ancla semanal (D5)", () => {
+  const r = rule({ frequency: "weekly", due_day: 9 });
+  assert.equal(nextRenewal(r, "2026-09-09"), "");
+});
+
+test("nextRenewal: due_day nulo → \"\" (monthly/quarterly/yearly)", () => {
+  assert.equal(nextRenewal(rule({ frequency: "monthly", due_day: null }), "2026-09-09"), "");
+  assert.equal(nextRenewal(rule({ frequency: "yearly", due_day: null, due_month: 3 }), "2026-09-09"), "");
+});
+
+test("nextRenewal: anual/trimestral sin due_month → \"\"", () => {
+  assert.equal(nextRenewal(rule({ frequency: "yearly", due_day: 14, due_month: null }), "2026-09-09"), "");
+  assert.equal(nextRenewal(rule({ frequency: "quarterly", due_day: 14, due_month: null }), "2026-09-09"), "");
+});
+
+// ---- daysUntil ----------------------------------------------------------------------------
+
+test("daysUntil: hoy → 0, mañana → 1", () => {
+  assert.equal(daysUntil("2026-09-09", "2026-09-09"), 0);
+  assert.equal(daysUntil("2026-09-10", "2026-09-09"), 1);
+});
+
+test("daysUntil: cruzando un cambio de mes y un cambio de año", () => {
+  assert.equal(daysUntil("2026-09-01", "2026-08-31"), 1);
+  assert.equal(daysUntil("2027-01-01", "2026-12-31"), 1);
+});
+
+// ---- wholeMonthsBetween --------------------------------------------------------------------
+
+test("wholeMonthsBetween: 12 jun → 9 sep = 2 (el 12 de septiembre aún no ha llegado)", () => {
+  assert.equal(wholeMonthsBetween("2026-06-12", "2026-09-09"), 2);
+});
+
+test("wholeMonthsBetween: 12 jun → 12 sep = 3", () => {
+  assert.equal(wholeMonthsBetween("2026-06-12", "2026-09-12"), 3);
+});
+
+test("wholeMonthsBetween: 31 ene → 28 feb = 1 (recorte de fin de mes: 28 es el último día de febrero)", () => {
+  assert.equal(wholeMonthsBetween("2026-01-31", "2026-02-28"), 1);
+});
+
+test("wholeMonthsBetween: 31 ene → 27 feb = 0 (27 no es el último día de febrero)", () => {
+  assert.equal(wholeMonthsBetween("2026-01-31", "2026-02-27"), 0);
+});
+
+test("wholeMonthsBetween: nunca negativo — una fecha 'to' anterior a 'from' da 0", () => {
+  assert.equal(wholeMonthsBetween("2026-09-09", "2026-06-12"), 0);
+});
+
+// ---- savedSinceCancelCents ------------------------------------------------------------------
+
+test("savedSinceCancelCents: 4,99 €/mes cancelada el 12 jun, hoy 9 sep → 998 (D6, meses completos)", () => {
+  const r = rule({ amount_cents: 499, frequency: "monthly", is_active: 0, cancelled_at: "2026-06-12" });
+  assert.equal(savedSinceCancelCents(r, "2026-09-09"), 998);
+});
+
+test("savedSinceCancelCents: sin cancelled_at → 0", () => {
+  const r = rule({ amount_cents: 499, frequency: "monthly", is_active: 0, cancelled_at: "" });
+  assert.equal(savedSinceCancelCents(r, "2026-09-09"), 0);
+});
+
+test("savedSinceCancelCents: el mismo día de la baja → 0", () => {
+  const r = rule({ amount_cents: 499, frequency: "monthly", is_active: 0, cancelled_at: "2026-09-09" });
+  assert.equal(savedSinceCancelCents(r, "2026-09-09"), 0);
+});
+
+test("savedSinceCancelCents: una anual de 99,99 € a los 5 meses redondea UNA sola vez", () => {
+  const r = rule({ amount_cents: 9999, frequency: "yearly", is_active: 0, cancelled_at: "2026-04-09" });
+  // round(9999 * 5 / 12) = round(4166.25) = 4166 — distinto de round(9999/12)*5 = 833*5 = 4165.
+  assert.equal(savedSinceCancelCents(r, "2026-09-09"), 4166);
 });

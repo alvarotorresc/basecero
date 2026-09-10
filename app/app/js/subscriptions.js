@@ -34,3 +34,90 @@ export const annualTotalCents = (rules) => activeSubscriptions(rules).reduce((s,
 
 /** Total mensual derivado del total anual (mismo criterio de un solo redondeo que monthlyCents). */
 export const monthlyTotalCents = (rules) => Math.round(annualTotalCents(rules) / 12);
+
+/** ISO (YYYY-MM-DD) del día `day` dentro del mes `monthIndex` (0-based) de `year`, recortado al
+ *  último día real de ese mes — mismo criterio de recorte que expectedPeriodDays (prevision.js):
+ *  día 31 en febrero da 28 (o 29 en bisiesto). T12:00:00 local (vía el constructor de 3 args) para
+ *  no pisar un cambio de hora, mismo patrón que format.js#prevDayIso. */
+function isoFromParts(year, monthIndex, day) {
+  const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+  return new Date(year, monthIndex, Math.min(day, lastDay), 12).toLocaleDateString("sv-SE");
+}
+
+/** Fecha ISO de la próxima renovación, o "" si no se puede saber.
+ *  - monthly: el próximo due_day igual o posterior a hoy (hoy cuenta como "todavía por llegar"),
+ *    con el día recortado al último del mes.
+ *  - yearly: (due_month, due_day) de este año si no ha pasado, si no del que viene.
+ *  - quarterly: se avanza de tres en tres meses desde due_month hasta alcanzar o superar hoy —
+ *    el mismo ciclo que ruleApplies (prevision.js), para que el radar y Previsión nunca discrepen
+ *    sobre en qué mes cae una trimestral.
+ *  - weekly: "". El esquema no guarda ningún ancla semanal: due_day es día DEL MES (spec §3 D5).
+ *  - due_day nulo, o quarterly/yearly sin due_month: "" — el mismo "no aplica" que ruleApplies
+ *    (prevision.js) devuelve para esos datos incompletos, en vez de inventar una fecha. */
+export function nextRenewal(rule, todayIso) {
+  if (rule.frequency === "weekly") return "";
+  if (rule.due_day == null || rule.due_day === "") return "";
+  const day = Number(rule.due_day);
+  const [todayYear, todayMonth] = todayIso.split("-").map(Number);
+
+  if (rule.frequency === "monthly") {
+    let year = todayYear, monthIndex = todayMonth - 1;
+    let iso = isoFromParts(year, monthIndex, day);
+    if (iso < todayIso) {
+      monthIndex += 1;
+      if (monthIndex > 11) { monthIndex = 0; year += 1; }
+      iso = isoFromParts(year, monthIndex, day);
+    }
+    return iso;
+  }
+
+  if (rule.frequency === "yearly" || rule.frequency === "quarterly") {
+    if (rule.due_month == null || rule.due_month === "") return "";
+    const step = rule.frequency === "yearly" ? 12 : 3;
+    let monthIndex = Number(rule.due_month) - 1;
+    let year = todayYear;
+    let iso = isoFromParts(year, monthIndex, day);
+    while (iso < todayIso) {
+      monthIndex += step;
+      year += Math.floor(monthIndex / 12);
+      monthIndex = monthIndex % 12;
+      iso = isoFromParts(year, monthIndex, day);
+    }
+    return iso;
+  }
+
+  return "";
+}
+
+/** Días naturales de hoy a `dateIso` (0 = hoy). Aritmética de fechas a mediodía, como el resto del
+ *  proyecto (format.js#prevDayIso, prevision.js#dayIndexOfPeriod), para no pisar un cambio de hora. */
+export function daysUntil(dateIso, todayIso) {
+  const ms = new Date(dateIso + "T12:00:00") - new Date(todayIso + "T12:00:00");
+  return Math.round(ms / 86400000);
+}
+
+/** Meses COMPLETOS entre dos fechas ISO. Un mes está completo cuando ha llegado el día del mes de
+ *  `fromIso`: del 12 de junio al 9 de septiembre van DOS meses completos, no tres — el 12 de
+ *  septiembre aún no ha llegado. Recorte de fin de mes: si `toIso` es el último día de su mes,
+ *  cuenta aunque su día sea menor (del 31 de enero al 28 de febrero va un mes completo, porque el
+ *  "31 de febrero" no existe). Nunca negativo. */
+export function wholeMonthsBetween(fromIso, toIso) {
+  const from = new Date(fromIso + "T12:00:00");
+  const to = new Date(toIso + "T12:00:00");
+  if (to <= from) return 0;
+  let months = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+  const toIsLastDayOfMonth = new Date(to.getFullYear(), to.getMonth() + 1, 0).getDate() === to.getDate();
+  if (to.getDate() < from.getDate() && !toIsLastDayOfMonth) months -= 1;
+  return Math.max(0, months);
+}
+
+/** Lo ahorrado desde la baja, en céntimos: la parte proporcional del coste ANUAL correspondiente a
+ *  los meses completos transcurridos. Se calcula sobre el anual y con UN solo redondeo
+ *  (round(annual * meses / 12)) en vez de multiplicar un mensual ya redondeado: así una anual de
+ *  99,99 € no arrastra el error de su doceava parte mes a mes.
+ *  Sin cancelled_at → 0. NO se persiste (spec §3 D2): se recalcula en cada render. */
+export function savedSinceCancelCents(rule, todayIso) {
+  if (!rule.cancelled_at) return 0;
+  const months = wholeMonthsBetween(rule.cancelled_at, todayIso);
+  return Math.round((annualCents(rule) * months) / 12);
+}
