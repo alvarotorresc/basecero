@@ -239,10 +239,12 @@ export const SQL = {
   // Bind: [updatedAt, periodId, categoryId].
   softDeleteBudget: `UPDATE budgets SET deleted=1, updated_at=? WHERE period_id=? AND category_id=? AND deleted=0`,
 
-  // Gasto por día en un rango (Task 12, tarjeta "Flujo de gasto" de Inicio). Mismo criterio que
-  // spentOfPeriod (MY_AMOUNT de expenses, restan las devoluciones que no sean liquidación de un
-  // compartido (REFUND_REDUCES_SPEND), prorrateadas), agrupado por fecha. Solo trae los días con
-  // movimiento — repo.spentLast7Days rellena los que faltan con 0 en JS (fillLast7Days).
+  // Gasto por día en un rango. Mismo criterio que spentOfPeriod (MY_AMOUNT de expenses, restan
+  // las devoluciones que no sean liquidación de un compartido (REFUND_REDUCES_SPEND),
+  // prorrateadas), agrupado por fecha. Solo trae los días con movimiento — quien la consuma
+  // rellena los que faltan con 0 en JS (semana-logic.js#fillDays). Se mantiene como invariante de
+  // regresión de spentByDayAndRootCategory (tests/app/charts.test.mjs y repo-sql.test.mjs), que
+  // comparte el mismo criterio de prorrateo/devoluciones.
   // Bind: [periodId, startDateIso, endDateIso].
   spentByDay: `SELECT t.date AS date,
     COALESCE(SUM(CASE WHEN t.type='expense' THEN ${MY_AMOUNT}

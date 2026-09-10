@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { sparklineSvg, netWorthBarsHtml } from "../../app/app/js/charts.js";
 import { SQL } from "../../app/app/js/sql.js";
-import { fillLast7Days } from "../../app/app/js/repo.js";
 import { fmtDiaIni } from "../../app/app/js/format.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
@@ -71,7 +70,7 @@ test("netWorthBarsHtml: serie toda positiva no pinta ninguna barra en rojo", () 
   assert.ok(!html.includes("var(--red)"), "sin puntos negativos no debe aparecer var(--red)");
 });
 
-// ---- SQL.spentByDay / fillLast7Days (datos de spentLast7Days) -----------
+// ---- SQL.spentByDay -------------------------------------------------------
 
 function tx(d, over = {}) {
   const v = {
@@ -90,34 +89,6 @@ function tx(d, over = {}) {
   return v.id;
 }
 
-test("SQL.spentByDay + fillLast7Days: 7 días con ceros rellenos y suma correcta (MY_AMOUNT prorrateado, refunds sueltos restan)", () => {
-  const d = openDb();
-  seedMinimal(d);
-  // últimos 7 días naturales terminando en 2026-08-24: 08-18..08-24 (inclusive)
-  tx(d, { date: "2026-08-17", cents: 5000 });                 // fuera de rango (8 días atrás) — no debe contar
-  tx(d, { date: "2026-08-20", cents: 2000 });                 // dentro, entero
-  tx(d, { date: "2026-08-22", cents: 4000, shared: 1 });      // dentro, 60% de periodo -> 2400
-  tx(d, { date: "2026-08-22", cents: 500, type: "refund" });  // refund suelto resta del mismo día
-  // 2026-08-18, -19, -21, -23, -24 sin movimientos -> deben quedar a 0
-
-  const rows = d.prepare(SQL.spentByDay).all("per-1", "2026-08-18", "2026-08-24");
-  const days = fillLast7Days(rows, "2026-08-24");
-
-  assert.equal(days.length, 7);
-  assert.deepEqual(days.map((x) => x.date),
-    ["2026-08-18", "2026-08-19", "2026-08-20", "2026-08-21", "2026-08-22", "2026-08-23", "2026-08-24"]);
-  assert.equal(days.find((x) => x.date === "2026-08-18").cents, 0);
-  assert.equal(days.find((x) => x.date === "2026-08-19").cents, 0);
-  assert.equal(days.find((x) => x.date === "2026-08-20").cents, 2000);
-  assert.equal(days.find((x) => x.date === "2026-08-21").cents, 0);
-  assert.equal(days.find((x) => x.date === "2026-08-22").cents, 2400 - 500);
-  assert.equal(days.find((x) => x.date === "2026-08-23").cents, 0);
-  assert.equal(days.find((x) => x.date === "2026-08-24").cents, 0);
-
-  const sum = days.reduce((s, x) => s + x.cents, 0);
-  assert.equal(sum, 2000 + (2400 - 500));
-});
-
 test("SQL.spentByDay: refund vinculado a gasto NO compartido resta ese día; vinculado a compartido no", () => {
   const d = openDb();
   seedMinimal(d);
@@ -134,14 +105,6 @@ test("SQL.spentByDay: refund vinculado a gasto NO compartido resta ese día; vin
 
   assert.equal(dia20.cents, 0, "gasto 2000 - refund 2000 (gasto NO compartido) = 0");
   assert.equal(dia22.cents, 2400, "gasto al 60% (2400) - 0 (refund liquida gasto compartido)");
-});
-
-test("fillLast7Days: sin filas, devuelve 7 ceros", () => {
-  const days = fillLast7Days([], "2026-08-24");
-  assert.equal(days.length, 7);
-  assert.ok(days.every((d) => d.cents === 0));
-  assert.equal(days[6].date, "2026-08-24");
-  assert.equal(days[0].date, "2026-08-18");
 });
 
 test("fmtDiaIni: iniciales L-D de una semana completa (2026-08-17 lunes .. 08-23 domingo)", () => {

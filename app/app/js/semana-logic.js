@@ -1,18 +1,18 @@
 /** Constructor PURO de la ventana semanal de la app (spec §6.2): sin DOM, sin `repo`, sin `i18n` —
- *  ni siquiera importa `prevision.js`. Es la ÚNICA fuente de «la semana»: `repo.fillLast7Days`
- *  delega en `fillDays`+`weekDates` de aquí, y las dos pantallas que pintan una barra apilada por
- *  día (Inicio compacta, Semana desplegada) comparten `daysWithCategories`.
+ *  ni siquiera importa `prevision.js`. Es la ÚNICA fuente de «la semana»: las dos pantallas que
+ *  pintan una barra apilada por día (Inicio compacta, Semana desplegada) comparten
+ *  `daysWithCategories`, y `weekRange`/`fillDays` alimentan sus consultas.
  *
  *  La ventana son 7 días naturales que TERMINAN HOY, no la semana natural (decisión 9 de la spec):
- *  es lo que ya hacía `repo.spentLast7Days` y lo que evita que «Esta semana» se quede casi vacía
- *  los lunes. `rangeLabelParts` devuelve números crudos (día, índice de mes 0-11), nunca texto: el
- *  nombre del mes lo resuelve la pantalla vía `i18n` (`monthLong`), este módulo no conoce idiomas. */
+ *  así se evita que «Esta semana» se quede casi vacía los lunes. `rangeLabelParts` devuelve
+ *  números crudos (día, índice de mes 0-11), nunca texto: el nombre del mes lo resuelve la
+ *  pantalla vía `i18n` (`monthLong`), este módulo no conoce idiomas. */
 
 export const WEEK_DAYS = 7;
 
-/** `n` fechas ISO ascendentes terminando en `todayIso` (inclusive). Mismo cálculo EXACTO que tenía
- *  `repo.fillLast7Days` (Date con mediodía local + toLocaleDateString("sv-SE")): cambiarlo aquí
- *  descuadraría el flujo de Inicio, la pantalla Semana y esa delegación entre sí. */
+/** `n` fechas ISO ascendentes terminando en `todayIso` (inclusive), vía Date con mediodía local +
+ *  toLocaleDateString("sv-SE"): cambiarlo aquí descuadraría el flujo de Inicio y la pantalla
+ *  Semana entre sí, las dos ventanas de esta misma función. */
 export function weekDates(todayIso, n = WEEK_DAYS) {
   const end = new Date(todayIso + "T12:00:00");
   const dates = [];

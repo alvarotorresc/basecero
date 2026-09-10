@@ -3,7 +3,6 @@ import { query, exec, execMany } from "./db.js";
 import { nowIso, hoyISO, prevDayIso, fmtMoney, fmtDec1, appLocale } from "./format.js";
 import { CONTRACT, insertSql } from "./contract.js";
 import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
-import { weekDates, fillDays } from "./semana-logic.js";
 import { resolveAccountId, sanitizeLoanMap, parseLoanMap } from "./account-defaults.js";
 import { POOL, CURATED_ICONS, CATEGORY_ICONS, parseStyle, initCategoryStyle } from "./category-colors.js";
 import { SEED_NAMES } from "./seeds.js";
@@ -21,7 +20,7 @@ export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[
  *  asistente de cierre normal como el onboarding (modo 'first', sin periodo previo). */
 /** ¿startDate cae on/antes del start_date del periodo open que se va a cerrar? Si es así,
  *  end_date (día anterior a startDate) quedaría ANTES de start_date del periodo que se cierra —
- *  un rango invertido. PURA y sin DB (mismo patrón que sharedFieldsLocked/fillLast7Days: así se
+ *  un rango invertido. PURA y sin DB (mismo patrón que sharedFieldsLocked: así se
  *  testea sin Worker) para que openNextPeriod pueda lanzar el error ANTES de construir el
  *  execMany. Sin periodo abierto (modo 'first') no hay nada que comparar: siempre false. */
 export const periodStartTooEarly = (open, startDate) => !!open && startDate <= open.start_date;
@@ -218,28 +217,6 @@ export async function upsertBudget(periodId, categoryId, amountCents) {
 /** Quita el límite de una categoría en un periodo: borrado lógico, idempotente (sin fila viva no
  *  hace nada). No lleva guard: quitar algo que no está es una operación válida. */
 export const deleteBudget = (periodId, categoryId) => exec(SQL.softDeleteBudget, [nowIso(), periodId, categoryId]);
-
-/** Ventana semanal de la app: vive en semana-logic.js (puro y bajo test) para que el flujo de
- *  Inicio, la pantalla Semana y esta función no puedan usar tres ventanas distintas. Antes
- *  reimplementaba aquí mismo el relleno de huecos (ver tests/app/charts.test.mjs, que sigue
- *  reproduciendo el mismo query+fill a mano como comprobación de regresión gratuita). */
-export const fillLast7Days = (rows, todayIso) => fillDays(rows, weekDates(todayIso));
-
-/** Tarjeta "Flujo de gasto" de Inicio (Task 12): gasto por día de los últimos 7 días naturales
- *  (hoy incluido), con los días sin movimiento a 0.
- *  LIMITACIÓN CONOCIDA: la query está acotada a `pid` (mismo criterio que el resto de Inicio,
- *  literal del brief: "un rango date BETWEEN ? AND ? del periodo"), así que en los primeros días
- *  de un periodo recién abierto la ventana de 7 días "se corta" en la fecha de inicio — los días
- *  que caen en el periodo ANTERIOR muestran 0 aunque hubiera gasto real ese día. No se resuelve
- *  aquí (quitar el filtro de periodo rompería la consistencia con el resto de números de Inicio,
- *  todos periodo-scoped); documentado para quien la use en la UI. */
-export async function spentLast7Days(pid) {
-  const today = hoyISO();
-  const start = new Date(today + "T12:00:00");
-  start.setDate(start.getDate() - 6);
-  const rows = await query(SQL.spentByDay, [pid, start.toLocaleDateString("sv-SE"), today]);
-  return fillLast7Days(rows, today);
-}
 
 /** Gasto por día y categoría raíz en [startIso, endIso] (Inicio v2: la espina de Semana, sus chips
  *  y el desglose de Inicio comparten esta única consulta — ver semana-logic.js#daysWithCategories). */
@@ -520,9 +497,8 @@ export async function balancesAt(dateIso) {
 
 /** Suma de balances = patrimonio neto (el pasivo resta solo, por tener opening/movimientos en
  *  negativo — no hace falta tratarlo distinto). PURA a propósito: la alimenta directamente
- *  tests/app/patrimonio.test.mjs con balances calculados a mano vía SQL.accountBalance, mismo
- *  patrón que repo.fillLast7Days (no hay Worker disponible en Node para probar balancesAt tal
- *  cual). */
+ *  tests/app/patrimonio.test.mjs con balances calculados a mano vía SQL.accountBalance (no hay
+ *  Worker disponible en Node para probar balancesAt tal cual). */
 export const netWorthOfBalances = (balances) => balances.reduce((sum, b) => sum + b.balance_cents, 0);
 
 export async function netWorthAt(dateIso) {

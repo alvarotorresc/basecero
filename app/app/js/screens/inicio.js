@@ -492,8 +492,8 @@ export async function renderInicio(container) {
       container.innerHTML = `<div class="banner-aviso red">${t("common.noOpenPeriod")}</div>`;
       return;
     }
-    // weekRange(hoy) da la MISMA ventana de 7 días que usan Semana y repo.fillLast7Days —
-    // semana-logic.js es la única fuente, así que Inicio no puede llevar una tercera.
+    // weekRange(hoy) da la MISMA ventana de 7 días que usa Semana — semana-logic.js es la única
+    // fuente, así que Inicio no puede llevar una tercera.
     const week = weekRange(hoy);
     [spent, income, rows, byId, sharedRows, netCents, budgets, prevision, rootRows,
       cuentas, weekRootRows, recentDates, meta] = await Promise.all([

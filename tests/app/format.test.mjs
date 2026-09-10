@@ -1,6 +1,6 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { initFormat, fmtMoney, fmtMoneyParts, moneyPartsHtml, currencySymbol, currencyCode, appLocale, fmtNum2, fmtNum0, fmtPct, fmtPct0, fmtDec1, parseCentsRaw, centsToRaw } from "../../app/app/js/format.js";
+import { initFormat, fmtMoney, fmtMoneyParts, moneyPartsHtml, currencySymbol, currencyCode, appLocale, fmtPct, fmtPct0, fmtDec1, parseCentsRaw, centsToRaw } from "../../app/app/js/format.js";
 
 // Intl mete espacios no separadores (U+00A0/U+202F): normalizar antes de comparar.
 const norm = (s) => s.replace(/\u00A0|\u202F/g, " ");
@@ -28,15 +28,10 @@ test("initFormat con valores inválidos cae a los defaults sin romper", () => {
   assert.equal(norm(fmtMoney(100)), "1,00 €");
 });
 
-test("fmtNum2, fmtPct y fmtDec1 siguen el locale de initFormat", () => {
-  // OJO paridad: los formateadores originales NO llevan useGrouping:"always" — en es-ES los
-  // 4 dígitos NO agrupan ("1800,00"). No "arreglarlo": cambiaría la salida actual de la app.
-  assert.equal(norm(fmtNum2(1800)), "1800,00");
-  assert.equal(norm(fmtNum2(18000)), "18.000,00");
+test("fmtPct y fmtDec1 siguen el locale de initFormat", () => {
   assert.equal(norm(fmtPct(0.605)), "60,5 %");
   assert.equal(norm(fmtDec1(3.25)), "3,3");
   initFormat({ locale: "en-US" });
-  assert.equal(norm(fmtNum2(1800)), "1,800.00");
   assert.equal(norm(fmtPct(0.605)), "60.5%");
 });
 
@@ -47,16 +42,6 @@ test("fmtPct0: entero en es-ES con espacio duro, sin espacio en en-US", () => {
   assert.equal(norm(fmtPct0(0.542)), "54 %");
   initFormat({ locale: "en-US" });
   assert.equal(norm(fmtPct0(0.542)), "54%");
-});
-
-test("fmtNum0: sin decimales, agrupando siempre (a diferencia de fmtNum2, para que un importe de 4 cifras quepa en columnas estrechas)", () => {
-  assert.equal(norm(fmtNum0(0)), "0");
-  assert.equal(norm(fmtNum0(1200.4)), "1.200");
-  assert.equal(norm(fmtNum0(999.5)), "1.000");
-  initFormat({ locale: "en-US" });
-  assert.equal(norm(fmtNum0(0)), "0");
-  assert.equal(norm(fmtNum0(1200.4)), "1,200");
-  assert.equal(norm(fmtNum0(999.5)), "1,000");
 });
 
 test("fmtMoneyParts (es-ES, EUR) separa main/cents/suffix — main incluye el separador decimal", () => {
