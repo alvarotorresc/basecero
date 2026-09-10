@@ -70,6 +70,10 @@ export const EN = {
     weekdays: {
       0: "S", 1: "M", 2: "T", 3: "W", 4: "T", 5: "F", 6: "S",
     },
+    // Mirrors ES weekdaysLong — same 0=Sunday index as `weekdays` (getDay()).
+    weekdaysLong: {
+      0: "Sunday", 1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday",
+    },
     demo: {
       rows: { one: "{n} row", other: "{n} rows" },
     },
@@ -97,16 +101,25 @@ export const EN = {
       evening: "Good evening",
     },
     header: { dayOf: "{period} · day {day} of {total}" },
+    streak: { one: "{n} day streak", other: "{n} day streak" },
+    account: { switch: "Switch account" },
     spent: {
       title: "Spent",
       income: "Income",
       saved: "Saved",
       rate: "Rate",
     },
-    movements: { empty: "Log your first expense with the ＋ button" },
+    movements: {
+      empty: "Log your first expense with the ＋ button",
+      viewAll: "View all",
+    },
     flow: {
       title: "Spending flow",
       last7: "Last 7 days · {total}",
+    },
+    week: {
+      title: "This week",
+      viewAll: "View the week",
     },
     categorySpend: {
       title: "Spending by category",
@@ -116,7 +129,12 @@ export const EN = {
       spent: "{currency} spent",
       of: "of {limit}",
       noLimit: "no limit",
-      viewAll: "View by category →",
+      over: "over the limit by {amount}",
+      viewAll: "View all",
+    },
+    savings: {
+      rate: "You’re saving {pct} of what you earn",
+      negative: "You’re spending more than you earn this period",
     },
     shared: {
       withPartner: "With {name}",
@@ -131,9 +149,13 @@ export const EN = {
       body: "You have shared expenses on record. Add their name to bring back the pending block and “Settle up”.",
       namePlaceholder: "Their name",
     },
+    pending: {
+      title: "Still to pay",
+      left: "You’ll have left",
+    },
     prevision: {
       title: "Forecast",
-      manage: "Manage recurring →",
+      manage: "Recurring",
       paid: "Paid",
       pending: "Pending",
       committed: "Remaining committed",
@@ -141,10 +163,41 @@ export const EN = {
     },
     available: {
       title: "Available this period",
+      days: { one: "{n} day", other: "{n} days" },
+      spentOf: "{spent} spent of {budget}",
+      today: "You can spend today",
       ofBudgeted: "of {amount} budgeted",
       paceOver: "▲ {amount} over the plan’s pace",
       paceUnder: "▼ {amount} under the plan’s pace",
     },
+    hucha: {
+      renewal: "{name} renews on {date} for {amount}. Still using it?",
+      limit: "{name} is at {pct} of its limit this period.",
+      idle: { one: "You’ve gone {n} day without logging anything.", other: "You’ve gone {n} days without logging anything." },
+      periodEnd: { one: "This period closes in {n} day.", other: "This period closes in {n} days." },
+      periodEndToday: "This period closes today.",
+      action: {
+        renewal: "View recurring",
+        limit: "View categories",
+        idle: "Log an expense",
+        periodEnd: "Open the next one",
+      },
+      dismiss: "Not now",
+    },
+  },
+  semana: {
+    title: "Week",
+    range: {
+      sameMonth: "{from} to {to} {month}",
+      crossMonth: "{from} {fromMonth} to {to} {toMonth}",
+    },
+    avgPerDay: "daily average",
+    today: "Today",
+    noSpend: "no spending",
+    uncategorized: "Uncategorized",
+    where: { title: "Where it went this week" },
+    empty: "Nothing logged yet this week.",
+    error: { load: "Couldn’t load the week: {error}" },
   },
   registro: {
     error: { load: "Couldn’t load the entry screen: {error}" },
