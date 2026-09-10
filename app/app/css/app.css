@@ -882,3 +882,30 @@ body.onboarding .fab { display: none; }
   #recibo.is-leaving { animation: bc-recibo-out .12s linear forwards; }
   @keyframes bc-recibo-out { to { opacity: 0 } }
 }
+
+/* ===== Inicio v2: héroe de cuenta y la hucha (plan 2026-09-10-inicio-v2, Task 7) ===== */
+
+/* Saldo de la cuenta principal (SISTEMA §2.3, --t-hero): distinto de .amount-hero (--t-figure-xl,
+   34px), que sigue siendo el total de sección (Disponible del periodo, Gasto por categoría…). */
+.hero-account { display: flex; flex-direction: column; gap: 6px; }
+.hero-account .balance {
+  font: var(--t-hero);
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+/* Saldo negativo: los tres tramos de la anatomía del importe en --danger (decisión 2 de la spec). */
+.hero-account .balance.is-negative,
+.hero-account .balance.is-negative .money-cents,
+.hero-account .balance.is-negative .money-cur { color: var(--danger); }
+
+/* La hucha (SISTEMA §4.15): franja tintada al acento con filete izquierdo, una sola frase y como
+   mucho dos acciones de texto — nunca un botón primario. */
+.hucha {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--accent-tint);
+  border-left: 2px solid var(--accent);
+  margin-bottom: var(--gap-section);
+}
