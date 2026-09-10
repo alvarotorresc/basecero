@@ -553,17 +553,13 @@ export const ES = {
     subcatCount: { one: "{n} subcategoría", other: "{n} subcategorías" },
     archivedLabel: "Archivada",
     addSubcategory: "+ Añadir subcategoría",
-    chevron: { collapse: "Colapsar subcategorías", expand: "Expandir subcategorías" },
-    flow: {
-      expenseCount: "Gastos ({n})",
-      incomeCount: "Ingresos ({n})",
-    },
+    drag: { aria: "Reordenar {name}" },
     empty: {
       expense: "Todavía no hay categorías de gasto.",
       income: "Todavía no hay categorías de ingreso.",
     },
     list: {
-      hint: "Mantén pulsado ≡ para reordenar. Toca una categoría para editarla; el chevron abre sus subcategorías.",
+      hint: "Toca una categoría para editarla. El asa la reordena.",
       archiveInfo: "Archivar oculta la categoría de los selectores sin tocar tu historial: los periodos cerrados siguen sumando igual. Nada se borra si algo lo usa.",
     },
     archive: {

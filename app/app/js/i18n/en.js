@@ -540,17 +540,13 @@ export const EN = {
     subcatCount: { one: "{n} subcategory", other: "{n} subcategories" },
     archivedLabel: "Archived",
     addSubcategory: "+ Add subcategory",
-    chevron: { collapse: "Collapse subcategories", expand: "Expand subcategories" },
-    flow: {
-      expenseCount: "Expenses ({n})",
-      incomeCount: "Income ({n})",
-    },
+    drag: { aria: "Reorder {name}" },
     empty: {
       expense: "No expense categories yet.",
       income: "No income categories yet.",
     },
     list: {
-      hint: "Press and hold ≡ to reorder. Tap a category to edit it; the chevron opens its subcategories.",
+      hint: "Tap a category to edit it. The handle reorders it.",
       archiveInfo: "Archiving hides the category from pickers without touching your history: closed periods still add up the same. Nothing is deleted if something uses it.",
     },
     archive: {

@@ -7,6 +7,8 @@ import { t } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { showConfirm } from "../modal.js";
+import { subHeaderHtml } from "../ui.js";
+import { icon } from "../icons.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -39,16 +41,15 @@ const NEED_LABEL_KEY = { need: "categorias.needLabel.need", want: "categorias.ne
 
 const subcatCount = (n) => t("categorias.subcatCount", { n });
 
-/** Sub de una raíz: "{necesario/prescindible/ahorro} · N subcategorías", o solo "N subcategorías"
- *  si la raíz no tiene need_type (las 3 raíces de ingreso sembradas). `childCount` cuenta TODAS
- *  las hijas del árbol construido en cliente (activas + archivadas) — a propósito NO es el campo
- *  `children` de listCategoriesAdmin (ese cuenta solo hijas ACTIVAS, para el guard de "máx 2
- *  niveles" de updateCategory): el artboard muestra "Casa · necesario · 6 subcategorías" con Gas
- *  archivada incluida en el 6, así que el conteo visible aquí debe incluir archivadas. */
-function rootSubtitle(root, childCount) {
-  const key = NEED_LABEL_KEY[root.need_type];
-  const label = key ? t(key) : null;
-  return label ? `${label} · ${subcatCount(childCount)}` : subcatCount(childCount);
+/** Sub de una raíz: "N subcategorías" a secas — Categorias.dc.html no distingue
+ *  necesario/prescindible en la lista, ese contraste vive solo en la vista previa de
+ *  CategoriaForm (ver previewKindText). `childCount` cuenta TODAS las hijas del árbol construido
+ *  en cliente (activas + archivadas) — a propósito NO es el campo `children` de
+ *  listCategoriesAdmin (ese cuenta solo hijas ACTIVAS, para el guard de "máx 2 niveles" de
+ *  updateCategory): el artboard muestra "6 subcategorías" con la archivada incluida en el 6, así
+ *  que el conteo visible aquí debe incluir archivadas. */
+function rootSubtitle(childCount) {
+  return subcatCount(childCount);
 }
 
 // Pastilla base de "chip" del formulario (Dentro de): NO reutiliza .chip/.chips de app.css —
@@ -98,7 +99,6 @@ export async function renderCategorias(container, onBack) {
   }
 
   const state = {
-    flow: "expense", expanded: new Set(),
     view: "list", form: null, formError: "",
   };
 
@@ -115,7 +115,6 @@ export async function renderCategorias(container, onBack) {
   }
 
   const rootsOfFlow = (flow) => roots.filter((r) => r.flow === flow);
-  const activeRootCount = (flow) => roots.filter((r) => r.flow === flow && !r.is_archived).length;
 
   // Color del dotico: si la categoría está archivada pierde su color propio (gris neutro
   // --card2, como el "Gas" archivado del artboard) — el icono (emoji) se mantiene igual.
@@ -387,7 +386,6 @@ export async function renderCategorias(container, onBack) {
       }
 
       await loadData();
-      state.flow = form.flow; // así la categoría recién creada/editada es visible sin cambiar de pestaña a mano
       goBack();
     } catch (e) {
       btn.disabled = false;
@@ -527,131 +525,122 @@ export async function renderCategorias(container, onBack) {
   }
 
   // ========================================================================
-  // Task 5: subvista de lista (sin cambios de comportamiento — solo pasa a
-  // colgar del dispatcher render()/state.view en vez de ser el único render)
+  // Task 5: subvista de lista (lista única y plana — decisión 4: sin segmentado
+  // Gasto/Ingreso, subcategorías SIEMPRE visibles, asa a la derecha en SVG)
   // ========================================================================
 
   // Fila de hija: envuelta en un div (data-child-row, para medir/mover en el drag — Task 7) que
-  // NO es el botón que abre el formulario — el handle ≡ vive fuera de ese botón a propósito, así
-  // un tap/drag sobre el handle nunca puede disparar su click (ver wireDragHandle más abajo).
-  function childRowHtml(child) {
+  // NO es el botón que abre el formulario — el asa vive fuera de ese botón a propósito, así un
+  // tap/drag sobre el asa nunca puede disparar su click (ver wireDragHandle más abajo). isLastRow
+  // es el ÚNICO criterio del filete inferior: con las hijas siempre visibles ya no hay un grupo
+  // "expandido" que separe visualmente a la siguiente raíz — cada fila (raíz o hija) lleva su
+  // propio filete, salvo la última de TODA la lista (Categorias.dc.html: solo "Ingresos", el
+  // último root, se queda sin él).
+  function childRowHtml(child, isLastRow) {
     const color = dotColor(child);
-    const icon = iconForCategory(child.id, byId);
+    const ic = iconForCategory(child.id, byId);
     return `
-    <div data-child-row="${escAttr(child.id)}" style="display:flex;align-items:center;padding-left:44px;${child.is_archived ? "opacity:0.5;" : ""}">
-      <span class="cat-drag" data-drag="${escAttr(child.id)}" aria-hidden="true"
-        style="color:var(--text-3);font-size:14px;flex-shrink:0;opacity:0.6;letter-spacing:-1px;cursor:grab;
-        touch-action:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;
-        padding:10px 8px 10px 0;">≡</span>
+    <div data-child-row="${escAttr(child.id)}" style="display:flex;align-items:center;min-height:56px;
+      padding-left:58px;${child.is_archived ? "opacity:0.5;" : ""}${isLastRow ? "" : "border-bottom:1px solid var(--rule);"}">
       <button type="button" class="cat-row" data-cat="${escAttr(child.id)}"
-        style="flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:9px 0;background:none;
+        style="flex:1;min-width:0;display:flex;align-items:center;gap:14px;padding:10px 0;background:none;
         border:0;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-        <div class="dotico" style="width:28px;height:28px;font-size:13px;--cat:${color};">${icon}</div>
-        <div class="tx-body" style="flex:1;min-width:0;">
-          <div class="tx-title">${escHtml(child.name)}</div>
-        </div>
+        <div class="dotico sm" style="--cat:${color};">${ic}</div>
+        <span class="tx-title" style="flex:1;min-width:0;">${escHtml(child.name)}</span>
         ${child.is_archived ? `<span class="day-label" style="flex-shrink:0;">${t("categorias.archivedLabel")}</span>` : ""}
       </button>
+      <span class="cat-drag" data-drag="${escAttr(child.id)}"
+        aria-label="${escAttr(t("categorias.drag.aria", { name: child.name }))}"
+        style="color:var(--text-3);flex-shrink:0;opacity:0.6;cursor:grab;touch-action:none;
+        -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;
+        display:flex;align-items:center;padding:10px 4px 10px 10px;">${icon("drag", { size: 18, stroke: "var(--ink-3)" })}</span>
     </div>`;
   }
 
-  // Grupo de hijas de una raíz expandida: ÚNICO contenedor .card de toda la pantalla (el resto de
-  // la lista va a fondo plano, como el artboard) — ese contraste de fondo es la señal visual de
-  // "esto está anidado bajo la raíz de arriba". Envolver también las raíces en un .card la
-  // borraría (el grupo dejaría de distinguirse de su entorno).
-  function groupHtml(root) {
+  // Grupo de hijas de una raíz: SIEMPRE se pinta (decisión 4 — ya no depende de state.expanded).
+  // Pierde el .card de antes: la indentación (58px) y el tamaño de insignia (.dotico.sm) ya
+  // distinguen una hija de una raíz, no hace falta un fondo propio (Categorias.dc.html no lo
+  // dibuja). El botón "+ Añadir subcategoría" se conserva al pie de cada grupo.
+  function groupHtml(root, lastId) {
     const kids = childrenByParent.get(root.id) ?? [];
-    // Item 4 (review final): una raíz archivada no ofrece "+ Añadir subcategoría" — createCategory
-    // ya lo rechazaría en el repo (padre archivado), esto evita el viaje de ida y vuelta con error.
+    // Item 4 (review final, heredado): una raíz archivada no ofrece "+ Añadir subcategoría" —
+    // createCategory ya lo rechazaría en el repo (padre archivado), esto evita el viaje de ida y
+    // vuelta con error.
     return `
-    <div class="card" style="border-radius:var(--radius-sm);padding:2px 12px 10px;margin-bottom:6px;">
-      ${kids.map(childRowHtml).join("")}
+      ${kids.map((child) => childRowHtml(child, child.id === lastId)).join("")}
       ${root.is_archived ? "" : `
       <button type="button" data-add-sub="${root.id}"
-        style="height:36px;padding:0 14px;margin:6px 0 0 44px;border-radius:999px;background:var(--card2);
+        style="height:36px;padding:0 14px;margin:6px 0 10px 58px;border-radius:999px;background:var(--card2);
         color:var(--text);border:0;font-size:12px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;">
         ${t("categorias.addSubcategory")}
-      </button>`}
-    </div>`;
+      </button>`}`;
   }
 
-  // Fila de raíz: DOS botones hermanos (no un botón dentro de otro — HTML inválido y el navegador
-  // lo desarma) dentro de un div flex — uno cubre dotico+texto y abre el formulario de edición, el
-  // otro es solo el chevron y expande/colapsa. Coincide con el hint de la pantalla: "Toca una
-  // categoría para editarla; el chevron abre sus subcategorías."
-  function rootRowHtml(root, isLast) {
-    const kids = childrenByParent.get(root.id) ?? [];
-    const expanded = state.expanded.has(root.id);
+  // Fila de raíz: dotico 44px + nombre + "N subcategorías", con el asa a la derecha, fuera del
+  // botón que abre el formulario (eso NO cambia — ver wireDragHandle). Sin chevron: las hijas de
+  // groupHtml() se pintan siempre justo debajo, nunca condicionadas a un estado de expansión.
+  function rootRowHtml(root, lastId) {
     const color = dotColor(root);
-    const icon = iconForCategory(root.id, byId);
-    const sub = rootSubtitle(root, kids.length);
-    // El separador entre raíces se omite en la última Y en cualquiera que esté expandida (su
-    // grupo de hijas, con fondo propio, ya la separa de la siguiente raíz) — mismo criterio que
-    // el artboard, donde Casa (expandida) y Ocio (última visible) llevan border-bottom:0.
-    const suppressBorder = isLast || expanded;
+    const ic = iconForCategory(root.id, byId);
+    const kids = childrenByParent.get(root.id) ?? [];
+    const isLastRow = root.id === lastId;
     return `
-    <div data-root-row="${escAttr(root.id)}" style="display:flex;align-items:center;${root.is_archived ? "opacity:0.5;" : ""}
-      ${suppressBorder ? "" : "border-bottom:1px solid var(--rule);"}">
-      <span class="cat-drag" data-drag="${escAttr(root.id)}" aria-hidden="true"
-        style="color:var(--text-3);font-size:14px;flex-shrink:0;opacity:0.6;letter-spacing:-1px;cursor:grab;
-        touch-action:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;
-        padding:14px 8px 14px 0;">≡</span>
+    <div data-root-row="${escAttr(root.id)}" style="display:flex;align-items:center;min-height:64px;
+      ${root.is_archived ? "opacity:0.5;" : ""}${isLastRow ? "" : "border-bottom:1px solid var(--rule);"}">
       <button type="button" class="cat-row" data-cat="${escAttr(root.id)}"
-        style="flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:13px 0;background:none;border:0;
+        style="flex:1;min-width:0;display:flex;align-items:center;gap:14px;padding:12px 0;background:none;border:0;
         text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-        <div class="dotico" style="--cat:${color};">${icon}</div>
+        <div class="dotico" style="--cat:${color};">${ic}</div>
         <div class="tx-body" style="min-width:0;">
           <div class="tx-title">${escHtml(root.name)}</div>
-          <div class="tx-sub">${sub}</div>
+          <div class="tx-sub">${rootSubtitle(kids.length)}</div>
         </div>
+        ${root.is_archived ? `<span class="day-label" style="flex-shrink:0;">${t("categorias.archivedLabel")}</span>` : ""}
       </button>
-      ${root.is_archived ? `<span class="day-label" style="flex-shrink:0;">${t("categorias.archivedLabel")}</span>` : ""}
-      <button type="button" data-chevron="${root.id}"
-        aria-label="${expanded ? t("categorias.chevron.collapse") : t("categorias.chevron.expand")}"
-        style="flex-shrink:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;
-        background:none;border:0;cursor:pointer;color:var(--text-3);-webkit-tap-highlight-color:transparent;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-          stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(${expanded ? 90 : 0}deg);">
-          <path d="M9 5l7 7-7 7"></path>
-        </svg>
-      </button>
+      <span class="cat-drag" data-drag="${escAttr(root.id)}"
+        aria-label="${escAttr(t("categorias.drag.aria", { name: root.name }))}"
+        style="color:var(--text-3);flex-shrink:0;opacity:0.6;cursor:grab;touch-action:none;
+        -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;
+        display:flex;align-items:center;padding:14px 4px 14px 10px;">${icon("drag", { size: 20, stroke: "var(--ink-3)" })}</span>
     </div>
-    ${expanded ? groupHtml(root) : ""}`;
+    ${groupHtml(root, lastId)}`;
   }
 
   function renderList() {
-    const flowRoots = rootsOfFlow(state.flow);
-    const expenseCount = activeRootCount("expense");
-    const incomeCount = activeRootCount("income");
+    // Orden completo de la pantalla (decisión 4): raíces de gasto con sus hijas, luego raíces de
+    // ingreso con las suyas — sobre este array se calcula qué fila es la ÚLTIMA de toda la lista
+    // (la única sin filete inferior, ver rootRowHtml/childRowHtml).
+    const flat = [];
+    for (const flow of ["expense", "income"]) {
+      for (const root of rootsOfFlow(flow)) {
+        flat.push(root);
+        for (const child of childrenByParent.get(root.id) ?? []) flat.push(child);
+      }
+    }
+    const lastId = flat.length ? flat[flat.length - 1].id : null;
+
+    const sectionHtml = (flow) => {
+      const flowRoots = rootsOfFlow(flow);
+      if (flowRoots.length === 0) {
+        return `<div style="padding:14px 0;color:var(--text-3);font-size:13px;">
+          ${t(flow === "expense" ? "categorias.empty.expense" : "categorias.empty.income")}</div>`;
+      }
+      return flowRoots.map((r) => rootRowHtml(r, lastId)).join("");
+    };
 
     container.innerHTML = `
       ${subHeaderHtml({ id: "cat-back", title: t("categorias.title"), action: { id: "cat-new", icon: "plus", label: t("common.addNew") } })}
 
-      <div class="segmented" style="margin-bottom:10px;border-radius:999px;">
-        ${[["expense", t("categorias.flow.expenseCount", { n: expenseCount })], ["income", t("categorias.flow.incomeCount", { n: incomeCount })]].map(([id, label]) => {
-          const active = state.flow === id;
-          const segStyle = active
-            ? "border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:600;"
-            : "border-radius:999px;";
-          return `<button type="button" data-flow="${id}" class="${active ? "active" : ""}" style="${segStyle}">${label}</button>`;
-        }).join("")}
-      </div>
-
-      <div style="font-size:11.5px;color:var(--text-3);margin-bottom:8px;">
+      <div style="font-size:13px;font-weight:500;color:var(--text-3);line-height:1.4;margin-bottom:8px;">
         ${t("categorias.list.hint")}
       </div>
 
       <div style="display:flex;flex-direction:column;">
-        ${flowRoots.length === 0
-          ? `<div class="card" style="text-align:center;color:var(--text-3);"><p>${t(state.flow === "expense" ? "categorias.empty.expense" : "categorias.empty.income")}</p></div>`
-          : flowRoots.map((r, i) => rootRowHtml(r, i === flowRoots.length - 1)).join("")}
+        ${sectionHtml("expense")}
+        ${sectionHtml("income")}
       </div>
 
-      <div class="card" style="border-radius:var(--radius-sm);padding:12px 16px;margin-top:16px;display:flex;align-items:center;gap:10px;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="1.7"
-          stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
-          <circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.01"></path>
-        </svg>
+      <div style="margin-top:16px;">
         <div style="font-size:11.5px;color:var(--text-3);">
           ${t("categorias.list.archiveInfo")}
         </div>
@@ -661,26 +650,27 @@ export async function renderCategorias(container, onBack) {
   }
 
   // ========================================================================
-  // Task 7: reorden por arrastre (handle ≡). Grupos de reorden: raíces del
-  // flow activo entre sí (rootsOfFlow), o hijas de una misma raíz entre sí
-  // (childrenByParent.get(parentId)) — jamás se cruza de grupo, porque los
-  // rects que se miden y comparan durante el arrastre son SIEMPRE los del
-  // propio grupo (nunca se consulta nada de otro grupo).
+  // Task 7: reorden por arrastre (asa icon("drag")). Grupos de reorden: raíces
+  // del flow de la categoría arrastrada entre sí (rootsOfFlow), o hijas de una
+  // misma raíz entre sí (childrenByParent.get(parentId)) — jamás se cruza de
+  // grupo, porque los rects que se miden y comparan durante el arrastre son
+  // SIEMPRE los del propio grupo (nunca se consulta nada de otro grupo).
   //
   // Indicador de drop (outline en la fila objetivo) en vez de desplazar los
-  // hermanos con transform: un grupo de raíces puede tener grupos de hijas
-  // expandidos intercalados entre dos de sus filas (groupHtml es HERMANO de
-  // la fila, no hijo — ver rootRowHtml), así que las filas de un mismo
-  // grupo no son necesariamente contiguas en pantalla. Desplazar hermanos
-  // asumiendo alturas/huecos uniformes se rompería en ese caso; el
+  // hermanos con transform: con las hijas SIEMPRE visibles (decisión 4), un
+  // grupo de raíces SIEMPRE tiene grupos de hijas intercalados entre dos de
+  // sus filas (groupHtml es HERMANO de la fila, no hijo — ver rootRowHtml),
+  // así que las filas de un mismo grupo NUNCA son contiguas en pantalla — ya
+  // no es una precaución para un caso raro, es el camino normal. Desplazar
+  // hermanos asumiendo alturas/huecos uniformes se rompería siempre; el
   // indicador no tiene ese problema porque no reposiciona nada más que la
   // propia fila arrastrada (ghost vía transform).
   //
   // setPointerCapture en pointerdown (no tras el umbral): así todo el gesto
   // — incluido el primer movimiento que decide si hay drag — llega SIEMPRE
-  // al handle, sin importar dónde ande el dedo/cursor. El umbral de 6px
+  // al asa, sin importar dónde ande el dedo/cursor. El umbral de 6px
   // solo gobierna cuándo se activa el feedback visual (ghost + indicador),
-  // no si el evento llega: un tap simple en el handle no dispara nada (no
+  // no si el evento llega: un tap simple en el asa no dispara nada (no
   // tiene onclick propio) y, al vivir fuera del botón .cat-row, tampoco
   // puede disparar accidentalmente su click — separar el target basta para
   // no interferir con el tap-para-editar, sin depender del umbral para eso.
@@ -792,19 +782,9 @@ export async function renderCategorias(container, onBack) {
 
   function wireList() {
     container.querySelector("#cat-back").onclick = () => onBack();
-    container.querySelector("#cat-new").onclick = () => openForm({ mode: "create", flow: state.flow });
-
-    container.querySelectorAll("[data-flow]").forEach((b) => {
-      b.onclick = () => { state.flow = b.dataset.flow; render(); };
-    });
-
-    container.querySelectorAll("[data-chevron]").forEach((b) => {
-      b.onclick = () => {
-        const id = b.dataset.chevron;
-        if (state.expanded.has(id)) state.expanded.delete(id); else state.expanded.add(id);
-        render();
-      };
-    });
+    // Decisión 4: sin state.flow, "Nueva categoría" desde la cabecera crea siempre en gasto — el
+    // propio formulario ya deja elegir el tipo con sus chips antes de guardar.
+    container.querySelector("#cat-new").onclick = () => openForm({ mode: "create", flow: "expense" });
 
     container.querySelectorAll("[data-cat]").forEach((b) => {
       b.onclick = () => {
