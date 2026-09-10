@@ -215,7 +215,6 @@ export const EN = {
     },
     merchant: {
       remembered: "remembered from last time",
-      listLabel: "Recent merchants",
     },
     limit: {
       remaining: "This leaves {amount} of {name}",

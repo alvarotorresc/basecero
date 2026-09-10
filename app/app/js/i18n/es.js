@@ -221,7 +221,6 @@ export const ES = {
     },
     merchant: {
       remembered: "recordado de la última vez",
-      listLabel: "Comercios recientes",
     },
     limit: {
       remaining: "Con este gasto quedan {amount} de {name}",
