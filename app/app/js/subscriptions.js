@@ -185,6 +185,20 @@ export function parseIgnored(raw) {
   return out;
 }
 
+/** Coste MENSUAL normalizado de todas las reglas activas que no son ingreso — el segundo dato del
+ *  héroe de Recurrentes («789,88 € al mes» en Recurrentes.dc.html:36). Deriva del anual con un
+ *  solo redondeo, igual que monthlyCents/monthlyTotalCents, para que dos vistas del mismo
+ *  conjunto no discrepen en un céntimo.
+ *  Excluye type:"income" por el mismo criterio que repo.previsionOfPeriod#comprometidoCents: un
+ *  ingreso previsto no es un compromiso mensual. SÍ incluye las transferencias: una aportación
+ *  mensual a la hucha es dinero comprometido igual que el alquiler.
+ *  Importe ÍNTEGRO, nunca prorrateado por my_share_pct (mismo criterio y mismo motivo que
+ *  annualCents: prorratear ataría la cifra al ajuste de reparto del periodo abierto). */
+export const monthlyCommitmentCents = (rules) =>
+  Math.round((rules ?? [])
+    .filter((r) => r.is_active && !r.cancelled_at && r.type !== "income")
+    .reduce((s, r) => s + annualCents(r), 0) / 12);
+
 /** Mapa saneado {ruleId: dueIso} de meta.renewal_snoozed. Mismo criterio de defensa en
  *  profundidad que parseIgnored: JSON roto, no-objeto, o una entrada cuyo valor no es una fecha
  *  ISO con forma válida se descarta en silencio. Guard `__proto__`: `out[k]=` SÍ dispara el
