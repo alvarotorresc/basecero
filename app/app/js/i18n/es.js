@@ -147,11 +147,6 @@ export const ES = {
     prevision: {
       manage: "Recurrentes",
     },
-    renewal: {
-      phrase: "{name} se renueva el {when} por {amount}. ¿Lo sigues usando?",
-      see: "Ver suscripciones",
-      notNow: "Ahora no",
-    },
     available: {
       title: "Disponible del periodo",
       days: { one: "{n} día", other: "{n} días" },
@@ -165,7 +160,7 @@ export const ES = {
       periodEnd: { one: "Este periodo se cierra en {n} día.", other: "Este periodo se cierra en {n} días." },
       periodEndToday: "Este periodo se cierra hoy.",
       action: {
-        renewal: "Ver recurrentes",
+        renewal: "Ver suscripciones",
         limit: "Ver categorías",
         idle: "Registrar un gasto",
         periodEnd: "Abrir el siguiente",

@@ -119,58 +119,6 @@ export function daysSinceLastEntry(dates, todayIso) {
   return Math.round((today - last) / 86400000);
 }
 
-const daysInMonth = (year, month0) => new Date(year, month0 + 1, 0).getDate();
-// due_day se acota al largo real del mes (31 en febrero → 28/29): new Date(y, m+1, 0).getDate().
-const isoOfYmd = (year, month0, day) => {
-  const d = Math.min(day, daysInMonth(year, month0));
-  return `${year}-${String(month0 + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-};
-
-/** Próximo cobro de una recurrente, en ISO (para la renovación de la hucha). due_day vacío → null
- *  (regla sin día fijo no tiene «próximo cobro» que anunciar). `weekly` se trata IGUAL que
- *  `monthly` — RULING del controller ya vigente en prevision.js:5-8, no se vuelve a discutir aquí.
- *  `quarterly`: siguiente mes del ciclo de 3 desde `due_month` que caiga hoy o después. `yearly`:
- *  `due_month`/`due_day` de este año, o del que viene si ya pasó. HOY cuenta como «todavía no ha
- *  pasado» en los tres casos (comparación >=, no >). */
-export function nextDueDateIso(rule, todayIso) {
-  if (rule.due_day == null || rule.due_day === "") return null;
-  const today = new Date(todayIso + "T12:00:00");
-  const year = today.getFullYear();
-  const month0 = today.getMonth();
-
-  if (rule.frequency === "monthly" || rule.frequency === "weekly") {
-    let candidate = isoOfYmd(year, month0, rule.due_day);
-    if (candidate < todayIso) {
-      const nextMonth0 = month0 + 1 > 11 ? 0 : month0 + 1;
-      const nextYear = month0 + 1 > 11 ? year + 1 : year;
-      candidate = isoOfYmd(nextYear, nextMonth0, rule.due_day);
-    }
-    return candidate;
-  }
-
-  if (rule.due_month == null || rule.due_month === "") return null;
-  const dueMonth0 = rule.due_month - 1;
-
-  if (rule.frequency === "yearly") {
-    let candidate = isoOfYmd(year, dueMonth0, rule.due_day);
-    if (candidate < todayIso) candidate = isoOfYmd(year + 1, dueMonth0, rule.due_day);
-    return candidate;
-  }
-
-  if (rule.frequency === "quarterly") {
-    for (let i = 0; i < 15; i++) {
-      const m = month0 + i;
-      const y = year + Math.floor(m / 12);
-      const m0 = ((m % 12) + 12) % 12;
-      if ((((m0 - dueMonth0) % 3) + 3) % 3 === 0) {
-        const candidate = isoOfYmd(y, m0, rule.due_day);
-        if (candidate >= todayIso) return candidate;
-      }
-    }
-  }
-  return null;
-}
-
 // Umbrales de la hucha (spec §8). LIMIT_PCT = 90, distinto del `warn` de category-spend.js (85 %):
 // una frase con voz propia debe ser más selectiva que un color de barra.
 export const HUCHA = { RENEWAL_DAYS: 7, LIMIT_PCT: 90, IDLE_DAYS: 3, PERIOD_END_DAYS: 3 };

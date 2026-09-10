@@ -142,11 +142,6 @@ export const EN = {
     prevision: {
       manage: "Recurring",
     },
-    renewal: {
-      phrase: "{name} renews on {when} for {amount}. Still using it?",
-      see: "View subscriptions",
-      notNow: "Not now",
-    },
     available: {
       title: "Available this period",
       days: { one: "{n} day", other: "{n} days" },
@@ -160,7 +155,7 @@ export const EN = {
       periodEnd: { one: "This period closes in {n} day.", other: "This period closes in {n} days." },
       periodEndToday: "This period closes today.",
       action: {
-        renewal: "View recurring",
+        renewal: "View subscriptions",
         limit: "View categories",
         idle: "Log an expense",
         periodEnd: "Open the next one",
