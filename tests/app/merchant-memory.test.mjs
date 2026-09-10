@@ -90,3 +90,29 @@ test("memoryPatch: devuelve un parche nuevo sin mutar entry", () => {
 test("memoryPatch: sin entry devuelve un parche vacío", () => {
   assert.deepEqual(memoryPatch(null, new Set()), {});
 });
+
+// sql.js#merchantHistory lee expense+income+refund del mismo comercio (un "Mercadona" puede
+// aparecer como gasto y, rarísimo pero posible, como una devolución de nómina registrada como
+// ingreso): la categoría que ganó merchantMemory() puede pertenecer a un tipo de movimiento
+// distinto al que se está rellenando ahora mismo. Sin este filtro, escribir el comercio en un
+// Gasto podía colar una categoría de Ingreso (o viceversa) — pasaba la validación (que solo mira
+// truthiness) y se guardaba un category_id que no aparece marcado en la rejilla ni cuenta para
+// los límites de su raíz real.
+test("memoryPatch: descarta categoryId si no está entre las categorías válidas del tipo actual", () => {
+  const entry = { categoryId: "cat-nomina", accountId: "acc-1", isShared: false, paidBy: "me", sharePct: null };
+  const patch = memoryPatch(entry, new Set(), ["cat-alimentacion-supermercado", "cat-restauracion-bares"]);
+  assert.ok(!("categoryId" in patch));
+  assert.equal(patch.accountId, "acc-1");
+});
+
+test("memoryPatch: conserva categoryId si SÍ está entre las categorías válidas del tipo actual", () => {
+  const entry = { categoryId: "cat-restauracion-bares", accountId: "acc-1", isShared: true, paidBy: "me", sharePct: 50 };
+  const patch = memoryPatch(entry, new Set(), ["cat-alimentacion-supermercado", "cat-restauracion-bares"]);
+  assert.equal(patch.categoryId, "cat-restauracion-bares");
+});
+
+test("memoryPatch: sin lista de categorías válidas (tercer argumento omitido) no filtra nada", () => {
+  const entry = { categoryId: "cat-nomina", accountId: "acc-1", isShared: false, paidBy: "me", sharePct: null };
+  const patch = memoryPatch(entry, new Set());
+  assert.equal(patch.categoryId, "cat-nomina");
+});

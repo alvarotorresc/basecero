@@ -67,14 +67,28 @@ export function merchantMemory(rows) {
  *  `isShared`): la memoria nunca pisa una decisión explícita. Devuelve un PARCHE nuevo, sin mutar
  *  `entry` ni el `touched` recibido — quien llama decide cómo aplicarlo (p.ej. `Object.assign`
  *  sobre `state`). Un campo ausente, vacío o `null` en `entry` no entra en el parche: no tiene
- *  sentido "recordar" un valor que nunca se guardó. */
-export function memoryPatch(entry, touched) {
+ *  sentido "recordar" un valor que nunca se guardó.
+ *
+ *  `validCategoryIds` (opcional): sql.js#merchantHistory lee expense+income+refund del mismo
+ *  comercio, así que la categoría que ganó `merchantMemory()` puede pertenecer a un TIPO de
+ *  movimiento distinto al que se está rellenando ahora (p.ej. un "Mercadona" usado una vez como
+ *  ingreso). Sin filtrar, ese `categoryId` pasaría la validación de Registro (que solo mira
+ *  truthiness) y se guardaría un id que no aparece marcado en la rejilla del tipo actual ni cuenta
+ *  para los límites de su raíz real. Cuando se pasa la lista de ids válidos del tipo en curso
+ *  (`categoriesFor().map(c => c.id)` en registro.js), `categoryId` se descarta del parche si no
+ *  está en ella; el resto de campos (cuenta, compartido, reparto) es agnóstico al tipo y no se
+ *  filtra. registro.js (único llamador de `memoryPatch`) SIEMPRE pasa esta lista — el mismo
+ *  problema en n26.js se resuelve aparte, con el mismo criterio, en `categoryForImportedRow`
+ *  (n26.js), que no pasa por esta función. El argumento solo se omite en los tests unitarios de
+ *  abajo, para poder probar el resto del parche sin montar una lista de categorías. */
+export function memoryPatch(entry, touched, validCategoryIds) {
   const patch = {};
   if (!entry) return patch;
   for (const field of ["categoryId", "accountId", "isShared", "paidBy", "sharePct"]) {
     if (touched?.has(field)) continue;
     const value = entry[field];
     if (value === undefined || value === null || value === "") continue;
+    if (field === "categoryId" && validCategoryIds && !validCategoryIds.includes(value)) continue;
     patch[field] = value;
   }
   return patch;

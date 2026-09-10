@@ -578,7 +578,9 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       // desde render() (mismo criterio que el «Más», §4.5).
       const entry = merchantMemoryMap[normalizeMerchant(state.merchant)];
       if (entry) {
-        const patch = memoryPatch(entry, state.touched);
+        // merchantHistory mezcla expense/income/refund del mismo comercio: la categoría recordada
+        // puede ser de un tipo distinto al que se está rellenando ahora (merchant-memory.js#memoryPatch).
+        const patch = memoryPatch(entry, state.touched, categoriesFor().map((c) => c.id));
         Object.assign(state, patch);
         // share_pct_override llega crudo de la BD (REAL, puede venir fuera de rango): se normaliza
         // igual que cualquier otro pct que entra desde fuera del propio stepper.

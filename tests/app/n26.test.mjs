@@ -82,6 +82,9 @@ async function runPipeline(d, rows, hashFn = sha256hex) {
   // Registro v2 §5.5: memoria de comercios cargada UNA vez, igual que en n26.js real —
   // merchantHistory() + merchantMemory() puros contra la MISMA base de test.
   const memory = merchantMemory(d.prepare(SQL.merchantHistory).all(500));
+  // Igual que en n26.js real: ids válidos por tipo, cargados una vez (ver categoryForImportedRow).
+  const expenseCatIds = d.prepare(SQL.listExpenseLeafCategories).all().map((c) => c.id);
+  const incomeCatIds = d.prepare(SQL.listIncomeCategories).all().map((c) => c.id);
   const res = { created: 0, reconciled: 0, skipped: 0, omitted: 0, categorized: 0 };
   const stmts = [];
   for (const r of rows) {
@@ -100,7 +103,7 @@ async function runPipeline(d, rows, hashFn = sha256hex) {
     } else {
       const id = "tx" + Math.floor(Math.random() * 1e9);
       const type = r.amountCents < 0 ? "expense" : "income";
-      const categoryId = categoryForImportedRow(r, memory);
+      const categoryId = categoryForImportedRow(r, memory, type === "expense" ? expenseCatIds : incomeCatIds);
       if (categoryId) res.categorized++;
       stmts.push({ sql: SQL.insertTransaction, bind: [id, r.bookingDate, "p1", type, Math.abs(r.amountCents),
         "acc-n26", "", categoryId, pure.bcSanitizeCell(r.partnerName), pure.bcSanitizeCell(r.paymentReference),
@@ -195,6 +198,25 @@ test("categoryForImportedRow: comercio desconocido entra con category_id vacío"
   assert.equal(categoryForImportedRow({ partnerName: "BANCO DESCONOCIDO" }, memory), "");
 });
 
+// merchantHistory lee expense+income+refund del mismo comercio (sql.js#merchantHistory): un banco
+// puede repetir el mismo texto de comercio en un cargo y en un abono. Sin validCategoryIds, una
+// fila expense podía heredar una categoría de income (o al revés) — mismo bug que memoryPatch en
+// registro.js, corregido aquí con el mismo criterio.
+test("categoryForImportedRow: descarta la categoría si no pertenece al tipo de la fila (validCategoryIds)", () => {
+  const memory = merchantMemory([
+    { merchant: "MERCADONA", category_id: "cat-nomina", account_id: "acc-1", is_shared: 0, share_pct_override: null, paid_by: "me", date: "2026-08-01", type: "income" },
+  ]);
+  // La fila importada es expense: cat-nomina (income) no está en la lista de válidas.
+  assert.equal(categoryForImportedRow({ partnerName: "MERCADONA" }, memory, ["cat-alimentacion-supermercado"]), "");
+});
+
+test("categoryForImportedRow: conserva la categoría si SÍ pertenece al tipo de la fila (validCategoryIds)", () => {
+  const memory = merchantMemory([
+    { merchant: "MERCADONA", category_id: "cat-alimentacion-supermercado", account_id: "acc-1", is_shared: 0, share_pct_override: null, paid_by: "me", date: "2026-08-01", type: "expense" },
+  ]);
+  assert.equal(categoryForImportedRow({ partnerName: "MERCADONA" }, memory, ["cat-alimentacion-supermercado"]), "cat-alimentacion-supermercado");
+});
+
 test("import CSV: fila de un comercio conocido entra CATEGORIZADA por la memoria de comercios", async () => {
   const d = db();
   // Historial previo del mismo comercio, ya reconciliado — no es candidato de dedupe (external_id
@@ -211,6 +233,21 @@ test("import CSV: fila de un comercio conocido entra CATEGORIZADA por la memoria
   // MARTA G. (fila 2) no tiene historial: entra sin categoría, y no cuenta en categorized.
   const ingreso = n26Rows(d).find((r) => r.merchant === "MARTA G.");
   assert.equal(ingreso.category_id, "");
+});
+
+test("import CSV: un comercio con historial de OTRO tipo (income) no cuela su categoría en una fila expense", async () => {
+  const d = db();
+  // Único historial de "MERCADONA": una fila income con una categoría de income (cat-nomina) —
+  // nunca una compra real de un súper, pero basta para probar que el filtro por tipo actúa
+  // (mismo comercio pudiendo aparecer, p.ej., en un abono con el mismo remitente que un cargo).
+  d.prepare(SQL.insertTransaction).run(
+    "hist-income", "2026-07-01", "p1", "income", 5000, "acc-n26", "",
+    "cat-nomina", "MERCADONA", "", 0, null, "me", 0, "", "", "hist-ext-income", "reconciled", T, T);
+
+  const res = await runImport(d, CSV_2ROWS); // fila 1: MERCADONA, -45.20 -> expense
+  assert.equal(res.categorized, 0);
+  const gasto = n26Rows(d).find((r) => r.merchant === "MERCADONA" && r.id !== "hist-income");
+  assert.equal(gasto.category_id, "");
 });
 
 test("import CSV: la fila que se CONCILIA no toca la categoría de la fila existente", async () => {
