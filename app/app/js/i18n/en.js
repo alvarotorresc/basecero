@@ -110,6 +110,7 @@ export const EN = {
     },
     movements: {
       empty: "Log your first expense with the ＋ button",
+      emptyPeriod: "No transactions in this period.",
       viewAll: "View all",
     },
     week: {

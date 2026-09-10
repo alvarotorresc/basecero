@@ -115,6 +115,7 @@ export const ES = {
     },
     movements: {
       empty: "Registra tu primer gasto con el botón ＋",
+      emptyPeriod: "No hay movimientos en este periodo.",
       viewAll: "Ver todos",
     },
     week: {

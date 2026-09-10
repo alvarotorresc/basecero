@@ -254,15 +254,21 @@ function huchaHtml(msg) {
 /** Movimientos plegados (I4/I5, Main.dc.html:82-131): sección + «Ver todos» → pestaña Movimientos
  *  (tabs.js, sin importar main.js). Cuerpo: groupByDay(foldedMovements(rows, hoy)), con «Hoy» para
  *  el día de hoy y la fecha larga para el resto. El bloque NO es un contenedor tocable entero
- *  (decisión 13): solo «Ver todos» navega, cada fila abre su propio detalle. */
-function movimientosPlegadosHtml(rows, hoy, byId, partnerName) {
+ *  (decisión 13): solo «Ver todos» navega, cada fila abre su propio detalle.
+ *  `rows` viene de listByDay(period.id): vacío tanto para un usuario sin ningún movimiento nunca
+ *  como para uno con meses de historial que acaba de abrir un periodo nuevo. hasHistory (derivado
+ *  de recentTxDates(), sin filtro de periodo) distingue los dos casos para no invitar a "registra
+ *  tu primer gasto" a quien ya tiene datos — bug heredado de v1, donde pasaba menos porque el
+ *  bloque no era el primer contenido bajo la cabecera. */
+function movimientosPlegadosHtml(rows, hoy, byId, partnerName, hasHistory) {
   const headerHtml = `
   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;">
     <span style="font-size:15px;font-weight:600;color:var(--ink);">${t("common.movements")}</span>
     <button type="button" id="inicio-movimientos-ver" class="link-btn" style="display:flex;align-items:center;gap:5px;">${t("inicio.movements.viewAll")}${CHEVRON_RIGHT_SVG}</button>
   </div>`;
   if (rows.length === 0) {
-    return `${headerHtml}<div style="font-size:12px;color:var(--ink-3);">${t("inicio.movements.empty")}</div>`;
+    const msg = hasHistory ? t("inicio.movements.emptyPeriod") : t("inicio.movements.empty");
+    return `${headerHtml}<div style="font-size:12px;color:var(--ink-3);">${msg}</div>`;
   }
   const groups = groupByDay(foldedMovements(rows, hoy));
   return `
@@ -565,7 +571,7 @@ export async function renderInicio(container) {
 
     ${huchaHtml(hucha)}
 
-    ${movimientosPlegadosHtml(rows, hoy, byId, partnerName)}
+    ${movimientosPlegadosHtml(rows, hoy, byId, partnerName, recentDates.length > 0)}
 
     ${estaSemanaHtml(semanaDias, semanaTotal, byId)}
 
