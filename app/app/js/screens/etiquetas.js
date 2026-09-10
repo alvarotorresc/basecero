@@ -178,8 +178,12 @@ export async function renderEtiquetas(container, onBack) {
     };
 
     const movementsBtn = container.querySelector("#ef-movements");
+    // Sin goBack(): goToTab("movimientos") ya cambia de pestaña con resetBack(), que descarta TODA
+    // la pila (back.js#resetTo) — es la única operación de historial permitida por tick (ver la
+    // cabecera de back.js). Un goBack() aquí antes sería una segunda operación en el mismo tick,
+    // dejando el historial con una entrada de más y haciendo que «atrás» caiga en Inicio en vez de
+    // en la lista de etiquetas (igual que [data-tag-open] en la lista, más abajo).
     if (movementsBtn) movementsBtn.onclick = () => {
-      goBack();
       goToTab("movimientos", { tagId: form.id });
     };
 
