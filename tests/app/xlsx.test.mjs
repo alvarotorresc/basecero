@@ -12,7 +12,7 @@ import { SQL } from "../../app/app/js/sql.js";
 test("export: pestaña por tabla, euros, bools y cabeceras sin _cents", () => {
   const db = openDb(); seedMinimal(db);
   const wb = rowsToWorkbook(X, dumpAll(db));
-  assert.deepEqual(wb.SheetNames, ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"]);
+  assert.deepEqual(wb.SheetNames, ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets","tags"]);
   const rows = X.utils.sheet_to_json(wb.Sheets.accounts, { defval: "" });
   const n26 = rows.find((r) => r.id === "acc-n26");
   assert.equal(n26.opening_balance, 1000);        // céntimos → euros, cabecera sin _cents
@@ -41,11 +41,34 @@ test("import: round de parseo devuelve formato SQLite e ignora extras", () => {
   assert.equal(data.periods[0].start_date, "2026-07-27");
 });
 
-test("import: falta una pestaña del contrato → error", () => {
+test("import: falta una pestaña del NÚCLEO -> error, las ocho", () => {
+  for (const table of ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"]) {
+    const wb = wbFromSeed();
+    delete wb.Sheets[table]; wb.SheetNames = wb.SheetNames.filter((n) => n !== table);
+    assert.match(workbookToRows(X, wb).errors[0] ?? "", new RegExp(table), table);
+  }
+});
+
+// Una hoja v3 (o v1, o v2): la pestaña `tags` no existía. No es un libro roto, es un libro de
+// antes de las etiquetas (D1, D2 en etiquetas-design.md).
+test("import: una hoja sin la pestaña tags entra limpia y deja la tabla vacía", () => {
   const wb = wbFromSeed();
-  delete wb.Sheets.budgets; wb.SheetNames = wb.SheetNames.filter((n) => n !== "budgets");
-  const { errors } = workbookToRows(X, wb);
-  assert.match(errors[0], /budgets/);
+  delete wb.Sheets.tags; wb.SheetNames = wb.SheetNames.filter((n) => n !== "tags");
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(data.tags, [], "materializada como [], NO undefined");
+  assert.deepEqual(validateImport(data), []);
+});
+
+// Lo que de verdad ejerce el `data[table] = []`: replaceAllStmts (repo.js) itera data[t] sin
+// guarda, así que con la clave a undefined esto reventaría DESPUÉS de validar.
+test("import: una hoja sin la pestaña tags se puede aplicar con replaceAllStmts", () => {
+  const wb = wbFromSeed();
+  delete wb.Sheets.tags; wb.SheetNames = wb.SheetNames.filter((n) => n !== "tags");
+  const { data } = workbookToRows(X, wb);
+  const db = openDb();
+  for (const s of replaceAllStmts(data)) db.prepare(s.sql).run(...(s.bind ?? []));
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM tags").get().c, 0);
 });
 
 // Regresión (hallazgo crítico de la review final): la hoja del GENERADOR real añade a la
@@ -195,7 +218,7 @@ function txRow(over) {
   return { id: "tx-x", date: "2026-08-02", period_id: "per-1", type: "expense",
     amount_cents: 10000, account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler",
     merchant: "M", note: "", is_shared: 0, share_pct_override: null, paid_by: "me", settled: 0,
-    ref_id: "", rule_id: "", external_id: "", status: "pending",
+    ref_id: "", rule_id: "", tag_id: "", external_id: "", status: "pending",
     created_at: "2026-08-02T00:00:00Z", updated_at: "2026-08-02T00:00:00Z", deleted: 0, ...over };
 }
 
@@ -220,7 +243,7 @@ test("import: replaceAll NO importa el schema_version de la hoja", () => {
       { key: "currency", value: "USD" },
       { key: "created_with", value: "basecero-pwa" },
     ],
-    accounts: [], categories: [], periods: [], transactions: [], recurring_rules: [], goals: [], budgets: [],
+    accounts: [], categories: [], periods: [], transactions: [], recurring_rules: [], goals: [], budgets: [], tags: [],
   };
   for (const s of replaceAllStmts(data)) db.prepare(s.sql).run(...(s.bind ?? []));
   const meta = Object.fromEntries(db.prepare("SELECT key, value FROM meta").all().map((r) => [r.key, r.value]));
@@ -712,7 +735,7 @@ test("ROUND-TRIP: export → import → mismos datos", () => {
     ({ id, date: "2026-08-02", period_id: "per-1", type, amount_cents: cents, account_id: "acc-n26",
        counter_account_id: "", category_id: type === "transfer" || type === "adjustment" ? "" : "cat-casa-alquiler",
        merchant: "M", note: "", is_shared: 0, share_pct_override: null, paid_by: "me", settled: 0, ref_id: "", rule_id: "",
-       external_id: "", status: "pending", created_at: T2, updated_at: T2, deleted: 0, ...extra })[c]));
+       tag_id: "", external_id: "", status: "pending", created_at: T2, updated_at: T2, deleted: 0, ...extra })[c]));
   tx("tx-e", "expense", 900, { is_shared: 1 });
   tx("tx-i", "income", 215000, { category_id: "cat-nomina" });
   tx("tx-t", "transfer", 5000, { counter_account_id: "acc-revolut" });
@@ -767,7 +790,7 @@ test("ROUND-TRIP sobre una BD MIGRADA (tag_id físicamente la última): los dump
     ({ id: "tx-mig", date: "2026-08-02", period_id: "per-1", type: "expense", amount_cents: 10000,
        account_id: "", counter_account_id: "", category_id: "cat-casa-alquiler", merchant: "M", note: "",
        is_shared: 1, share_pct_override: null, paid_by: "partner", settled: 0, ref_id: "", rule_id: "",
-       external_id: "", status: "pending", created_at: "2026-08-02T00:00:00Z",
+       tag_id: "", external_id: "", status: "pending", created_at: "2026-08-02T00:00:00Z",
        updated_at: "2026-08-02T00:00:00Z", deleted: 0 })[c]));
 
   const original = dumpAll(db);
@@ -885,7 +908,7 @@ test("import: replaceAll fusiona meta — conserva claves que la hoja no trae", 
       { key: "currency", value: "USD" },
       { key: "created_with", value: "basecero-pwa" },
     ],
-    accounts: [], categories: [], periods: [], transactions: [], recurring_rules: [], goals: [], budgets: [],
+    accounts: [], categories: [], periods: [], transactions: [], recurring_rules: [], goals: [], budgets: [], tags: [],
   };
   for (const s of replaceAllStmts(data)) db.prepare(s.sql).run(...(s.bind ?? []));
   const meta = Object.fromEntries(db.prepare("SELECT key, value FROM meta").all().map((r) => [r.key, r.value]));
@@ -939,4 +962,48 @@ test("ROUND-TRIP: una fila de budgets con deleted=1 sobrevive intacta", () => {
   assert.deepEqual(dumpAll(db2), original);
   assert.equal(db2.prepare("SELECT deleted FROM budgets WHERE id='bud-quitado'").get().deleted, 1,
     "el límite quitado sigue quitado tras el round-trip: no resucita como límite activo");
+});
+
+// ---- Etiquetas de proyecto (Task 2, etiquetas-design §4/§5): tags como hoja opcional ---------
+
+// El test SAGRADO del proyecto (spec §11): una etiqueta con límite, otra sin, y un movimiento con
+// tag_id sobreviven export -> import -> replaceAllStmts -> dumpAll idéntico al original.
+test("ROUND-TRIP: una etiqueta con límite, otra sin límite y un movimiento etiquetado sobreviven", () => {
+  const db = openDb(); seedMinimal(db);
+  const T4 = "2026-08-04T00:00:00Z";
+  db.prepare(insertSql("tags")).run("tag-japon", "Viaje Japón", 150000, 0, T4, T4, 0);
+  db.prepare(insertSql("tags")).run("tag-reforma", "Reforma baño", null, 0, T4, T4, 0);
+  db.prepare(insertSql("transactions")).run(...CONTRACT.transactions.cols.map((c) =>
+    ({ id: "tx-etiquetada", date: "2026-08-04", period_id: "per-1", type: "expense", amount_cents: 5000,
+       account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa", merchant: "M", note: "",
+       is_shared: 0, share_pct_override: null, paid_by: "me", settled: 0, ref_id: "", rule_id: "",
+       tag_id: "tag-japon", external_id: "", status: "pending", created_at: T4, updated_at: T4, deleted: 0 })[c]));
+
+  const original = dumpAll(db);
+  const buf = X.write(rowsToWorkbook(X, original), { type: "buffer", bookType: "xlsx" });
+  const { data, errors } = workbookToRows(X, X.read(buf, { type: "buffer" }));
+  assert.deepEqual(errors, []);
+  const reforma = data.tags.find((r) => r.id === "tag-reforma");
+  assert.equal(reforma.budget_cents, null, "celda de límite vacía -> null, NO required");
+  assert.deepEqual(validateImport(data), []);
+
+  const db2 = openDb();
+  for (const s of replaceAllStmts(data)) db2.prepare(s.sql).run(...(s.bind ?? []));
+  assert.deepEqual(dumpAll(db2), original);
+});
+
+test("validate: tag_id vacío no es fkEmpty; a un id inexistente es fkMissing; a una etiqueta borrada desde una fila viva no da error (allowDeletedRef)", () => {
+  const sinEtiqueta = parse((x) => { x.transactions.push(txRow({ id: "tx-sin-etiqueta" })); });
+  assert.deepEqual(validateImport(sinEtiqueta), []);
+
+  const etiquetaInexistente = parse((x) => { x.transactions.push(txRow({ id: "tx-etiqueta-mala", tag_id: "tag-nope" })); });
+  assert.match(validateImport(etiquetaInexistente)[0], /tag_id/);
+
+  const T4 = "2026-08-04T00:00:00Z";
+  const etiquetaBorrada = parse((x) => {
+    x.tags.push({ id: "tag-borrada", name: "Vieja", budget_cents: null, is_archived: 0, created_at: T4, updated_at: T4, deleted: 1 });
+    x.transactions.push(txRow({ id: "tx-etiqueta-borrada", tag_id: "tag-borrada" }));
+  });
+  assert.deepEqual(validateImport(etiquetaBorrada), [],
+    "la app nunca produce tags.deleted=1 (archivar es is_archived), pero una hoja editada a mano sí puede");
 });

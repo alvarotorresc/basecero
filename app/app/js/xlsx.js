@@ -68,7 +68,16 @@ export function workbookToRows(X, wb, now = nowIso()) {
   const data = {}, errors = [];
   for (const table of Object.keys(CONTRACT)) {
     const ws = wb.Sheets[table];
-    if (!ws) { errors.push(t("errors.xlsx.missingSheet", { table })); continue; }
+    if (!ws) {
+      // Una hoja ausente de una tabla OPCIONAL describe un mundo válido —«este libro es anterior
+      // a las etiquetas, así que no había ninguna»—, no un libro roto. El `data[table] = []` NO es
+      // cosmético: sin él la clave queda undefined y replaceAllStmts (repo.js) hace
+      // `for (const row of data[t])` sin guarda, así que importar cualquier hoja v1/v2/v3 reventaría
+      // con "data[t] is not iterable" DESPUÉS de haber pasado la validación. validateImport sí es
+      // tolerante (`data[t] ?? []`), el repo no.
+      if (CONTRACT[table].optional) { data[table] = []; continue; }
+      errors.push(t("errors.xlsx.missingSheet", { table })); continue;
+    }
     const cols = CONTRACT[table].cols, bools = new Set(BOOL_COLS[table] ?? []);
     const defaults = TEXT_DEFAULTS[table] ?? {};
     const byHeader = Object.fromEntries(cols.map((c) => [xlsxHeader(c), c]));

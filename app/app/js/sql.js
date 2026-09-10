@@ -439,4 +439,4 @@ export const SQL = {
   // [nombreNuevo, now, id, nombreSemillaDelOtroIdioma].
   retranslateCategory: `UPDATE categories SET name = ?, updated_at = ? WHERE id = ? AND name = ? AND deleted = 0`,
 };
-export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"];
+export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets","tags"];

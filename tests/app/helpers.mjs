@@ -30,7 +30,7 @@ export function seedMinimal(db) {
 }
 export const dumpAll = (db) => {
   const out = {};
-  for (const t of ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"])
+  for (const t of ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets","tags"])
     out[t] = db.prepare(`SELECT * FROM ${t}`).all();
   return out;
 };
