@@ -165,3 +165,87 @@ test("buildReport: la estructura es serializable", () => {
   assert.deepEqual(JSON.parse(JSON.stringify(r)), r);
 });
 
+// ---- Task 4: categorías y comparativa con el periodo anterior (N3) --------------------------
+
+test("buildReport: las siete categorias con su comparativa contra agosto", () => {
+  const { rows, totalCents, prevTotalCents, totalDeltaPct } = buildReport(fixture()).categories;
+  const casa = rows.find((r) => r.rootId === "cat-casa");
+  assert.equal(casa.spentCents, 24560);
+  assert.equal(casa.prevCents, 23800);
+  assert.equal(Number(casa.deltaPct.toFixed(1)), 3.2);
+  assert.equal(casa.direction, "up");
+  const ali = rows.find((r) => r.rootId === "cat-alimentacion");
+  assert.equal(Number(ali.deltaPct.toFixed(1)), -12.8);
+  assert.equal(ali.direction, "down"); // gastar menos es bueno (SISTEMA §4.19)
+  assert.equal(totalCents, 84720);
+  assert.equal(prevTotalCents, 82440);
+  assert.equal(Number(totalDeltaPct.toFixed(1)), 2.8);
+});
+
+test("buildReport: sin periodo anterior no hay comparativa", () => {
+  const r = buildReport({ ...fixture(), prevPeriod: null, prevSpentByRoot: [] });
+  assert.equal(r.categories.hasPrev, false);
+  for (const row of r.categories.rows) {
+    assert.equal(row.prevCents, null);
+    assert.equal(row.deltaPct, null);
+    assert.equal(row.direction, "new");
+  }
+});
+
+test("buildReport: categoria que no existia antes -> 'new', sin dividir por cero", () => {
+  const f = fixture();
+  f.spentByRoot.push({ root_id: "cat-nueva", name: "Categoria nueva", spent_cents: 5000 });
+  // sin fila en prevSpentByRoot para cat-nueva: prevCents cae a 0 por defecto.
+  const r = buildReport(f);
+  const nueva = r.categories.rows.find((row) => row.rootId === "cat-nueva");
+  assert.equal(nueva.prevCents, 0);
+  assert.equal(nueva.direction, "new");
+  assert.equal(nueva.deltaPct, null, "no se divide por cero: sin gasto previo no hay porcentaje");
+});
+
+test("buildReport: mismo gasto que el periodo anterior -> 'flat' y deltaPct 0", () => {
+  const f = fixture();
+  f.spentByRoot.push({ root_id: "cat-igual", name: "Categoria igual", spent_cents: 3000 });
+  f.prevSpentByRoot.push({ root_id: "cat-igual", name: "Categoria igual", spent_cents: 3000 });
+  const r = buildReport(f);
+  const igual = r.categories.rows.find((row) => row.rootId === "cat-igual");
+  assert.equal(igual.direction, "flat");
+  assert.equal(igual.deltaPct, 0);
+  assert.equal(igual.deltaCents, 0);
+});
+
+test("buildReport: categoria SIN limite -> limitCents 0, level null, pctOfLimit 0", () => {
+  const coche = buildReport(fixture()).categories.rows.find((r) => r.rootId === "cat-coche");
+  assert.equal(coche.limitCents, 0);
+  assert.equal(coche.level, null); // null, NO "ok": budgetStatus devuelve null
+  assert.equal(coche.pctOfLimit, 0);
+  assert.ok(coche.shareOfMax >= 0 && coche.shareOfMax <= 100);
+});
+
+test("buildReport: raiz con gasto negativo (mas devoluciones que gasto) -> shareOfMax acotado", () => {
+  const f = fixture();
+  f.spentByRoot.push({ root_id: "cat-negativa", name: "Categoria negativa", spent_cents: -500 });
+  const r = buildReport(f);
+  const neg = r.categories.rows.find((row) => row.rootId === "cat-negativa");
+  assert.ok(neg.shareOfMax >= 0 && neg.shareOfMax <= 100);
+  assert.equal(neg.shareOfMax, 0, "un gasto negativo no puede dar un ancho de barra negativo");
+});
+
+test("buildReport: categoria al limite y excedida -> level warn / over", () => {
+  const f = {
+    ...cleanFixture(),
+    spentByRoot: [
+      { root_id: "cat-warn", name: "Al limite", spent_cents: 9000 },
+      { root_id: "cat-over", name: "Excedida", spent_cents: 12000 },
+    ],
+    prevSpentByRoot: [],
+    budgets: [
+      { id: "b1", category_id: "cat-warn", amount_cents: 10000 },
+      { id: "b2", category_id: "cat-over", amount_cents: 10000 },
+    ],
+  };
+  const rows = buildReport(f).categories.rows;
+  assert.equal(rows.find((r) => r.rootId === "cat-warn").level, "warn");
+  assert.equal(rows.find((r) => r.rootId === "cat-over").level, "over");
+});
+
