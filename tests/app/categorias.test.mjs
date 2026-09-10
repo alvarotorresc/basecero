@@ -51,10 +51,14 @@ test("computeReorder: no muta el array recibido", () => {
 // las filas que hay de por medio — así que el resultado es idéntico al del mismo grupo "solo",
 // sin hijas intercaladas: es la garantía en Node de que la decisión 4 no rompe el reordenar.
 test("computeReorder: le da igual que las filas de un grupo no sean contiguas en el DOM — es una función pura sobre IDs, nunca sobre posiciones de pantalla", () => {
-  const soloGroup = ["cat-casa", "cat-alimentacion", "cat-ocio"];
-  const sameGroupWithChildrenInterleaved = ["cat-casa", "cat-alimentacion", "cat-ocio"]; // mismos IDs: la interfaz nunca ve las filas de hijas intercaladas
-  assert.deepEqual(computeReorder(soloGroup, 0, 2), computeReorder(sameGroupWithChildrenInterleaved, 0, 2));
-  assert.deepEqual(computeReorder(soloGroup, 2, 0), computeReorder(sameGroupWithChildrenInterleaved, 2, 0));
+  // computeReorder solo ve el array de IDs del grupo — nunca los rects de pantalla ni las filas
+  // de hijas que caen de por medio en el DOM real —, así que comprobar el resultado exacto sobre
+  // este array YA es la garantía: no hace falta (ni tiene sentido) comparar contra una segunda
+  // llamada con el mismo literal, eso pasaría para cualquier implementación, incluida una que no
+  // reordene nada.
+  const group = ["cat-casa", "cat-alimentacion", "cat-ocio"];
+  assert.deepEqual(computeReorder(group, 0, 2), ["cat-alimentacion", "cat-ocio", "cat-casa"]);
+  assert.deepEqual(computeReorder(group, 2, 0), ["cat-ocio", "cat-casa", "cat-alimentacion"]);
 });
 
 // ---- SQL directas contra node:sqlite ----------------------------------------
