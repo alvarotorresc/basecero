@@ -1,11 +1,12 @@
 import {
   getOpenPeriod, spentByRootCategory, spentByChildCategory, budgetsOfPeriod,
-  allCategoriesById, upsertBudget, deleteBudget,
+  allCategoriesById, upsertBudget, deleteBudget, rootSpendHistory,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
-import { budgetStatus, pctOf, relativeWidth, limitTotals, sortRootRows, budgetMap } from "../category-spend.js";
+import { budgetStatus, pctOf, relativeWidth, limitTotals, sortRootRows, budgetMap, compareRoots, spentSeriesByRoot } from "../category-spend.js";
+import { trendSvg } from "../charts.js";
 import { eurToCents } from "../contract.js";
-import { fmtMoney, moneyPartsHtml, hoyISO, currencySymbol } from "../format.js";
+import { fmtMoney, moneyPartsHtml, hoyISO, currencySymbol, fmtPct } from "../format.js";
 import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
@@ -24,6 +25,11 @@ const fmtPctInt = (pct) => `${Math.round(pct)}\u00A0%`;
 const clampPct = (pct) => Math.min(100, Math.max(0, pct));
 
 const chevronSvg = (deg) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${deg}deg);"><path d="M9 5l7 7-7 7"></path></svg>`;
+
+// Flechas "tendencia sube"/"tendencia baja" del repertorio SISTEMA.md §3 — NUNCA un chevron
+// rotado (SISTEMA §4.19 lo dice explícito): son un glifo propio, no chevronSvg(±90) disfrazado.
+const ICON_TREND_UP = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5"></path></svg>`;
+const ICON_TREND_DOWN = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v13M6.5 12.5 12 18l5.5-5.5"></path></svg>`;
 
 /** Pantalla «Gasto por categoría»: total del periodo + TODAS las raíces de gasto activas, cada una
  *  desplegable para ver su detalle por subcategoría y poner, cambiar o quitar su límite.
@@ -48,18 +54,35 @@ export async function renderGastoPorCategoria(container, onBack) {
   let rootRows = [];
   let budgetByCategory = {};
   let byId = {};
+  // Comparativa y mini tendencia (N3, Task 14): prevPeriod es el periodo INMEDIATAMENTE anterior
+  // (null si este es el primero), cmpByRoot es compareRoots() indexado por root_id y seriesByRoot
+  // es spentSeriesByRoot() indexado igual — mismo criterio de índice que informe-logic.js#buildCategories
+  // (cmpByRoot), que es de donde se extrajo compareRoots en el Task 6.
+  let prevPeriod = null;
+  let cmpByRoot = {};
+  let seriesByRoot = {};
 
   async function load() {
     period = await getOpenPeriod();
     if (!period) return false;
-    const [rows, budgetRows, cats] = await Promise.all([
+    const [rows, budgetRows, cats, history] = await Promise.all([
       spentByRootCategory(period.id),
       budgetsOfPeriod(period.id),
       allCategoriesById(),
+      rootSpendHistory(period.id, 3),
     ]);
     rootRows = rows;
     budgetByCategory = budgetMap(budgetRows);
     byId = cats;
+    // history: del más antiguo al más reciente, el actual siempre al final (repo.rootSpendHistory).
+    // El anterior es el penúltimo elemento; con un único periodo (sin historia previa) no hay
+    // penúltimo y la comparativa entera se omite (Step 3: compareRoots con prevRows=[] da
+    // direction "new"/deltaPct null en todas las filas, y comparisonLineHtml no pinta nada).
+    const hasPrevPeriod = history.length >= 2;
+    prevPeriod = hasPrevPeriod ? history[history.length - 2].period : null;
+    const prevRows = hasPrevPeriod ? history[history.length - 2].rows : [];
+    cmpByRoot = Object.fromEntries(compareRoots(rows, prevRows).map((c) => [c.rootId, c]));
+    seriesByRoot = spentSeriesByRoot(history);
     return true;
   }
 
@@ -136,6 +159,40 @@ export async function renderGastoPorCategoria(container, onBack) {
       </div>`;
   }
 
+  /** Línea de comparativa (N3, Task 14, artboard etiquetas-design §8): a la izquierda el nombre del
+   *  periodo anterior y su cifra; a la derecha la mini tendencia de 3 periodos (trendSvg) + la
+   *  flecha del repertorio §3 (nunca un chevron) + el delta a un decimal — --danger si "up"
+   *  (gastó más), --pos si "down" (gastó menos: SISTEMA §4.19, "gastar menos es bueno").
+   *  Sin periodo anterior (prevPeriod null) NO se pinta nada (Step 3). Con prevPeriod pero sin un
+   *  tercer periodo, trendSvg da igualmente una tendencia — de dos barras, no null (necesita >=2
+   *  valores, y aquí hay exactamente 2: anterior y actual). "flat"/"new" no llevan flecha: no hay
+   *  "más" ni "menos" que anunciar (flat: mismo gasto exacto; new: no había nada que comparar). */
+  function comparisonLineHtml(row) {
+    if (!prevPeriod) return "";
+    const cmp = cmpByRoot[row.root_id];
+    if (!cmp) return "";
+    const color = colorForCategory(row.root_id, byId);
+    const spark = trendSvg(seriesByRoot[row.root_id] ?? [], color);
+    const showArrow = cmp.direction === "up" || cmp.direction === "down";
+    const trendColor = cmp.direction === "up" ? "var(--danger)" : cmp.direction === "down" ? "var(--pos)" : "var(--text-2)";
+    const arrowIcon = cmp.direction === "up" ? ICON_TREND_UP : cmp.direction === "down" ? ICON_TREND_DOWN : "";
+    const deltaText = cmp.deltaPct != null
+      ? `${cmp.deltaPct > 0 ? "+" : cmp.deltaPct < 0 ? "−" : ""}${escHtml(fmtPct(Math.abs(cmp.deltaPct) / 100))}`
+      : "";
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:1px;">
+        <span class="num" style="font-size:11px;color:var(--text-3);">${escHtml(prevPeriod.name)} ${escHtml(fmtMoney(cmp.prevCents))}</span>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          ${spark}
+          ${deltaText ? `
+          <span style="display:flex;align-items:center;gap:3px;color:${trendColor};">
+            ${showArrow ? `<span style="display:flex;" aria-hidden="true">${arrowIcon}</span>` : ""}
+            <span class="num" style="font-size:11px;font-weight:700;">${deltaText}</span>
+          </span>` : ""}
+        </div>
+      </div>`;
+  }
+
   function rootRowHtml(row, maxSpent) {
     const limitCents = budgetByCategory[row.root_id] ?? 0;
     const st = budgetStatus(row.spent_cents, limitCents);
@@ -199,6 +256,7 @@ export async function renderGastoPorCategoria(container, onBack) {
               color:${expanded ? "var(--text)" : "var(--text-2)"};">${chevronSvg(expanded ? 90 : 0)}</span>
           </button>
           ${barHtml}
+          ${comparisonLineHtml(row)}
         </div>
         ${rootError ? `<div style="font-size:11px;color:var(--red);">${escHtml(rootError)}</div>` : ""}
         ${expanded ? expandedHtml(row, limitCents) : ""}
@@ -256,6 +314,12 @@ export async function renderGastoPorCategoria(container, onBack) {
       <div class="card" style="padding:6px 16px;display:flex;flex-direction:column;margin-bottom:16px;">
         ${rows.map((r) => rootRowHtml(r, maxSpent)).join('<hr class="divider">')}
       </div>`}
+
+      ${prevPeriod ? `
+      <div style="font-size:11px;color:var(--text-3);margin:-6px 0 16px;">${t("informe.categories.orientativo", {
+        prev: escHtml(prevPeriod.name), current: escHtml(period.name),
+        day: dayIndexOfPeriod(period.start_date, hoyISO()), total: expectedPeriodDays(period.start_date),
+      })}</div>` : ""}
     `;
 
     wire();
