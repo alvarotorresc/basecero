@@ -18,7 +18,7 @@ main#screen {
   min-height: 100dvh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 20px var(--pad-screen) calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 24px);
+  padding: 20px var(--pad-screen) calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 88px);
 }
 
 /* ===== componentes base (docs/design/final-v2/SISTEMA.md) =====
@@ -347,7 +347,7 @@ main#screen {
   padding: 10px 4px;
   border-radius: var(--r-0);
   background: var(--surface-2);
-  border: 0;
+  border: 1px solid transparent;
   color: var(--ink-2);
   font-size: 11px;
   font-weight: 500;
