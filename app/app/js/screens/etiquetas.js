@@ -6,7 +6,8 @@ import { t } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { goToTab } from "../tabs.js";
-import { subHeaderHtml } from "../ui.js";
+import { subHeaderHtml, metaHtml } from "../ui.js";
+import { icon } from "../icons.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -15,14 +16,11 @@ const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&qu
 // límite quitado a mitad de sesión o una cifra inconsistente no debe producir CSS inválido.
 const clampPct = (pct) => Math.min(100, Math.max(0, pct));
 
-// Icono «etiqueta» del repertorio (SISTEMA.md §3), constante local — mismo patrón que
-// ICON_TRANSFER/ICON_UNCAT en movimientos.js. D14: una etiqueta no tiene color propio (en este
-// sistema el color significa categoría), así que el icono va siempre neutro sobre el `.dotico`
-// SIN fijar `--cat` (cae al gris por defecto de la clase) — nunca el color de una categoría.
-const ICON_TAG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="stroke:var(--ink-2);" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V4h7l9 9-7 7z"></path><circle cx="8" cy="8" r="1.2" fill="var(--ink-2)" stroke="none"></circle></svg>`;
-const ICON_PLUS = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>`;
-const ICON_PENCIL = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>`;
-const ICON_CHEVRON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg>`;
+// Icono «etiqueta» del repertorio (icons.js#tag, SISTEMA.md §3). D14: una etiqueta no tiene color
+// propio (en este sistema el color significa categoría), así que el icono va siempre neutro sobre
+// el `.dotico` SIN fijar `--cat` (cae al gris por defecto de la clase) — nunca el color de una
+// categoría.
+const ICON_TAG = icon("tag", { size: 20, stroke: "var(--ink-2)" });
 
 /** Pantalla «Etiquetas de proyecto» (N11): lista de administración + subvista de formulario de
  *  alta/edición/archivado, mismo patrón de dos vistas que categorias.js/recurrentes.js. Se entra
@@ -183,7 +181,7 @@ export async function renderEtiquetas(container, onBack) {
     // la pila (back.js#resetTo) — es la única operación de historial permitida por tick (ver la
     // cabecera de back.js). Un goBack() aquí antes sería una segunda operación en el mismo tick,
     // dejando el historial con una entrada de más y haciendo que «atrás» caiga en Inicio en vez de
-    // en la lista de etiquetas (igual que [data-tag-open] en la lista, más abajo).
+    // en la lista de etiquetas.
     if (movementsBtn) movementsBtn.onclick = () => {
       goToTab("movimientos", { tagId: form.id });
     };
@@ -213,13 +211,11 @@ export async function renderEtiquetas(container, onBack) {
     return t("etiquetas.row.open");
   }
 
-  // La fila NO es un <button> que lo envuelva todo: flex con dos botones hermanos — el cuerpo
-  // (entra en Movimientos filtrado) y el icono «editar» de 44px (abre el formulario) — más el
-  // chevron decorativo. Un botón dentro de otro es HTML inválido que el navegador desarma (mismo
-  // criterio que gasto-por-categoria.js#rootRowHtml/categorias.js#rootRowHtml).
+  // Una fila = un control (§9.6): la fila entera es UN <button> que abre el formulario — desde
+  // ahí se llega a Movimientos filtrado (#ef-movements, ya existe). Ya no hay un lápiz aparte ni
+  // un chevron decorativo suelto: el chevron vive DENTRO del único botón, como en el artboard.
   function rowHtml(row) {
     const hasLimit = row.budget_cents > 0;
-    const sub = `${t("etiquetas.row.movements", { n: row.n })} | ${statusWord(row)}`;
     let amountLine = "";
     if (hasLimit) {
       const pct = pctOf(row.spent_cents, row.budget_cents);
@@ -235,21 +231,17 @@ export async function renderEtiquetas(container, onBack) {
     }
     return `
       <div style="display:flex;flex-direction:column;padding:11px 0;${row.is_archived ? "opacity:0.5;" : ""}">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <button type="button" data-tag-open="${escAttr(row.id)}"
-            style="flex:1;min-width:0;display:flex;align-items:center;gap:12px;background:none;border:0;padding:0;margin:0;
-            color:inherit;font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-            <div class="dotico">${ICON_TAG}</div>
-            <div class="tx-body" style="flex:1;min-width:0;">
-              <div class="tx-title">${escHtml(row.name)}</div>
-              <div class="tx-sub">${sub}</div>
-            </div>
-            ${!hasLimit ? `<span class="num" style="font-size:14px;font-weight:700;white-space:nowrap;flex-shrink:0;">${escHtml(fmtMoney(row.spent_cents))}</span>` : ""}
-          </button>
-          <button type="button" class="icon-btn" data-tag-edit="${escAttr(row.id)}" aria-label="${t("common.edit")}"
-            style="width:44px;height:44px;">${ICON_PENCIL}</button>
-          <span aria-hidden="true" style="flex-shrink:0;color:var(--text-3);display:flex;">${ICON_CHEVRON}</span>
-        </div>
+        <button type="button" data-tag-open="${escAttr(row.id)}"
+          style="width:100%;display:flex;align-items:center;gap:12px;background:none;border:0;padding:0;margin:0;
+          color:inherit;font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+          <div class="dotico">${ICON_TAG}</div>
+          <div class="tx-body" style="flex:1;min-width:0;">
+            <div class="tx-title">${escHtml(row.name)}</div>
+            ${metaHtml([t("etiquetas.row.movements", { n: row.n }), statusWord(row)])}
+          </div>
+          ${!hasLimit ? `<span class="num" style="font-size:14px;font-weight:700;white-space:nowrap;flex-shrink:0;">${escHtml(fmtMoney(row.spent_cents))}</span>` : ""}
+          <span aria-hidden="true" style="flex-shrink:0;color:var(--ink-3);display:flex;">${icon("chevronRight", { size: 20 })}</span>
+        </button>
         ${amountLine}
       </div>`;
   }
@@ -257,10 +249,10 @@ export async function renderEtiquetas(container, onBack) {
   function newTagRowHtml() {
     return `
       <button type="button" id="et-new-row"
-        style="width:100%;display:flex;align-items:center;gap:12px;padding:11px 0;background:none;border:0;
-        color:var(--text-2);font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-        <div class="dotico" style="background:var(--surface-2);">${ICON_PLUS}</div>
-        <span style="font-size:13.5px;font-weight:600;">${t("etiquetas.new")}</span>
+        style="width:100%;display:flex;align-items:center;gap:10px;padding:11px 0;background:none;border:0;
+        color:var(--accent);font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+        ${icon("plus", { size: 20, stroke: "var(--accent)" })}
+        <span style="font-size:14px;font-weight:600;">${t("etiquetas.new")}</span>
       </button>`;
   }
 
@@ -296,12 +288,11 @@ export async function renderEtiquetas(container, onBack) {
     const newRow = container.querySelector("#et-new-row");
     if (newRow) newRow.onclick = () => openForm(null);
 
+    // Una fila = un control (§9.6): la fila entera abre el formulario; desde ahí se llega a
+    // Movimientos filtrado (#ef-movements, arriba). Ya no hay un botón de editar aparte.
     container.querySelectorAll("[data-tag-open]").forEach((b) => {
-      b.onclick = () => goToTab("movimientos", { tagId: b.dataset.tagOpen });
-    });
-    container.querySelectorAll("[data-tag-edit]").forEach((b) => {
       b.onclick = () => {
-        const row = rows.find((r) => r.id === b.dataset.tagEdit);
+        const row = rows.find((r) => r.id === b.dataset.tagOpen);
         if (row) openForm(row);
       };
     });
