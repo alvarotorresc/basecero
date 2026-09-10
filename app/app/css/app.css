@@ -375,6 +375,17 @@ main#screen {
   font-weight: 700;
 }
 
+/* rejilla ESTÁTICA de categorías en Registro (Registro v2 §4.3): repeat(4, 1fr), sin scroll
+   horizontal — sustituye a .chips-scroll SOLO en esta pantalla; recurrentes.js y movimientos.js
+   siguen con el scroller de 2 filas y no se tocan. .chip-v dentro de esta rejilla pierde su ancho
+   fijo de 74px (pensado para el auto-flow de .chips-scroll) para poder ocupar la columna entera. */
+.chips-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.chips-grid .chip-v { width: auto; }
+
 /* ===== filas de movimiento ===== */
 .tx-row {
   display: flex;

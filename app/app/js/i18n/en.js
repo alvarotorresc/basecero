@@ -189,6 +189,16 @@ export const EN = {
       transfer: "Save transfer",
       refund: "Save refund",
       adjustment: "Save adjustment",
+      expenseWithAmount: "Save expense of {amount}",
+    },
+    categories: {
+      showAll: "See all {n} categories",
+    },
+    more: {
+      toggle: "More",
+      summaryNoNote: "no note or photo",
+      summaryPhoto: "has a photo",
+      summaryToday: "today",
     },
     refund: {
       unlink: "Remove link",

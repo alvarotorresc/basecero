@@ -11,6 +11,7 @@ import { userMessage } from "../errors.js";
 import { focusInput } from "../viewport.js";
 import { showReceipt } from "../recibo.js";
 import { showToast } from "../toast.js";
+import { quickRegisterEnabled, detailsOpen, foldedSummaryParts, visibleCategories } from "../registro-mode.js";
 
 // labelKey/SAVE_KEY en vez de texto resuelto: son consts de módulo, evaluadas al importar el
 // fichero (antes de que boot() llame a initI18n con el idioma real) — si guardaran el string ya
@@ -27,6 +28,9 @@ const SAVE_KEY = {
   refund: "registro.save.refund", adjustment: "registro.save.adjustment",
 };
 const needsCategory = (tipo) => tipo === "expense" || tipo === "income" || tipo === "refund";
+// §4.2 de la spec: dos filas de cuatro (Registro.dc.html). El literal vive aquí, no en
+// registro-mode.js — el módulo puro solo decide CUÁNTAS entran, no el número en sí.
+const CATS_GRID_LIMIT = 8;
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -78,6 +82,13 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     ruleId: prefill?.ruleId ?? "",
     adjustmentSign: "+",
     refundPickerOpen: false,
+    // Registro v2 §4: quick gobierna qué se pinta (registro-mode.js#detailsOpen); expanded es el
+    // «Más» tocado a mano en ESTE formulario (nunca persiste entre aperturas de Registro).
+    // allCats: se pasó de las CATS_GRID_LIMIT primeras categorías a la lista entera («Ver las N
+    // categorías»); una vez tocado no se vuelve a plegar en este formulario.
+    quick: quickRegisterEnabled(meta.quick_register),
+    expanded: false,
+    allCats: false,
   };
   let errorMsg = "";
 
@@ -214,6 +225,30 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     </div>`;
   }
 
+  /** Fila «Más» que sustituye a cuenta/comercio/fecha/nota/compartido cuando `detailsOpen` dice que
+   *  no toca pintarlos (Registro v2 §4.3). El resumen sale de registro-mode.js#foldedSummaryParts
+   *  (array, nunca un string con «·»); aquí solo se decide QUÉ entra en cada campo del resumen y se
+   *  pinta con divisores de 1px entre trozos (SISTEMA.md §1). */
+  function moreRowHtml() {
+    const accountName = partnerPaid() ? "" : (accounts.find((a) => a.id === state.accountId)?.name ?? "");
+    const dateLabel = state.fecha === hoyISO() ? t("registro.more.summaryToday") : fmtDiaCorto(state.fecha);
+    const hasNote = !!state.note.trim();
+    const sharedLabel = needsCategory(state.tipo) && state.tipo !== "income" && partnerName && state.isShared
+      ? t("common.sharedWith", { name: escHtml(partnerName) })
+      : "";
+    const parts = foldedSummaryParts({ accountName, dateLabel, hasNote, hasPhoto: false, sharedLabel }, t);
+    const summaryHtml = parts.map((p, i) => (i === 0 ? "" : `<span style="width:1px;height:11px;background:var(--hairline-strong);flex-shrink:0;"></span>`)
+      + `<span style="font-size:12px;font-weight:500;color:var(--text-3);">${escHtml(p)}</span>`).join("");
+    return `
+    <button type="button" id="reg-more-toggle" style="display:flex; align-items:center; gap:12px; width:100%; min-height:60px; padding:10px 0; margin-top:12px; border:0; border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline); background:transparent; color:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent;">
+      <div style="display:flex; flex-direction:column; gap:4px; flex:1; min-width:0;">
+        <span style="font-size:14px; font-weight:600;">${t("registro.more.toggle")}</span>
+        <div style="display:flex; align-items:center; gap:9px; flex-wrap:wrap;">${summaryHtml}</div>
+      </div>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;"><path d="M5 9.5 12 16l7-6.5"></path></svg>
+    </button>`;
+  }
+
   function render() {
     const cats = categoriesFor();
     const { mine: myCents, partner: partnerCents } = state.isShared ? splitCents(state.cents, state.sharePct) : { mine: state.cents, partner: 0 };
@@ -224,8 +259,12 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     const saveStyle = needsCategory(state.tipo) && state.categoryId
       ? `background:var(--accent);color:var(--accent-ink);`
       : "";
-
-    const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
+    // Registro v2 §4.3: el CTA lleva el importe («Guardar gasto de 45,20 €») SOLO para gasto — es
+    // la clave que trae la spec (registro.save.expenseWithAmount), no una por tipo. Con importe a
+    // 0 se cae al texto de siempre.
+    const saveLabel = state.tipo === "expense" && state.cents > 0
+      ? t("registro.save.expenseWithAmount", { amount: escHtml(fmtMoney(state.cents)) })
+      : t(SAVE_KEY[state.tipo]);
 
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
@@ -254,11 +293,19 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         <hr class="divider" style="margin-top:6px;">
       </div>
 
-      ${cats.length ? `
+      ${cats.length ? (() => {
+        // Registro v2 §4.3: rejilla estática de 2 filas de 4 en vez del scroll horizontal
+        // (.chips-scroll la siguen usando recurrentes.js/movimientos.js — no se toca esa clase).
+        // «Ver las N» ya tocado (state.allCats) enseña la lista entera; si no, visibleCategories
+        // decide y la seleccionada nunca queda escondida.
+        const { shown, hidden } = state.allCats
+          ? { shown: cats, hidden: 0 }
+          : visibleCategories(cats, state.categoryId, CATS_GRID_LIMIT);
+        return `
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
         <div class="section-title">${t("common.category")}</div>
-        <div class="chips-scroll">
-          ${cats.map((c) => {
+        <div class="chips-grid">
+          ${shown.map((c) => {
             const color = colorForCategory(c.id, byId);
             const textColor = textColorForCategory(c.id, byId);
             const icon = iconForCategory(c.id, byId);
@@ -271,8 +318,15 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
             </button>`;
           }).join("")}
         </div>
-      </div>` : ""}
+        ${hidden > 0 ? `
+        <button type="button" id="reg-cats-more" style="border:0;background:transparent;color:var(--text-3);font-size:13px;font-weight:500;padding:0;height:32px;display:flex;align-items:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+          ${t("registro.categories.showAll", { n: cats.length })}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9.5 12 16l7-6.5"></path></svg>
+        </button>` : ""}
+      </div>`;
+      })() : ""}
 
+      ${detailsOpen({ quick: state.quick, expanded: state.expanded, tipo: state.tipo }) ? `
       ${partnerPaid() ? "" : renderAccountsSection()}
 
       ${state.tipo === "refund" ? renderRefundPicker() : ""}
@@ -334,16 +388,12 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
           </div>
         </div>` : ""}
       </div>` : ""}
+      ` : moreRowHtml()}
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
-      <button type="button" class="btn-primary" id="reg-save" style="${saveStyle}">${t(SAVE_KEY[state.tipo])}</button>
+      <button type="button" class="btn-primary" id="reg-save" style="${saveStyle}">${saveLabel}</button>
     `;
-
-    if (prevChipsScroll != null) {
-      const chipsEl = container.querySelector(".chips-scroll");
-      if (chipsEl) chipsEl.scrollLeft = prevChipsScroll;
-    }
 
     wire();
   }
@@ -415,6 +465,13 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         mineEl.textContent = fmtMoney(myCents);
         partnerEl.textContent = fmtMoney(partnerPaid() ? state.cents : partnerCents);
       }
+      // Registro v2 §4.3: el CTA lleva el importe en vivo — nunca un render() completo aquí
+      // (mataría el cursor del input, mismo criterio que el reparto de arriba).
+      if (state.tipo === "expense") {
+        container.querySelector("#reg-save").textContent = state.cents > 0
+          ? t("registro.save.expenseWithAmount", { amount: fmtMoney(state.cents) })
+          : t(SAVE_KEY.expense);
+      }
     };
 
     const refundToggle = container.querySelector("#reg-refund-toggle");
@@ -433,9 +490,29 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     const unlinkBtn = container.querySelector("#reg-refund-unlink");
     if (unlinkBtn) unlinkBtn.onclick = () => clearRefundLink();
 
-    container.querySelector("#reg-merchant").oninput = (e) => { state.merchant = e.target.value; };
-    container.querySelector("#reg-note").oninput = (e) => { state.note = e.target.value; };
-    container.querySelector("#reg-fecha").onchange = (e) => { state.fecha = e.target.value || hoyISO(); };
+    // Registro v2 §4.3: los tres viven dentro del bloque que se pliega tras «Más» en modo rápido
+    // — sin el guard, wire() lanzaría al no encontrar el elemento con el bloque plegado.
+    const merchantInput = container.querySelector("#reg-merchant");
+    if (merchantInput) merchantInput.oninput = (e) => { state.merchant = e.target.value; };
+    const noteInput = container.querySelector("#reg-note");
+    if (noteInput) noteInput.oninput = (e) => { state.note = e.target.value; };
+    const fechaInput = container.querySelector("#reg-fecha");
+    if (fechaInput) fechaInput.onchange = (e) => { state.fecha = e.target.value || hoyISO(); };
+
+    const catsMoreBtn = container.querySelector("#reg-cats-more");
+    if (catsMoreBtn) catsMoreBtn.onclick = () => {
+      state.allCats = true;
+      render();
+    };
+
+    const moreToggle = container.querySelector("#reg-more-toggle");
+    if (moreToggle) moreToggle.onclick = () => {
+      state.expanded = true;
+      render();
+      // Invariante de foco (§4.5): SOLO desde el handler, nunca desde render() — si no, cada
+      // repintado (p.ej. tocar un chip de categoría) robaría el foco al importe.
+      focusInput(container.querySelector("#reg-merchant"));
+    };
 
     const sharedToggle = container.querySelector("#reg-shared");
     if (sharedToggle) sharedToggle.onchange = (e) => {

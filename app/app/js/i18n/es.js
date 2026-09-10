@@ -194,6 +194,16 @@ export const ES = {
       transfer: "Guardar transferencia",
       refund: "Guardar devolución",
       adjustment: "Guardar ajuste",
+      expenseWithAmount: "Guardar gasto de {amount}",
+    },
+    categories: {
+      showAll: "Ver las {n} categorías",
+    },
+    more: {
+      toggle: "Más",
+      summaryNoNote: "sin nota ni foto",
+      summaryPhoto: "con foto",
+      summaryToday: "hoy",
     },
     refund: {
       unlink: "Quitar vínculo",
