@@ -4,7 +4,7 @@ import {
   annualCents, monthlyCents, activeSubscriptions, inactiveSubscriptions,
   annualTotalCents, monthlyTotalCents, nextRenewal, daysUntil, wholeMonthsBetween, savedSinceCancelCents,
   RENEWAL_SOON_DAYS, renewalNotice, parseIgnored, parseSnoozed, IGNORED_MAX,
-  monthlyCommitmentCents,
+  monthlyCommitmentCents, ruleStateKey,
 } from "../../app/app/js/subscriptions.js";
 
 /** Regla mínima con la forma de una fila real de recurring_rules — solo los campos que estos
@@ -336,4 +336,33 @@ test("monthlyCommitmentCents: la lista del artboard da 78988", () => {
 test("monthlyCommitmentCents: lista vacía o nula da 0", () => {
   assert.equal(monthlyCommitmentCents([]), 0);
   assert.equal(monthlyCommitmentCents(undefined), 0);
+});
+
+// ---- ruleStateKey (P4, spec §5.1 decisión 7) -----------------------------------------------
+
+test("ruleStateKey: una transferencia es siempre \"transfer\", tenga o no item este periodo", () => {
+  const transferRule = rule({ type: "transfer" });
+  assert.equal(ruleStateKey(transferRule, { rule: transferRule, myCents: 100, paid: false }), "transfer");
+  assert.equal(ruleStateKey(transferRule, undefined), "transfer");
+});
+
+test("ruleStateKey: un ingreso nunca lleva etiqueta, tenga o no item", () => {
+  const incomeRule = rule({ type: "income" });
+  assert.equal(ruleStateKey(incomeRule, { rule: incomeRule, myCents: 100, paid: true }), null);
+  assert.equal(ruleStateKey(incomeRule, undefined), null);
+});
+
+test("ruleStateKey: un gasto con item pagado da \"paid\"", () => {
+  const expenseRule = rule({ type: "expense" });
+  assert.equal(ruleStateKey(expenseRule, { rule: expenseRule, myCents: 100, paid: true }), "paid");
+});
+
+test("ruleStateKey: un gasto con item sin pagar da \"pending\"", () => {
+  const expenseRule = rule({ type: "expense" });
+  assert.equal(ruleStateKey(expenseRule, { rule: expenseRule, myCents: 100, paid: false }), "pending");
+});
+
+test("ruleStateKey: un gasto SIN item (no aplica este mes) no lleva etiqueta", () => {
+  const expenseRule = rule({ type: "expense" });
+  assert.equal(ruleStateKey(expenseRule, undefined), null);
 });

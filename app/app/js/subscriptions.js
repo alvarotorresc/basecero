@@ -199,6 +199,20 @@ export const monthlyCommitmentCents = (rules) =>
     .filter((r) => r.is_active && !r.cancelled_at && r.type !== "income")
     .reduce((s, r) => s + annualCents(r), 0) / 12);
 
+/** Etiqueta de estado bajo el importe de una fila de Recurrentes (spec §5.1, decisión 7). `item`
+ *  es el { rule, myCents, paid } que devuelve repo.previsionOfPeriod para esta regla, o
+ *  undefined/null si la regla no aplica este mes (previsionOfPeriod la deja fuera de `items`).
+ *  El TIPO manda: una transferencia no es "pagada" ni "pendiente" —es un movimiento entre cuentas
+ *  propias— así que lleva SIEMPRE la misma etiqueta, tenga o no item este periodo. Un ingreso
+ *  previsto nunca lleva etiqueta (va con el signo + en verde, sin más). Para el resto (gasto),
+ *  la etiqueta depende de item.paid; sin item, la regla no aplica este mes y no lleva ninguna. */
+export function ruleStateKey(rule, item) {
+  if (rule.type === "transfer") return "transfer";
+  if (rule.type === "income") return null;
+  if (!item) return null;
+  return item.paid ? "paid" : "pending";
+}
+
 /** Mapa saneado {ruleId: dueIso} de meta.renewal_snoozed. Mismo criterio de defensa en
  *  profundidad que parseIgnored: JSON roto, no-objeto, o una entrada cuyo valor no es una fecha
  *  ISO con forma válida se descarta en silencio. Guard `__proto__`: `out[k]=` SÍ dispara el
