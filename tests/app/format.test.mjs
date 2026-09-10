@@ -1,6 +1,6 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { initFormat, fmtMoney, fmtMoneyParts, moneyPartsHtml, currencySymbol, currencyCode, appLocale, fmtPct, fmtPct0, fmtDec1, parseCentsRaw, centsToRaw } from "../../app/app/js/format.js";
+import { initFormat, fmtMoney, fmtMoneyParts, moneyPartsHtml, currencySymbol, currencyCode, appLocale, fmtPct, fmtPct0, fmtDec1, parseCentsRaw, centsToRaw, fmtDiaCorto } from "../../app/app/js/format.js";
 
 // Intl mete espacios no separadores (U+00A0/U+202F): normalizar antes de comparar.
 const norm = (s) => s.replace(/\u00A0|\u202F/g, " ");
@@ -118,4 +118,15 @@ test("moneyPartsHtml: cero y negativos no rompen la anatomía", () => {
 });
 test("moneyPartsHtml: escapa lo que sale de Intl", () => {
   assert.ok(!moneyPartsHtml(100).includes("<script"));
+});
+
+// fmtDiaCorto (§1.10 del plan de rediseño): Intl da "sept" para septiembre en es-ES (4 letras),
+// y los artboards escriben "sep" (3). El recorte es solo cosmético sobre la abreviatura del mes.
+test("fmtDiaCorto: recorta la abreviatura de mes de Intl a tres letras (sept -> sep)", () => {
+  assert.equal(norm(fmtDiaCorto("2026-09-12")), "12 sep");
+});
+test("fmtDiaCorto: no toca el día ni el año, y no recorta un mes que ya viene en tres letras", () => {
+  assert.equal(norm(fmtDiaCorto("2026-05-03")), "3 may");
+  initFormat({ locale: "en-US" });
+  assert.equal(norm(fmtDiaCorto("2026-09-12")), "Sep 12");
 });
