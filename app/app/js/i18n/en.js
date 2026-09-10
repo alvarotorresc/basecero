@@ -937,7 +937,7 @@ export const EN = {
   },
   // Period report (F1). screens/informe.js.
   informe: {
-    title: "Period report",
+    title: "Report",
     openPeriod: "Period under way, day {n} of {m}",
     closedPeriod: "Closed, {start} to {end}",
     generatedAt: "Generated today at {time}",
@@ -969,6 +969,7 @@ export const EN = {
     },
     shared: {
       title: "With {name}",
+      periodTotal: "Shared expenses this period",
       myPart: "Your share",
       net: {
         theyOwe: "{name} owes you",
@@ -985,6 +986,7 @@ export const EN = {
     movements: {
       title: "Movements by category",
       count: "{n} total",
+      groupCount: { one: "{n} movement", other: "{n} movements" },
       andMore: "and {n} more movements",
       others: "Other",
     },

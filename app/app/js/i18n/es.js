@@ -960,7 +960,7 @@ export const ES = {
   },
   // Informe del periodo (F1). screens/informe.js.
   informe: {
-    title: "Informe del periodo",
+    title: "Informe",
     openPeriod: "Periodo en curso, día {n} de {m}",
     closedPeriod: "Cerrado, del {start} al {end}",
     generatedAt: "Generado hoy {time}",
@@ -992,6 +992,7 @@ export const ES = {
     },
     shared: {
       title: "Con {name}",
+      periodTotal: "Gastos compartidos del periodo",
       myPart: "Tu parte",
       net: {
         theyOwe: "{name} te debe",
@@ -1008,6 +1009,7 @@ export const ES = {
     movements: {
       title: "Movimientos por categoría",
       count: "{n} en total",
+      groupCount: { one: "{n} movimiento", other: "{n} movimientos" },
       andMore: "y {n} movimientos más",
       others: "Otros",
     },

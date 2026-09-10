@@ -4,7 +4,7 @@ import {
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { eurToCents } from "../contract.js";
-import { fmtMoney, moneyPartsHtml, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol, centsToRaw } from "../format.js";
+import { fmtMoney, moneyPartsHtml, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol } from "../format.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, stepPct } from "../share-pct.js";
 import { inheritedBudgetsRaw, budgetMap } from "../category-spend.js";
@@ -129,7 +129,10 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
     // remanente entero. sourceAccountId/sourceBalanceCents viven en el state porque la fecha de
     // inicio (#pn-fecha) puede cambiar el saldo de origen (la transferencia lleva esa fecha).
     sweepChoice: initialDestinations[0]?.goalId ?? "keep",
-    sweepAmountRaw: centsToRaw(remainder.cents),
+    // Punto decimal a propósito, NO centsToRaw (coma): es lo único que admite el value de un
+    // <input type="number"> — mismo criterio que category-spend.js#inheritedBudgetsRaw. Con coma
+    // el navegador rechaza el valor en silencio y el campo se ve vacío.
+    sweepAmountRaw: remainder.cents ? String(remainder.cents / 100) : "",
     sourceAccountId,
     sourceBalanceCents,
   };

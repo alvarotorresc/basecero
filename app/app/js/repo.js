@@ -693,7 +693,8 @@ export async function reportInputs(periodId) {
   const closeDateIso = period.status === "open" ? hoyISO() : period.end_date;
   const [
     accountsStart, accountsEnd, spentByRoot, prevSpentByRoot, budgets, transactions,
-    categoriesById, incomeCents, spentCents, partnerNetCents, subscriptionRules, meta,
+    categoriesById, incomeCents, spentCents, prevIncomeCents, prevSpentCents,
+    partnerNetCents, subscriptionRules, meta,
   ] = await Promise.all([
     balancesAt(prevDayIso(period.start_date)),
     balancesAt(closeDateIso),
@@ -704,13 +705,17 @@ export async function reportInputs(periodId) {
     allCategoriesById(),
     incomeOfPeriod(period.id),
     spentOfPeriod(period.id),
+    // «En agosto, el 43 %» (segunda mitad de la frase de ahorro): la tasa del periodo ANTERIOR.
+    prevPeriod ? incomeOfPeriod(prevPeriod.id) : Promise.resolve(0),
+    prevPeriod ? spentOfPeriod(prevPeriod.id) : Promise.resolve(0),
     pendingSettlementNetCents(),
     listRules(),
     getMetaAll(),
   ]);
   return {
     period, prevPeriod, accountsStart, accountsEnd, spentByRoot, prevSpentByRoot, budgets,
-    transactions, categoriesById, incomeCents, spentCents, partnerNetCents,
+    transactions, categoriesById, incomeCents, spentCents, prevIncomeCents, prevSpentCents,
+    partnerNetCents,
     partnerName: (meta.partner_name || "").trim(),
     subscriptionRules,
     todayIso: hoyISO(),

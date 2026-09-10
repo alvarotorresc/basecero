@@ -38,18 +38,19 @@ function buildMeta({ period, todayIso }) {
   };
 }
 
-function buildSummary({ incomeCents, spentCents, budgets }) {
+function buildSummary({ incomeCents, spentCents, budgets, prevIncomeCents, prevSpentCents }) {
   const savedCents = incomeCents - spentCents;
   const budgetTotalCents = Object.values(budgetMap(budgets ?? [])).reduce((s, c) => s + c, 0);
   const availableCents = budgetTotalCents - spentCents;
   const savingsRatePct = incomeCents > 0 ? Math.round((savedCents / incomeCents) * 100) : null;
+  // «Ahorras el 54 % de lo que ingresas. En agosto, el 43 %.» — la segunda mitad. Sin periodo
+  // anterior (o sin ingresos ese periodo), null: la pantalla omite la frase entera.
+  const prevSavingsRatePct = prevIncomeCents > 0
+    ? Math.round(((prevIncomeCents - (prevSpentCents ?? 0)) / prevIncomeCents) * 100)
+    : null;
   return {
     incomeCents, spentCents, savedCents, availableCents, budgetTotalCents,
-    savingsRatePct,
-    // Sin el income/gasto del periodo anterior entre las entradas de repo.reportInputs, no hay de
-    // dónde derivar esta cifra sin duplicar dos consultas más: se deja en null (la pantalla omite
-    // la segunda frase de «Ahorras el X%…» cuando no hay dato, igual que hoy con hasPrev).
-    prevSavingsRatePct: null,
+    savingsRatePct, prevSavingsRatePct,
   };
 }
 

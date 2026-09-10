@@ -148,12 +148,15 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
   rule("summary");
 
   // 3. Tus cuentas
+  // "->" en vez de "→": el separador lo componemos NOSOTROS (no es texto de usuario), así que
+  // basta con elegir uno que ya esté en WinAnsi — evita depender de que winAnsiSafe lo convierta
+  // a "?" (verificado: WinAnsi no codifica U+2192).
   text("accounts", t("informe.pdf.accounts"), { size: 13, bold: true });
   for (const a of report.accounts.rows) {
-    text("accounts", `${a.name}  ${fmtMoney(a.startCents)} → ${fmtMoney(a.endCents)}`, { mono: true });
+    text("accounts", `${a.name}  ${fmtMoney(a.startCents)} -> ${fmtMoney(a.endCents)}`, { mono: true });
   }
   text("accounts", t("informe.pdf.accountsTotal", {
-    amount: `${fmtMoney(report.accounts.totalStartCents)} → ${fmtMoney(report.accounts.totalEndCents)}`,
+    amount: `${fmtMoney(report.accounts.totalStartCents)} -> ${fmtMoney(report.accounts.totalEndCents)}`,
   }), { bold: true, mono: true });
   rule("accounts");
 

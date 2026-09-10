@@ -76,6 +76,9 @@ function fixture() {
     },
     incomeCents: 185000,
     spentCents: 84720,
+    // Agosto: (190000-108300)/190000 = 43 % exacto — el «En agosto, el 43 %.» del artboard.
+    prevIncomeCents: 190000,
+    prevSpentCents: 108300,
     partnerNetCents: 2260,
     partnerName: "Marta",
     subscriptionRules: [
@@ -123,6 +126,18 @@ test("buildReport: el resumen cuadra con la hoja de datos del sistema", () => {
 test("buildReport: sin ingresos la tasa es null, nunca NaN", () => {
   const r = buildReport({ ...fixture(), incomeCents: 0 });
   assert.equal(r.summary.savingsRatePct, null);
+});
+
+// «Ahorras el 54 % de lo que ingresas. En agosto, el 43 %.» (Main.dc.html / Informe.dc.html): la
+// segunda mitad de la frase necesita la tasa de ahorro del periodo ANTERIOR.
+test("buildReport: la tasa de ahorro del periodo anterior tambien se calcula", () => {
+  const r = buildReport(fixture());
+  assert.equal(r.summary.prevSavingsRatePct, 43);
+});
+
+test("buildReport: sin ingresos previos (o sin periodo anterior) la tasa previa es null", () => {
+  assert.equal(buildReport({ ...fixture(), prevIncomeCents: 0 }).summary.prevSavingsRatePct, null);
+  assert.equal(buildReport(cleanFixture()).summary.prevSavingsRatePct, null);
 });
 
 // REGRESION del off-by-one: SQL.accountBalance filtra t.date <= ? (sql.js:280), asi que el
