@@ -31,24 +31,39 @@ licencia procede de los metadatos del proyecto upstream. La Apache-2.0 no exige 
 íntegro cuando no hay un `NOTICE` que propagar, solo conservar los avisos de copyright — que es lo
 que hace este apartado.
 
-## Outfit (fuente)
+## Schibsted Grotesk (fuente)
 
-- **Componente:** Outfit, fuente variable (eje `wght` 100-900), subset latin.
-- **Rutas:** `app/app/vendor/fonts/QGYvz_MVcBeNP4NJtEtq.woff2` y `app/app/vendor/fonts/fonts.css`
+- **Componente:** Schibsted Grotesk, fuente variable (eje `wght`), subset latin.
+- **Rutas:** `app/app/vendor/fonts/schibsted-grotesk-latin.woff2` y `app/app/vendor/fonts/fonts.css`
 - **Licencia:** SIL Open Font License, versión 1.1 — texto completo más abajo, tal y como exige la
   propia licencia.
-- **Web del proyecto:** <https://github.com/Outfitio/Outfit-Fonts>
 
 Aviso de copyright:
 
 ```
-Copyright 2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts)
+Copyright The Schibsted Grotesk Project Authors
 ```
 
-Outfit no declara ningún *Reserved Font Name*, así que la cláusula 5 de la licencia no restringe el
-nombre de ningún trabajo derivado.
+## JetBrains Mono (fuente)
+
+- **Componente:** JetBrains Mono, fuente variable (eje `wght`), subset latin.
+- **Rutas:** `app/app/vendor/fonts/jetbrains-mono-latin.woff2` y `app/app/vendor/fonts/fonts.css`
+- **Licencia:** SIL Open Font License, versión 1.1 — texto completo más abajo, tal y como exige la
+  propia licencia.
+
+Aviso de copyright:
+
+```
+Copyright 2020 The JetBrains Mono Project Authors
+```
+
+JetBrains Mono declara un *Reserved Font Name*: «JetBrains Mono». La cláusula 5 de la licencia
+impide que un trabajo derivado y modificado siga usando ese nombre.
 
 ### Texto de la SIL Open Font License, Version 1.1
+
+(Cubre tanto Schibsted Grotesk como JetBrains Mono: ambas se distribuyen bajo la misma versión de
+la licencia.)
 
 ```
 -----------------------------------------------------------
