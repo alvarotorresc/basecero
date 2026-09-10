@@ -222,3 +222,56 @@ test("basura: undefined no lanza", () => {
 test("RULES_BY_LANG expone es (y no lanza si se añade en/otro idioma más tarde)", () => {
   assert.ok(RULES_BY_LANG.es);
 });
+
+// ------------------------------------------------------------------ B2: inglés reducido
+
+function parseEn(text, opts = {}) {
+  return parseNaturalExpense(text, {
+    categories: [{ id: "cat-health", name: "Health" }],
+    accounts: [{ id: "acc-n26", name: "N26" }],
+    merchants: {}, counterpartName: "Marta", today: TODAY, lang: "en",
+    ...opts,
+  });
+}
+
+test("en: «12.50 at the bar» -> 1250, merchant bar", () => {
+  const r = parseEn("12.50 at the bar");
+  assert.equal(r.cents, 1250);
+  assert.equal(r.merchant, "bar");
+});
+
+test("en: «12.50 in the bar» -> 1250, merchant bar", () => {
+  const r = parseEn("12.50 in the bar");
+  assert.equal(r.cents, 1250);
+  assert.equal(r.merchant, "bar");
+});
+
+test("en: «with Marta» -> shared true", () => {
+  assert.equal(parseEn("with Marta").shared, true);
+});
+
+test("en: «yesterday» -> today - 1 day", () => {
+  assert.equal(parseEn("12.50 at the bar yesterday").date, "2026-09-08");
+});
+
+test("en: «on monday» -> ocurrencia pasada más cercana", () => {
+  assert.equal(parseEn("12.50 at the bar on monday").date, "2026-09-07");
+});
+
+test("en: categoría por nombre", () => {
+  assert.equal(parseEn("12 health").categoryId, "cat-health");
+});
+
+test("en: cuenta por nombre", () => {
+  assert.equal(parseEn("12 n26").accountId, "acc-n26");
+});
+
+test("en: los números en palabras NO se soportan («twelve fifty» sin importe)", () => {
+  assert.equal(parseEn("twelve fifty at the bar").cents, null);
+});
+
+// El español no cambia de comportamiento al añadir RULES_EN: se re-ejercitan un par de casos
+// representativos ya cubiertos arriba (la suite entera de B1 ya lo garantiza al seguir en verde).
+test("es: sigue funcionando igual tras añadir inglés (frase del artboard)", () => {
+  assert.equal(parse("45,20 en el Bar La Plaza con Marta").merchant, "Bar La Plaza");
+});

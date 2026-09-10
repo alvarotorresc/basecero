@@ -73,7 +73,37 @@ const RULES_ES = {
   dayOnlyRe: /\bel\s+(\d{1,2})\b/,
 };
 
-export const RULES_BY_LANG = { es: RULES_ES };
+const WEEKDAYS_EN = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
+const MONTHS_EN = {
+  january: 0, february: 1, march: 2, april: 3, may: 4, june: 5, july: 6, august: 7,
+  september: 8, october: 9, november: 10, december: 11,
+};
+
+// Inglés REDUCIDO (spec §8.4): importes con `.`/`,`, «at X»/«in X» para el comercio, «with
+// <name>», «yesterday»/«today»/nombres de día, categorías y cuentas por nombre. SIN números en
+// palabras (wordNumbers:false) — un parser inglés completo es otra PR (§12, fuera de alcance);
+// esconder la caja en inglés no es opción (regla de i18n del ecosistema).
+const RULES_EN = {
+  merchantTriggerSrc: "\\b(?:at|in)\\s+(?:the\\s+)?",
+  stopWords: ["with", "for", "today", "yesterday", "on"],
+  sharedTrigger: /\bwith\s+([a-z]+)\b/,
+  sharedAltTrigger: null,
+  // Sin trigger de porcentaje en inglés: "at NN%" colisionaría con el propio disparador de
+  // comercio ("at X"). No está en el alcance reducido de §8.4 (solo "with <name>" para compartido).
+  pctTrigger: null,
+  centsSeparators: [],
+  wordNumbers: false,
+  todayWord: /\btoday\b/,
+  yesterdayWord: /\byesterday\b/,
+  dayBeforeYesterdayWord: /\bthe\s+day\s+before\s+yesterday\b/,
+  weekdayRe: /\bon\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/,
+  weekdays: WEEKDAYS_EN,
+  monthDayRe: /\bthe\s+(\d{1,2})(?:st|nd|rd|th)?\s+of\s+([a-z]+)\b/,
+  months: MONTHS_EN,
+  dayOnlyRe: null,
+};
+
+export const RULES_BY_LANG = { es: RULES_ES, en: RULES_EN };
 
 // ---------------------------------------------------------------------- helpers de tramo (spans)
 
