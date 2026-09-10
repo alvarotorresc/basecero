@@ -1175,3 +1175,10 @@ body.onboarding .fab { display: none; }
   color: var(--ink);
   font-weight: 500;
 }
+/* Gasto por categoría (§9.7): el € es ahora la cifra destacada de la cabecera de fila (16px), pero
+   .money-cents/.money-cur son proporciones EM pensadas para figuras de 34-56px (SISTEMA §2.3) —
+   a 16px salen ilegibles (9/6.7px). Selector con ámbito (no se toca .money-cents/.money-cur en
+   sí) para que esta fila concreta lea 16/13/12, como el artboard. */
+.gc-amount { font-size: 16px; font-weight: 500; }
+.gc-amount .money-cents { font-size: .8125em; }
+.gc-amount .money-cur { font-size: .75em; }

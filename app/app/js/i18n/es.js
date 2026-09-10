@@ -360,18 +360,11 @@ export const ES = {
     },
     total: {
       title: "Gastado este periodo",
-      withLimit: {
-        one: "{spent} de {limit} en la única categoría con límite ({pct})",
-        other: "{spent} de {limit} en las {n} categorías con límite ({pct})",
-      },
-      remaining: {
-        one: "Te quedan {amount} en la única categoría con límite",
-        other: "Te quedan {amount} en las {n} categorías con límite",
-      },
-      over: {
-        one: "Te has pasado {amount} en la única categoría con límite",
-        other: "Te has pasado {amount} en las {n} categorías con límite",
-      },
+      // Decisión 6: el héroe ahora compara con el presupuesto GENERAL del periodo (suma de todos
+      // los budgetsOfPeriod), no con el subtotal de las categorías con límite —de ahí que withLimit/
+      // remaining/over (que sí hablaban de "la única categoría con límite"/"las N categorías con
+      // límite") se borren en este mismo commit: son la lectura antigua que se aparta del artboard.
+      ofBudget: "de {budget} presupuestados",
       noLimits: "Ninguna categoría tiene límite este periodo",
     },
     byCategory: {
@@ -386,9 +379,14 @@ export const ES = {
       prev: "{name} {amount}",
     },
     row: {
-      ofLimit: "{spent} de {limit}",
+      // Swap (§9.7): el € ya es la cifra destacada de la cabecera de fila, así que este pie deja
+      // de repetirlo — de "{spent} de {limit}" a solo "de {limit}".
+      ofLimit: "de {limit}",
       // Solo cuando se ha pasado del límite: el exceso, ya calculado, para no tener que restar de
-      // cabeza. Por debajo del límite se sigue usando ofLimit.
+      // cabeza. Sustituye a la línea ofLimit entera (no se pintan las dos a la vez).
+      overBy: "superado por {over}",
+      // ofLimitOver/noLimit/noPct (con {spent} en la plantilla, o pensados para el hueco de un %
+      // sin límite que ya no se pinta) se quedan sin consumidor: repetirían la cifra de la cabecera.
       ofLimitOver: "{spent} de {limit}, superado por {over}",
       noLimit: "{spent}, sin límite",
       noPct: "—",

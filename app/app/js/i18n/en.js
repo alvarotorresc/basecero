@@ -352,18 +352,7 @@ export const EN = {
     },
     total: {
       title: "Spent this period",
-      withLimit: {
-        one: "{spent} of {limit} in the only category with a limit ({pct})",
-        other: "{spent} of {limit} in the {n} categories with a limit ({pct})",
-      },
-      remaining: {
-        one: "You have {amount} left in the only category with a limit",
-        other: "You have {amount} left in the {n} categories with a limit",
-      },
-      over: {
-        one: "You’ve gone {amount} over in the only category with a limit",
-        other: "You’ve gone {amount} over in the {n} categories with a limit",
-      },
+      ofBudget: "of {budget} budgeted",
       noLimits: "No category has a limit this period",
     },
     byCategory: {
@@ -375,7 +364,8 @@ export const EN = {
       prev: "{name} {amount}",
     },
     row: {
-      ofLimit: "{spent} of {limit}",
+      ofLimit: "of {limit}",
+      overBy: "over by {over}",
       ofLimitOver: "{spent} of {limit}, over by {over}",
       noLimit: "{spent}, no limit",
       noPct: "—",
