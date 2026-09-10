@@ -13,10 +13,10 @@ test("subHeaderHtml: siempre TRES celdas, para que el título quede centrado de 
 });
 
 test("subHeaderHtml: escapa el título (puede venir del nombre de un periodo o de una etiqueta)", () => {
-  // escHtml, aquí y en las 15 pantallas, solo neutraliza & y < (attribute-safe por contrato,
-  // i18n.test.mjs lo comprueba); > no se escapa en ningún sitio del repo.
+  // escHtml viene de esc.js (PR chore/esc-html): superconjunto seguro que neutraliza & < > " ',
+  // no solo & y < como hacían la mayoría de las copias locales que reemplazó.
   const html = subHeaderHtml({ title: "Viaje <Japón> & Corea" });
-  assert.match(html, /Viaje &lt;Japón> &amp; Corea/);
+  assert.match(html, /Viaje &lt;Japón&gt; &amp; Corea/);
   assert.ok(!html.includes("<Japón>"));
 });
 
@@ -69,7 +69,7 @@ test("metaHtml: sin segmentos, .meta-row vacío", () => {
 });
 
 test("metaHtml: escapa cada segmento", () => {
-  assert.match(metaHtml(["<b>x</b>", "A & B"]), /&lt;b>x&lt;\/b>/);
+  assert.match(metaHtml(["<b>x</b>", "A & B"]), /&lt;b&gt;x&lt;\/b&gt;/);
   assert.match(metaHtml(["<b>x</b>", "A & B"]), /A &amp; B/);
 });
 

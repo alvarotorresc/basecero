@@ -14,14 +14,12 @@
  *  Cuelga de <body>, no de #screen: las pantallas se repintan enteras con innerHTML y se lo
  *  llevarían por delante (el recibo aparece justo DESPUÉS de que Registro haya cedido el sitio). */
 
+import { escHtml } from "./esc.js";
+
 const ENTER_MS = 600;   // velo 140 + impresión 420 + sello (arranca a 380, dura 220) = 600
 const HOLD_MS = 900;    // §4.13 fase 4
 const HOLD_REDUCED_MS = 600;
 const EXIT_MS = 260;    // §4.13 fase 5
-
-// & y < y > (mismo criterio que modal.js): un comercio o una nota con marcado no debe verse como
-// una etiqueta a medias.
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 // Los dos zigzags del borde, copiados de ReciboGuardado.dc.html:37,106 como constantes: mismo
 // `d`, pero `fill="currentColor"` en vez del hex a fuego, así que el color lo pone
