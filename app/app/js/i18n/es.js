@@ -30,6 +30,11 @@ export const ES = {
     // myShare/pctValue: SISTEMA.md §4.4, segmentos de metaHtml (movimientos.js:583, registro.js:504).
     myShare: "Tu parte",
     pctValue: "{pct} %",
+    // dateValue/amountValue: segmentos de metaHtml que envuelven una fecha/importe ya formateados
+    // (fmtDiaCorto/fmtMoney) para que pasen por t() como el resto de segmentos de una fila —
+    // spec §1.4/§4, fila de liquidar.js#rowHtml.
+    dateValue: "{date}",
+    amountValue: "{amount}",
     // myPartSuffix se queda en prosa (con su separador ya sin punto medio): lo siguen concatenando tal cual
     // inicio.js y semana.js, que esta PR no toca (spec §9.1/§9.2). myPart es el mismo segmento SIN
     // el prefijo, para el sub de movRowHtml (§2.1 bloque 7) cuando ese bloque pase a metaHtml.
@@ -318,14 +323,17 @@ export const ES = {
     net: { title: "Neto" },
     account: { title: "Cuenta de la liquidación" },
     empty: "No queda nada pendiente de liquidar.",
-    // select.aria: aria-label de la casilla de selección por fila (SISTEMA.md §4.8bis). Las
-    // demás claves de `select` (`none`) y las de `row` (`theirPct`/`myPct`) las añade Task 3.3.
+    // select.aria: aria-label de la casilla de selección por fila (SISTEMA.md §4.8bis).
+    // select.none: texto del botón de pie cuando no hay ninguna fila marcada.
     select: {
       aria: "Incluir {merchant} en la liquidación",
+      none: "Elige al menos un gasto",
     },
+    // row.theirPct/myPct: tercer segmento del sub de una fila (metaHtml), junto a
+    // common.dateValue/amountValue — sustituyen a subTheirs/subMine (spec §1.4/§4).
     row: {
-      subTheirs: "{date}, {amount}, su {pct} %",
-      subMine: "{date}, {amount}, tu {pct} %",
+      theirPct: "su {pct} %",
+      myPct: "tu {pct} %",
     },
     footer: {
       collect: "Cobrar {amount} de {name}",

@@ -4,22 +4,21 @@ import { fmtMoney, moneyPartsHtml, fmtDiaCorto } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
-import { subHeaderHtml } from "../ui.js";
+import { metaHtml, subHeaderHtml } from "../ui.js";
 import { icon } from "../icons.js";
 import { netOfSelected } from "../share-pct.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
-/** Fila de gasto pendiente: .dotico + nombre + sub (fecha · importe original · % de quien debe esa
- *  parte: el de la contraparte en las filas 'partner_owes', el MÍO en las 'i_owe')
- *  — réplica de docs/design/material-expresivo/Liquidar.dc.html:38-57 (clase `.tx`, sin envoltorio de tarjeta propio: la
- *  lista completa comparte una única `.card` con `<hr class="divider">` entre filas, mismo criterio
- *  que gasto-por-categoria.js/patrimonio.js#cuentasCardHtml). Task 5 (backlog, liquidar en bloque): la fila
- *  ya NO lleva botón propio — el artboard solo tiene el botón de liquidación al pie (armado
- *  inline en render(), más abajo), y con settleAllShared liquidando TODOS los pendientes visibles
- *  de una vez, un botón por fila liquidaría solo esa fila, un camino distinto al del artboard que
- *  ya no hace falta mantener.
+/** Fila de gasto pendiente: casilla + `.dotico.sm` (36px) + nombre + sub (fecha · importe
+ *  original · % de quien debe esa parte: el de la contraparte en las filas 'partner_owes', el
+ *  MÍO en las 'i_owe') — réplica de Liquidar.dc.html:50-92 (fila de 60px, sin envoltorio de
+ *  tarjeta propio: la lista completa comparte una única `.card` con `<hr class="divider">` entre
+ *  filas, mismo criterio que gasto-por-categoria.js/patrimonio.js#cuentasCardHtml). La fila NO
+ *  lleva botón propio de liquidar — el artboard solo tiene el botón de liquidación al pie (armado
+ *  inline en render(), más abajo); lo que SÍ lleva es la casilla de selección (§4.8bis), que
+ *  decide si la fila entra en el neto y en la liquidación de ese botón.
  *
  *  El % es DERIVADO de r.settle_cents/r.amount_cents (ambos vienen en la fila de
  *  pendingSettlements, sql.js) — no un campo nuevo. Se deriva aquí en vez de leer el pct del
@@ -27,14 +26,15 @@ const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&qu
  *  (puede tener override o venir de un periodo cerrado), así que recalcularlo desde ese mismo par
  *  de importes es más fiel que cualquier otra fuente disponible. Como settle_cents es «lo que la
  *  contraparte me debe» en 'partner_owes' y «lo que le debo yo» en 'i_owe', el MISMO cociente da el
- *  pct de ella en un caso y el mío en el otro: por eso el texto del sub se elige por dirección.
+ *  pct de ella en un caso y el mío en el otro: por eso la clave del tercer segmento del sub se
+ *  elige por dirección (liquidar.row.theirPct / .myPct).
  *  Sustituye al sub anterior (categoría · fecha): el nombre de categoría ya no se repite aquí
  *  porque el título ya lo usa como fallback (`r.merchant || catName`) y el artboard no lo lleva en
  *  el sub de ninguna fila.
  *
- *  `selected` es el `state.selected` (Set de ids) de renderLiquidar: decide si la casilla de la
- *  fila (SISTEMA.md §4.8bis) sale marcada. La fila entera sigue sin ser un botón — solo la
- *  casilla lo es — así que `wire()` cablea `[data-select]`, no la fila. */
+ *  `selected` es el `state.selected` (Set de ids) de renderLiquidar: decide si la casilla sale
+ *  marcada. La fila entera sigue sin ser un botón — solo la casilla lo es — así que `wire()`
+ *  cablea `[data-select]`, no la fila. */
 function rowHtml(r, byId, selected) {
   const cat = byId[r.category_id];
   const catName = cat?.name ?? "";
@@ -42,29 +42,31 @@ function rowHtml(r, byId, selected) {
   const catIcon = iconForCategory(r.category_id, byId);
   const title = r.merchant || catName || t("common.type.expense");
   const pct = r.amount_cents ? Math.round((r.settle_cents / r.amount_cents) * 100) : 0;
-  // subTheirs = «su {pct} %» (lo pagué yo, ella me debe esa parte); subMine = «tu {pct} %»
-  // (lo pagó ella, le debo mi parte). El importe original del ticket va en las dos.
-  const sub = t(r.direction === "i_owe" ? "liquidar.row.subMine" : "liquidar.row.subTheirs",
-    { date: fmtDiaCorto(r.date), amount: fmtMoney(r.amount_cents), pct });
+  const pctKey = r.direction === "i_owe" ? "liquidar.row.myPct" : "liquidar.row.theirPct";
+  const sub = metaHtml([
+    t("common.dateValue", { date: fmtDiaCorto(r.date) }),
+    t("common.amountValue", { amount: fmtMoney(r.amount_cents) }),
+    t(pctKey, { pct }),
+  ]);
   const checked = selected.has(r.id);
   return `
-    <div class="tx-row" style="padding:10px 0;">
+    <div class="tx-row" style="padding:12px 0;">
       <button type="button" class="check-box" role="checkbox" aria-checked="${checked}"
         aria-label="${escAttr(t("liquidar.select.aria", { merchant: title }))}"
         data-select="${escAttr(r.id)}">${icon("check", { size: 16, width: 2.6 })}</button>
-      <div class="dotico" style="--cat:${color};">${catIcon}</div>
+      <div class="dotico sm" style="--cat:${color};">${catIcon}</div>
       <div class="tx-body">
         <div class="tx-title">${escHtml(title)}</div>
-        <div class="tx-sub">${escHtml(sub)}</div>
+        ${sub}
       </div>
       <div class="num" style="font-size:14px;font-weight:700;flex-shrink:0;">${fmtMoney(r.settle_cents)}</div>
     </div>`;
 }
 
 /** Pantalla "Liquidar": dos secciones de gastos compartidos pendientes (de todos los periodos)
- *  —lo que me debe y lo que le debo— con el NETO en el hero; un solo botón liquida las dos
- *  direcciones a la vez, con selector de cuenta arriba y confirmación en dos toques. onBack vuelve
- *  a Inicio (que se re-renderiza entero, igual que renderRegistro/onDone en main.js).
+ *  —lo que me debe y lo que le debo— con el NETO de lo SELECCIONADO en el hero; un solo botón al
+ *  pie liquida las filas marcadas, con selector de cuenta arriba y confirmación en dos toques.
+ *  onBack vuelve a Inicio (que se re-renderiza entero, igual que renderRegistro/onDone en main.js).
  *
  *  El selector de cuenta va ANTES de la lista (no al pie, como en el artboard): settleAllShared
  *  exige accountId al liquidar (ver wire() más abajo), así que el usuario necesita poder elegirla
@@ -76,13 +78,14 @@ function rowHtml(r, byId, selected) {
  *  sobre app/js/screens/*.js y repo.js: solo comentarios internos, ningún string de UI) — brecha
  *  documentada, no fabricada (regla explícita del brief).
  *
- *  Task 5 (backlog, liquidar en bloque): UN solo botón al pie («Cobrar…»/«Pagar…»/«Liquidar ·
- *  queda a cero» según el signo del neto) liquida TODOS los pendientes actualmente listados
- *  (state.rows, ya filtrados/cargados arriba) con la cuenta seleccionada — repo.settleAllShared
- *  hace el execMany atómico (o se liquidan todos, o ninguno).
- *  Los botones por fila se retiran (ver rowHtml): el artboard solo tiene el botón del pie, y con la
- *  operación en bloque disponible, un botón que liquidara una única fila sería un segundo camino
- *  que el artboard no contempla — más simple mantener solo el que el diseño pide. */
+ *  UN solo botón al pie («Cobrar…»/«Pagar…»/«Liquidar, queda a cero» según el signo del neto
+ *  SELECCIONADO, o el aviso liquidar.select.none si no hay ninguna fila marcada) liquida las
+ *  filas de `state.selected` (por defecto, todas — decisión 3) con la cuenta elegida —
+ *  repo.settleAllShared hace el execMany atómico (o se liquidan todas las elegidas, o ninguna).
+ *  Los botones por fila no existen (ver rowHtml): el artboard solo tiene el botón del pie, y con
+ *  la operación en bloque disponible sobre un subconjunto elegible por casilla, un botón que
+ *  liquidara una única fila sería un segundo camino que el artboard no contempla — más simple
+ *  mantener solo el que el diseño pide. */
 export async function renderLiquidar(container, onBack) {
   let rows, accountsAll, byId, meta;
   try {
@@ -124,17 +127,25 @@ export async function renderLiquidar(container, onBack) {
       : net < 0
         ? t("common.settlement.youOwe", { name: escHtml(name) })
         : t("common.settlement.even");
-    const footerLabel = net > 0
-      ? (state.confirm ? t("liquidar.footer.collectConfirm", { amount: fmtMoney(net) })
-                       : t("liquidar.footer.collect", { amount: fmtMoney(net), name: escHtml(name) }))
-      : net < 0
-        ? (state.confirm ? t("liquidar.footer.payConfirm", { amount: fmtMoney(-net) })
-                         : t("liquidar.footer.pay", { amount: fmtMoney(-net), name: escHtml(name) }))
-        : (state.confirm ? t("liquidar.footer.evenConfirm") : t("liquidar.footer.even"));
+    // Sin ninguna fila marcada no hay nada que liquidar: el botón se deshabilita con un aviso
+    // propio en vez de dejar pulsar «Liquidar, queda a cero» (que es el label del neto 0 CON
+    // filas seleccionadas, un caso distinto: cobros y pagos elegidos que se cancelan entre sí).
+    const nothingSelected = state.selected.size === 0;
+    const footerLabel = nothingSelected
+      ? t("liquidar.select.none")
+      : net > 0
+        ? (state.confirm ? t("liquidar.footer.collectConfirm", { amount: fmtMoney(net) })
+                         : t("liquidar.footer.collect", { amount: fmtMoney(net), name: escHtml(name) }))
+        : net < 0
+          ? (state.confirm ? t("liquidar.footer.payConfirm", { amount: fmtMoney(-net) })
+                           : t("liquidar.footer.pay", { amount: fmtMoney(-net), name: escHtml(name) }))
+          : (state.confirm ? t("liquidar.footer.evenConfirm") : t("liquidar.footer.even"));
+    // Sin el padding:6px 16px que llevaba el .card: con el bloque a sangre, las filas quedan a
+    // ras del margen de pantalla (22px), como en Liquidar.dc.html.
     const sectionHtml = (titleText, rows) => rows.length === 0 ? "" : `
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">
         <div class="section-title">${titleText}</div>
-        <div class="card" style="padding:6px 16px;display:flex;flex-direction:column;">
+        <div class="card" style="display:flex;flex-direction:column;">
           ${rows.map((r) => rowHtml(r, byId, state.selected)).join('<hr class="divider">')}
         </div>
       </div>`;
@@ -162,7 +173,7 @@ export async function renderLiquidar(container, onBack) {
         ? `<div class="card" style="text-align:center;color:var(--text-3)"><p>${t("liquidar.empty")}</p></div>`
         : `${sectionHtml(t("common.settlement.theyOwe", { name: escHtml(name) }), theyOwe)}
           ${sectionHtml(t("common.settlement.youOwe", { name: escHtml(name) }), iOwe)}
-          <button type="button" class="btn-primary" id="liq-settle-all" ${state.busy ? "disabled" : ""}>
+          <button type="button" class="btn-primary" id="liq-settle-all" ${state.busy || nothingSelected ? "disabled" : ""}>
             ${footerLabel}
           </button>`}
     `;
@@ -207,7 +218,7 @@ export async function renderLiquidar(container, onBack) {
         state.busy = true;
         settleBtn.disabled = true;
         try {
-          await settleAllShared(state.rows.map((r) => r.id), state.accountId);
+          await settleAllShared([...state.selected], state.accountId);
           state.rows = await pendingSettlements();
           // Recarga → todo vuelve a marcarse (decisión 3): son gastos pendientes nuevos, ninguno
           // heredado del Set anterior seguiría siendo válido de todas formas.

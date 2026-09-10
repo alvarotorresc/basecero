@@ -30,6 +30,11 @@ export const EN = {
     // myShare/pctValue: mirrors ES — metaHtml segments (movimientos.js:583, registro.js:504).
     myShare: "Your share",
     pctValue: "{pct}%",
+    // dateValue/amountValue: metaHtml segments that wrap an already-formatted date/amount
+    // (fmtDiaCorto/fmtMoney) so they go through t() like every other row segment — spec
+    // §1.4/§4, liquidar.js#rowHtml.
+    dateValue: "{date}",
+    amountValue: "{amount}",
     // myPartSuffix stays prose (dot-free separator): inicio.js/semana.js keep concatenating it
     // as-is (§9.1/§9.2 don't touch it). myPart is the same segment WITHOUT the prefix, for
     // movRowHtml's sub (§2.1 block 7) once that block moves to metaHtml.
@@ -310,14 +315,17 @@ export const EN = {
     net: { title: "Net" },
     account: { title: "Settlement account" },
     empty: "Nothing left to settle.",
-    // select.aria: aria-label for the per-row selection checkbox (SISTEMA.md §4.8bis). The rest
-    // of `select` (`none`) and `row` (`theirPct`/`myPct`) are added by Task 3.3.
+    // select.aria: aria-label for the per-row selection checkbox (SISTEMA.md §4.8bis).
+    // select.none: footer button copy when no row is checked.
     select: {
       aria: "Include {merchant} in the settlement",
+      none: "Pick at least one expense",
     },
+    // row.theirPct/myPct: third metaHtml segment of a row's sub, alongside
+    // common.dateValue/amountValue — replace subTheirs/subMine (spec §1.4/§4).
     row: {
-      subTheirs: "{date}, {amount}, their {pct}%",
-      subMine: "{date}, {amount}, your {pct}%",
+      theirPct: "their {pct}%",
+      myPct: "your {pct}%",
     },
     footer: {
       collect: "Collect {amount} from {name}",
