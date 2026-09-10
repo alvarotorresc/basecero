@@ -22,16 +22,17 @@ const BTN_SECONDARY = "background:var(--card2);color:var(--text);border:0;"
  *  nav() bloqueado — ver main.js), así que un simple banner sin salida deja a quien lo use
  *  atrapado. "Reintentar" vuelve a montar la pantalla entera; "Volver" (solo en modo 'next',
  *  donde SÍ hay algo a lo que volver sin haber creado nada) llama a onDone() como cancelación. */
-function renderAsistenteError(container, mode, onDone, message) {
+function renderAsistenteError(container, { mode, onDone, onBack, embed }, message) {
   container.innerHTML = `
     <div class="banner-aviso red" style="margin-bottom:14px;">${escHtml(message)}</div>
     <div style="display:flex; gap:8px;">
       <button type="button" class="btn-primary" id="pn-error-retry" style="flex:1;">${t("common.retry")}</button>
       ${mode === "next" ? `<button type="button" id="pn-error-back" style="${BTN_SECONDARY}">${t("common.goBack")}</button>` : ""}
     </div>`;
-  container.querySelector("#pn-error-retry").onclick = () => renderPeriodoNuevo(container, { mode, onDone });
+  container.querySelector("#pn-error-retry").onclick =
+    () => renderPeriodoNuevo(container, { mode, onDone, onBack, embed });
   const back = container.querySelector("#pn-error-back");
-  if (back) back.onclick = () => onDone();
+  if (back) back.onclick = () => (onBack ?? onDone)();
 }
 
 /** Pantalla única (sin tab bar, flecha atrás) para abrir un periodo nuevo: en modo 'next'
@@ -50,7 +51,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     if (mode === "next") {
       closingPeriod = await getOpenPeriod();
       if (!closingPeriod) {
-        renderAsistenteError(container, mode, onDone, t("periodo.error.noOpenToClose"));
+        renderAsistenteError(container, { mode, onDone, onBack, embed }, t("periodo.error.noOpenToClose"));
         return;
       }
       const [spent, income, all, roots, budgetRows, metaAll, goals, accounts, defaultAccId] = await Promise.all([
@@ -72,7 +73,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
       [rootRows, meta] = await Promise.all([spentByRootCategory(""), getMetaAll()]);
     }
   } catch (e) {
-    renderAsistenteError(container, mode, onDone, t("periodo.error.load", { error: userMessage(e) }));
+    renderAsistenteError(container, { mode, onDone, onBack, embed }, t("periodo.error.load", { error: userMessage(e) }));
     return;
   }
   const partnerName = (meta.partner_name || "").trim();
