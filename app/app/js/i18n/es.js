@@ -886,6 +886,7 @@ export const ES = {
     stamp: "Guardado",
     total: "Total",
     undo: "Deshacer",
+    undone: "Movimiento deshecho",
     myPart: "Tu parte",
     undoFailed: "No se pudo deshacer: {error}",
   },

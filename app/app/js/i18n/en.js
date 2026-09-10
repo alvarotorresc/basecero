@@ -867,6 +867,7 @@ export const EN = {
     stamp: "Saved",
     total: "Total",
     undo: "Undo",
+    undone: "Movement undone",
     myPart: "Your share",
     undoFailed: "Could not undo: {error}",
   },

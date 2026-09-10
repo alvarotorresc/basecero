@@ -685,7 +685,14 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
           labels: { brand: "BaseCero", stamp: t("recibo.stamp"), total: t("recibo.total"), undo: t("recibo.undo") },
           onUndo: async () => {
             try {
+              // Borrado LÓGICO (softDeleteTransaction), NUNCA un DELETE: si lo que se acaba de
+              // guardar era una devolución/ajuste enlazado por refId, addTransaction ya puso
+              // settled=1 en el gasto que enlaza (repo.js) — solo la rama refund/adjustment de
+              // softDeleteTransaction (repo.js:399-403) deshace ese settled con
+              // unsettleIfNoActiveSettlements. Un DELETE dejaría ese gasto marcado como liquidado
+              // por un apunte que ya no existe.
               await softDeleteTransaction(newId);
+              showToast(t("recibo.undone"));
               onUndone?.();
             } catch (e) {
               showToast(t("recibo.undoFailed", { error: userMessage(e) }));
