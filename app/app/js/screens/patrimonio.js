@@ -3,73 +3,61 @@ import {
   getAccount, createAccount, updateAccount, listExpenseRootCategories, allCategoriesById,
   createGoal, updateGoal, softDeleteGoal, getAccountLoans, setAccountLoan,
 } from "../repo.js";
-import { colorForCategory, iconForCategory, POOL } from "../category-colors.js";
-import { fmtMoney, moneyPartsHtml, hoyISO, fmtDec1, currencySymbol, currencyCode, parseCentsRaw, centsToRaw } from "../format.js";
+import { colorForCategory, iconForCategory } from "../category-colors.js";
+import { fmtMoney, fmtMoneyParts, moneyPartsHtml, hoyISO, fmtDec1, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { netWorthBarsHtml } from "../charts.js";
 import { t } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { showConfirm } from "../modal.js";
-import { subHeaderHtml } from "../ui.js";
+import { subHeaderHtml, metaHtml } from "../ui.js";
+import { icon } from "../icons.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
 // ---- tarjeta "Patrimonio neto" --------------------------------------------
 
-// Color en style="stroke:..." (no en el atributo de presentación stroke="var(...)"), mismo
-// criterio que ICON_TRANSFER/ICON_UNCAT de movimientos.js — var() en style está garantizado por
-// CSS Values, no depende de que el motor resuelva custom properties en un atributo SVG.
-const ICON_ARROW = (up) => `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-    style="stroke:${up ? "var(--green)" : "var(--red)"};" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-    ${up ? '<path d="M12 19V5M12 5l-6 6M12 5l6 6"></path>' : '<path d="M12 5v14M12 19l-6-6M12 19l6-6"></path>'}
-  </svg>`;
-
-/** Tarjeta "Patrimonio neto": importe héroe (.amount-hero, 34/700) + badge de variación ABSOLUTA
- *  vs el último periodo CERRADO + evolución en barras (netWorthBarsHtml, charts.js) — réplica de
- *  docs/design/material-expresivo/Patrimonio.dc.html:32-59. La variación es el propio penúltimo vs último punto de
+/** Tarjeta "Patrimonio neto": importe héroe (.amount-hero.lg, 56px) + variación en texto plano
+ *  (sin píldora, sin flecha, §1.6) + línea de "operativo" (suma de las cuentas checking, el
+ *  subconjunto que ya lee balancesAt) + evolución en barras (netWorthBarsHtml, charts.js) —
+ *  réplica de Patrimonio.dc.html:24-40. La variación es el propio penúltimo vs último punto de
  *  `series` (el último es siempre "hoy"; el penúltimo, si existe, es el del último cerrado —
  *  mismos puntos que ya trae netWorthSeries, sin repetir la query, y que pinta netWorthBarsHtml).
- *  Sin ningún cerrado (series.length<2) no hay nada con qué comparar: se ocultan el badge y la
- *  línea de contexto («cierre de X: Y», el saldo de ese último cerrado). */
-function netWorthCardHtml(netWorthCents, series) {
+ *  Sin ningún cerrado (series.length<2) no hay nada con qué comparar: se oculta la variación. */
+function netWorthCardHtml(netWorthCents, series, accounts) {
   const n = series.length;
   const variation = n >= 2 ? series[n - 1].cents - series[n - 2].cents : null;
-  const up = variation === null || variation >= 0;
-  // Badge re-estilado como píldora con fondo tintado (mismo criterio color-mix que .banner-aviso /
-  // el badge "Este periodo: X/Y" de inicio.js), en vez del fondo hexadecimal fijo anterior.
-  const badgeHtml = variation === null ? "" : `
-    <div style="display:flex;align-items:center;gap:5px;background:color-mix(in srgb, ${up ? "var(--green)" : "var(--red)"} 16%, var(--card));border-radius:999px;padding:6px 10px;flex-shrink:0;">
-      ${ICON_ARROW(up)}
-      <div class="num" style="font-size:11px;font-weight:700;color:${up ? "var(--green)" : "var(--red)"};">${t("patrimonio.netWorth.deltaThisPeriod", { amount: fmtMoney(Math.abs(variation)) })}</div>
+  const operationalCents = accounts
+    .filter((a) => a.type === "checking")
+    .reduce((sum, a) => sum + a.balance_cents, 0);
+
+  // Anatomía del importe (§2.3) a mano, no moneyPartsHtml: sus tres spans fijan su propio color
+  // (money-cents en --ink-2, money-cur en --ink-3, app.css:780-781), que aquí pisaría el verde/
+  // rojo de la variación entera — el mismo problema que resuelve .amount-hero.text-green para el
+  // héroe, pero a 20px (no es un .amount-hero), así que se construye aquí en vez de reutilizarlo.
+  const variationHtml = variation === null ? "" : (() => {
+    const up = variation >= 0;
+    const color = up ? "var(--pos)" : "var(--danger)";
+    const { main, cents, suffix } = fmtMoneyParts(variation);
+    return `
+    <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
+      <div class="num" style="display:flex;align-items:baseline;font-size:20px;font-weight:600;letter-spacing:-.01em;color:${color};">
+        ${up ? "+" : ""}${escHtml(main)}<span style="font-size:14px;">${escHtml(cents)}</span><span style="font-size:12px;font-weight:500;margin-left:2px;">${escHtml(suffix)}</span>
+      </div>
+      <span style="font-size:13px;color:var(--ink-2);">${t("patrimonio.netWorth.thisPeriod")}</span>
     </div>`;
-  const prev = n >= 2 ? series[n - 2] : null;
-  const contextLineHtml = prev
-    ? `<span style="font-size:11px;color:var(--text-2);">${t("patrimonio.netWorth.closeContext", { label: escHtml(prev.label), amount: escHtml(fmtMoney(prev.cents)) })}</span>`
-    : "";
-  // Envuelto en un único div: el badge y la línea de contexto son hijos flex del propio `.card`
-  // (gap:16px) — sin este wrapper, un `prev` nulo (0 periodos cerrados) dejaría un hijo vacío
-  // ocupando igualmente el gap del padre.
-  const sideHtml = prev
-    ? `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">${badgeHtml}${contextLineHtml}</div>`
-    : "";
-  // netWorthBarsHtml devuelve dos filas hermanas (barras + etiquetas) pensadas para flujo de
-  // bloque, no para ser hijas directas de un flex column con gap — sin este wrapper el gap:16px
-  // del `.card` se cuela entre ambas filas y las separa del resto del texto que ya traen sus
-  // propios margin-top. Condicionado a que haya contenido: con <2 puntos, netWorthBarsHtml
-  // devuelve "" y no debe generar un hijo fantasma que igualmente ocupe el gap del padre.
+  })();
+
   const barsHtml = netWorthBarsHtml(series);
 
   return `
-    <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
-        <div style="display:flex;flex-direction:column;gap:6px;">
-          <div class="section-title">${t("patrimonio.netWorth.title")}</div>
-          <div class="amount-hero num">${moneyPartsHtml(netWorthCents)}</div>
-        </div>
-        ${sideHtml}
-      </div>
-      ${barsHtml ? `<div>${barsHtml}</div>` : ""}
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+      <div class="section-title">${t("patrimonio.netWorth.title")}</div>
+      <div class="amount-hero lg num">${moneyPartsHtml(netWorthCents)}</div>
+      ${variationHtml}
+      <div style="font-size:11px;color:var(--ink-3);">${t("patrimonio.operational", { amount: escHtml(fmtMoney(operationalCents)) })}</div>
+      ${barsHtml ? `<div style="margin-top:6px;">${barsHtml}</div>` : ""}
     </div>`;
 }
 
@@ -786,13 +774,13 @@ export async function renderPatrimonio(container) {
   function renderMain() {
     container.innerHTML = `
       <header class="screen-header">
-        <h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">${t("patrimonio.title")}</h1>
+        <h1>${t("patrimonio.title")}</h1>
         <p>${t("patrimonio.subtitle")}</p>
       </header>
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
-      ${netWorthCardHtml(netWorthOfBalances(accounts), series)}
+      ${netWorthCardHtml(netWorthOfBalances(accounts), series, accounts)}
       ${cuentasCardHtml(accounts, accountLoans)}
       ${objetivosCardHtml(goals)}
     `;

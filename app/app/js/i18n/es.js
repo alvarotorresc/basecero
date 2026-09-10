@@ -405,9 +405,9 @@ export const ES = {
     subtitle: "Calculado con todos tus movimientos",
     netWorth: {
       title: "Patrimonio neto",
-      deltaThisPeriod: "{amount} este periodo",
-      closeContext: "cierre de {label}: {amount}",
+      thisPeriod: "este periodo",
     },
+    operational: "Operativo, sin ahorro ni deudas: {amount}",
     accountType: {
       checking: "Corriente",
       savings: "Ahorro",

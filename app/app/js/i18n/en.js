@@ -394,9 +394,9 @@ export const EN = {
       // La card va justo bajo el H1 «Net worth»: en inglés se llama «Total» para no apilar
       // la misma frase dos veces (en español Patrimonio / Patrimonio neto ya divergen solos).
       title: "Total",
-      deltaThisPeriod: "{amount} this period",
-      closeContext: "close of {label}: {amount}",
+      thisPeriod: "this period",
     },
+    operational: "Operating, excluding savings and debt: {amount}",
     accountType: {
       checking: "Checking",
       savings: "Savings",
