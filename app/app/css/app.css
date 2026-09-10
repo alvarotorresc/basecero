@@ -974,7 +974,7 @@ body.onboarding .fab { display: none; }
 .sub-header-body { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 /* 17px sans 600 sin token propio, igual que .modal-title: §2.3 no publica ese tamaño y no se
    amplía la escala del sistema por un solo uso (ver D2 de la spec). */
-.sub-header-title { font: var(--t-section); font-size: 17px; color: var(--ink); }
+.sub-header-title { font: var(--t-section); font-size: 17px; color: var(--ink); margin: 0; }
 .sub-header-sub { font: var(--t-micro); font-size: 12px; color: var(--ink-3); text-align: center; }
 .sub-header-slot { width: 44px; height: 44px; flex-shrink: 0; }
 /* Variante de asistente (PeriodoNuevo.dc.html:24, Onboarding2-4): título --t-title a la

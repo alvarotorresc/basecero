@@ -38,7 +38,7 @@ export function subHeaderHtml({ title, id = "screen-back", subtitle = "", backLa
   return `<div class="sub-header${align === "start" ? " is-start" : ""}">
     ${left}
     <div class="sub-header-body">
-      <span class="sub-header-title">${escHtml(title)}</span>
+      <h1 class="sub-header-title">${escHtml(title)}</h1>
       ${subtitle ? `<span class="sub-header-sub">${escHtml(subtitle)}</span>` : ""}
     </div>
     ${right}
