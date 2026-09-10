@@ -74,9 +74,12 @@ function chipHtml(chip, byId) {
 /** Pantalla «Semana»: línea de tiempo día a día de la ventana de 7 días de semana-logic.js, con el
  *  día de hoy abierto por defecto y un acordeón de uno (Semana.dc.html). Misma firma que
  *  renderGastoPorCategoria (load/render/wire + el mismo tratamiento de error y de periodo cerrado
- *  en otra pestaña) — ver spec §8 y el patrón real en gasto-por-categoria.js. */
-export async function renderSemana(container, onBack) {
-  const state = { open: hoyISO() };
+ *  en otra pestaña) — ver spec §8 y el patrón real en gasto-por-categoria.js.
+ *  `openDay` (revisión de código): el día que hay que dejar desplegado al pintar, en vez de
+ *  hoyISO() por defecto — lo usa el onBack de abrir un detalle (más abajo) para que volver de un
+ *  movimiento no cierre el día que el usuario tenía abierto. */
+export async function renderSemana(container, onBack, { openDay } = {}) {
+  const state = { open: openDay ?? hoyISO() };
   let period = null;
   let days = [];
   let total = { totalCents: 0, avgCents: 0 };
@@ -235,7 +238,7 @@ export async function renderSemana(container, onBack) {
       };
     });
     container.querySelectorAll("[data-tx]").forEach((el) => {
-      el.onclick = () => openTxDetail(container, el.dataset.tx, () => renderSemana(container, onBack));
+      el.onclick = () => openTxDetail(container, el.dataset.tx, () => renderSemana(container, onBack, { openDay: state.open }));
     });
   }
 
