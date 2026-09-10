@@ -3,6 +3,7 @@ import { query, exec, execMany } from "./db.js";
 import { nowIso, hoyISO, prevDayIso, fmtMoney, fmtDec1, appLocale } from "./format.js";
 import { CONTRACT, insertSql } from "./contract.js";
 import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
+import { weekDates, fillDays } from "./semana-logic.js";
 import { resolveAccountId, sanitizeLoanMap, parseLoanMap } from "./account-defaults.js";
 import { POOL, CURATED_ICONS, CATEGORY_ICONS, parseStyle, initCategoryStyle } from "./category-colors.js";
 import { SEED_NAMES } from "./seeds.js";
@@ -218,22 +219,11 @@ export async function upsertBudget(periodId, categoryId, amountCents) {
  *  hace nada). No lleva guard: quitar algo que no está es una operación válida. */
 export const deleteBudget = (periodId, categoryId) => exec(SQL.softDeleteBudget, [nowIso(), periodId, categoryId]);
 
-/** Completa los huecos de SQL.spentByDay (que solo trae los días CON movimiento) con 0, para
- *  los 7 días naturales que terminan en `todayIso` (inclusive). Pura — sin I/O — para que
- *  spentLast7Days (que sí hace la query) sea testable sin duplicar la lógica de relleno (ver
- *  tests/app/charts.test.mjs, que reproduce el mismo query+fill a mano). */
-export function fillLast7Days(rows, todayIso) {
-  const byDate = Object.fromEntries(rows.map((r) => [r.date, r.cents]));
-  const end = new Date(todayIso + "T12:00:00");
-  const days = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(end);
-    d.setDate(d.getDate() - i);
-    const iso = d.toLocaleDateString("sv-SE");
-    days.push({ date: iso, cents: byDate[iso] ?? 0 });
-  }
-  return days;
-}
+/** Ventana semanal de la app: vive en semana-logic.js (puro y bajo test) para que el flujo de
+ *  Inicio, la pantalla Semana y esta función no puedan usar tres ventanas distintas. Antes
+ *  reimplementaba aquí mismo el relleno de huecos (ver tests/app/charts.test.mjs, que sigue
+ *  reproduciendo el mismo query+fill a mano como comprobación de regresión gratuita). */
+export const fillLast7Days = (rows, todayIso) => fillDays(rows, weekDates(todayIso));
 
 /** Tarjeta "Flujo de gasto" de Inicio (Task 12): gasto por día de los últimos 7 días naturales
  *  (hoy incluido), con los días sin movimiento a 0.
