@@ -254,6 +254,42 @@ test("layoutReport: sin comparativa no hay ningun porcentaje con signo", () => {
   assert.ok(!texts.some((s) => /^[+-]/.test(s)));
 });
 
+// Regresion: `page()` siempre resuelve a la ULTIMA pagina. Si la insignia se empuja con `page()`
+// DESPUES de las barras/el texto del signo (que pueden disparar ensure() y saltar de pagina), una
+// fila que se parte justo ahi deja la insignia huerfana en la pagina SIGUIENTE con la `y` de la
+// fila ANTERIOR — silenciosa, porque `b.y >= margin` sigue siendo cierto. Con 2 categorias
+// (smallReport) nunca se observa: hace falta bastantes mas para forzar un salto DENTRO de la
+// seccion de categorias.
+function reportWithManyCategories(n) {
+  const base = smallReport();
+  // spentCents todos cercanos entre si (1000..1000+n): las barras salen casi a ancho completo,
+  // muy lejos de BADGE_SIZE (6pt) — así un rect de 6x6 solo puede ser la insignia, nunca una barra.
+  const rows = Array.from({ length: n }, (_, i) => ({
+    rootId: `cat-gen-${i}`, name: `Categoria ${i}`, color: "#123456", textColor: "#456789", icon: "•",
+    spentCents: 1000 + i, limitCents: 0, pctOfLimit: 0, level: null, shareOfMax: 90,
+    prevCents: 900 + i, deltaCents: 100, deltaPct: 11.1, direction: "up",
+  }));
+  return {
+    ...base,
+    categories: {
+      rows, totalCents: rows.reduce((s, r) => s + r.spentCents, 0),
+      prevTotalCents: rows.reduce((s, r) => s + r.prevCents, 0), totalDeltaPct: 5, hasPrev: true,
+    },
+  };
+}
+
+test("layoutReport: con un salto de pagina dentro de categorias, la insignia se queda en la pagina de su nombre", () => {
+  const { pages } = layoutReport(reportWithManyCategories(30));
+  assert.ok(pages.length > 1, "hacen falta bastantes categorias para forzar el salto dentro de la seccion");
+  for (const p of pages) {
+    const badges = p.blocks.filter((b) => b.kind === "rect" && b.section === "categories" && b.w === 6 && b.h === 6);
+    for (const badge of badges) {
+      const nameDeEstaFila = p.blocks.some((b) => b.kind === "text" && b.section === "categories" && b.y === badge.y);
+      assert.ok(nameDeEstaFila, `insignia en y=${badge.y} sin el texto de su fila en la misma pagina`);
+    }
+  }
+});
+
 test("layoutReport: con comparativa, las paginas del PDF siguen siendo las que dijo layoutReport", async () => {
   const report = smallReport();
   const bytes = await buildPdfBytes(PDFLib, report);

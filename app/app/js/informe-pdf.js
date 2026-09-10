@@ -200,6 +200,10 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
     // categoría solo rellena la barra de abajo (y, con comparativa, la insignia), nunca el
     // texto (D5/D7 de la spec). Con comparativa, BADGE_INDENT le hace sitio a la insignia.
     const rowY = text("categories", `${c.name}  ${fmtMoney(c.spentCents)}`, { mono: true, indent: hasPrevCategories ? BADGE_INDENT : 0 });
+    // `page()` resuelve siempre a la ÚLTIMA página: hay que fijar la página del NOMBRE aquí,
+    // antes de que las barras/el texto de más abajo puedan disparar ensure() y saltar de página
+    // — si no, la insignia acabaría en la página siguiente con la `y` de la anterior.
+    const rowPage = page();
     bar("categories", { value: c.spentCents, max: maxSpent, color: c.color });
     if (hasPrevCategories) {
       // Segunda barra, atenuada, con el gasto del periodo anterior — misma escala (mismo
@@ -215,7 +219,9 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
       // Insignia del color de categoría, antes del nombre — se pinta DESPUÉS de la barra
       // principal (arriba) para no robarle el puesto: comparten color, y el test que busca "el
       // primer rect de este color" (barRowsGeometry) tiene que seguir encontrando la barra real.
-      page().blocks.push({ kind: "rect", section: "categories", x: margin, y: rowY, w: BADGE_SIZE, h: BADGE_SIZE, color: c.color });
+      // En `rowPage` (no `page()`): tiene que quedarse en la página del nombre, no en la que
+      // esté abierta después de las barras/el texto del signo.
+      rowPage.blocks.push({ kind: "rect", section: "categories", x: margin, y: rowY, w: BADGE_SIZE, h: BADGE_SIZE, color: c.color });
     }
   }
   text("categories", t("informe.pdf.categoriesTotal", { amount: fmtMoney(report.categories.totalCents) }), { bold: true, mono: true });
