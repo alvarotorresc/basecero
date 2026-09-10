@@ -92,8 +92,10 @@ function buildCategories({ spentByRoot, prevSpentByRoot, budgets, categoriesById
   // compareRoots (category-spend.js) es la extracción de lo que vivía aquí (Task 6,
   // etiquetas-design §7.1): un índice por rootId porque `sorted` ya reordenó las filas y
   // compareRoots devuelve su propio array en el orden de entrada, no el de pintado.
+  // hasPrev explícito: el periodo anterior puede existir sin gasto (prevSpentByRoot vacío), y
+  // compareRoots no puede distinguir eso de «no hay periodo anterior» a partir de las filas solas.
   const cmpByRoot = Object.fromEntries(
-    compareRoots(spentByRoot ?? [], prevSpentByRoot ?? []).map((c) => [c.rootId, c]),
+    compareRoots(spentByRoot ?? [], prevSpentByRoot ?? [], hasPrev).map((c) => [c.rootId, c]),
   );
 
   const rows = sorted.map((r) => {

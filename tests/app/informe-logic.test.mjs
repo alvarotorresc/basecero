@@ -223,6 +223,20 @@ test("buildReport: sin periodo anterior no hay comparativa", () => {
   }
 });
 
+test("buildReport: hubo periodo anterior pero sin gasto (prevSpentByRoot vacio) -> filas con prevCents 0, no sin comparativa", () => {
+  // hasPrev se decide por prevPeriod (!!prevPeriod), no por si prevSpentByRoot trae filas: un
+  // periodo anterior real en el que no se gasto nada llega con las dos cosas a la vez, y ahi la
+  // pantalla SI debe pintar «‹periodo› 0,00 €» en cada fila (no omitir la comparativa entera).
+  const r = buildReport({ ...fixture(), prevSpentByRoot: [] });
+  assert.equal(r.categories.hasPrev, true);
+  for (const row of r.categories.rows) {
+    assert.equal(row.prevCents, 0);
+    assert.equal(row.direction, "new");
+    assert.equal(row.deltaPct, null, "sin gasto previo no hay porcentaje que calcular");
+  }
+  assert.equal(r.categories.prevTotalCents, 0);
+});
+
 test("buildReport: categoria que no existia antes -> 'new', sin dividir por cero", () => {
   const f = fixture();
   f.spentByRoot.push({ root_id: "cat-nueva", name: "Categoria nueva", spent_cents: 5000 });

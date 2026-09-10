@@ -210,6 +210,17 @@ test("compareRoots: prevRows vacío (sin periodo anterior) -> todas 'new', delta
   }
 });
 
+test("compareRoots: hasPrev=true con prevRows vacío (hubo periodo anterior, sin gasto) -> prevCents 0 y direction 'new', no null", () => {
+  const bySpent = Object.fromEntries(CURRENT_ROWS.map((r) => [r.root_id, r.spent_cents]));
+  const rows = compareRoots(CURRENT_ROWS, [], true);
+  for (const row of rows) {
+    assert.equal(row.prevCents, 0);
+    assert.equal(row.deltaCents, bySpent[row.rootId], row.rootId); // no null: spent - 0
+    assert.equal(row.deltaPct, null, "sin gasto previo no hay porcentaje que calcular");
+    assert.equal(row.direction, "new", row.rootId);
+  }
+});
+
 test("compareRoots: deltaCents === 0 -> 'flat' (mismo gasto que el periodo anterior)", () => {
   const [row] = compareRoots(
     [{ root_id: "cat-igual", name: "Igual", spent_cents: 3000 }],

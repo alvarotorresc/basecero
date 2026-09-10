@@ -111,10 +111,13 @@ export function inheritedBudgetsRaw(budgetRows, rootRows) {
  *                 "new"  si prev <= 0 (no había con qué comparar)
  *                 "up"   si se gastó más   -> se pinta en --danger
  *                 "down" si se gastó menos -> se pinta en --pos   (gastar menos es bueno, SISTEMA §4.19)
- *  Con prevRows vacío (no hay periodo anterior) todas salen "new" con deltaPct null, y la pantalla
- *  omite la comparativa entera. */
-export function compareRoots(currentRows, prevRows) {
-  const hasPrev = (prevRows ?? []).length > 0;
+ *  `hasPrev`: por defecto se deduce de `prevRows`, pero eso confunde «no hay periodo anterior»
+ *  con «hubo periodo anterior y no se gastó nada en él» — ambos llegan con prevRows vacío. Quien
+ *  SÍ sabe la diferencia es el llamante (informe-logic.js#buildCategories ya calcula
+ *  `!!prevPeriod`), así que puede pasarlo explícito; con prevRows vacío pero hasPrev=true todas
+ *  las raíces salen con prevCents 0 (gasto previo real, aunque fuera nulo) en vez de null (no hay
+ *  con qué comparar), y la pantalla pinta la línea «‹periodo› 0,00 €» en vez de omitirla. */
+export function compareRoots(currentRows, prevRows, hasPrev = (prevRows ?? []).length > 0) {
   const prevByRoot = Object.fromEntries((prevRows ?? []).map((r) => [r.root_id, r.spent_cents]));
   return (currentRows ?? []).map((r) => {
     let prevCents = null, deltaCents = null, deltaPct = null, direction = "new";
