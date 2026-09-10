@@ -81,6 +81,14 @@ test("daysSinceLastEntry", () => {
   assert.equal(daysSinceLastEntry([], "2026-09-09"), null);
 });
 
+// Revisión de código: una fecha futura (reloj del dispositivo adelantado, o un apunte mal
+// tecleado) no debe apagar la regla 3 de la hucha silenciando el "sin apuntar" con un apunte que
+// en realidad todavía no ha pasado.
+test("daysSinceLastEntry: ignora las fechas futuras (> todayIso)", () => {
+  assert.equal(daysSinceLastEntry(["2026-10-01", "2026-09-06"], "2026-09-09"), 3);
+  assert.equal(daysSinceLastEntry(["2026-10-01"], "2026-09-09"), null);
+});
+
 const rule = (o) => ({ frequency: "monthly", due_day: 14, due_month: null, is_active: 1, ...o });
 
 test("nextDueDateIso: mensual este mes y el que viene", () => {

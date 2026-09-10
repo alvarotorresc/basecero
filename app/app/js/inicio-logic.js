@@ -105,11 +105,16 @@ export function streakDays(dates, todayIso) {
 }
 
 /** Días desde el último apunte (para el «Llevas N días sin apuntar» de la hucha). `dates` DESC
- *  (contrato de recentTxDates): dates[0] es la fecha más reciente. Sin ninguna fecha, null —
- *  el llamante decide si eso dispara la regla 3 o no (hoy no la dispara: ver huchaMessage). */
+ *  (contrato de recentTxDates): dates[0] es la fecha más reciente. Filtra aquí las fechas
+ *  FUTURAS (> todayIso — un apunte mal tecleado, o el reloj del dispositivo adelantado): sin este
+ *  filtro un apunte de mañana silenciaría la regla 3 aunque ayer no se hubiera apuntado nada.
+ *  Comparación de strings ISO (YYYY-MM-DD), sin pasar por Date: mismo orden que el cronológico.
+ *  Sin ninguna fecha pasada, null — el llamante decide si eso dispara la regla 3 o no (hoy no la
+ *  dispara: ver huchaMessage). */
 export function daysSinceLastEntry(dates, todayIso) {
-  if (!dates || dates.length === 0) return null;
-  const last = new Date(dates[0] + "T12:00:00");
+  const past = (dates ?? []).filter((d) => d <= todayIso);
+  if (past.length === 0) return null;
+  const last = new Date(past[0] + "T12:00:00");
   const today = new Date(todayIso + "T12:00:00");
   return Math.round((today - last) / 86400000);
 }
