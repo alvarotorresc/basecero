@@ -9,6 +9,7 @@ import { limitWarning } from "../limit-warning.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
+import { metaHtml } from "../ui.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { userMessage } from "../errors.js";
 import { focusInput } from "../viewport.js";
@@ -501,11 +502,11 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
           </div>
           <div style="display:flex; gap:8px;">
             <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
-              <div style="font-size:10px; color:var(--text-3);">${t("common.myShare", { pct: state.sharePct })}</div>
+              <div style="font-size:10px; color:var(--text-3);">${metaHtml([t("common.myShare"), t("common.pctValue", { pct: state.sharePct })])}</div>
               <div class="num" id="reg-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
             </div>
             <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
-              <div style="font-size:10px; color:var(--text-3);">${partnerPaid() ? t("common.paidFull", { name: escHtml(partnerName) }) : `${escHtml(partnerName)} · ${100 - state.sharePct}%`}</div>
+              <div style="font-size:10px; color:var(--text-3);">${partnerPaid() ? metaHtml([t("common.paidByName", { name: partnerName }), t("common.paidTotal")]) : `${escHtml(partnerName)} · ${100 - state.sharePct}%`}</div>
               <div class="num" id="reg-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerPaid() ? state.cents : partnerCents)}</div>
             </div>
           </div>

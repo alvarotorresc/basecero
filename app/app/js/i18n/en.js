@@ -27,8 +27,14 @@ export const EN = {
     to: "To",
     changeSign: "Change sign",
     linkedTo: "Linked to",
-    myShare: "Your share: {pct}%",
+    // myShare/pctValue: mirrors ES — metaHtml segments (movimientos.js:583, registro.js:504).
+    myShare: "Your share",
+    pctValue: "{pct}%",
+    // myPartSuffix stays prose (dot-free separator): inicio.js/semana.js keep concatenating it
+    // as-is (§9.1/§9.2 don't touch it). myPart is the same segment WITHOUT the prefix, for
+    // movRowHtml's sub (§2.1 block 7) once that block moves to metaHtml.
     myPartSuffix: ", your share {amount}",
+    myPart: "your share {amount}",
     sharedWith: "Shared with {name}",
     settlement: {
       theyOwe: "{name} owes you",
@@ -36,7 +42,11 @@ export const EN = {
       even: "You are square",
     },
     paidBy: { label: "Who paid", me: "I paid", partner: "{name} paid" },
-    paidFull: "{name} paid the full amount",
+    // paidByName/paidTotal: metaHtml segments for "{name} paid, full amount" (movimientos.js:587,
+    // registro.js:508). Different name from `paidBy` on purpose: `common.paidBy` is already the
+    // "Who paid" selector object above — reusing the name would shadow it.
+    paidByName: "{name} paid",
+    paidTotal: "full amount",
     split: { label: "Split", hint: "{name} pays {pct}%", decreaseAria: "Decrease your share", increaseAria: "Increase your share" },
     merchant: "Merchant",
     date: "Date",

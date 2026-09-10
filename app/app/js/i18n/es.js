@@ -27,8 +27,14 @@ export const ES = {
     to: "Hacia",
     changeSign: "Cambiar signo",
     linkedTo: "Vinculado a",
-    myShare: "Tu parte: {pct} %",
+    // myShare/pctValue: SISTEMA.md §4.4, segmentos de metaHtml (movimientos.js:583, registro.js:504).
+    myShare: "Tu parte",
+    pctValue: "{pct} %",
+    // myPartSuffix se queda en prosa (con su separador ya sin punto medio): lo siguen concatenando tal cual
+    // inicio.js y semana.js, que esta PR no toca (spec §9.1/§9.2). myPart es el mismo segmento SIN
+    // el prefijo, para el sub de movRowHtml (§2.1 bloque 7) cuando ese bloque pase a metaHtml.
     myPartSuffix: ", tu parte {amount}",
+    myPart: "tu parte {amount}",
     sharedWith: "Compartido con {name}",
     settlement: {
       theyOwe: "{name} te debe",
@@ -36,7 +42,12 @@ export const ES = {
       even: "Estáis en paz",
     },
     paidBy: { label: "Quién pagó", me: "Pagué yo", partner: "Pagó {name}" },
-    paidFull: "{name} pagó el total",
+    // paidByName/paidTotal: segmentos de metaHtml para «{name} pagó, total» (movimientos.js:587,
+    // registro.js:508). Nombre distinto de `paidBy` a propósito: `common.paidBy` ya es el objeto
+    // del selector «Quién pagó» de arriba — reutilizar el nombre lo pisaría. Sustituyen a
+    // `paidFull`, que se borra: sin más consumidores tras este cambio.
+    paidByName: "pagó {name}",
+    paidTotal: "total",
     split: { label: "Reparto", hint: "{name} paga el {pct} %", decreaseAria: "Bajar tu parte", increaseAria: "Subir tu parte" },
     merchant: "Comercio",
     date: "Fecha",
