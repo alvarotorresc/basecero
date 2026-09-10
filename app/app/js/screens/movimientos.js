@@ -864,11 +864,11 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     const currentPeriod = periods[periodIdx] ?? periods[0];
 
     // Chips por categoría raíz (artboard Movimientos.dc.html:32-35): activa = tinta invertida
-    // (.chip.active del sistema). Un color inline SIEMPRE gana sobre una regla de clase, así que
-    // fijar style="color:X" también cuando está activa taparía el color:var(--bg) de .chip.active
-    // y rompería la inversión — por eso el textColorForCategory de la raíz solo se fija inline
-    // cuando la chip NO está activa; sin tinte de fondo (a diferencia de .chip-icon, que sí lleva
-    // círculo — el artboard aquí es texto plano con el emoji delante).
+    // (.chip.active del sistema); inactiva = texto en --ink-2 neutro (el color de .chip por
+    // defecto), SOLO el emoji lleva el tinte de la categoría — el artboard aquí es texto plano
+    // con el emoji delante, sin tinte de fondo (a diferencia de .chip-icon, que sí lleva círculo).
+    // Por eso el color va en un <span> alrededor del emoji, nunca en el botón entero: un color
+    // inline en el botón SIEMPRE ganaría sobre .chip.active y rompería la inversión al activarse.
     const catChipsHtml = rootCats.map((catId) => {
       const active = state.filter.rootCatId === catId;
       // catIcon: mismo criterio que movRowHtml — deja el nombre `icon` libre para la función
@@ -876,7 +876,9 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       const catIcon = iconForCategory(catId, byId);
       const name = byId[catId]?.name ?? "";
       const color = textColorForCategory(catId, byId);
-      return `<button type="button" class="chip${active ? " active" : ""}" data-chip-cat="${catId}" style="padding:0 14px;${active ? "" : `color:${color};`}">${catIcon} ${escHtml(name)}</button>`;
+      return `<button type="button" class="chip${active ? " active" : ""}" data-chip-cat="${catId}" style="padding:0 14px;">
+        <span style="${active ? "" : `color:${color};`}">${catIcon}</span> ${escHtml(name)}
+      </button>`;
     }).join("");
 
     // Chip "Sin categoría · N" (artboard Movimientos.dc.html:35): activa = tinta invertida;
