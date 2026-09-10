@@ -74,9 +74,12 @@ export function createModal(doc, { pushBack, goBack, win }) {
       dlg.showModal();
       // {scroll:false}: abrir/cerrar el modal apunta una entrada de historial pero no es un cambio
       // de pantalla — la pantalla de detrás debe quedarse donde estaba (back.js: push/popstate).
+      // {chrome:false}: por el mismo motivo, tampoco es un cambio de subpantalla — abrir o cerrar
+      // el modal no debe encender ni apagar `body.subscreen` (tab bar/FAB y el padding de
+      // `main#screen`), que se quede como estuviera la pantalla de detrás (back.js: syncChrome).
       // showModal() va ANTES que esto: si pushBack lanza, el diálogo ya está abierto y Cancelar
       // debe poder cerrarlo igual (arriba, con pushed=false, sin tocar goBack()).
-      try { pushBack(() => { byBack = true; dlg.close(); }, { scroll: false }); pushed = true; } catch {}
+      try { pushBack(() => { byBack = true; dlg.close(); }, { scroll: false, chrome: false }); pushed = true; } catch {}
       dlg.querySelector("#modal-cancel").onclick = () => dlg.close();
       dlg.querySelector("#modal-confirm").onclick = () => { confirmed = true; dlg.close(); };
       dlg.querySelector("#modal-cancel").focus();

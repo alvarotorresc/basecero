@@ -114,10 +114,10 @@ test("confirm: apunta una entrada en la pila de atras", () => {
   assert.deepEqual(calls, ["pushBack"]);
 });
 
-test("confirm: pushBack recibe {scroll:false} — el modal no es un cambio de pantalla", () => {
+test("confirm: pushBack recibe {scroll:false, chrome:false} — el modal no es un cambio de pantalla ni de subpantalla", () => {
   const { backOpts, modal } = harness();
   modal.confirm(OPTS);
-  assert.deepEqual(backOpts, [{ scroll: false }]);
+  assert.deepEqual(backOpts, [{ scroll: false, chrome: false }]);
 });
 
 test("cancelar: cierra, desmonta, deshace la entrada y NO ejecuta onConfirm", () => {
