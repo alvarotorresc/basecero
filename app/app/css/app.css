@@ -776,7 +776,7 @@ body.onboarding .fab { display: none; }
 #toast {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 12px);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 84px);
   z-index: 25;
   width: calc(100% - 2 * var(--pad-screen));
   max-width: 440px;
