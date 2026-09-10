@@ -1,6 +1,7 @@
 import {
   addTransaction, getOpenPeriod, listExpenseLeafCategories, listIncomeCategories,
   listAccounts, allCategoriesById, recentForRefund, getMetaAll, softDeleteTransaction,
+  loadMerchantMemory,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
@@ -12,6 +13,7 @@ import { focusInput } from "../viewport.js";
 import { showReceipt } from "../recibo.js";
 import { showToast } from "../toast.js";
 import { quickRegisterEnabled, detailsOpen, foldedSummaryParts, visibleCategories } from "../registro-mode.js";
+import { normalizeMerchant, memoryPatch } from "../merchant-memory.js";
 
 // labelKey/SAVE_KEY en vez de texto resuelto: son consts de módulo, evaluadas al importar el
 // fichero (antes de que boot() llame a initI18n con el idioma real) — si guardaran el string ya
@@ -42,20 +44,28 @@ const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt
  *  «Deshacer» en el recibo — sin esto, el movimiento borrado se queda pintado hasta la siguiente
  *  navegación. */
 export async function renderRegistro(container, onDone, prefill, onUndone) {
-  let period, expenseCats, incomeCats, accountsAll, byId, meta;
+  let period, expenseCats, incomeCats, accountsAll, byId, meta, merchantMemoryMap;
   try {
-    [period, expenseCats, incomeCats, accountsAll, byId, meta] = await Promise.all([
+    [period, expenseCats, incomeCats, accountsAll, byId, meta, merchantMemoryMap] = await Promise.all([
       getOpenPeriod(),
       listExpenseLeafCategories(),
       listIncomeCategories(),
       listAccounts(),
       allCategoriesById(),
       getMetaAll(),
+      loadMerchantMemory(),
     ]);
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">${t("registro.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
+
+  // Registro v2 §5.4: opciones del <datalist> nativo, ordenadas por uso (count desc) y luego por
+  // la más reciente, cap 200 — no cambian durante la sesión de este formulario, así que se
+  // calculan UNA vez y no en cada render().
+  const merchantOptions = Object.values(merchantMemoryMap)
+    .sort((a, b) => b.count - a.count || String(b.lastUsedAt).localeCompare(String(a.lastUsedAt)))
+    .slice(0, 200);
 
   let refundCandidates = [];
   if (period) {
@@ -89,6 +99,11 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     quick: quickRegisterEnabled(meta.quick_register),
     expanded: false,
     allCats: false,
+    // Registro v2 §5.4: campos que el usuario ya tocó a mano en ESTE formulario — la memoria de
+    // comercios nunca vuelve a pisarlos (registro-mode no interviene aquí; es del formulario, no
+    // de la densidad). merchantRemembered pinta la pista «recordado de la última vez».
+    touched: new Set(),
+    merchantRemembered: false,
   };
   let errorMsg = "";
 
@@ -333,14 +348,20 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
 
       <div style="display:flex; gap:8px; margin-bottom:12px;">
         <label class="field field-stack" style="flex:1;">
-          <span class="field-label">${t("common.merchant")}</span>
-          <input type="text" id="reg-merchant" value="${escAttr(state.merchant)}" placeholder="${t("common.optional")}">
+          <span style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+            <span class="field-label">${t("common.merchant")}</span>
+            ${state.merchantRemembered ? `<span style="font-size:11px; font-weight:500; color:var(--accent);">${t("registro.merchant.remembered")}</span>` : ""}
+          </span>
+          <input type="text" id="reg-merchant" list="reg-merchants" value="${escAttr(state.merchant)}" placeholder="${t("common.optional")}" aria-label="${t("registro.merchant.listLabel")}">
         </label>
         <label class="field field-stack" style="flex:1;">
           <span class="field-label">${t("common.date")}</span>
           <input type="date" id="reg-fecha" value="${state.fecha}">
         </label>
       </div>
+      <datalist id="reg-merchants">
+        ${merchantOptions.map((e) => `<option value="${escAttr(e.display)}"></option>`).join("")}
+      </datalist>
       <label class="field field-stack" style="margin-bottom:18px;">
         <span class="field-label">${t("common.note")}</span>
         <input type="text" id="reg-note" value="${escAttr(state.note)}" placeholder="${t("common.optional")}">
@@ -411,6 +432,9 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         // Mismo criterio que el guard B4 de ingresos: un 'partner' heredado no puede colarse con el
         // control oculto (solo se pinta para expense).
         state.paidBy = "me";
+        // Un touched de un tipo anterior (p.ej. categoryId de un gasto) no tiene sentido para el
+        // tipo nuevo — categoryId ya se acaba de borrar dos líneas arriba.
+        state.touched = new Set();
         errorMsg = "";
         render();
       };
@@ -419,6 +443,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     container.querySelectorAll("[data-cat]").forEach((b) => {
       b.onclick = () => {
         state.categoryId = b.dataset.cat;
+        state.touched.add("categoryId");
         errorMsg = "";
         render();
       };
@@ -436,6 +461,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     container.querySelectorAll("[data-acc]").forEach((b) => {
       b.onclick = () => {
         state.accountId = b.dataset.acc;
+        state.touched.add("accountId");
         if (state.counterAccountId === state.accountId) state.counterAccountId = "";
         render();
       };
@@ -493,7 +519,29 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     // Registro v2 §4.3: los tres viven dentro del bloque que se pliega tras «Más» en modo rápido
     // — sin el guard, wire() lanzaría al no encontrar el elemento con el bloque plegado.
     const merchantInput = container.querySelector("#reg-merchant");
-    if (merchantInput) merchantInput.oninput = (e) => { state.merchant = e.target.value; };
+    if (merchantInput) merchantInput.oninput = (e) => {
+      state.merchant = e.target.value;
+      // Registro v2 §5.4: casar EXACTO por valor normalizado, nunca por prefijo (rellenaría la
+      // categoría a media palabra). Todo lo rellenado es editable y respeta `touched`
+      // (memoryPatch). Un render() completo hace falta porque el parche puede tocar categoría,
+      // cuenta y el toggle de compartido a la vez — se refoca el propio campo desde AQUÍ, nunca
+      // desde render() (mismo criterio que el «Más», §4.5).
+      const entry = merchantMemoryMap[normalizeMerchant(state.merchant)];
+      if (entry) {
+        const patch = memoryPatch(entry, state.touched);
+        Object.assign(state, patch);
+        // share_pct_override llega crudo de la BD (REAL, puede venir fuera de rango): se normaliza
+        // igual que cualquier otro pct que entra desde fuera del propio stepper.
+        if ("sharePct" in patch) state.sharePct = normalizePct(patch.sharePct, state.sharePct);
+        state.merchantRemembered = true;
+        render();
+        focusInput(container.querySelector("#reg-merchant"));
+      } else if (state.merchantRemembered) {
+        state.merchantRemembered = false;
+        render();
+        focusInput(container.querySelector("#reg-merchant"));
+      }
+    };
     const noteInput = container.querySelector("#reg-note");
     if (noteInput) noteInput.oninput = (e) => { state.note = e.target.value; };
     const fechaInput = container.querySelector("#reg-fecha");
@@ -517,6 +565,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     const sharedToggle = container.querySelector("#reg-shared");
     if (sharedToggle) sharedToggle.onchange = (e) => {
       state.isShared = e.target.checked;
+      state.touched.add("isShared");
       // Desmarcar compartido devuelve el gasto a «Pagué yo»: sin esto un 'partner' heredado
       // sobreviviría con el control oculto y la cuenta volvería a ser obligatoria sin decirlo.
       state.paidBy = "me";

@@ -200,6 +200,10 @@ export const EN = {
       summaryPhoto: "has a photo",
       summaryToday: "today",
     },
+    merchant: {
+      remembered: "remembered from last time",
+      listLabel: "Recent merchants",
+    },
     refund: {
       unlink: "Remove link",
       toggle: "Refunding an expense? {arrow}",

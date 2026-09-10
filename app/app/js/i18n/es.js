@@ -205,6 +205,10 @@ export const ES = {
       summaryPhoto: "con foto",
       summaryToday: "hoy",
     },
+    merchant: {
+      remembered: "recordado de la última vez",
+      listLabel: "Comercios recientes",
+    },
     refund: {
       unlink: "Quitar vínculo",
       toggle: "¿Devuelve un gasto? {arrow}",
