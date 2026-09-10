@@ -353,21 +353,24 @@ export async function renderPatrimonio(container) {
         <input type="text" id="acc-name" value="${escAttr(f.name)}" placeholder="${t("common.egPlaceholder", { example: "Revolut" })}">
       </label>
 
-      <div class="segmented" style="margin-bottom:18px;">
-        ${ACCOUNT_TYPES.map((at) => `<button type="button" data-acc-tipo="${at.id}" class="${f.type === at.id ? "active" : ""}">${t(at.labelKey)}</button>`).join("")}
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+        <span class="field-label">${t("common.typeLabel")}</span>
+        <div class="chips">
+          ${ACCOUNT_TYPES.map((at) => `<button type="button" class="chip${f.type === at.id ? " active" : ""}" data-acc-tipo="${at.id}">${t(at.labelKey)}</button>`).join("")}
+        </div>
       </div>
 
-      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px;">
-        <div class="section-title">${t("patrimonio.account.openingBalance")}</div>
+      <div style="display:flex; flex-direction:column; gap:4px; padding-bottom:8px; margin-bottom:8px; border-bottom:2px solid var(--accent);">
+        <span style="font-size:13px;font-weight:500;color:var(--accent);">${t("patrimonio.account.openingBalance")}</span>
         <div class="amount-display" style="align-items:center;">
           <button type="button" class="icon-btn" id="acc-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;">${f.sign}</button>
           <input type="text" inputmode="decimal" id="acc-raw" value="${escAttr(f.raw)}" placeholder="0"
-            style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
-          <span class="amount-currency">${currencySymbol()}</span>
+            style="border:0;background:none;color:var(--ink);font:600 36px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
+          <span class="amount-currency" style="font-size:17px;">${currencySymbol()}</span>
+          <span style="width:2px;height:30px;background:var(--accent);margin-left:4px;flex-shrink:0;" aria-hidden="true"></span>
         </div>
-        <hr class="divider" style="margin-top:6px;">
       </div>
-      <div style="font-size:11px;color:var(--text-3);margin-bottom:18px;">
+      <div style="font-size:11px;color:var(--ink-3);margin-bottom:18px;">
         ${f.type === "liability"
           ? t("patrimonio.account.note.liability")
           : t("patrimonio.account.note.default")}
@@ -378,7 +381,7 @@ export async function renderPatrimonio(container) {
         <div class="section-title">${t("patrimonio.account.monthlyInstallment")}</div>
         <div class="amount-display" style="align-items:center;">
           <input type="text" inputmode="decimal" id="acc-loan-raw" value="${escAttr(f.loanRaw)}" placeholder="0"
-            style="border:0;background:none;color:var(--text);font:600 32px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
+            style="border:0;background:none;color:var(--ink);font:600 32px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
           <span class="amount-currency">${currencySymbol()}</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
@@ -550,24 +553,28 @@ export async function renderPatrimonio(container) {
         <input type="text" inputmode="decimal" id="goal-pct" value="${escAttr(f.pct)}" placeholder="${t("common.egPlaceholder", { example: "20" })}">
       </label>`;
     }
-    // savings_target / provision / spending_cap: los 3 llevan un importe objetivo.
+    // savings_target / provision / spending_cap: los 3 llevan un importe objetivo, "Meta" a 34px
+    // (campo destacado en --accent, D13) en vez de los 56px de un héroe de pantalla.
     const amountLabel = f.type === "provision" ? t("patrimonio.goal.amountLabel.annual") : t("patrimonio.goal.amountLabel.default");
     const amountHtml = `
-      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
-        <div class="section-title">${amountLabel}</div>
+      <div style="display:flex; flex-direction:column; gap:4px; padding-bottom:8px; margin-bottom:8px; border-bottom:2px solid var(--accent);">
+        <span style="font-size:13px;font-weight:500;color:var(--accent);">${amountLabel}</span>
         <div class="amount-display" style="align-items:center;">
           <input type="text" inputmode="decimal" id="goal-raw" value="${escAttr(f.raw)}" placeholder="0"
-            style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
-          <span class="amount-currency">${currencySymbol()}</span>
+            style="border:0;background:none;color:var(--ink);font:600 34px var(--font-num);letter-spacing:-0.015em;width:100%;outline:none;">
+          <span class="amount-currency" style="font-size:15px;">${currencySymbol()}</span>
+          <span style="width:2px;height:28px;background:var(--accent);margin-left:4px;flex-shrink:0;" aria-hidden="true"></span>
         </div>
-        <hr class="divider" style="margin-top:6px;">
       </div>`;
 
     if (f.type === "savings_target") {
       return `${amountHtml}
       <label class="field field-stack" style="margin-bottom:18px;">
         <span class="field-label">${t("patrimonio.goal.dateLabel")}</span>
-        <input type="date" id="goal-date" value="${escAttr(f.targetDate)}">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="color:var(--ink-3);flex-shrink:0;display:flex;">${icon("calendar", { size: 18 })}</span>
+          <input type="date" id="goal-date" value="${escAttr(f.targetDate)}" style="flex:1;">
+        </div>
       </label>`;
     }
 
@@ -578,10 +585,10 @@ export async function renderPatrimonio(container) {
         <div class="chips-scroll">
           ${expenseRootCats.map((c) => {
             const color = colorForCategory(c.id, byId);
-            const icon = iconForCategory(c.id, byId);
+            const catIcon = iconForCategory(c.id, byId);
             const active = f.categoryId === c.id;
             return `<button type="button" class="chip-v${active ? " active" : ""}" data-goal-cat="${c.id}" style="--cat:${color};">
-              <span class="chip-icon">${icon}</span><span>${escHtml(c.name)}</span>
+              <span class="chip-icon">${catIcon}</span><span>${escHtml(c.name)}</span>
             </button>`;
           }).join("")}
         </div>
@@ -595,6 +602,10 @@ export async function renderPatrimonio(container) {
     const f = state.goalForm;
     const editing = !!state.editingGoalId;
     const isHucha = HUCHA_GOAL_TYPES.has(f.type);
+    // "Ahorrado hoy" (spec §3.3.4): el dato ya está en `goals` (goalsWithProgress, cargado en
+    // loadData) — se busca por id en vez de recalcularlo. Solo existe editando: un goal nuevo
+    // todavía no tiene progreso que mostrar.
+    const progress = editing ? goals.find((x) => x.goal.id === state.editingGoalId) : null;
 
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
 
@@ -610,20 +621,33 @@ export async function renderPatrimonio(container) {
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
         <span class="field-label">${t("common.typeLabel")}</span>
         <div style="padding:14px 16px;font-size:15px;font-weight:600;background:var(--card2);border-radius:var(--radius-sm);">${t(GOAL_TYPE_KEY[f.type])}</div>
-        <div style="font-size:11px;color:var(--text-3);">${t("patrimonio.goal.typeLockedNote")}</div>
+        <div style="font-size:11px;color:var(--ink-3);">${t("patrimonio.goal.typeLockedNote")}</div>
       </div>` : `
-      <div class="segmented" style="margin-bottom:18px;">
-        ${GOAL_TYPES.map((gt) => `<button type="button" data-goal-tipo="${gt.id}" class="${f.type === gt.id ? "active" : ""}">${t(gt.labelKey)}</button>`).join("")}
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+        <span class="field-label">${t("common.typeLabel")}</span>
+        <div class="chips">
+          ${GOAL_TYPES.map((gt) => `<button type="button" class="chip${f.type === gt.id ? " active" : ""}" data-goal-tipo="${gt.id}">${t(gt.labelKey)}</button>`).join("")}
+        </div>
       </div>`}
 
       ${renderGoalConditionalFields(f)}
 
+      ${progress ? `
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
+          <span class="field-label">${t("patrimonio.goal.savedToday")}</span>
+          <div class="num" style="font-size:16px;font-weight:600;color:var(--ink);">${fmtGoalAmount(progress.goal, progress.currentCents)}</div>
+        </div>
+        <div class="bar" style="--cat:var(--pos);"><i style="width:${Math.min(100, Math.max(0, progress.pct))}%;"></i></div>
+        <span class="num" style="font-size:12px;font-weight:600;color:var(--ink-2);align-self:flex-end;">${Math.round(progress.pct)} %</span>
+      </div>` : ""}
+
       ${isHucha ? `
       <div class="card" style="padding:12px 14px; margin-bottom:18px;">
         ${editing ? `
-        <div style="font-size:10px; color:var(--text-3);">${t("patrimonio.goal.linkedSavings")}</div>
+        <div style="font-size:10px; color:var(--ink-3);">${t("patrimonio.goal.linkedSavings")}</div>
         <div style="font-size:14px; font-weight:600;">${escHtml(f.accountName || "—")}</div>`
-          : `<div style="font-size:12px;color:var(--text-2);">${t("patrimonio.goal.autoSavingsNote")}</div>`}
+          : `<div style="font-size:12px;color:var(--ink-2);">${t("patrimonio.goal.autoSavingsNote")}</div>`}
       </div>` : ""}
 
       <div class="card" style="padding:0 16px; margin-bottom:18px;">
@@ -641,12 +665,7 @@ export async function renderPatrimonio(container) {
       <button type="button" class="btn-primary" id="goal-save" style="margin-bottom:${editing ? "10px" : "0"};">
         ${editing ? t("common.saveChanges") : t("patrimonio.goal.create")}
       </button>
-      ${editing ? `
-      <button type="button" id="goal-delete"
-        style="width:100%;background:transparent;color:var(--red);
-          border:1px solid var(--red);border-radius:var(--radius-sm);padding:16px;font:600 16px var(--font-ui);cursor:pointer;">
-        ${t("patrimonio.goal.delete")}
-      </button>` : ""}
+      ${editing ? `<button type="button" class="btn-danger" id="goal-delete">${t("patrimonio.goal.delete")}</button>` : ""}
     `;
 
     if (prevChipsScroll != null) {

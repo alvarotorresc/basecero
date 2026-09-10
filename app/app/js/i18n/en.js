@@ -446,6 +446,7 @@ export const EN = {
       amountLabel: { annual: "Annual target", default: "Target amount" },
       dateLabel: "Target date (optional)",
       typeLockedNote: "The type can’t be changed once the goal is created. To change it, delete it and create a new one.",
+      savedToday: "Saved so far",
       linkedSavings: "Linked savings",
       autoSavingsNote: "Its savings account will be created automatically",
       activeLabel: "Active",

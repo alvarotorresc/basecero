@@ -459,6 +459,7 @@ export const ES = {
       amountLabel: { annual: "Objetivo anual", default: "Importe objetivo" },
       dateLabel: "Fecha objetivo (opcional)",
       typeLockedNote: "El tipo no se puede cambiar una vez creado el objetivo. Para cambiarlo, bórralo y crea uno nuevo.",
+      savedToday: "Ahorrado hoy",
       linkedSavings: "Hucha vinculada",
       autoSavingsNote: "Se creará su hucha automáticamente",
       activeLabel: "Activo",
