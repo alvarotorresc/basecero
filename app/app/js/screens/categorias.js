@@ -615,14 +615,14 @@ export async function renderCategorias(container, onBack) {
     return `
     <div data-child-row="${escAttr(child.id)}" style="display:flex;align-items:center;min-height:56px;
       padding-left:58px;${child.is_archived ? "opacity:0.5;" : ""}${isLastRow ? "" : "border-bottom:1px solid var(--rule);"}">
-      <button type="button" class="cat-row" data-cat="${escAttr(child.id)}"
+      <button type="button" data-cat="${escAttr(child.id)}"
         style="flex:1;min-width:0;display:flex;align-items:center;gap:14px;padding:10px 0;background:none;
         border:0;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
         <div class="dotico sm" style="--cat:${color};">${ic}</div>
         <span class="tx-title" style="flex:1;min-width:0;">${escHtml(child.name)}</span>
         ${child.is_archived ? `<span class="day-label" style="flex-shrink:0;">${t("categorias.archivedLabel")}</span>` : ""}
       </button>
-      <span class="cat-drag" data-drag="${escAttr(child.id)}" aria-hidden="true"
+      <span data-drag="${escAttr(child.id)}" aria-hidden="true"
         style="color:var(--text-3);flex-shrink:0;opacity:0.6;cursor:grab;touch-action:none;
         -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;
         display:flex;align-items:center;padding:10px 4px 10px 10px;">${icon("drag", { size: 18, stroke: "var(--ink-3)" })}</span>
@@ -659,7 +659,7 @@ export async function renderCategorias(container, onBack) {
     return `
     <div data-root-row="${escAttr(root.id)}" style="display:flex;align-items:center;min-height:64px;
       ${root.is_archived ? "opacity:0.5;" : ""}${isLastRow ? "" : "border-bottom:1px solid var(--rule);"}">
-      <button type="button" class="cat-row" data-cat="${escAttr(root.id)}"
+      <button type="button" data-cat="${escAttr(root.id)}"
         style="flex:1;min-width:0;display:flex;align-items:center;gap:14px;padding:12px 0;background:none;border:0;
         text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
         <div class="dotico" style="--cat:${color};">${ic}</div>
@@ -669,7 +669,7 @@ export async function renderCategorias(container, onBack) {
         </div>
         ${root.is_archived ? `<span class="day-label" style="flex-shrink:0;">${t("categorias.archivedLabel")}</span>` : ""}
       </button>
-      <span class="cat-drag" data-drag="${escAttr(root.id)}" aria-hidden="true"
+      <span data-drag="${escAttr(root.id)}" aria-hidden="true"
         style="color:var(--text-3);flex-shrink:0;opacity:0.6;cursor:grab;touch-action:none;
         -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;
         display:flex;align-items:center;padding:14px 4px 14px 10px;">${icon("drag", { size: 20, stroke: "var(--ink-3)" })}</span>
@@ -742,7 +742,7 @@ export async function renderCategorias(container, onBack) {
   // al asa, sin importar dónde ande el dedo/cursor. El umbral de 6px
   // solo gobierna cuándo se activa el feedback visual (ghost + indicador),
   // no si el evento llega: un tap simple en el asa no dispara nada (no
-  // tiene onclick propio) y, al vivir fuera del botón .cat-row, tampoco
+  // tiene onclick propio) y, al vivir fuera del botón de la fila, tampoco
   // puede disparar accidentalmente su click — separar el target basta para
   // no interferir con el tap-para-editar, sin depender del umbral para eso.
   function wireDragHandle(handle) {

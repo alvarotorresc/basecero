@@ -180,11 +180,6 @@ main#screen {
   gap: 8px;
   line-height: 1;
 }
-.amount-display .num {
-  font: var(--t-hero);
-  letter-spacing: -.02em;
-  font-variant-numeric: tabular-nums;
-}
 .amount-display .amount-currency {
   font-size: 23px;
   font-weight: 500;
@@ -305,10 +300,6 @@ main#screen {
   background: var(--accent);
   color: var(--accent-ink);
   font-weight: 600;
-}
-.chip.active .chip-icon {
-  background: color-mix(in srgb, var(--accent-ink) 16%, transparent);
-  color: var(--accent-ink);
 }
 
 /* fila de chips de filtro en una sola línea con scroll horizontal (Movimientos, Task 4: «Todos» +
@@ -439,22 +430,6 @@ main#screen {
 }
 .tx-amount.negative { color: var(--ink); }   /* §4.4: el gasto NO va en rojo, va en tinta normal */
 .tx-amount.positive { color: var(--pos); }
-.tx-tag {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--text-2);
-  background: var(--card2);
-  border-radius: 6px;
-  padding: 3px 6px;
-  flex-shrink: 0;
-}
-
-/* ===== cabecera de grupo por día (lista de movimientos de Inicio) ===== */
-.day-header {
-  font: var(--t-micro);
-  color: var(--ink-3);
-}
 
 /* ===== filas de lista genéricas (ajustes) ===== */
 .list-row {
@@ -501,13 +476,6 @@ main#screen {
 }
 .field:focus-within .field-label {
   color: var(--accent);
-}
-.field-value {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
 }
 .field input,
 .field select {
