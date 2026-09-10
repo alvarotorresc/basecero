@@ -209,6 +209,10 @@ export const ES = {
       remembered: "recordado de la última vez",
       listLabel: "Comercios recientes",
     },
+    limit: {
+      remaining: "Con este gasto quedan {amount} de {name}",
+      over: "Con este gasto te pasas {amount} de {name}",
+    },
     refund: {
       unlink: "Quitar vínculo",
       toggle: "¿Devuelve un gasto? {arrow}",

@@ -1,9 +1,11 @@
 import {
   addTransaction, getOpenPeriod, listExpenseLeafCategories, listIncomeCategories,
   listAccounts, allCategoriesById, recentForRefund, getMetaAll, softDeleteTransaction,
-  loadMerchantMemory,
+  loadMerchantMemory, spentByRootCategory, budgetsOfPeriod,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
+import { budgetMap } from "../category-spend.js";
+import { limitWarning } from "../limit-warning.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
@@ -36,6 +38,18 @@ const CATS_GRID_LIMIT = 8;
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+/** Copia de la banda de límite (Registro v2 §6.2): «Con este gasto quedan {amount} de {name}» en
+ *  ok/warn, «…te pasas {amount}…» en over. Devuelve texto SIN escapar — quien la use en un
+ *  `innerHTML` (render()) lo escapa; quien la use en `textContent` (el oninput del importe) no
+ *  necesita, y escaparlo dos veces convertiría un «&» legítimo del nombre de una categoría en
+ *  «&amp;amp;». */
+function limitBandText(warning) {
+  const amount = fmtMoney(Math.abs(warning.remainingAfterCents));
+  return warning.level === "over"
+    ? t("registro.limit.over", { amount, name: warning.rootName })
+    : t("registro.limit.remaining", { amount, name: warning.rootName });
+}
 
 /** Monta la pantalla completa de registro rápido de un movimiento (5 tipos).
  *  onDone() se llama tanto al cerrar (✕) como tras guardar con éxito.
@@ -70,6 +84,18 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
   let refundCandidates = [];
   if (period) {
     try { refundCandidates = await recentForRefund(period.id); } catch { refundCandidates = []; }
+  }
+
+  // Registro v2 §6.2: datos del aviso de límite, cargados aquí (no en el Promise.all de arriba)
+  // porque necesitan period.id, que ese Promise.all todavía está resolviendo. Mismo criterio y
+  // mismo try/catch que refundCandidates: un fallo aquí degrada a "sin aviso", no rompe la pantalla.
+  let spentByRoot = {}, budgetByCategory = {};
+  if (period) {
+    try {
+      const [spentRows, budgetRows] = await Promise.all([spentByRootCategory(period.id), budgetsOfPeriod(period.id)]);
+      spentByRoot = Object.fromEntries(spentRows.map((r) => [r.root_id, r.spent_cents]));
+      budgetByCategory = budgetMap(budgetRows);
+    } catch { spentByRoot = {}; budgetByCategory = {}; }
   }
 
   const accounts = accountsAll.filter((a) => a.type !== "liability");
@@ -280,6 +306,12 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     const saveLabel = state.tipo === "expense" && state.cents > 0
       ? t("registro.save.expenseWithAmount", { amount: escHtml(fmtMoney(state.cents)) })
       : t(SAVE_KEY[state.tipo]);
+    // Registro v2 §6: solo un GASTO gasta contra un límite (limit-warning.js no recibe `tipo`:
+    // el gating de qué tipos preguntan es de aquí). amountCents es MI PARTE (myCents), no el
+    // ticket completo — MY_AMOUNT es también el criterio de SQL.spentByRootCategory.
+    const warning = state.tipo === "expense"
+      ? limitWarning({ categoryId: state.categoryId, amountCents: myCents, byId, spentByRoot, budgetByCategory })
+      : null;
 
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
@@ -340,6 +372,12 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         </button>` : ""}
       </div>`;
       })() : ""}
+
+      ${warning ? `
+      <div class="limit-band ${warning.level}" id="reg-limit-band">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5 21 19.5H3z"></path><path d="M12 10v4"></path><path d="M12 17h.01"></path></svg>
+        <span id="reg-limit-text">${escHtml(limitBandText(warning))}</span>
+      </div>` : ""}
 
       ${detailsOpen({ quick: state.quick, expanded: state.expanded, tipo: state.tipo }) ? `
       ${partnerPaid() ? "" : renderAccountsSection()}
@@ -484,10 +522,10 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       state.raw = e.target.value;
       state.cents = parseCentsRaw(state.raw);
       errorMsg = "";
+      const { mine: myCents, partner: partnerCents } = splitCents(state.cents, state.sharePct);
       const mineEl = container.querySelector("#reg-split-mine");
       const partnerEl = container.querySelector("#reg-split-partner");
       if (state.isShared && mineEl && partnerEl) {
-        const { mine: myCents, partner: partnerCents } = splitCents(state.cents, state.sharePct);
         mineEl.textContent = fmtMoney(myCents);
         partnerEl.textContent = fmtMoney(partnerPaid() ? state.cents : partnerCents);
       }
@@ -497,6 +535,18 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         container.querySelector("#reg-save").textContent = state.cents > 0
           ? t("registro.save.expenseWithAmount", { amount: fmtMoney(state.cents) })
           : t(SAVE_KEY.expense);
+      }
+      // Registro v2 §6.2: la banda de límite se recalcula en el oninput y se PARCHEA (texto +
+      // clase), igual que el reparto de arriba — nunca render() completo aquí. La banda solo
+      // existe ya en el DOM si categoría+límite estaban puestos en el último render(): typing el
+      // importe nunca hace aparecer ni desaparecer la banda, solo cambia su contenido.
+      const limitBandEl = container.querySelector("#reg-limit-band");
+      if (limitBandEl && state.tipo === "expense") {
+        const w = limitWarning({ categoryId: state.categoryId, amountCents: state.isShared ? myCents : state.cents, byId, spentByRoot, budgetByCategory });
+        if (w) {
+          limitBandEl.className = `limit-band ${w.level}`;
+          limitBandEl.querySelector("#reg-limit-text").textContent = limitBandText(w);
+        }
       }
     };
 

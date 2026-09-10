@@ -204,6 +204,10 @@ export const EN = {
       remembered: "remembered from last time",
       listLabel: "Recent merchants",
     },
+    limit: {
+      remaining: "This leaves {amount} of {name}",
+      over: "This goes {amount} over {name}",
+    },
     refund: {
       unlink: "Remove link",
       toggle: "Refunding an expense? {arrow}",

@@ -610,6 +610,29 @@ main#screen {
 }
 .banner-aviso.red svg { color: var(--danger); }
 
+/* ===== banda de aviso de límite (Registro v2 §6.2, SISTEMA.md §4.17) =====
+   Tres estados vía clase + modificador — NUNCA estilo inline: el oninput del importe (registro.js)
+   solo parchea `textContent` y `className`, nunca hace un render() completo (mataría el cursor del
+   input), así que cambiar de pinta tiene que ser tan barato como reasignar una clase.
+   Ancho completo de verdad (bleed hasta el borde de la pantalla): los márgenes negativos compensan
+   el --pad-screen del contenedor, igual que pide "banda de ancho completo" del artboard. */
+.limit-band {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin: 0 calc(var(--pad-screen) * -1) 18px;
+  padding: 7px var(--pad-screen);
+  box-sizing: border-box;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.limit-band svg { flex-shrink: 0; width: 20px; height: 20px; color: currentColor; }
+.limit-band.warn { background: var(--warn-tint); color: var(--warn); }
+.limit-band.over { background: var(--danger-tint); color: var(--danger); }
+
 /* el aviso de almacenamiento no persistente se antepone a body (fuera de #screen):
    franja roja tenue fija arriba, a todo lo ancho del layout */
 body > .banner-aviso {
