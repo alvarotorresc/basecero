@@ -962,7 +962,6 @@ export const EN = {
       wrongPassphrase: "Incorrect password or corrupted file",
     },
     attachments: {
-      unsupported: "This browser can’t save the photo.",
       writeFailed: "The photo could not be saved: {error}",
       bundleCorrupt: "The backup is damaged and the photos could not be read.",
     },

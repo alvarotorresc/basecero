@@ -1031,7 +1031,6 @@ export const ES = {
     // Foto del ticket (N5, Registro v2 §9). bundleCorrupt es el mensaje del UserError que lanza
     // unpackBundle (bundle.js): CFB.read es de una librería que no controlamos.
     attachments: {
-      unsupported: "Este navegador no puede guardar la foto.",
       writeFailed: "No se pudo guardar la foto: {error}",
       bundleCorrupt: "La copia está dañada y no se pudieron leer las fotos.",
     },
