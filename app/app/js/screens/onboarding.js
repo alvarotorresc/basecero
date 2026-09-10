@@ -30,17 +30,17 @@ const ACCOUNT_TYPES = [
   { id: "liability", labelKey: "onboarding.account.type.liability" },
 ];
 const ACCOUNT_TYPE_LABEL_KEY = Object.fromEntries(ACCOUNT_TYPES.map((at) => [at.id, at.labelKey]));
-// Preview del paso 3: un emoji por color del POOL (decorativo, mismos pares que el artboard).
-const PREVIEW_ICONS = ["🛒", "🎉", "🧾", "📺", "💶", "🚗", "❤️‍🩹", "🍽️", "🚌", "🎁", "🏠", "👕"];
+// BOX solo la usan ya paso2Html (filas de cuenta / nota informativa): desaparece del todo en la
+// Task 7.4 («fuera las cajas» del paso 2), no antes — paso1Html deja de usarla en esta misma task.
 const BOX = `background:var(--card);border-radius:0;padding:12px 16px;`;
-// Feature cards del paso 1 (bienvenida): color + path SVG (decorativos) + claves de texto.
+// Feature rows del paso 1 (bienvenida): icono monocromo del repertorio §3 + claves de texto.
+// Onboarding1.dc.html:37-59 — lock / download ("hoja de cálculo, exportable e importable") /
+// calendar, EN ESE ORDEN: no "repeat" (el plan lo cita mal; el path del artboard es
+// ICON_PATHS.download verbatim, y encaja con el copy "exporta e importa tus datos").
 const WELCOME_FEATURES = [
-  ["var(--green)", `<rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 018 0v3"></path>`,
-    "onboarding.welcome.feature1.title", "onboarding.welcome.feature1.subtitle"],
-  ["#4F94E9", `<path d="M13 3H6.5A1.5 1.5 0 005 4.5v15A1.5 1.5 0 006.5 21h11a1.5 1.5 0 001.5-1.5V9z"></path><path d="M13 3v6h6"></path>`,
-    "onboarding.welcome.feature2.title", "onboarding.welcome.feature2.subtitle"],
-  ["var(--amber)", `<rect x="3.5" y="5" width="17" height="16" rx="2.5"></rect><path d="M3.5 9.5h17M8 3v4M16 3v4"></path>`,
-    "onboarding.welcome.feature3.title", "onboarding.welcome.feature3.subtitle"],
+  ["lock", "onboarding.welcome.feature1.title", "onboarding.welcome.feature1.subtitle"],
+  ["download", "onboarding.welcome.feature2.title", "onboarding.welcome.feature2.subtitle"],
+  ["calendar", "onboarding.welcome.feature3.title", "onboarding.welcome.feature3.subtitle"],
 ];
 
 export async function renderOnboarding(container, { onDone }) {
@@ -77,8 +77,8 @@ export async function renderOnboarding(container, { onDone }) {
 
   function paso1Html() {
     return `
-    <div style="margin-top:44px;display:flex;flex-direction:column;align-items:flex-start;gap:14px;">
-      <svg width="64" height="64" viewBox="0 0 512 512" aria-hidden="true" style="display:block;flex-shrink:0;">
+    <div style="margin-top:28px;display:flex;flex-direction:column;align-items:flex-start;gap:18px;">
+      <svg width="96" height="96" viewBox="0 0 512 512" aria-hidden="true" style="display:block;flex-shrink:0;">
         <rect width="512" height="512" rx="112" fill="#D4FF3F"></rect>
         <path d="M193.43 112.79A41 42 0 1 0 166 186A41 42 0 1 1 138.57 259.21" fill="none" stroke="#14180B" stroke-width="40" stroke-linecap="round"></path>
         <rect x="149" y="78" width="34" height="216" rx="17" fill="#14180B"></rect>
@@ -86,23 +86,28 @@ export async function renderOnboarding(container, { onDone }) {
         <rect x="329" y="78" width="34" height="216" rx="17" fill="#14180B"></rect>
         <rect x="138" y="349" width="236" height="50" rx="25" fill="#14180B"></rect>
       </svg>
-      <div style="font-size:32px;font-weight:800;letter-spacing:-0.02em;line-height:1.12;">${t("onboarding.welcome.titleLine1")}<br>${t("onboarding.welcome.titleLine2")}</div>
-      <div style="font-size:14px;color:var(--text-2);line-height:1.5;">${t("onboarding.welcome.subtitle")}</div>
+      <div style="max-width:250px;font-size:34px;font-weight:600;letter-spacing:-.015em;line-height:1.1;">${t("onboarding.welcome.title")}</div>
     </div>
-    <div style="margin-top:36px;display:flex;flex-direction:column;gap:20px;">
-      ${WELCOME_FEATURES.map(([color, path, titleKey, subtitleKey]) => `
-      <div style="display:flex;align-items:flex-start;gap:12px;">
-        <div style="width:36px;height:36px;border-radius:0;background:var(--card);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${path}</svg>
+    <div style="margin-top:30px;display:flex;flex-direction:column;gap:20px;">
+      ${WELCOME_FEATURES.map(([iconName, titleKey, subtitleKey]) => `
+      <div style="display:flex;align-items:flex-start;gap:14px;">
+        <div style="width:36px;height:36px;border-radius:var(--r-circle);background:var(--surface-2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          ${icon(iconName)}
         </div>
-        <div><div style="font-size:14px;font-weight:700;">${t(titleKey)}</div>
-        <div style="font-size:12px;color:var(--text-2);line-height:1.45;">${t(subtitleKey)}</div></div>
+        <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
+          <span style="font-size:15px;font-weight:600;">${t(titleKey)}</span>
+          <span style="font-size:13px;font-weight:500;color:var(--ink-3);line-height:1.4;">${t(subtitleKey)}</span>
+        </div>
       </div>`).join("")}
     </div>
-    <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px;padding-top:32px;">
+    <div style="margin-top:auto;display:flex;flex-direction:column;gap:12px;padding-top:32px;">
       <button type="button" class="btn-primary" id="onb-start" style="width:100%;">${t("onboarding.welcome.startBtn")}</button>
-      <div style="text-align:center;font-size:11.5px;color:var(--text-2);">${t("onboarding.welcome.importPrompt")}
-        <button type="button" id="onb-import-link" style="background:none;border:0;padding:0;color:var(--text);font-weight:600;font-size:11.5px;cursor:pointer;font-family:inherit;">${t("onboarding.welcome.importLink")}</button>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
+        <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("onboarding.welcome.startHint")}</span>
+        <div style="display:flex;align-items:center;gap:5px;">
+          <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("onboarding.welcome.importPrompt")}</span>
+          <button type="button" id="onb-import-link" style="background:none;border:0;padding:0;color:var(--ink);font-weight:600;font-size:12px;cursor:pointer;font-family:inherit;">${t("onboarding.welcome.importLink")}</button>
+        </div>
       </div>
     </div>`;
   }

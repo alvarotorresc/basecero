@@ -797,13 +797,12 @@ export const EN = {
   onboarding: {
     cta: { next: "Next" },
     welcome: {
-      titleLine1: "Your money,",
-      titleLine2: "from zero.",
-      subtitle: "BaseCero is your expense notebook: it lives on this device — no sign-ups, no cloud, no one watching.",
+      title: "Your money, from zero.",
       feature1: { title: "Everything stays here", subtitle: "No server, no sign-up. Works even offline." },
       feature2: { title: "Your data is a spreadsheet", subtitle: "Export and import your data whenever you want: it’s never locked in." },
       feature3: { title: "Your month starts on payday", subtitle: "Periods run from payday to payday, not the 1st to the 30th." },
-      startBtn: "Start (2 minutes)",
+      startBtn: "Start",
+      startHint: "Two minutes",
       importPrompt: "Coming from another backup?",
       importLink: "Import a spreadsheet or backup",
     },

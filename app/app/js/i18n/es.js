@@ -827,13 +827,15 @@ export const ES = {
   onboarding: {
     cta: { next: "Seguir" },
     welcome: {
-      titleLine1: "Tu dinero,",
-      titleLine2: "desde cero.",
-      subtitle: "BaseCero es tu cuaderno de gastos: vive en este dispositivo, sin cuentas, sin nube, sin nadie mirando.",
+      // Titular audaz (SISTEMA.md §1.7): una sola cadena a 34/600, no dos claves con <br>.
+      title: "Tu dinero, desde cero.",
       feature1: { title: "Todo se queda aquí", subtitle: "Sin servidor y sin registro. Funciona hasta sin conexión." },
       feature2: { title: "Tu dato es una hoja de cálculo", subtitle: "Exporta e importa tus datos cuando quieras: nunca están atrapados." },
       feature3: { title: "Tu mes empieza cuando cobras", subtitle: "Los periodos van de nómina a nómina, no del 1 al 30." },
-      startBtn: "Empezar (2 minutos)",
+      startBtn: "Empezar",
+      // startHint: recortada de startBtn («Empezar · 2 minutos» → PROSA en P0 → aquí SEGMENTOS,
+      // línea propia bajo el CTA, Onboarding1.dc.html:66).
+      startHint: "Dos minutos",
       importPrompt: "¿Vienes de otra copia?",
       importLink: "Importar una hoja o backup",
     },
