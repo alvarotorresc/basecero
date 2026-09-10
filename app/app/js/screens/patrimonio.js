@@ -63,87 +63,85 @@ function netWorthCardHtml(netWorthCents, series, accounts) {
 
 // ---- tarjeta "Cuentas" -----------------------------------------------------
 
-// Trazos de los iconos SVG de docs/design/material-expresivo/Patrimonio.dc.html:71-118 (uno por tipo de cuenta, no por
-// cuenta concreta: aquí solo hay 3 tipos). SISTEMA.md §2.2 es explícito: una cuenta no tiene ni
-// icono ni color propios — se identifica por su nombre y su tipo escritos — así que los tres
-// entran en --ink-2, no en un hex de tipo (reskin v2, tarea 9).
-const ACCOUNT_ICON = {
-  checking: { color: "var(--ink-2)", paths: '<rect x="3" y="5.5" width="18" height="13" rx="3.5"></rect><path d="M3 10.5h18"></path>' },
-  savings: { color: "var(--ink-2)", paths: '<path d="M5 8.5h14a1.6 1.6 0 011.6 1.6v7.3A1.6 1.6 0 0119 19H5a1.6 1.6 0 01-1.6-1.6V6.6A1.6 1.6 0 015 5h10"></path><circle cx="16.5" cy="13.8" r="1.2"></circle>' },
-  liability: { color: "var(--ink-2)", paths: '<path d="M4.2 16.2h15.6v-3.8l-1.7-4.1a1.6 1.6 0 00-1.5-1H7.4a1.6 1.6 0 00-1.5 1l-1.7 4.1z"></path><path d="M6 16.2v2.4h2.6v-2.4M15.4 16.2v2.4H18v-2.4"></path>' },
-};
-
+// SISTEMA.md §2.2 es explícito: una cuenta no tiene ni icono ni color propios — se identifica
+// por su nombre y su tipo ESCRITOS. La fila ya no lleva insignia (Task 7, P2): esto reemplaza al
+// antiguo ACCOUNT_ICON, que se borra con su único consumidor (cuentaRowHtml).
 const ACCOUNT_TYPES = [
   { id: "checking", labelKey: "patrimonio.accountType.checking" },
   { id: "savings", labelKey: "patrimonio.accountType.savings" },
   { id: "liability", labelKey: "patrimonio.accountType.liability" },
 ];
+const ACCOUNT_TYPE_KEY = Object.fromEntries(ACCOUNT_TYPES.map((at) => [at.id, at.labelKey]));
 
-/** Subtítulo por tipo — "Cuenta corriente · por defecto" es el único texto literal que pedía el
- *  brief original; "Ahorro" queda deliberadamente genérico (no hay en el contrato ningún campo
- *  del que derivar "2 huchas con objetivo" sin inventar datos). Para un PASIVO con cuota mensual
- *  definida (Task 6, meta.account_loans — ver account-defaults.js#sanitizeLoanMap y
- *  repo.setAccountLoan/getAccountLoans), en vez del genérico "Pasivo" se muestra "quedan N
- *  cuotas" = techo(|balance| / monthlyCents) — balance_cents es negativo en un pasivo, de ahí el
- *  valor absoluto. Sin cuota definida (mapa vacío o entrada saneada fuera), cae al "Pasivo" de
- *  siempre: es opcional, no todo pasivo tiene por qué llevar una. */
-function accountSubtitle(a, isDefault, accountLoans) {
-  if (a.type === "checking") return isDefault ? t("patrimonio.accountSubtitle.checkingDefault") : t("patrimonio.accountSubtitle.checking");
-  if (a.type === "savings") return t("patrimonio.accountSubtitle.savings");
+/** Segmentos del sub de una fila de cuenta, para metaHtml([tipo, …]): el tipo (mismo texto que
+ *  el chip del formulario) y, opcionalmente, un segundo dato — "Por defecto" en la cuenta
+ *  corriente por defecto, o "quedan N cuotas" en un PASIVO con cuota mensual definida (Task 6,
+ *  meta.account_loans — ver account-defaults.js#sanitizeLoanMap y repo.setAccountLoan/
+ *  getAccountLoans) = techo(|balance| / monthlyCents) — balance_cents es negativo en un pasivo,
+ *  de ahí el valor absoluto. Un pasivo ya pagado (saldo 0, o en positivo si se pagó de más) no
+ *  tiene ninguna cuota que contar, y Math.ceil(0 / monthlyCents) daba «quedan 0 cuotas», que se
+ *  lee como un error de la app — cae al tipo solo, igual que un pasivo sin cuota definida. */
+function accountSubtitleSegments(a, isDefault, accountLoans) {
+  const typeLabel = t(ACCOUNT_TYPE_KEY[a.type] ?? ACCOUNT_TYPE_KEY.checking);
+  if (a.type === "checking") return [typeLabel, isDefault ? t("patrimonio.accountSubtitle.default") : null];
+  if (a.type === "savings") return [typeLabel];
   const monthlyCents = accountLoans[a.id]?.monthlyCents;
-  // balance_cents < 0: un pasivo ya pagado (saldo 0, o en positivo si se pagó de más) no tiene
-  // ninguna cuota que contar, y Math.ceil(0 / monthlyCents) daba «quedan 0 cuotas», que se lee como
-  // un error de la app. Cae al subtítulo genérico, igual que un pasivo sin cuota definida.
   if (monthlyCents > 0 && a.balance_cents < 0) {
     const n = Math.ceil(Math.abs(a.balance_cents) / monthlyCents);
-    return t("patrimonio.accountSubtitle.installmentsLeft", { n });
+    return [typeLabel, t("patrimonio.accountSubtitle.installmentsLeft", { n })];
   }
-  return t("patrimonio.accountSubtitle.liability");
+  return [typeLabel];
 }
 
+/** Fila de cuenta (60px, §2.2): sin insignia ni icono — solo nombre + tipo escrito. Un pasivo va
+ *  entero (las tres partes del importe) en --danger. */
 function cuentaRowHtml(a, isDefault, accountLoans) {
-  const icon = ACCOUNT_ICON[a.type] ?? ACCOUNT_ICON.checking;
   const isLiability = a.type === "liability";
   return `
     <button type="button" class="list-row" data-acc="${a.id}"
-      style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-      <div class="list-row-icon" style="--cat:${icon.color};">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="stroke:${icon.color};" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icon.paths}</svg>
+      style="width:100%;min-height:60px;text-align:left;background:none;border:0;padding:10px 0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+      <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;">
+        <span style="font-size:15px;font-weight:500;color:var(--ink);">${escHtml(a.name)}</span>
+        ${metaHtml(accountSubtitleSegments(a, isDefault, accountLoans))}
       </div>
-      <div class="list-row-body">
-        <div class="list-row-title">${escHtml(a.name)}</div>
-        <div class="list-row-sub">${accountSubtitle(a, isDefault, accountLoans)}</div>
-      </div>
-      <div style="text-align:right;">
-        <div class="num" style="font-size:15px;font-weight:600;${isLiability ? "color:var(--red);" : ""}">${fmtMoney(a.balance_cents)}</div>
-        <div style="font-size:10.5px;color:var(--text-3);">${t("patrimonio.accounts.today")}</div>
-      </div>
+      <div class="num" style="flex-shrink:0;font-size:16px;font-weight:500;${isLiability ? "color:var(--danger);" : ""}">${moneyPartsHtml(a.balance_cents)}</div>
     </button>`;
 }
 
+/** Cabecera de sección compartida por "Cuentas" y "Objetivos" (SISTEMA.md §4.6): título 15/600 +
+ *  divisor de 1px + recuento en metaHtml (§1.3) + .icon-btn de 44px con icon("plus") a la
+ *  derecha. El divisor es el mismo `.meta-sep` que publica ui.js — se reutiliza su markup en vez
+ *  de duplicar la regla, aunque aquí no venga de una llamada a metaHtml (el título no es un
+ *  segmento de metadatos: lleva su propio tamaño y color, --t-section/--ink, no --t-label/
+ *  --ink-3). */
+function sectionHeaderHtml({ title, count, btnId, btnLabel }) {
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="section-title">${escHtml(title)}</span>
+        <span class="meta-sep" aria-hidden="true"></span>
+        ${metaHtml([count])}
+      </div>
+      <button type="button" class="icon-btn" id="${escAttr(btnId)}" aria-label="${escAttr(btnLabel)}">${icon("plus")}</button>
+    </div>`;
+}
+
 /** Tarjeta "Cuentas": una fila por cuenta activa (balancesAt ya excluye archivadas/borradas),
- *  separadas por <hr class="divider"> — réplica de docs/design/material-expresivo/Patrimonio.dc.html:61-121, + botón
- *  "Nueva cuenta" en la cabecera. Cada fila abre la subvista de edición (Task 14). El lado derecho
- *  es a dos líneas (saldo + "hoy", como el artboard) para las 3 cuentas: "hoy" es el único
- *  subtítulo que aplica siempre y sin inventar nada (balancesAt se pide con hoyISO()). Para un
- *  pasivo CON cuota mensual definida, accountSubtitle sustituye ese subtítulo por "quedan N
- *  cuotas" (Task 6) — accountLoans (meta.account_loans, cargado en loadData) viaja hasta aquí. */
+ *  separadas por <hr class="divider"> — réplica de Patrimonio.dc.html:61-125, + botón "Nueva
+ *  cuenta" en la cabecera. Cada fila abre la subvista de edición. */
 function cuentasCardHtml(accounts, accountLoans) {
   const n = accounts.length;
-  const header = `
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:15px;font-weight:700;">${t("patrimonio.accounts.title")}</div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="font-size:11px;color:var(--text-3);">${t("patrimonio.accounts.countActive", { n, currency: currencyCode() })}</div>
-        <button type="button" class="icon-btn" id="btn-nueva-cuenta" aria-label="${t("patrimonio.accounts.new")}" style="width:28px;height:28px;border-radius:9px;font-size:16px;">+</button>
-      </div>
-    </div>`;
+  const header = sectionHeaderHtml({
+    title: t("patrimonio.accounts.title"),
+    count: t("patrimonio.accounts.countActive", { n }),
+    btnId: "btn-nueva-cuenta", btnLabel: t("patrimonio.accounts.new"),
+  });
 
   if (n === 0) {
     return `
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
         ${header}
-        <div class="card" style="text-align:center;color:var(--text-3);">${t("patrimonio.accounts.empty")}</div>
+        <div class="card" style="text-align:center;color:var(--ink-3);">${t("patrimonio.accounts.empty")}</div>
       </div>`;
   }
 
@@ -153,7 +151,7 @@ function cuentasCardHtml(accounts, accountLoans) {
   return `
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
       ${header}
-      <div class="card" style="padding:6px 16px;display:flex;flex-direction:column;">
+      <div style="display:flex;flex-direction:column;">
         ${rowsHtml}
       </div>
     </div>`;
@@ -253,20 +251,17 @@ function goalRingRowHtml(g, color) {
  *  la cabecera. Cada fila abre la subvista de edición (Task 14). */
 function objetivosCardHtml(goals) {
   const n = goals.length;
-  const header = `
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:15px;font-weight:700;">${t("patrimonio.goals.title")}</div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="font-size:11px;color:var(--text-3);">${t("patrimonio.goals.countActive", { n })}</div>
-        <button type="button" class="icon-btn" id="btn-nuevo-objetivo" aria-label="${t("patrimonio.goals.new")}" style="width:28px;height:28px;border-radius:9px;font-size:16px;">+</button>
-      </div>
-    </div>`;
+  const header = sectionHeaderHtml({
+    title: t("patrimonio.goals.title"),
+    count: t("patrimonio.goals.countActive", { n }),
+    btnId: "btn-nuevo-objetivo", btnLabel: t("patrimonio.goals.new"),
+  });
 
   if (n === 0) {
     return `
       <div style="display:flex;flex-direction:column;gap:10px;">
         ${header}
-        <div class="card" style="text-align:center;color:var(--text-3);">${t("patrimonio.goals.empty")}</div>
+        <div class="card" style="text-align:center;color:var(--ink-3);">${t("patrimonio.goals.empty")}</div>
       </div>`;
   }
 

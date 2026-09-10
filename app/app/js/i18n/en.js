@@ -403,11 +403,8 @@ export const EN = {
       liability: "Liability",
     },
     accountSubtitle: {
-      checking: "Checking account",
-      checkingDefault: "Checking account, default",
-      // Task 7 (6c): mirrors ES — see accountSubtitle there.
-      savings: "Savings",
-      liability: "Liability",
+      // Task 7 (P2, redesign v2): mirrors ES — see accountSubtitle there.
+      default: "Default",
       installmentsLeft: { one: "{n} installment left", other: "{n} installments left" },
     },
     accounts: {
@@ -415,7 +412,6 @@ export const EN = {
       countActive: { one: "{n} active", other: "{n} active" },
       new: "New account",
       empty: "You don’t have any accounts yet.",
-      today: "today",
     },
     account: {
       title: { edit: "Edit account" },

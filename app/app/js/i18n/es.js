@@ -414,12 +414,10 @@ export const ES = {
       liability: "Pasivo",
     },
     accountSubtitle: {
-      checking: "Cuenta corriente",
-      checkingDefault: "Cuenta corriente, por defecto",
-      // Task 7 (6c): antes accountSubtitle reutilizaba accountType.{savings,liability} (las
-      // etiquetas del segmented control) — mismo texto, claves propias para no acoplar ambos usos.
-      savings: "Ahorro",
-      liability: "Pasivo",
+      // Task 7 (P2, rediseño v2): el subtítulo de fila ya no es una frase hecha — es
+      // metaHtml([tipo, "Por defecto" | "quedan {n} cuotas"]), así que "tipo" reutiliza
+      // accountType.* (los mismos textos de los chips) y aquí solo queda lo que no está ya ahí.
+      default: "Por defecto",
       installmentsLeft: { one: "queda {n} cuota", other: "quedan {n} cuotas" },
     },
     accounts: {
@@ -427,7 +425,6 @@ export const ES = {
       countActive: { one: "{n} activa", other: "{n} activas" },
       new: "Nueva cuenta",
       empty: "Todavía no tienes ninguna cuenta.",
-      today: "hoy",
     },
     account: {
       title: { edit: "Editar cuenta" },
