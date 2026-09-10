@@ -1,8 +1,9 @@
 import {
   addTransaction, getOpenPeriod, listExpenseLeafCategories, listIncomeCategories,
   listAccounts, allCategoriesById, recentForRefund, getMetaAll, softDeleteTransaction,
-  loadMerchantMemory, spentByRootCategory, budgetsOfPeriod, listTags, createTag,
+  loadMerchantMemory, spentByRootCategory, budgetsOfPeriod, listTags, createTag, setAttachmentFlag,
 } from "../repo.js";
+import { attachments, compressImage } from "../attachments.js";
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
 import { budgetMap } from "../category-spend.js";
 import { limitWarning } from "../limit-warning.js";
@@ -157,8 +158,16 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     // pise con lo que dice la memoria.
     touched: new Set(["categoryId", "accountId", "isShared", "paidBy", "sharePct"].filter((f) => prefill && prefill[f] !== undefined)),
     merchantRemembered: false,
+    // Foto del ticket (N5, Registro v2 §9.4): el Blob YA comprimido (compressImage), listo para
+    // subir. El fichero no se escribe en OPFS hasta tener el id del movimiento (addTransaction
+    // corre primero) — ver el handler de guardar.
+    photo: null,
   };
   let errorMsg = "";
+  // Foto del ticket (N5): URL del Blob de state.photo YA creada, o null. render() la reutiliza
+  // (crear una nueva en cada repintado filtraría memoria) y la revoca en cuanto state.photo
+  // cambia de referencia (nueva foto elegida) o se vacía — ver photoPreviewUrl() más abajo.
+  let photoObjectUrl = null;
 
   const categoriesFor = () => {
     if (state.tipo === "income") return incomeCats;
@@ -438,7 +447,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       ? t("common.sharedWith", { name: partnerName })
       : "";
     const tagLabel = state.tagId ? tagName(state.tagId) : "";
-    const parts = foldedSummaryParts({ accountName, dateLabel, hasNote, hasPhoto: false, sharedLabel, tagName: tagLabel }, t);
+    const parts = foldedSummaryParts({ accountName, dateLabel, hasNote, hasPhoto: !!state.photo, sharedLabel, tagName: tagLabel }, t);
     const summaryHtml = parts.map((p, i) => (i === 0 ? "" : `<span style="width:1px;height:11px;background:var(--hairline-strong);flex-shrink:0;"></span>`)
       + `<span style="font-size:12px;font-weight:500;color:var(--text-3);">${escHtml(p)}</span>`).join("");
     return `
@@ -590,6 +599,30 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         <div class="section-title">${t("movimientos.detail.tagLabel")}</div>
         ${renderTagControl()}
       </div>
+
+      ${attachments?.available() ? (() => {
+        // Foto del ticket (N5, §9.3): el módulo devuelve un Blob, nunca una URL — la pantalla es
+        // dueña del par crear/revocar. Se reutiliza la URL ya creada mientras state.photo no
+        // cambie de referencia (evita filtrar una foto por cada repintado); el onchange de
+        // #reg-photo-input (wire()) es quien revoca la anterior al elegir una nueva.
+        if (state.photo && !photoObjectUrl) photoObjectUrl = URL.createObjectURL(state.photo);
+        if (!state.photo && photoObjectUrl) { URL.revokeObjectURL(photoObjectUrl); photoObjectUrl = null; }
+        return `
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:18px;">
+        ${state.photo ? `
+        <div style="position:relative; flex-shrink:0;">
+          <img src="${escAttr(photoObjectUrl)}" alt="" style="width:44px;height:44px;border-radius:var(--r-1);object-fit:cover;background:var(--surface-2);border:1px solid var(--hairline-strong);display:block;">
+          <button type="button" id="reg-photo-remove" aria-label="${escAttr(t("registro.photo.remove"))}"
+            style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:1px solid var(--hairline-strong);background:var(--surface-1);color:var(--ink-3);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;">
+            ${icon("close", { size: 11 })}
+          </button>
+        </div>` : ""}
+        <button type="button" id="reg-photo-btn" style="height:44px;border-radius:999px;border:1px solid var(--hairline-strong);background:transparent;color:var(--ink-3);font-size:13px;font-weight:500;padding:0 14px;display:inline-flex;align-items:center;gap:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+          ${icon("camera", { size: 18 })}${state.photo ? t("registro.photo.replace") : t("registro.photo.add")}
+        </button>
+        <input type="file" id="reg-photo-input" accept="image/*" capture="environment" style="display:none">
+      </div>`;
+      })() : ""}
 
       <label class="field field-stack" style="margin-bottom:18px;">
         <span class="field-label">${t("common.note")}</span>
@@ -878,6 +911,32 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     const fechaInput = container.querySelector("#reg-fecha");
     if (fechaInput) fechaInput.onchange = (e) => { state.fecha = e.target.value || hoyISO(); };
 
+    // Foto del ticket (N5, Registro v2 §9.4): el botón dispara el input oculto (patrón exacto de
+    // #btn-n26-import/#n26-file-input, ajustes.js), que comprime la foto elegida y la guarda en
+    // state.photo — el fichero no se escribe en OPFS hasta el guardado (ver el handler de abajo).
+    const photoBtn = container.querySelector("#reg-photo-btn");
+    if (photoBtn) photoBtn.onclick = () => container.querySelector("#reg-photo-input").click();
+    const photoInput = container.querySelector("#reg-photo-input");
+    if (photoInput) photoInput.onchange = async (e) => {
+      const file = e.target.files[0];
+      e.target.value = ""; // permite re-elegir el MISMO fichero
+      if (!file) return;
+      try {
+        const compressed = await compressImage(file);
+        // Reemplazar una foto ya elegida ("Otra foto"): la URL vieja apunta al Blob viejo y
+        // render() no la recrearía sola (solo lo hace cuando photoObjectUrl está a null) — sin
+        // esto la miniatura se queda enseñando la foto anterior mientras se guarda la nueva.
+        if (photoObjectUrl) { URL.revokeObjectURL(photoObjectUrl); photoObjectUrl = null; }
+        state.photo = compressed;
+        render();
+      } catch (err) {
+        // El formulario NO pierde nada: state.photo se queda como estaba.
+        showToast(t("errors.attachments.writeFailed", { error: userMessage(err) }));
+      }
+    };
+    const photoRemoveBtn = container.querySelector("#reg-photo-remove");
+    if (photoRemoveBtn) photoRemoveBtn.onclick = () => { state.photo = null; render(); };
+
     // Selector de etiqueta (Task 13): mismo criterio que movimientos.js#wireDetail — puro estado
     // de UI hasta guardar. Invariante del foco (§4.5): SOLO el handler de «Nueva etiqueta» pide
     // foco tras su propio render(), nunca desde render() en sí — el foco de #reg-raw al arrancar
@@ -995,6 +1054,15 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
           ruleId: state.ruleId,
           tagId: state.tagId || "",
         });
+        // Foto del ticket (N5, §9.4): SIEMPRE DESPUÉS de que newId exista y ANTES de onDone() (la
+        // pantalla ya cedió el sitio después). Orden que protege lo que importa: si la foto falla,
+        // el gasto YA está guardado — addTransaction se llamó sin hasAttachment (default false).
+        if (state.photo) {
+          try {
+            await attachments.put(newId, state.photo);
+            await setAttachmentFlag(newId, true);
+          } catch { showToast(t("registro.photo.savedWithout")); }
+        }
         onDone();   // primero: el ticket cae sobre la pantalla ya repintada (ReciboGuardado.dc.html)
         const [y, m, d] = state.fecha.split("-");
         const now = new Date();

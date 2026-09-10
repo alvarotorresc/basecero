@@ -249,6 +249,16 @@ export const ES = {
       // devolución. Se marca distinto de alreadyRefunded para que no se lean como lo mismo.
       settledLabel: "Liquidado, {amount}",
     },
+    // Foto del ticket (N5, Registro v2 §9). viewAria se reutiliza también en el visor a pantalla
+    // completa del detalle de movimiento (movimientos.js), como movimientos.detail.tagLabel ya se
+    // reutiliza aquí.
+    photo: {
+      add: "Foto del ticket",
+      replace: "Otra foto",
+      remove: "Quitar la foto",
+      viewAria: "Ver la foto del ticket",
+      savedWithout: "El gasto se guardó, pero no se pudo adjuntar la foto",
+    },
   },
   movimientos: {
     error: {
@@ -1012,6 +1022,13 @@ export const ES = {
       newerVersion: "Copia de una versión más nueva (formato {version}). Actualiza BaseCero.",
       invalidHeader: "Cabecera inválida (iteraciones fuera de rango)",
       wrongPassphrase: "Contraseña incorrecta o archivo dañado",
+    },
+    // Foto del ticket (N5, Registro v2 §9). bundleCorrupt es el mensaje del UserError que lanza
+    // unpackBundle (bundle.js): CFB.read es de una librería que no controlamos.
+    attachments: {
+      unsupported: "Este navegador no puede guardar la foto.",
+      writeFailed: "No se pudo guardar la foto: {error}",
+      bundleCorrupt: "La copia está dañada y no se pudieron leer las fotos.",
     },
     xlsx: {
       missingSheet: "falta la pestaña «{table}»",

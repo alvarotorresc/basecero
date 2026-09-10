@@ -131,6 +131,11 @@ export async function addTransaction({
   return newId;
 }
 
+/** Foto del ticket (N5, Registro v2 §9.4): marca/desmarca el flag DESPUÉS de que el fichero ya
+ *  esté escrito en OPFS (attachments.put) — nunca antes, así una fila nunca promete una foto que
+ *  no existe todavía. */
+export const setAttachmentFlag = (id, on) => exec(SQL.setAttachmentFlag, [on ? 1 : 0, nowIso(), id]);
+
 export const spentOfPeriod = async (pid) => (await query(SQL.spentOfPeriod, [pid]))[0].spent_cents;
 export const incomeOfPeriod = async (pid) => (await query(SQL.incomeOfPeriod, [pid]))[0].income_cents;
 export const listByDay = (pid) => query(SQL.listByDay, [pid]);

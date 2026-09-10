@@ -238,6 +238,13 @@ export const EN = {
       alreadyRefunded: "Already refunded, {amount}",
       settledLabel: "Settled, {amount}",
     },
+    photo: {
+      add: "Photo of the receipt",
+      replace: "Another photo",
+      remove: "Remove the photo",
+      viewAria: "View the receipt photo",
+      savedWithout: "The expense was saved, but the photo could not be attached",
+    },
   },
   movimientos: {
     error: {
@@ -951,6 +958,11 @@ export const EN = {
       newerVersion: "Backup from a newer version (format {version}). Update BaseCero.",
       invalidHeader: "Invalid header (iterations out of range)",
       wrongPassphrase: "Incorrect password or corrupted file",
+    },
+    attachments: {
+      unsupported: "This browser can’t save the photo.",
+      writeFailed: "The photo could not be saved: {error}",
+      bundleCorrupt: "The backup is damaged and the photos could not be read.",
     },
     xlsx: {
       missingSheet: "missing sheet “{table}”",
