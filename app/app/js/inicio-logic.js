@@ -32,15 +32,18 @@ export function daysLeftOfPeriod(startDateIso, todayIso) {
 export const remainingAfterRecurringCents = (availableCents, pendingRecurringCents) =>
   availableCents - pendingRecurringCents;
 
-/** «Hoy puedes gastar» (N7, spec §5.2): remaining / max(1, daysLeft), redondeado.
- *  max(1, daysLeft) NO es defensivo por gusto: el último día del periodo daysLeft vale 0, y el
- *  usuario debe ver que puede gastar TODO lo que queda, no un división por cero. Con un periodo
- *  que se alarga (daysLeft negativo) pasa lo mismo. Sin margen (remaining ≤ 0) el resultado sale
- *  negativo a propósito: la pantalla lo pinta en --danger con 0,00 €, esta función no lo capa. */
+/** «Hoy puedes gastar» (N7, spec §5.2): remaining / max(1, daysLeft + 1), redondeado. El +1
+ *  cuenta HOY: daysLeftOfPeriod da los días que faltan DESPUÉS de hoy, así que sin él el
+ *  penúltimo día del periodo (daysLeft=1) repartía el margen entre un solo día y la pantalla
+ *  decía «gasta todo» un día antes de tiempo. max(1, …) sigue sin ser defensivo por gusto: en el
+ *  ÚLTIMO día (daysLeft=0) y en un periodo que se alarga (daysLeft negativo) el divisor cae
+ *  igualmente a 1 — mismo resultado que antes en esos dos casos límite, el usuario ve que puede
+ *  gastar TODO lo que queda, no una división por cero. Sin margen (remaining ≤ 0) el resultado
+ *  sale negativo a propósito: la pantalla lo pinta en --danger con 0,00 €, esta función no lo capa. */
 export function dailyAllowanceCents(availableCents, pendingRecurringCents, startDateIso, todayIso) {
   const remaining = remainingAfterRecurringCents(availableCents, pendingRecurringCents);
   const daysLeft = daysLeftOfPeriod(startDateIso, todayIso);
-  return Math.round(remaining / Math.max(1, daysLeft));
+  return Math.round(remaining / Math.max(1, daysLeft + 1));
 }
 
 /** Plegado de movimientos (I4/I5): `rows` YA ordenadas DESC por fecha (contrato de `listByDay`,

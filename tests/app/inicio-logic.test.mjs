@@ -22,8 +22,12 @@ test("daysLeftOfPeriod: 30 − 9 = 21, el mismo «21 días» del artboard", () =
   assert.equal(daysLeftOfPeriod("2026-09-01", "2026-10-05"), -5);  // periodo alargado
 });
 
-test("dailyAllowanceCents: (35280 − 13689) / 21 = 1028 céntimos", () => {
-  assert.equal(dailyAllowanceCents(35280, 13689, "2026-09-01", "2026-09-09"), 1028);
+test("dailyAllowanceCents: (35280 − 13689) / 22 = 981 céntimos (+1 día porque hoy cuenta)", () => {
+  assert.equal(dailyAllowanceCents(35280, 13689, "2026-09-01", "2026-09-09"), 981);
+});
+
+test("dailyAllowanceCents: día 29 de 30 con 200 € de margen → 100 € (quedan hoy y mañana)", () => {
+  assert.equal(dailyAllowanceCents(20000, 0, "2026-09-01", "2026-09-29"), 10000);
 });
 
 test("dailyAllowanceCents: el último día no divide por cero y da todo lo que queda", () => {
