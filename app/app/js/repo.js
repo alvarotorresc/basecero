@@ -895,6 +895,26 @@ export async function updateAccount(id, fields) {
   await exec(SQL.updateAccount, [bcSanitizeCell(name), type, openingBalanceCents, now, id]);
 }
 
+/** Borra una cuenta que todavía no tiene NINGÚN movimiento. Existe solo para el paso 2 del
+ *  onboarding: quitar una cuenta que se acaba de crear por error (las cuentas se persisten al
+ *  añadirlas, onboarding.js). NO es la feature «borrar cuenta» de PatrimonioCuenta, que está
+ *  aparcada a propósito (decisión 1): esa tiene que decidir qué hacer con las cuentas que SÍ
+ *  tienen movimientos, y eso es una decisión de producto, no un DELETE.
+ *  Borrado DURO y guardado: el WHERE hace la comprobación en el mismo statement, así que no hay
+ *  ventana entre comprobar y borrar. Si la cuenta tiene movimientos, no se borra nada y no se
+ *  lanza — pero `db.js#exec` (Worker/sqlite-wasm, no es de P7 tocarlo) descarta la respuesta del
+ *  Worker y no expone `changes`, así que el resultado se confirma con una lectura de vuelta: si
+ *  `getAccount(id)` sigue encontrando la fila, no se borró nada.
+ *  No hace falta limpiar meta: resolveAccountId ya tolera un default_account_id/import_account_id
+ *  que apunte a una cuenta que no existe (account-defaults.js:2-6), y una entrada suelta de
+ *  meta.account_loans nunca se lee sin su cuenta.
+ *  Solo se llama desde el paso 2 del onboarding: nadie debe cablearlo a PatrimonioCuenta y dar por
+ *  hecha la feature aparcada. */
+export async function deleteEmptyAccount(id) {
+  await exec(SQL.deleteEmptyAccount, [id, id, id]);
+  return !(await getAccount(id));
+}
+
 /** Cuota mensual de un pasivo (Task 6, CONFIG-IN-META — mismo patrón que setCategoryStyle, sin
  *  migración de esquema ni cambio de contrato xlsx). Read-modify-write de meta.account_loans:
  *  lee el JSON completo, toca SOLO `accountId`, reescribe entero. `monthlyCents` no positivo (o
