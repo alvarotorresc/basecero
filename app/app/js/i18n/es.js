@@ -811,7 +811,7 @@ export const ES = {
     },
     row: {
       renewsOn: "renueva el {date}",
-      renewsInDays: "renueva el {date}, en {days} días",
+      renewsInDays: { one: "renueva el {date}, en {n} día", other: "renueva el {date}, en {n} días" },
       renewsWeekly: "renueva cada semana",
       perYear: "/año",
       noDate: "sin fecha de renovación",

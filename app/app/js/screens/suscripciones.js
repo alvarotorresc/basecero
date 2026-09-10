@@ -29,7 +29,8 @@ function renewsInfo(rule, todayIso) {
   if (!dueIso) return { text: t("suscripciones.row.noDate"), dueIso: "", warn: false };
   const days = daysUntil(dueIso, todayIso);
   if (days <= RENEWAL_SOON_DAYS) {
-    return { text: t("suscripciones.row.renewsInDays", { date: fmtDiaLargo(dueIso), days }), dueIso, warn: true };
+    // n (no "days"): dispara el plural {one, other} de t() — "en 1 día" en vez de "en 1 días".
+    return { text: t("suscripciones.row.renewsInDays", { date: fmtDiaLargo(dueIso), n: days }), dueIso, warn: true };
   }
   return { text: t("suscripciones.row.renewsOn", { date: fmtDiaLargo(dueIso) }), dueIso, warn: false };
 }
