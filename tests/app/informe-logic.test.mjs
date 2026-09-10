@@ -59,18 +59,20 @@ function fixture() {
       { id: "t-ocio-compartido", date: "2026-09-02", type: "expense", amount_cents: 11510, category_id: "cat-ocio", merchant: "Cafe Central", note: "", is_shared: 1, account_id: "acc-corriente", counter_account_id: "", share_pct_override: 50, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 5755 },
       { id: "t-suscripcion-netflix", date: "2026-09-02", type: "expense", amount_cents: 1299, category_id: "cat-suscripciones", merchant: "Netflix", note: "cargo detectado como recurrente", is_shared: 0, account_id: "acc-corriente", counter_account_id: "", share_pct_override: null, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 1299 },
       { id: "t-ingreso-nomina", date: "2026-09-01", type: "income", amount_cents: 185000, category_id: "cat-nomina", merchant: "Nomina agosto", note: "", is_shared: 0, account_id: "acc-corriente", counter_account_id: "", share_pct_override: null, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 185000 },
+      { id: "t-transferencia", date: "2026-09-03", type: "transfer", amount_cents: 10000, category_id: "", merchant: "", note: "", is_shared: 0, account_id: "acc-corriente", counter_account_id: "acc-fondo", share_pct_override: null, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 10000 },
+      { id: "t-ajuste", date: "2026-09-04", type: "adjustment", amount_cents: -500, category_id: "", merchant: "", note: "Ajuste de redondeo", is_shared: 0, account_id: "acc-corriente", counter_account_id: "", share_pct_override: null, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: -500 },
     ],
     categoriesById: {
-      "cat-casa": { id: "cat-casa", parent_id: "" },
-      "cat-alimentacion": { id: "cat-alimentacion", parent_id: "" },
-      "cat-coche": { id: "cat-coche", parent_id: "" },
-      "cat-restauracion": { id: "cat-restauracion", parent_id: "" },
-      "cat-ocio": { id: "cat-ocio", parent_id: "" },
-      "cat-transporte": { id: "cat-transporte", parent_id: "" },
-      "cat-salud": { id: "cat-salud", parent_id: "" },
-      "cat-suscripciones": { id: "cat-suscripciones", parent_id: "" },
-      "cat-nomina": { id: "cat-nomina", parent_id: "" },
-      "cat-ropa": { id: "cat-ropa", parent_id: "" },
+      "cat-casa": { id: "cat-casa", name: "Casa", parent_id: "" },
+      "cat-alimentacion": { id: "cat-alimentacion", name: "Alimentacion", parent_id: "" },
+      "cat-coche": { id: "cat-coche", name: "Coche", parent_id: "" },
+      "cat-restauracion": { id: "cat-restauracion", name: "Restauracion", parent_id: "" },
+      "cat-ocio": { id: "cat-ocio", name: "Ocio", parent_id: "" },
+      "cat-transporte": { id: "cat-transporte", name: "Transporte", parent_id: "" },
+      "cat-salud": { id: "cat-salud", name: "Salud", parent_id: "" },
+      "cat-suscripciones": { id: "cat-suscripciones", name: "Suscripciones", parent_id: "" },
+      "cat-nomina": { id: "cat-nomina", name: "Nomina", parent_id: "" },
+      "cat-ropa": { id: "cat-ropa", name: "Ropa", parent_id: "" },
     },
     incomeCents: 185000,
     spentCents: 84720,
@@ -249,3 +251,80 @@ test("buildReport: categoria al limite y excedida -> level warn / over", () => {
   assert.equal(rows.find((r) => r.rootId === "cat-over").level, "over");
 });
 
+
+// ---- Task 5: movimientos, compartidos y suscripciones ----------------------------------------
+
+test("buildReport: movimientos agrupados por raiz y ordenados por fecha descendente", () => {
+  const r = buildReport(fixture());
+  const alimentacion = r.movements.groups.find((g) => g.rootId === "cat-alimentacion");
+  assert.equal(alimentacion.count, 2);
+  assert.deepEqual(alimentacion.items.map((i) => i.date), ["2026-09-08", "2026-09-02"]);
+});
+
+// El total de cabecera es el de spentByRootCategory, NO la suma de las filas: el SQL descuenta
+// devoluciones con REFUND_REDUCES_SPEND (sql.js:11-12) y recalcular en JS abriria una divergencia
+// silenciosa entre el informe y «Gasto por categoria». En este fixture la lista de movimientos es
+// una MUESTRA (no el libro mayor completo del periodo): la suma de sus filas nunca coincide con
+// el total real, que es justo lo que este test fija.
+test("buildReport: el total de un grupo es el del SQL, no la suma de sus filas", () => {
+  const r = buildReport(fixture());
+  const alimentacion = r.movements.groups.find((g) => g.rootId === "cat-alimentacion");
+  const sumaFilas = alimentacion.items.reduce((s, i) => s + i.cents, 0);
+  assert.equal(alimentacion.totalCents, 18740);
+  assert.notEqual(alimentacion.totalCents, sumaFilas);
+});
+
+test("buildReport: ingresos, transferencias y ajustes van al grupo 'others'", () => {
+  const r = buildReport(fixture());
+  const types = r.movements.others.items.map((i) => i.type).sort();
+  assert.deepEqual(types, ["adjustment", "income", "transfer"]);
+  assert.equal(r.movements.others.count, 3);
+});
+
+test("buildReport: count es el total de movimientos del periodo", () => {
+  const f = fixture();
+  const r = buildReport(f);
+  assert.equal(r.movements.count, f.transactions.length);
+});
+
+test("buildReport: compartidos — integro y mi parte son cifras distintas", () => {
+  const s = buildReport(fixture()).shared;
+  assert.equal(s.periodTotalCents, 19940);
+  assert.equal(s.myPartCents, 9970);
+  assert.equal(s.netCents, 2260); // viene de fuera: NO esta acotado al periodo
+  assert.equal(s.direction, "partner_owes");
+});
+
+test("buildReport: neto negativo -> 'i_owe'; neto 0 -> 'settled'", () => {
+  assert.equal(buildReport({ ...fixture(), partnerNetCents: -500 }).shared.direction, "i_owe");
+  assert.equal(buildReport({ ...fixture(), partnerNetCents: 0 }).shared.direction, "settled");
+});
+
+test("buildReport: sin partner_name la seccion de compartidos es null", () => {
+  assert.equal(buildReport({ ...fixture(), partnerName: "" }).shared, null);
+});
+
+test("buildReport: suscripciones — 49,98 al mes y 599,76 al ano", () => {
+  const sub = buildReport(fixture()).subscriptions;
+  assert.equal(sub.activeCount, 3);
+  assert.equal(sub.monthlyCents, 4998);
+  assert.equal(sub.annualCents, 59976);
+});
+
+test("buildReport: una anual que no aplica este mes no suma al coste del periodo", () => {
+  const f = {
+    ...cleanFixture(),
+    period: { id: "per-x", name: "Septiembre", start_date: "2026-09-01", end_date: "", status: "open", my_share_pct: 100 },
+    subscriptionRules: [
+      { id: "r-mensual", name: "Mensual", type: "expense", amount_cents: 1000, category_id: "", account_id: "acc-1", counter_account_id: "", frequency: "monthly", due_day: 5, due_month: null, is_shared: 0, is_active: 1, is_subscription: 1, cancelled_at: "" },
+      { id: "r-anual", name: "Anual de marzo", type: "expense", amount_cents: 9999, category_id: "", account_id: "acc-1", counter_account_id: "", frequency: "yearly", due_day: 1, due_month: 3, is_shared: 0, is_active: 1, is_subscription: 1, cancelled_at: "" },
+    ],
+  };
+  const sub = buildReport(f).subscriptions;
+  assert.equal(sub.activeCount, 2);
+  assert.equal(sub.periodCents, 1000, "septiembre no es marzo: la anual no aporta al coste de ESTE periodo");
+});
+
+test("buildReport: sin suscripciones activas la seccion es null", () => {
+  assert.equal(buildReport({ ...fixture(), subscriptionRules: [] }).subscriptions, null);
+});

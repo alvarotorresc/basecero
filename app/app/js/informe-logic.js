@@ -6,9 +6,10 @@
  *  Devuelve una estructura SERIALIZABLE (JSON.parse(JSON.stringify(r)) es idéntica — hay test):
  *  números, strings y arrays, nunca HTML ni nodos ni funciones. La pantalla y el PDF son dos
  *  presentadores de este mismo objeto (spec §5.2, D2). */
-import { dayIndexOfPeriod, expectedPeriodDays } from "./prevision.js";
+import { dayIndexOfPeriod, expectedPeriodDays, ruleApplies, myAmountOfRule, periodMonth } from "./prevision.js";
 import { budgetMap, budgetStatus, pctOf, relativeWidth, sortRootRows } from "./category-spend.js";
-import { colorForCategory, textColorForCategory, iconForCategory } from "./category-colors.js";
+import { colorForCategory, textColorForCategory, iconForCategory, rootOf } from "./category-colors.js";
+import { activeSubscriptions, monthlyTotalCents, annualTotalCents } from "./subscriptions.js";
 
 function buildMeta({ period, todayIso }) {
   const isOpen = period.status === "open";
@@ -110,14 +111,110 @@ function buildCategories({ spentByRoot, prevSpentByRoot, budgets, categoriesById
   return { rows, totalCents, prevTotalCents, totalDeltaPct, hasPrev };
 }
 
-export function buildReport(input) {
+const byDateDesc = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+
+function movementItem(t) {
   return {
-    meta: buildMeta(input),
-    summary: buildSummary(input),
-    accounts: buildAccounts(input),
-    categories: buildCategories(input),
-    movements: { count: 0, groups: [], others: { count: 0, items: [] } },
-    shared: null,
-    subscriptions: null,
+    id: t.id, date: t.date, merchant: t.merchant, cents: t.amount_cents,
+    type: t.type, isShared: !!t.is_shared, paidBy: t.paid_by,
   };
+}
+
+/** Movimientos agrupados por raíz de gasto (expense/refund); ingresos, transferencias y ajustes
+ *  van al grupo `others` (spec §5.6): esos tres tipos no componen `spentOfPeriod`, así que
+ *  agruparlos por categoría no significaría nada. El total de cabecera de cada grupo es el de
+ *  `categories.rows` (que a su vez viene de `spentByRootCategory`, D12) — NUNCA la suma de los
+ *  `items` listados, que puede ser una muestra parcial de los movimientos reales de la raíz. */
+function buildMovements({ transactions, categoriesById }, categories) {
+  const txs = transactions ?? [];
+  const byId = categoriesById ?? {};
+  const othersTypes = new Set(["income", "transfer", "adjustment"]);
+  const groupsById = new Map();
+  const others = [];
+  for (const t of txs) {
+    if (othersTypes.has(t.type)) { others.push(t); continue; }
+    const rootId = rootOf(t.category_id, byId);
+    if (!groupsById.has(rootId)) groupsById.set(rootId, []);
+    groupsById.get(rootId).push(t);
+  }
+
+  const groups = [];
+  const seenRoots = new Set();
+  for (const catRow of categories.rows) {
+    if (!groupsById.has(catRow.rootId)) continue;
+    seenRoots.add(catRow.rootId);
+    const items = groupsById.get(catRow.rootId).slice().sort(byDateDesc);
+    groups.push({
+      rootId: catRow.rootId, name: catRow.name, color: catRow.color, icon: catRow.icon,
+      totalCents: catRow.spentCents, count: items.length, items: items.map(movementItem),
+    });
+  }
+  // Una raíz con movimientos pero SIN fila en categories.rows (p.ej. archivada a mitad de periodo,
+  // spec §5.3) no puede perder sus movimientos en silencio: se añade al final con el total de sus
+  // propias filas, lo único que queda disponible para ella.
+  for (const [rootId, items] of groupsById) {
+    if (seenRoots.has(rootId)) continue;
+    const sorted = items.slice().sort(byDateDesc);
+    groups.push({
+      rootId, name: byId[rootId]?.name ?? "", color: colorForCategory(rootId, byId), icon: iconForCategory(rootId, byId),
+      totalCents: sorted.reduce((s, t) => s + t.amount_cents, 0), count: sorted.length,
+      items: sorted.map(movementItem),
+    });
+  }
+
+  const sortedOthers = others.slice().sort(byDateDesc);
+  return {
+    count: txs.length,
+    groups,
+    others: { count: sortedOthers.length, items: sortedOthers.map(movementItem) },
+  };
+}
+
+/** Compartidos del periodo: `periodTotalCents`/`myPartCents` salen de las filas `is_shared=1` de
+ *  `transactions` (íntegro vs. mi parte, spec §5.6); `netCents` es `partnerNetCents`, que viene
+ *  de fuera y NO está acotado al periodo (es el mismo héroe de Liquidar). Sin `partnerName`
+ *  configurado, la sección entera es `null` (mismo criterio que periodo-nuevo.js:222). */
+function buildShared({ transactions, partnerNetCents, partnerName }) {
+  const name = (partnerName ?? "").trim();
+  if (!name) return null;
+  const sharedTx = (transactions ?? []).filter((t) => t.is_shared);
+  const periodTotalCents = sharedTx.reduce((s, t) => s + t.amount_cents, 0);
+  const myPartCents = sharedTx.reduce((s, t) => s + t.my_amount_cents, 0);
+  const netCents = partnerNetCents ?? 0;
+  const direction = netCents > 0 ? "partner_owes" : netCents < 0 ? "i_owe" : "settled";
+  const items = sharedTx.slice().sort(byDateDesc).map((t) => ({
+    id: t.id, date: t.date, merchant: t.merchant, cents: t.amount_cents, myCents: t.my_amount_cents, paidBy: t.paid_by,
+  }));
+  return { partnerName: name, periodTotalCents, myPartCents, netCents, direction, items };
+}
+
+/** Suscripciones activas y su coste (spec §5.6). Se reutilizan enteras `activeSubscriptions`/
+ *  `monthlyTotalCents`/`annualTotalCents` de subscriptions.js (cero aritmética duplicada) y
+ *  `ruleApplies`/`myAmountOfRule`/`periodMonth` de prevision.js para el coste de ESTE periodo.
+ *  Sin ninguna suscripción activa, la sección es `null`. */
+function buildSubscriptions({ subscriptionRules, period }) {
+  const rules = subscriptionRules ?? [];
+  const active = activeSubscriptions(rules);
+  if (active.length === 0) return null;
+  const month = periodMonth(period.start_date, period.end_date);
+  const periodCents = active
+    .filter((r) => ruleApplies(r, month))
+    .reduce((s, r) => s + myAmountOfRule(r, period.my_share_pct), 0);
+  return {
+    activeCount: active.length,
+    periodCents,
+    monthlyCents: monthlyTotalCents(rules),
+    annualCents: annualTotalCents(rules),
+  };
+}
+
+export function buildReport(input) {
+  const meta = buildMeta(input);
+  const summary = buildSummary(input);
+  const accounts = buildAccounts(input);
+  const categories = buildCategories(input);
+  const movements = buildMovements(input, categories);
+  const shared = buildShared(input);
+  const subscriptions = buildSubscriptions(input);
+  return { meta, summary, accounts, categories, movements, shared, subscriptions };
 }
