@@ -629,7 +629,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:18px;">
         ${state.photo ? `
         <div style="position:relative; flex-shrink:0;">
-          <img src="${escAttr(photoObjectUrl)}" alt="" style="width:44px;height:44px;border-radius:var(--r-1);object-fit:cover;background:var(--surface-2);border:1px solid var(--hairline-strong);display:block;">
+          <img src="${escAttr(photoObjectUrl)}" alt="" style="width:44px;height:44px;object-fit:cover;background:var(--surface-2);border:1px solid var(--hairline-strong);display:block;">
           <button type="button" id="reg-photo-remove" aria-label="${escAttr(t("registro.photo.remove"))}"
             style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:1px solid var(--hairline-strong);background:var(--surface-1);color:var(--ink-3);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;">
             ${icon("close", { size: 11 })}

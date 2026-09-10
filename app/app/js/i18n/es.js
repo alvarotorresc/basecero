@@ -203,7 +203,7 @@ export const ES = {
     close: "Cerrar",
     type: { transfer: "Transfer.", more: "Más tipos de apunte" },
     natural: {
-      placeholder: "Dilo o escríbelo: 12,50 en el bar",
+      placeholder: "Dilo o escríbelo: «12,50 en el bar»",
       mic: "Dictar el gasto",
       micListening: "Escuchando…",
       micDenied: "No se pudo usar el micro. Escríbelo.",
