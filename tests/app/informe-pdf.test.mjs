@@ -4,8 +4,9 @@
 // de CSV ajenos: sin este saneo, el PDF de un usuario normal revienta.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { winAnsiSafe, layoutReport, A4 } from "../../app/app/js/informe-pdf.js";
+import { winAnsiSafe, layoutReport, A4, buildPdfBytes, reportFilename } from "../../app/app/js/informe-pdf.js";
 import { barRowsGeometry } from "../../app/app/js/charts.js";
+import { createRequire } from "node:module";
 
 test("winAnsiSafe: conserva lo que WinAnsi si codifica", () => {
   const ok = "Alimentación ñ áéíóú ü ç — · « » 1.480,15 €";
@@ -165,4 +166,50 @@ test("layoutReport: los rects de las barras salen de barRowsGeometry", () => {
   assert.ok(rect, "debe haber un rect de barra para la categoria Casa");
   assert.equal(rect.w, expected.w);
   assert.equal(rect.h, expected.h);
+});
+
+// ---- Task 10: buildPdfBytes y pdf-loader.js -----------------------------------------------------
+// pdf-lib se carga con createRequire, igual que tests/app/helpers.mjs:5-6 hace con xlsx (el UMD
+// expone module.exports).
+
+const require = createRequire(import.meta.url);
+const PDFLib = require("../../app/app/vendor/pdf-lib/pdf-lib.min.js");
+
+test("buildPdfBytes: los bytes son un PDF valido", async () => {
+  const bytes = await buildPdfBytes(PDFLib, smallReport());
+  assert.equal(Buffer.from(bytes.slice(0, 5)).toString(), "%PDF-");
+});
+
+test("buildPdfBytes: las paginas del PDF son las que dijo layoutReport", async () => {
+  const report = reportWith(60);
+  const bytes = await buildPdfBytes(PDFLib, report);
+  const doc = await PDFLib.PDFDocument.load(bytes);
+  assert.ok(doc.getPageCount() >= 2);
+  assert.equal(doc.getPageCount(), layoutReport(report).pages.length);
+});
+
+test("buildPdfBytes: un informe grande da estrictamente mas paginas que uno pequeno", async () => {
+  const [bigBytes, smallBytes] = await Promise.all([
+    buildPdfBytes(PDFLib, reportWith(60)),
+    buildPdfBytes(PDFLib, reportWith(3)),
+  ]);
+  const [bigDoc, smallDoc] = await Promise.all([PDFLib.PDFDocument.load(bigBytes), PDFLib.PDFDocument.load(smallBytes)]);
+  assert.ok(bigDoc.getPageCount() > smallDoc.getPageCount());
+});
+
+// El caso que revienta en producción si falta winAnsiSafe.
+test("buildPdfBytes: una categoria con emoji y un comercio con flecha no lanzan", async () => {
+  const report = reportWith(3, { categoryName: "🏠 Casa", merchant: "Bar → La Plaza" });
+  await assert.doesNotReject(() => buildPdfBytes(PDFLib, report));
+});
+
+test("buildPdfBytes: un importe de fr-FR (con U+202F) no lanza", async () => {
+  const frAmount = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(-1234.5);
+  const report = reportWith(3, { merchant: `Pedido ${frAmount}` });
+  await assert.doesNotReject(() => buildPdfBytes(PDFLib, report));
+});
+
+test("reportFilename: determinista y sin caracteres de ruta", () => {
+  assert.equal(reportFilename(smallReport()), "basecero-informe-2026-09-01.pdf");
+  assert.ok(!/[/\\:]/.test(reportFilename(smallReport())));
 });

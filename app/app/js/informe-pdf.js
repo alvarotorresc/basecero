@@ -1,4 +1,6 @@
 import { barRowsGeometry } from "./charts.js";
+import { fmtMoney, fmtDiaCorto } from "./format.js";
+import { t } from "./i18n/index.js";
 
 /** Presentador PDF del Informe del periodo. Dos mitades, mismo criterio que charts.js: misma
  *  testabilidad, un fichero menos.
@@ -106,13 +108,13 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
       y = pageSize.h - margin;
     }
   }
-  function text(section, str, { size = 10, align = "left", bold = false, color, extra } = {}) {
+  function text(section, str, { size = 10, align = "left", bold = false, color, mono = false } = {}) {
     const lineH = size + 4;
     ensure(lineH);
     y -= lineH;
     page().blocks.push({
       kind: "text", section, text: String(str ?? ""), x: margin, y, align,
-      maxX: margin + contentW, maxWidth: contentW, size, bold, color, ...extra,
+      maxX: margin + contentW, maxWidth: contentW, size, bold, color, mono,
     });
   }
   function rule(section) {
@@ -130,54 +132,64 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
   // 1. Cabecera
   text("header", report.meta.name, { size: 18, bold: true });
   text("header", report.meta.isOpen
-    ? `${report.meta.dayIndex}/${report.meta.expectedDays}`
-    : `${report.meta.startDate} - ${report.meta.endDate}`, { size: 10 });
+    ? `${fmtDiaCorto(report.meta.startDate)} – ${fmtDiaCorto(report.meta.closeDate)}`
+    : `${fmtDiaCorto(report.meta.startDate)} – ${fmtDiaCorto(report.meta.endDate)}`, { size: 10 });
   rule("header");
 
   // 2. Resumen
-  text("summary", "Resumen", { size: 13, bold: true });
-  text("summary", `Ingresos ${report.summary.incomeCents}`);
-  text("summary", `Gastado ${report.summary.spentCents}`);
-  text("summary", `Ahorrado ${report.summary.savedCents}`);
-  text("summary", `Disponible ${report.summary.availableCents}`);
-  if (report.summary.savingsRatePct != null) text("summary", `Tasa de ahorro ${report.summary.savingsRatePct}%`);
+  text("summary", t("informe.pdf.summary"), { size: 13, bold: true });
+  text("summary", `${t("informe.pdf.income")}  ${fmtMoney(report.summary.incomeCents)}`, { mono: true });
+  text("summary", `${t("informe.pdf.spent")}  ${fmtMoney(report.summary.spentCents)}`, { mono: true });
+  text("summary", `${t("informe.pdf.saved")}  ${fmtMoney(report.summary.savedCents)}`, { mono: true });
+  text("summary", `${t("informe.pdf.available")}  ${fmtMoney(report.summary.availableCents)}`, { mono: true });
+  if (report.summary.savingsRatePct != null) {
+    text("summary", t("informe.pdf.savingsRate", { pct: report.summary.savingsRatePct }));
+  }
   rule("summary");
 
   // 3. Tus cuentas
-  text("accounts", "Tus cuentas", { size: 13, bold: true });
-  for (const a of report.accounts.rows) text("accounts", `${a.name} ${a.startCents} -> ${a.endCents}`);
-  text("accounts", `Total operativo ${report.accounts.totalStartCents} -> ${report.accounts.totalEndCents}`, { bold: true });
+  text("accounts", t("informe.pdf.accounts"), { size: 13, bold: true });
+  for (const a of report.accounts.rows) {
+    text("accounts", `${a.name}  ${fmtMoney(a.startCents)} → ${fmtMoney(a.endCents)}`, { mono: true });
+  }
+  text("accounts", t("informe.pdf.accountsTotal", {
+    amount: `${fmtMoney(report.accounts.totalStartCents)} → ${fmtMoney(report.accounts.totalEndCents)}`,
+  }), { bold: true, mono: true });
   rule("accounts");
 
   // 4. Gasto por categoría
-  text("categories", "Gasto por categoría", { size: 13, bold: true });
+  text("categories", t("informe.pdf.categories"), { size: 13, bold: true });
   const maxSpent = Math.max(0, ...report.categories.rows.map((c) => c.spentCents));
   for (const c of report.categories.rows) {
-    text("categories", `${c.name} ${c.spentCents}`, { color: c.textColor });
+    // El nombre de la categoría va SIEMPRE en tinta de papel (SISTEMA §2.1): el color de
+    // categoría solo rellena la barra de abajo, nunca el texto (D5/D7 de la spec).
+    text("categories", `${c.name}  ${fmtMoney(c.spentCents)}`, { mono: true });
     bar("categories", { value: c.spentCents, max: maxSpent, color: c.color });
   }
-  text("categories", `Total ${report.categories.totalCents}`, { bold: true });
+  text("categories", t("informe.pdf.categoriesTotal", { amount: fmtMoney(report.categories.totalCents) }), { bold: true, mono: true });
   rule("categories");
 
   // 5. Con la contraparte
   if (report.shared) {
-    text("shared", `Con ${report.shared.partnerName}`, { size: 13, bold: true });
-    text("shared", `Total del periodo ${report.shared.periodTotalCents}`);
-    text("shared", `Mi parte ${report.shared.myPartCents}`);
-    text("shared", `Neto ${report.shared.netCents}`);
+    text("shared", t("informe.pdf.shared", { name: report.shared.partnerName }), { size: 13, bold: true });
+    text("shared", t("informe.pdf.periodTotal", { amount: fmtMoney(report.shared.periodTotalCents) }), { mono: true });
+    text("shared", t("informe.pdf.myPart", { amount: fmtMoney(report.shared.myPartCents) }), { mono: true });
+    text("shared", t("informe.pdf.net", { amount: fmtMoney(report.shared.netCents) }), { mono: true });
     rule("shared");
   }
 
   // 6. Suscripciones
   if (report.subscriptions) {
-    text("subscriptions", "Suscripciones", { size: 13, bold: true });
-    text("subscriptions", `${report.subscriptions.activeCount} activas · ${report.subscriptions.monthlyCents}/mes`);
-    text("subscriptions", `${report.subscriptions.annualCents}/año`);
+    text("subscriptions", t("informe.pdf.subscriptions"), { size: 13, bold: true });
+    text("subscriptions", t("informe.pdf.subscriptionsActive", {
+      n: report.subscriptions.activeCount, amount: fmtMoney(report.subscriptions.monthlyCents),
+    }), { mono: true });
+    text("subscriptions", t("informe.pdf.subscriptionsYear", { amount: fmtMoney(report.subscriptions.annualCents) }), { mono: true });
     rule("subscriptions");
   }
 
   // 7. Movimientos por categoría — la lista completa, la parte que se lleva las páginas.
-  text("movements", "Movimientos por categoría", { size: 13, bold: true });
+  text("movements", t("informe.pdf.movements"), { size: 13, bold: true });
   for (const g of report.movements.groups) {
     // Regla de viuda: la cabecera de grupo arrastra al menos su primera fila a la página
     // siguiente si no caben las dos juntas — nunca se queda sola al final de una página.
@@ -185,14 +197,18 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
     ensure(headerLineH + firstItemLineH);
     y -= headerLineH;
     page().blocks.push({
-      kind: "text", section: "movements", text: `${g.name} · ${g.totalCents}`, x: margin, y,
+      kind: "text", section: "movements", text: `${g.name}  ${fmtMoney(g.totalCents)}`, x: margin, y,
       align: "left", maxX: margin + contentW, maxWidth: contentW, size: 12, bold: true, groupHeader: true,
     });
-    for (const it of g.items) text("movements", `${it.date}  ${it.merchant}  ${it.cents}`, { size: 10 });
+    for (const it of g.items) {
+      text("movements", `${fmtDiaCorto(it.date)}   ${it.merchant}   ${fmtMoney(it.cents)}`, { size: 10, mono: true });
+    }
   }
   if (report.movements.others.items.length) {
-    text("movements", "Otros", { size: 12, bold: true });
-    for (const it of report.movements.others.items) text("movements", `${it.date}  ${it.merchant}  ${it.cents}`, { size: 10 });
+    text("movements", t("informe.pdf.others"), { size: 12, bold: true });
+    for (const it of report.movements.others.items) {
+      text("movements", `${fmtDiaCorto(it.date)}   ${it.merchant}   ${fmtMoney(it.cents)}`, { size: 10, mono: true });
+    }
   }
 
   // Pie numerado {n}/{total} en cada página, dentro de la franja reservada por FOOTER_H.
@@ -205,4 +221,77 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
   });
 
   return { pageSize, margin, pages };
+}
+
+// ---- buildPdfBytes — adaptador de dibujo con pdf-lib (inyectado) -------------------------------
+// PDFLib entra por INYECCIÓN: este módulo no lo importa ni lo carga (el test lo trae con
+// createRequire, la app con pdf-loader.js/<script>) — es lo único que mide texto y trunca.
+
+/** "basecero-informe-2026-09-01.pdf" — determinista, sin slug del nombre del periodo (que es
+ *  texto libre del usuario). Mismo estilo que basecero-{hoy}.xlsx. */
+export const reportFilename = (report) => `basecero-informe-${report.meta.startDate}.pdf`;
+
+const PAPER = [0xed, 0xe6, 0xda];
+const PAPER_INK = [0x1b, 0x1a, 0x16];
+const PAPER_DIM = [0x6b, 0x64, 0x59];
+
+function rgbFromParts(PDFLib, [r, g, b]) {
+  return PDFLib.rgb(r / 255, g / 255, b / 255);
+}
+
+function rgbFromHex(PDFLib, hex) {
+  const s = String(hex ?? "").replace("#", "");
+  const r = parseInt(s.slice(0, 2), 16) || 0;
+  const g = parseInt(s.slice(2, 4), 16) || 0;
+  const b = parseInt(s.slice(4, 6), 16) || 0;
+  return rgbFromParts(PDFLib, [r, g, b]);
+}
+
+// Alineación derecha y truncado con elipsis vía font.widthOfTextAtSize (§7.3): busca por
+// bisección el prefijo más largo que, con la elipsis añadida, sigue cabiendo en maxWidth.
+function truncateToFit(font, text, size, maxWidth) {
+  if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
+  const ellipsis = "…";
+  let lo = 0, hi = text.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (font.widthOfTextAtSize(text.slice(0, mid) + ellipsis, size) <= maxWidth) lo = mid;
+    else hi = mid - 1;
+  }
+  return text.slice(0, lo) + ellipsis;
+}
+
+/** Adaptador: recorre layoutReport y dibuja con pdf-lib. Fondo `--paper`, StandardFonts
+ *  Helvetica/HelveticaBold/Courier (Courier para las cifras, `--font-mono` del sistema).
+ *  `drawText` con `winAnsiSafe` SIEMPRE — es la única frontera de saneo del módulo (Task 2).
+ *  Devuelve Uint8Array. */
+export async function buildPdfBytes(PDFLib, report, opts) {
+  const { pageSize, pages } = layoutReport(report, opts);
+  const doc = await PDFLib.PDFDocument.create();
+  const helvetica = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+  const helveticaBold = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+  const courier = await doc.embedFont(PDFLib.StandardFonts.Courier);
+  const paper = rgbFromParts(PDFLib, PAPER);
+  const ink = rgbFromParts(PDFLib, PAPER_INK);
+  const dim = rgbFromParts(PDFLib, PAPER_DIM);
+
+  for (const p of pages) {
+    const pdfPage = doc.addPage([pageSize.w, pageSize.h]);
+    pdfPage.drawRectangle({ x: 0, y: 0, width: pageSize.w, height: pageSize.h, color: paper });
+    for (const b of p.blocks) {
+      if (b.kind === "rule") {
+        pdfPage.drawRectangle({ x: b.x, y: b.y, width: b.w, height: 1, color: dim });
+      } else if (b.kind === "rect") {
+        if (b.w > 0 && b.h > 0) pdfPage.drawRectangle({ x: b.x, y: b.y, width: b.w, height: b.h, color: rgbFromHex(PDFLib, b.color) });
+      } else if (b.kind === "text") {
+        const font = b.bold ? helveticaBold : b.mono ? courier : helvetica;
+        const safe = winAnsiSafe(b.text);
+        const fitted = truncateToFit(font, safe, b.size, b.maxWidth);
+        const width = font.widthOfTextAtSize(fitted, b.size);
+        const x = b.align === "right" ? b.maxX - width : b.x;
+        pdfPage.drawText(fitted, { x, y: b.y, size: b.size, font, color: b.color ? rgbFromHex(PDFLib, b.color) : ink });
+      }
+    }
+  }
+  return doc.save();
 }

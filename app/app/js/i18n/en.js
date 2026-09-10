@@ -930,4 +930,30 @@ export const EN = {
     myPart: "Your share",
     undoFailed: "Could not undo: {error}",
   },
+  // Period report (F1): PDF labels (informe-pdf.js). Lands here before informe.* (the screen,
+  // plan Task 11) because the PDF ships first — Task 11 adds the rest of the informe.*
+  // namespace on top of this same root.
+  informe: {
+    pdf: {
+      summary: "Summary",
+      income: "Income",
+      spent: "Spent",
+      saved: "Saved",
+      available: "Available",
+      savingsRate: "Savings rate {pct}%",
+      accounts: "Your accounts",
+      accountsTotal: "Operating total {amount}",
+      categories: "Spending by category",
+      categoriesTotal: "Total {amount}",
+      shared: "With {name}",
+      periodTotal: "Period total {amount}",
+      myPart: "My part {amount}",
+      net: "Net {amount}",
+      subscriptions: "Subscriptions",
+      subscriptionsActive: "{n} active · {amount} per month",
+      subscriptionsYear: "{amount} per year",
+      movements: "Movements by category",
+      others: "Other",
+    },
+  },
 };

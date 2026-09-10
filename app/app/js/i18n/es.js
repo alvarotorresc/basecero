@@ -951,4 +951,30 @@ export const ES = {
     myPart: "Tu parte",
     undoFailed: "No se pudo deshacer: {error}",
   },
+  // Informe del periodo (F1): etiquetas del PDF (informe-pdf.js). Nace aquí, antes que
+  // informe.* (la pantalla, Task 11 del plan) porque el PDF se implementa primero — Task 11
+  // añade el resto del espacio de nombres informe.* sobre esta misma raíz.
+  informe: {
+    pdf: {
+      summary: "Resumen",
+      income: "Ingresos",
+      spent: "Gastado",
+      saved: "Ahorrado",
+      available: "Disponible",
+      savingsRate: "Tasa de ahorro {pct}%",
+      accounts: "Tus cuentas",
+      accountsTotal: "Total operativo {amount}",
+      categories: "Gasto por categoría",
+      categoriesTotal: "Total {amount}",
+      shared: "Con {name}",
+      periodTotal: "Total del periodo {amount}",
+      myPart: "Mi parte {amount}",
+      net: "Neto {amount}",
+      subscriptions: "Suscripciones",
+      subscriptionsActive: "{n} activas · {amount} al mes",
+      subscriptionsYear: "{amount} al año",
+      movements: "Movimientos por categoría",
+      others: "Otros",
+    },
+  },
 };
