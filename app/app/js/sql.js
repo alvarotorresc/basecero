@@ -377,10 +377,16 @@ export const SQL = {
     SELECT ?,?,?,?, COALESCE(MAX(display_order),0)+1, 0, ?,?,0 FROM accounts WHERE deleted=0`,
   updateAccount: `UPDATE accounts SET name=?, type=?, opening_balance_cents=?, updated_at=? WHERE id=?`,
   // Onboarding paso 2, D9 (repo.js#deleteEmptyAccount): borrado DURO guardado. El WHERE hace la
-  // comprobación de "sin movimientos activos" en el MISMO statement — no hay ventana entre
-  // comprobar y borrar. Bind SIEMPRE [id, id, id]. Movimientos deleted=1 no cuentan (se ignoran).
+  // comprobación de "sin movimientos activos, sin regla recurrente ni objetivo que la referencien"
+  // en el MISMO statement — no hay ventana entre comprobar y borrar. Bind SIEMPRE
+  // [id, id, id, id, id, id]. Filas deleted=1 no cuentan (se ignoran) en ninguna de las tres tablas.
   deleteEmptyAccount: `DELETE FROM accounts WHERE id=? AND NOT EXISTS (
-    SELECT 1 FROM transactions WHERE deleted=0 AND (account_id=? OR counter_account_id=?))`,
+    SELECT 1 FROM transactions WHERE deleted=0 AND (account_id=? OR counter_account_id=?)
+  ) AND NOT EXISTS (
+    SELECT 1 FROM recurring_rules WHERE deleted=0 AND (account_id=? OR counter_account_id=?)
+  ) AND NOT EXISTS (
+    SELECT 1 FROM goals WHERE deleted=0 AND account_id=?
+  )`,
   getGoal: `SELECT * FROM goals WHERE id=? AND deleted=0`,
   insertGoal: `INSERT INTO goals (id,name,type,target_amount_cents,target_months,target_pct,target_date,account_id,category_id,is_active,created_at,updated_at,deleted)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0)`,
