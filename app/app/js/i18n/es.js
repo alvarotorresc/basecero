@@ -318,6 +318,11 @@ export const ES = {
     net: { title: "Neto" },
     account: { title: "Cuenta de la liquidación" },
     empty: "No queda nada pendiente de liquidar.",
+    // select.aria: aria-label de la casilla de selección por fila (SISTEMA.md §4.8bis). Las
+    // demás claves de `select` (`none`) y las de `row` (`theirPct`/`myPct`) las añade Task 3.3.
+    select: {
+      aria: "Incluir {merchant} en la liquidación",
+    },
     row: {
       subTheirs: "{date}, {amount}, su {pct} %",
       subMine: "{date}, {amount}, tu {pct} %",

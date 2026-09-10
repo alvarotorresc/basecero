@@ -5,8 +5,10 @@ import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 import { subHeaderHtml } from "../ui.js";
+import { icon } from "../icons.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 
 /** Fila de gasto pendiente: .dotico + nombre + sub (fecha · importe original · % de quien debe esa
  *  parte: el de la contraparte en las filas 'partner_owes', el MÍO en las 'i_owe')
@@ -27,21 +29,29 @@ const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt
  *  pct de ella en un caso y el mío en el otro: por eso el texto del sub se elige por dirección.
  *  Sustituye al sub anterior (categoría · fecha): el nombre de categoría ya no se repite aquí
  *  porque el título ya lo usa como fallback (`r.merchant || catName`) y el artboard no lo lleva en
- *  el sub de ninguna fila. */
-function rowHtml(r, byId) {
+ *  el sub de ninguna fila.
+ *
+ *  `selected` es el `state.selected` (Set de ids) de renderLiquidar: decide si la casilla de la
+ *  fila (SISTEMA.md §4.8bis) sale marcada. La fila entera sigue sin ser un botón — solo la
+ *  casilla lo es — así que `wire()` cablea `[data-select]`, no la fila. */
+function rowHtml(r, byId, selected) {
   const cat = byId[r.category_id];
   const catName = cat?.name ?? "";
   const color = colorForCategory(r.category_id, byId);
-  const icon = iconForCategory(r.category_id, byId);
+  const catIcon = iconForCategory(r.category_id, byId);
   const title = r.merchant || catName || t("common.type.expense");
   const pct = r.amount_cents ? Math.round((r.settle_cents / r.amount_cents) * 100) : 0;
   // subTheirs = «su {pct} %» (lo pagué yo, ella me debe esa parte); subMine = «tu {pct} %»
   // (lo pagó ella, le debo mi parte). El importe original del ticket va en las dos.
   const sub = t(r.direction === "i_owe" ? "liquidar.row.subMine" : "liquidar.row.subTheirs",
     { date: fmtDiaCorto(r.date), amount: fmtMoney(r.amount_cents), pct });
+  const checked = selected.has(r.id);
   return `
     <div class="tx-row" style="padding:10px 0;">
-      <div class="dotico" style="--cat:${color};">${icon}</div>
+      <button type="button" class="check-box" role="checkbox" aria-checked="${checked}"
+        aria-label="${escAttr(t("liquidar.select.aria", { merchant: title }))}"
+        data-select="${escAttr(r.id)}">${icon("check", { size: 16, width: 2.6 })}</button>
+      <div class="dotico" style="--cat:${color};">${catIcon}</div>
       <div class="tx-body">
         <div class="tx-title">${escHtml(title)}</div>
         <div class="tx-sub">${escHtml(sub)}</div>
@@ -87,6 +97,11 @@ export async function renderLiquidar(container, onBack) {
 
   const state = {
     rows,
+    // Todas marcadas por defecto (decisión 3): «liquidar todo» sigue siendo el resultado si
+    // nadie toca ninguna casilla — netOfSelected(rows, selected) con selected === todos los ids
+    // da el mismo neto que la suma de siempre (spec §4, test de share-pct.test.mjs). Se
+    // reinicializa igual tras cada recarga de pendingSettlements() (ver wire()).
+    selected: new Set(rows.map((r) => r.id)),
     accountId: resolveAccountId(meta.default_account_id, accounts) ?? "",
     confirm: false,
     busy: false,
@@ -118,7 +133,7 @@ export async function renderLiquidar(container, onBack) {
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">
         <div class="section-title">${titleText}</div>
         <div class="card" style="padding:6px 16px;display:flex;flex-direction:column;">
-          ${rows.map((r) => rowHtml(r, byId)).join('<hr class="divider">')}
+          ${rows.map((r) => rowHtml(r, byId, state.selected)).join('<hr class="divider">')}
         </div>
       </div>`;
 
@@ -159,6 +174,18 @@ export async function renderLiquidar(container, onBack) {
       b.onclick = () => { state.accountId = b.dataset.acc; state.confirm = false; render(); };
     });
 
+    // Casilla de selección por fila (§4.8bis): cambiar la selección invalida la confirmación en
+    // curso, igual que cambiar de cuenta — el importe que el segundo toque va a confirmar ya no
+    // sería el que ve el usuario.
+    container.querySelectorAll("[data-select]").forEach((b) => {
+      b.onclick = () => {
+        const id = b.dataset.select;
+        if (state.selected.has(id)) state.selected.delete(id); else state.selected.add(id);
+        state.confirm = false;
+        render();
+      };
+    });
+
     const settleBtn = container.querySelector("#liq-settle-all");
     if (settleBtn) {
       settleBtn.onclick = async () => {
@@ -180,6 +207,9 @@ export async function renderLiquidar(container, onBack) {
         try {
           await settleAllShared(state.rows.map((r) => r.id), state.accountId);
           state.rows = await pendingSettlements();
+          // Recarga → todo vuelve a marcarse (decisión 3): son gastos pendientes nuevos, ninguno
+          // heredado del Set anterior seguiría siendo válido de todas formas.
+          state.selected = new Set(state.rows.map((r) => r.id));
           state.confirm = false;
           errorMsg = "";
         } catch (e) {
@@ -190,7 +220,10 @@ export async function renderLiquidar(container, onBack) {
           // desde dentro del catch — la promesa del onclick quedaría rechazada sin nadie que la
           // escuche y el error compuesto arriba no llegaría a servir de nada. Si no se puede
           // releer, las filas se quedan como estaban: el mensaje de arriba ya explica qué pasó.
-          try { state.rows = await pendingSettlements(); } catch { /* se conserva state.rows */ }
+          try {
+            state.rows = await pendingSettlements();
+            state.selected = new Set(state.rows.map((r) => r.id));
+          } catch { /* se conserva state.rows (y state.selected, a juego) */ }
         } finally {
           state.busy = false;
           render();

@@ -310,6 +310,11 @@ export const EN = {
     net: { title: "Net" },
     account: { title: "Settlement account" },
     empty: "Nothing left to settle.",
+    // select.aria: aria-label for the per-row selection checkbox (SISTEMA.md §4.8bis). The rest
+    // of `select` (`none`) and `row` (`theirPct`/`myPct`) are added by Task 3.3.
+    select: {
+      aria: "Include {merchant} in the settlement",
+    },
     row: {
       subTheirs: "{date}, {amount}, their {pct}%",
       subMine: "{date}, {amount}, your {pct}%",
