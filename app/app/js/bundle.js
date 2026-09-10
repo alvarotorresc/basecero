@@ -105,8 +105,12 @@ export function unpackRestore(CFB, plainBytes) {
   if (!isBundle(plainBytes)) return { xlsx: plainBytes, attachments: [] };
   const parts = unpackBundle(CFB, plainBytes);
   const xlsxPart = parts.find((p) => p.name === "data.xlsx");
+  // M-2 (revisión de código): sin esto, un paquete sin data.xlsx dejaba `xlsx: undefined` y el
+  // llamante (ajustes.js/onboarding.js) se lo pasaba a XLSX.read(undefined, …), que revienta con
+  // el error crudo de la librería — justo lo que el UserError de arriba existe para evitar.
+  if (!xlsxPart) throw new UserError(t("errors.attachments.bundleCorrupt"));
   const attachments = parts
     .filter((p) => p.name.startsWith(PHOTO_PREFIX))
     .map((p) => ({ id: p.name.slice(PHOTO_PREFIX.length).replace(/\.jpg$/, ""), data: p.data }));
-  return { xlsx: xlsxPart?.data, attachments };
+  return { xlsx: xlsxPart.data, attachments };
 }

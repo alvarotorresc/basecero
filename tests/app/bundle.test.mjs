@@ -139,6 +139,19 @@ test("unpackRestore: unos bytes de paquete devuelven { xlsx, attachments: [{id, 
   assert.deepEqual(new Uint8Array(attachments[0].data), photo);
 });
 
+// M-2 (revisión de código): un paquete sin data.xlsx (p.ej. dañado a medias) dejaba
+// `xlsxPart?.data` en `undefined`, que XLSX.read(undefined, …) revienta con el error crudo de la
+// librería en vez del UserError que unpackBundle ya usa para esto.
+test("unpackRestore: un paquete sin data.xlsx -> UserError, nunca el error crudo de la librería", () => {
+  const bytes = packBundle(X.CFB, [
+    { name: "attachments/01ARZ3NDEKTSV4RRFFQ69G5FAV.jpg", data: new Uint8Array([1, 2]) },
+  ]);
+  assert.throws(() => unpackRestore(X.CFB, bytes), (e) => {
+    assert.ok(e instanceof UserError, `esperaba UserError, fue ${e.constructor.name}: ${e.message}`);
+    return true;
+  });
+});
+
 test("unpackRestore: unos bytes que empiezan por PK (copia antigua, sin paquete) devuelven el xlsx y attachments: []", () => {
   const xlsx = new Uint8Array([80, 75, 3, 4, 5, 5, 5]);
   const { xlsx: outXlsx, attachments } = unpackRestore(X.CFB, xlsx);
