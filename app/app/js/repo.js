@@ -1,5 +1,6 @@
 import { SQL, TABLES } from "./sql.js";
 import { query, exec, execMany } from "./db.js";
+import { attachments } from "./attachments.js";
 import { nowIso, hoyISO, prevDayIso, fmtMoney, fmtDec1, appLocale } from "./format.js";
 import { CONTRACT, insertSql } from "./contract.js";
 import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
@@ -444,6 +445,13 @@ export async function softDeleteTransaction(id) {
   } else {
     await exec(SQL.softDeleteTransaction, [now, id]);
   }
+  // Foto del ticket (N5, §9.5): el fichero se borra de VERDAD aunque la fila sea un borrado
+  // lógico — no viaja en el .xlsx y nada podría restaurarlo, así que dejarlo huérfano en OPFS no
+  // protege ningún dato. softDeleteTransaction es el ÚNICO camino de borrado que existe, así que
+  // esto cubre a la vez el modal del detalle (movimientos.js) y, gratis, el «Deshacer» del recibo
+  // (registro.js) justo cuando la foto se acaba de escribir. El error se traga: un fichero que no
+  // se pudo borrar no debe impedir borrar el movimiento.
+  try { await attachments?.remove(id); } catch { /* no debe bloquear el borrado del movimiento */ }
 }
 
 export const listRules = () => query(SQL.listRules);

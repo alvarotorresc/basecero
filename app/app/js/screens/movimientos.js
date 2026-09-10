@@ -3,6 +3,7 @@ import {
   listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById, hasActiveLinkedSettlement,
   getMetaAll, listTags, createTag, tagTotals, tagTotalsOfPeriod,
 } from "../repo.js";
+import { attachments } from "../attachments.js";
 import { colorForCategory, iconForCategory, textColorForCategory, rootOf } from "../category-colors.js";
 import { budgetStatus } from "../category-spend.js";
 import { matchesFilter, isUncategorized } from "../movimientos-filter.js";
@@ -183,6 +184,11 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     opening: false, // apertura de detalle en curso (ver openDetail)
   };
   let errorMsg = "";
+  // Foto del ticket (N5, spec §9.8): la URL del Blob leído en openDetail (state.detail.photoBlob).
+  // Se revoca y se vuelve a crear en CADA renderDetail() (updateDetail -> render() repinta con
+  // innerHTML en cada cambio de estado) y también al salir del detalle (backToList) — sin esto,
+  // cada repintado filtraría una foto entera en memoria.
+  let detailPhotoUrl = null;
 
   async function loadPeriodData() {
     [state.rows, state.uncategorizedCount, state.tagTotalsPeriod, state.tagTotalsAll] = await Promise.all([
@@ -368,7 +374,16 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       tagId: row.tag_id || null,
       tagPickerOpen: false, // Task 12: solo UI, nunca se manda al guardar
       newTagDraft: null, // Task 12: != null mientras se escribe el nombre de una etiqueta nueva
+      // Foto del ticket (N5): photoBlob se lee AQUÍ (openDetail es async; renderDetail no puede
+      // esperar a OPFS). has_attachment=1 sin fichero (hoja .xlsx restaurada, o un fallo del paso
+      // 3 de §9.4) se trata como "sin foto" — null, sin banner ni error (spec §9.2/§13.11): el
+      // FICHERO es la verdad, la columna solo evita sondear OPFS en la lista.
+      photoBlob: null,
+      photoViewerOpen: false,
     };
+    if (row.has_attachment && attachments) {
+      try { state.detail.photoBlob = await attachments.blob(id); } catch { state.detail.photoBlob = null; }
+    }
     state.linkedExpense = null;
     // El apunte de liquidación tiene DOS formas desde Task 3: la devolución ENTRANTE (refund) y el
     // ajuste SALIENTE (adjustment con ref_id, el que se crea cuando pagó ella). Los dos apuntan a un
@@ -395,6 +410,9 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
   }
 
   function backToList() {
+    // Foto del ticket: se sale del detalle sin pasar por otro renderDetail() que revoque la URL
+    // vigente — hay que hacerlo aquí, el único otro punto de salida.
+    if (detailPhotoUrl) { URL.revokeObjectURL(detailPhotoUrl); detailPhotoUrl = null; }
     state.view = "list";
     state.detailId = null;
     state.detail = null;
@@ -518,6 +536,12 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
 
   function renderDetail() {
     const d = state.detail;
+    // Foto del ticket: revocar SIEMPRE la URL del repintado anterior antes de crear la nueva —
+    // ver el comentario de detailPhotoUrl más arriba. d.photoBlob no cambia durante la sesión de
+    // detalle (solo openDetail lo rellena), así que esto es barato: una URL por repintado, nunca
+    // dos vivas a la vez.
+    if (detailPhotoUrl) { URL.revokeObjectURL(detailPhotoUrl); detailPhotoUrl = null; }
+    if (d.photoBlob) detailPhotoUrl = URL.createObjectURL(d.photoBlob);
     const cats = categoriesFor(d.type);
     const { mine: myCents, partner: partnerCents } = d.isShared ? splitCents(d.cents, d.sharePct) : { mine: d.cents, partner: 0 };
     const locked = !!d.settledLocked;
@@ -580,7 +604,22 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
         ${fechaBoxHtml(d)}
         ${renderTagControl(d)}
+        ${detailPhotoUrl ? `
+        <button type="button" id="mov-photo-thumb" aria-label="${escAttr(t("registro.photo.viewAria"))}"
+          style="width:44px;height:44px;border-radius:var(--r-1);border:1px solid var(--hairline-strong);padding:0;overflow:hidden;flex-shrink:0;cursor:pointer;background:var(--surface-2);">
+          <img src="${escAttr(detailPhotoUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">
+        </button>` : ""}
       </div>
+
+      ${d.photoViewerOpen && detailPhotoUrl ? `
+      <div id="mov-photo-viewer" role="dialog" aria-label="${escAttr(t("registro.photo.viewAria"))}" tabindex="-1"
+        style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;cursor:pointer;">
+        <button type="button" id="mov-photo-viewer-close" aria-label="${escAttr(t("movimientos.detail.photoClose"))}"
+          style="position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+          ${icon("close", { size: 20, stroke: "#fff" })}
+        </button>
+        <img src="${escAttr(detailPhotoUrl)}" alt="" style="max-width:100%;max-height:100%;object-fit:contain;">
+      </div>` : ""}
 
       <label class="field field-stack" style="margin-bottom:18px;">
         <span class="field-label">${t("common.note")}</span>
@@ -642,6 +681,19 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
   function wireDetail() {
     const d = state.detail;
     container.querySelector("#mov-back").onclick = () => goBack();
+
+    // Foto del ticket: miniatura abre el visor a pantalla completa; el visor se cierra al tocar
+    // en cualquier sitio, con el botón explícito o con Escape (spec §9.8).
+    const photoThumb = container.querySelector("#mov-photo-thumb");
+    if (photoThumb) photoThumb.onclick = () => updateDetail({ photoViewerOpen: true });
+    const photoViewer = container.querySelector("#mov-photo-viewer");
+    if (photoViewer) {
+      photoViewer.onclick = () => updateDetail({ photoViewerOpen: false });
+      photoViewer.onkeydown = (e) => { if (e.key === "Escape") updateDetail({ photoViewerOpen: false }); };
+      photoViewer.focus();
+    }
+    const photoViewerClose = container.querySelector("#mov-photo-viewer-close");
+    if (photoViewerClose) photoViewerClose.onclick = (e) => { e.stopPropagation(); updateDetail({ photoViewerOpen: false }); };
 
     container.querySelectorAll("[data-cat]").forEach((b) => {
       b.onclick = () => updateDetail({ categoryId: b.dataset.cat });

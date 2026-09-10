@@ -277,6 +277,7 @@ export const EN = {
       tagLabel: "Tag",
       noTag: "No tag",
       newTag: "New tag",
+      photoClose: "Close the photo",
     },
     tagCard: {
       movements: { one: "{n} movement", other: "{n} movements" },

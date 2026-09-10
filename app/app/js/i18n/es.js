@@ -291,6 +291,8 @@ export const ES = {
       tagLabel: "Etiqueta",
       noTag: "Sin etiqueta",
       newTag: "Nueva etiqueta",
+      // Foto del ticket (N5): aria-label del velo a pantalla completa que enseña la foto.
+      photoClose: "Cerrar la foto",
     },
     tagCard: {
       movements: { one: "{n} movimiento", other: "{n} movimientos" },
