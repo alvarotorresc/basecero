@@ -1,13 +1,16 @@
 import {
   listRules, listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById,
-  createRule, updateRule, softDeleteRule, getMetaAll,
+  createRule, updateRule, softDeleteRule, cancelSubscription, getMetaAll,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { fmtMoney, moneyPartsHtml, currencySymbol, parseCentsRaw, centsToRaw, hoyISO } from "../format.js";
+import { annualCents } from "../subscriptions.js";
 import { t, monthLong } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { showConfirm } from "../modal.js";
+import { showToast } from "../toast.js";
+import { renderSuscripciones } from "./suscripciones.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -33,7 +36,7 @@ const needsMonth = (freq) => freq === "quarterly" || freq === "yearly";
 /** Pantalla "Recurrentes": lista de reglas (Task 11 la consume para generar movimientos de
  *  previsión) + formulario de alta/edición con borrado en dos toques (mismo patrón que
  *  movimientos.js openDetail/backToList). onBack vuelve a quien la haya abierto (Ajustes). */
-export async function renderRecurrentes(container, onBack) {
+export async function renderRecurrentes(container, onBack, opts = {}) {
   let rules, expenseCats, incomeCats, accountsAll, byId, meta;
   try {
     [rules, expenseCats, incomeCats, accountsAll, byId, meta] = await Promise.all([
@@ -101,7 +104,10 @@ export async function renderRecurrentes(container, onBack) {
       text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;${!r.is_active ? "opacity:0.55;" : ""}">
       <div class="dotico" style="--cat:${color};">${icon}</div>
       <div class="tx-body">
-        <div class="tx-title">${escHtml(r.name)}</div>
+        <div class="tx-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span>${escHtml(r.name)}</span>
+          ${r.is_subscription ? `<span style="display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;background:var(--surface-2);color:var(--ink-2);font-size:11px;font-weight:500;flex-shrink:0;">${t("recurrentes.badge.subscription")}</span>` : ""}
+        </div>
         <div class="tx-sub">${escHtml(ruleSubtitle(r))}</div>
       </div>
       <div class="num" style="font-size:14px;font-weight:700;flex-shrink:0;${amountColor}">${fmtMoney(r.amount_cents)}</div>
@@ -119,7 +125,7 @@ export async function renderRecurrentes(container, onBack) {
       name: "", type: "expense", raw: "", cents: 0, categoryId: null,
       accountId: accounts[0]?.id ?? "", counterAccountId: "",
       frequency: "monthly", dueDay: "1", dueMonth: "",
-      isShared: false, isActive: true,
+      isShared: false, isActive: true, isSubscription: false,
     };
     pushBack(backToList);
     state.view = "form";
@@ -134,7 +140,7 @@ export async function renderRecurrentes(container, onBack) {
       categoryId: r.category_id || null, accountId: r.account_id, counterAccountId: r.counter_account_id || "",
       frequency: r.frequency, dueDay: r.due_day != null ? String(r.due_day) : "",
       dueMonth: r.due_month != null ? String(r.due_month) : "",
-      isShared: !!r.is_shared, isActive: !!r.is_active,
+      isShared: !!r.is_shared, isActive: !!r.is_active, isSubscription: !!r.is_subscription,
     };
     pushBack(backToList);
     state.view = "form";
@@ -205,11 +211,18 @@ export async function renderRecurrentes(container, onBack) {
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
-      ${state.rules.length === 0
-        ? `<div class="card" style="text-align:center;color:var(--text-3)"><p>${t("recurrentes.empty")}</p></div>`
-        : `<div class="card" style="padding:4px 16px; display:flex; flex-direction:column;">
-            ${state.rules.map((r, i) => ruleRowHtml(r, i > 0)).join("")}
-          </div>`}
+      <div class="card" style="padding:4px 16px; display:flex; flex-direction:column;">
+        ${state.rules.length === 0
+          ? `<p style="text-align:center;color:var(--text-3);padding:16px 0;">${t("recurrentes.empty")}</p>`
+          : state.rules.map((r, i) => ruleRowHtml(r, i > 0)).join("")}
+        <hr class="divider">
+        <button type="button" id="rec-radar-link"
+          style="width:100%;display:flex;align-items:center;gap:12px;padding:16px 0;min-height:56px;
+          background:transparent;border:0;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+          <span style="flex:1;font-size:14px;font-weight:600;color:var(--accent);">${t("recurrentes.radarLink")}</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M9.5 5 16 12l-6.5 7"/></svg>
+        </button>
+      </div>
     `;
     wireList();
   }
@@ -223,12 +236,24 @@ export async function renderRecurrentes(container, onBack) {
         if (r) openEdit(r);
       };
     });
+    container.querySelector("#rec-radar-link").onclick = () => {
+      pushBack(() => render());
+      renderSuscripciones(container, goBack);
+    };
   }
 
   function renderForm() {
     const f = state.form;
     const cats = categoriesFor(f.type);
     const withCategory = needsCategory(f.type);
+    // «Cancelar la suscripción» solo tiene sentido sobre lo GUARDADO, no sobre el formulario en
+    // curso: f.isSubscription/f.isActive cambian con cada toggle sin guardar, así que un usuario
+    // que desmarca "es una suscripción" (o la desactiva) vería el botón desaparecer/aparecer antes
+    // de pulsar "Guardar cambios" — y si lo pulsa, cancelSubscription() actuaría sobre una fila
+    // cuyo estado real en BD puede no ser ni suscripción ni activa. Se mira state.rules (la última
+    // lista recargada tras guardar), nunca el formulario vivo.
+    const saved = state.rules.find((r) => r.id === state.editId);
+    const canCancelSubscription = !!(saved?.is_subscription && saved?.is_active);
 
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
 
@@ -295,6 +320,23 @@ export async function renderRecurrentes(container, onBack) {
         </label>` : ""}
       </div>
 
+      ${f.type === "expense" ? `
+      <div style="display:flex; flex-direction:column; gap:10px; padding:16px; background:var(--accent-tint); border-left:2px solid var(--accent); margin-bottom:18px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <span style="font-size:15px; font-weight:600;">${t("recurrentes.form.subscriptionLabel")}</span>
+          <span class="toggle">
+            <input type="checkbox" id="rec-subscription" ${f.isSubscription ? "checked" : ""}>
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+          </span>
+        </div>
+        <span style="font-size:13px; line-height:1.45; color:var(--ink-2);">${t("recurrentes.form.subscriptionHint")}</span>
+        ${f.isSubscription && f.cents > 0 ? `
+        <div style="display:flex; align-items:baseline; gap:6px; padding-top:2px;">
+          <span class="num" style="font:var(--t-figure-l); letter-spacing:-.01em;">${moneyPartsHtml(annualCents({ amount_cents: f.cents, frequency: f.frequency }))}</span>
+          <span style="font-size:13px; font-weight:500; color:var(--ink-2);">${t("recurrentes.form.perYear")}</span>
+        </div>` : ""}
+      </div>` : ""}
+
       ${withCategory && f.type !== "income" && (f.isShared || partnerName) ? `
       <div class="card" style="padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
@@ -321,6 +363,13 @@ export async function renderRecurrentes(container, onBack) {
       <button type="button" class="btn-primary" id="rec-save" style="margin-bottom:${state.editId ? "10px" : "0"};">
         ${state.editId ? t("common.saveChanges") : t("recurrentes.form.create")}
       </button>
+      ${state.editId && canCancelSubscription ? `
+      <button type="button" id="rec-cancel-subscription"
+        style="width:100%;background:var(--danger-tint);color:var(--danger);
+          border:1px solid rgba(255,122,107,.4);border-radius:999px;padding:16px;font:600 15px var(--font-ui);
+          cursor:pointer;margin-bottom:10px;">
+        ${t("recurrentes.form.cancelSubscription")}
+      </button>` : ""}
       ${state.editId ? `
       <button type="button" id="rec-delete"
         style="width:100%;background:transparent;color:var(--red);
@@ -388,6 +437,11 @@ export async function renderRecurrentes(container, onBack) {
 
     container.querySelector("#rec-active").onchange = (e) => { f.isActive = e.target.checked; };
 
+    // render() aquí (a diferencia de isShared/isActive): la visibilidad del coste anual depende
+    // de f.isSubscription, así que hay que repintar para que aparezca o desaparezca.
+    const subscriptionToggle = container.querySelector("#rec-subscription");
+    if (subscriptionToggle) subscriptionToggle.onchange = (e) => { f.isSubscription = e.target.checked; render(); };
+
     container.querySelector("#rec-save").onclick = async () => {
       const btn = container.querySelector("#rec-save");
       const msg = validationError();
@@ -414,6 +468,7 @@ export async function renderRecurrentes(container, onBack) {
           dueMonth: needsMonth(f.frequency) ? parseInt(f.dueMonth, 10) : null,
           isShared: withCategory && f.type !== "income" ? f.isShared : false,
           isActive: f.isActive,
+          isSubscription: f.type === "expense" ? f.isSubscription : false,
         };
         if (state.editId) await updateRule(state.editId, fields);
         else await createRule(fields);
@@ -424,6 +479,32 @@ export async function renderRecurrentes(container, onBack) {
         errorMsg = t("common.saveFailed", { error: userMessage(e) });
         render();
       }
+    };
+
+    // Sin este botón, una suscripción solo se podría cancelar en los 7 días previos a su
+    // renovación (única ventana en la que la tarjeta de aviso del radar ofrece «Voy a cancelarlo»).
+    const cancelSubBtn = container.querySelector("#rec-cancel-subscription");
+    if (cancelSubBtn) cancelSubBtn.onclick = () => {
+      showConfirm({
+        title: t("suscripciones.cancel.title"),
+        message: t("suscripciones.cancel.message", { name: f.name }),
+        cancelText: t("common.cancel"),
+        confirmText: t("suscripciones.cancel.confirm"),
+        onConfirm: async () => {
+          const btn = container.querySelector("#rec-cancel-subscription");
+          if (btn) btn.disabled = true;
+          try {
+            await cancelSubscription(state.editId, hoyISO());
+            state.rules = await listRules();
+            showToast(t("toast.subscriptionCancelled"));
+            goBack();
+          } catch (e) {
+            if (btn) btn.disabled = false;
+            errorMsg = t("common.saveFailed", { error: userMessage(e) });
+            render();
+          }
+        },
+      });
     };
 
     const deleteBtn = container.querySelector("#rec-delete");
@@ -455,5 +536,10 @@ export async function renderRecurrentes(container, onBack) {
     else renderList();
   }
 
-  render();
+  // Radar → formulario (Task 10): si el llamador pide abrir una regla concreta (Suscripciones,
+  // fila de Activas) y esa regla sigue entre las cargadas, el primer pintado va directo al
+  // formulario en vez de a la lista — sin reimplementar un formulario de once campos aparte.
+  const editRule = opts.editRuleId && rules.find((r) => r.id === opts.editRuleId);
+  if (editRule) openEdit(editRule);
+  else render();
 }

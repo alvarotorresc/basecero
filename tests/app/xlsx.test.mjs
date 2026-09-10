@@ -89,9 +89,14 @@ test("import: fila totalmente vacía en una pestaña de datos (no meta) se desca
 const parse = (mutate) => workbookToRows(X, wbFromSeed(mutate)).data;
 
 test("validate: base semilla válida", () => { assert.deepEqual(validateImport(parse()), []); });
-test("validate: schema_version distinta de 1 o 2", () => {
-  const d = parse((x) => { x.meta.find((m) => m.key === "schema_version").value = "3"; });
+test("validate: schema_version distinta de 1, 2 o 3", () => {
+  const d = parse((x) => { x.meta.find((m) => m.key === "schema_version").value = "9"; });
   assert.match(validateImport(d)[0], /schema_version/);
+});
+
+test("validate: una hoja schema_version=3 (Suscripciones) se acepta", () => {
+  const d = parse((x) => { x.meta.find((m) => m.key === "schema_version").value = "3"; });
+  assert.deepEqual(validateImport(d), []);
 });
 
 test("validate: una hoja v1 (schema_version=1) se sigue aceptando", () => {
@@ -219,7 +224,7 @@ test("import: replaceAll NO importa el schema_version de la hoja", () => {
   };
   for (const s of replaceAllStmts(data)) db.prepare(s.sql).run(...(s.bind ?? []));
   const meta = Object.fromEntries(db.prepare("SELECT key, value FROM meta").all().map((r) => [r.key, r.value]));
-  assert.equal(meta.schema_version, "2", "la versión es propiedad de ESTA BD, no de la hoja");
+  assert.equal(meta.schema_version, "3", "la versión es propiedad de ESTA BD, no de la hoja");
   assert.equal(meta.currency, "USD", "el resto de claves de la hoja sí se aplican");
 });
 test("validate: created_with dual — acepta hoja y pwa, rechaza otros", () => {
@@ -256,8 +261,9 @@ test("validate: id con caracteres no válidos se rechaza — en meta.key y en ca
 });
 test("validate: PK duplicada (dentro de la misma pestaña, meta usa key)", () => {
   const d = parse((x) => { x.meta.push({ key: "schema_version", value: "1" }); });
-  // el duplicado se reporta en la fila de la SEGUNDA aparición (fila 13: las 11 semillas + esta)
-  assert.match(validateImport(d).join("\n"), /pestaña «meta» fila 13: id duplicado \(«schema_version»\)/);
+  // el duplicado se reporta en la fila de la SEGUNDA aparición (fila 16: las 14 semillas —incluidas
+  // quick_register (Registro v2 §4.1) y subscription_ignored/renewal_snoozed (Suscripciones)— + esta)
+  assert.match(validateImport(d).join("\n"), /pestaña «meta» fila 16: id duplicado \(«schema_version»\)/);
 });
 test("validate: dos periodos open", () => {
   const d = parse((x) => { x.periods.push({ ...x.periods[0], id: "per-2", name: "Otro" }); });
@@ -397,7 +403,7 @@ test("validate: transacción viva con rule_id a una regla borrada no es error (a
   const d = parse((x) => {
     x.recurring_rules.push({ id: "rr-borrada", name: "Vieja", type: "expense", amount_cents: 1000,
       category_id: "cat-casa-alquiler", account_id: "acc-n26", counter_account_id: "", frequency: "monthly",
-      due_day: 1, due_month: null, is_shared: 0, is_active: 0,
+      due_day: 1, due_month: null, is_shared: 0, is_active: 0, is_subscription: 0, cancelled_at: "",
       created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 1 });
     x.transactions.push({ ...txBase, id: "tx-de-regla-borrada", rule_id: "rr-borrada" });
   });
@@ -417,7 +423,7 @@ test("validate: due_day fuera de rango (32) → error de rango", () => {
   const d = parse((x) => {
     x.recurring_rules.push({ id: "rr-1", name: "Alquiler", type: "expense", amount_cents: 1000,
       category_id: "cat-casa-alquiler", account_id: "acc-n26", counter_account_id: "", frequency: "monthly",
-      due_day: 32, due_month: null, is_shared: 0, is_active: 1,
+      due_day: 32, due_month: null, is_shared: 0, is_active: 1, is_subscription: 0, cancelled_at: "",
       created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 0 });
   });
   assert.match(validateImport(d).join("\n"), /pestaña «recurring_rules».*due_day fuera de rango \[1, 31\] \(«32»\)/s);
@@ -427,7 +433,7 @@ test("validate: due_month fuera de rango (13) → error", () => {
   const d = parse((x) => {
     x.recurring_rules.push({ id: "rr-1", name: "Alquiler", type: "expense", amount_cents: 1000,
       category_id: "cat-casa-alquiler", account_id: "acc-n26", counter_account_id: "", frequency: "monthly",
-      due_day: null, due_month: 13, is_shared: 0, is_active: 1,
+      due_day: null, due_month: 13, is_shared: 0, is_active: 1, is_subscription: 0, cancelled_at: "",
       created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 0 });
   });
   assert.match(validateImport(d).join("\n"), /pestaña «recurring_rules».*due_month fuera de rango \[1, 12\] \(«13»\)/s);
@@ -501,7 +507,7 @@ test("validate: recurring_rules.amount_cents en blanco → error required", () =
   const d = parse();
   d.recurring_rules.push({ id: "rr-blank", name: "Alquiler", type: "expense", amount_cents: null,
     category_id: "cat-casa-alquiler", account_id: "acc-n26", counter_account_id: "", frequency: "monthly",
-    due_day: 1, due_month: null, is_shared: 0, is_active: 1,
+    due_day: 1, due_month: null, is_shared: 0, is_active: 1, is_subscription: 0, cancelled_at: "",
     created_at: "x", updated_at: "x", deleted: 0 });
   assert.deepEqual(validateImport(d),
     ["pestaña «recurring_rules» fila 2: amount_cents es obligatorio y está vacío"]);
@@ -716,7 +722,7 @@ test("ROUND-TRIP: export → import → mismos datos", () => {
   tx("tx-mio", "expense", 10000, { is_shared: 1, paid_by: "me" });
   tx("tx-suyo", "expense", 10000, { is_shared: 1, paid_by: "partner", account_id: "" });
   tx("tx-liq", "adjustment", -6000, { ref_id: "tx-suyo", merchant: "Liquidacion con Alex" });
-  db.prepare(insertSql("recurring_rules")).run("rr-1","Alquiler","expense",90000,"cat-casa-alquiler","acc-n26","","monthly",1,null,1,1,T2,T2,0);
+  db.prepare(insertSql("recurring_rules")).run("rr-1","Alquiler","expense",90000,"cat-casa-alquiler","acc-n26","","monthly",1,null,1,1,0,"",T2,T2,0);
   db.prepare(insertSql("goals")).run("goal-1","Fondo emergencia","emergency_fund",null,6,null,"","acc-revolut","",1,T2,T2,0);
   db.prepare(insertSql("budgets")).run("bud-1","per-1","cat-casa",70000,T2,T2,0);
 
@@ -746,7 +752,13 @@ test("ROUND-TRIP sobre una BD MIGRADA (paid_by físicamente la última): los dum
   assert.ok(!db.prepare("PRAGMA table_info(transactions)").all().some((c) => c.name === "paid_by"),
     "la BD de partida es la de la versión anterior: transactions SIN paid_by");
 
-  for (const s of pendingMigrations({ transactions: db.prepare("PRAGMA table_info(transactions)").all().map((c) => c.name) }))
+  for (const s of pendingMigrations({
+    transactions: db.prepare("PRAGMA table_info(transactions)").all().map((c) => c.name),
+    // recurring_rules ya nació con is_subscription/cancelled_at (schema.sql corrió DESPUÉS de la
+    // tabla vieja): sin este segundo mapa, needed() vería un [] por defecto y el ALTER reventaría
+    // con "duplicate column name" sobre una columna que ya existe.
+    recurring_rules: db.prepare("PRAGMA table_info(recurring_rules)").all().map((c) => c.name),
+  }))
     (s.bind?.length ? db.prepare(s.sql).run(...s.bind) : db.exec(s.sql));
   assert.equal(db.prepare("PRAGMA table_info(transactions)").all().at(-1).name, "paid_by");
   seedMinimal(db);
@@ -766,6 +778,99 @@ test("ROUND-TRIP sobre una BD MIGRADA (paid_by físicamente la última): los dum
   const db2 = openDb();     // BD de schema.sql FRESCO (paid_by en medio)
   for (const s of replaceAllStmts(data)) db2.prepare(s.sql).run(...(s.bind ?? []));
   assert.deepEqual(dumpAll(db2), original);
+});
+
+// ---- Suscripciones (v3): is_subscription / cancelled_at ------------------------------------
+
+test("ROUND-TRIP: una regla marcada como suscripción y cancelada sobrevive export→import", () => {
+  const db = openDb(); seedMinimal(db);
+  const T2 = "2026-08-02T00:00:00Z";
+  db.prepare(insertSql("recurring_rules")).run(
+    "rr-sub", "Spotify", "expense", 1299, "cat-casa-alquiler", "acc-n26", "", "monthly", 14, null,
+    0, 0, 1, "2026-06-12", T2, T2, 0,
+  );
+
+  const original = dumpAll(db);
+  const buf = X.write(rowsToWorkbook(X, original), { type: "buffer", bookType: "xlsx" });
+  const { data, errors } = workbookToRows(X, X.read(buf, { type: "buffer" }));
+  assert.deepEqual(errors, []);
+  const rr = data.recurring_rules.find((r) => r.id === "rr-sub");
+  assert.equal(rr.is_subscription, 1);
+  assert.equal(rr.cancelled_at, "2026-06-12");
+  assert.deepEqual(validateImport(data), []);
+
+  const db2 = openDb();
+  for (const s of replaceAllStmts(data)) db2.prepare(s.sql).run(...(s.bind ?? []));
+  assert.deepEqual(dumpAll(db2), original);
+});
+
+test("import: una hoja v2 (sin cabeceras is_subscription/cancelled_at) entra con 0 y '' y valida limpio", () => {
+  const wb = wbFromSeed((dump) => {
+    dump.recurring_rules.push({ id: "rr-v2", name: "Alquiler", type: "expense", amount_cents: 90000,
+      category_id: "cat-casa-alquiler", account_id: "acc-n26", counter_account_id: "", frequency: "monthly",
+      due_day: 1, due_month: null, is_shared: 0, is_active: 1, is_subscription: 0, cancelled_at: "",
+      created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 0 });
+  });
+  const ws = wb.Sheets.recurring_rules;
+  const fullHeader = X.utils.sheet_to_json(ws, { header: 1 })[0];
+  const rows = X.utils.sheet_to_json(ws, { defval: "" });
+  const header = fullHeader.filter((h) => h !== "is_subscription" && h !== "cancelled_at"); // hoja v2
+  wb.Sheets.recurring_rules = X.utils.aoa_to_sheet([header, ...rows.map((r) => header.map((h) => r[h]))]);
+
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  const rr = data.recurring_rules.find((r) => r.id === "rr-v2");
+  assert.equal(rr.is_subscription, 0);
+  assert.equal(rr.cancelled_at, "");
+  assert.deepEqual(validateImport(data), []);
+});
+
+test("validate: cancelled_at con fecha inválida → dateFormat", () => {
+  const d = parse((x) => {
+    x.recurring_rules.push({ id: "rr-bad-date", name: "Alquiler", type: "expense", amount_cents: 1000,
+      category_id: "cat-casa-alquiler", account_id: "acc-n26", counter_account_id: "", frequency: "monthly",
+      due_day: 1, due_month: null, is_shared: 0, is_active: 0, is_subscription: 1, cancelled_at: "2026-13-40",
+      created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 0 });
+  });
+  assert.match(validateImport(d).join("\n"),
+    /pestaña «recurring_rules».*cancelled_at no es una fecha ISO válida \(«2026-13-40»\)/s);
+});
+
+// Igual que "validate: columna booleana con valor no reconocido" más abajo: el vector real es una
+// celda escrita directamente (hoja a mano/corrupta), no `parse()` — ese camino pasa por
+// rowsToWorkbook, que coerciona cualquier no-1 a `false` ANTES de llegar a validateImport.
+test("validate: is_subscription no booleano → booleanInvalid", () => {
+  const wb = wbFromSeed();
+  const ws = wb.Sheets.recurring_rules;
+  const header = X.utils.sheet_to_json(ws, { header: 1 })[0];
+  const row = { id: "rr-bad-bool", name: "Alquiler", type: "expense", amount: 10,
+    category_id: "cat-casa-alquiler", account_id: "acc-n26", counter_account_id: "", frequency: "monthly",
+    due_day: 1, due_month: "", is_shared: false, is_active: true, is_subscription: "quizá", cancelled_at: "",
+    created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: false };
+  wb.Sheets.recurring_rules = X.utils.aoa_to_sheet([header, header.map((h) => row[h] ?? "")]);
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  assert.match(validateImport(data).join("\n"),
+    /pestaña «recurring_rules».*is_subscription no es un valor booleano válido \(«quizá»\)/s);
+});
+
+test("validate: cancelled_at con is_active=1 → cancelledActive; con is_active=0, limpio", () => {
+  const withActive = parse((x) => {
+    x.recurring_rules.push({ id: "rr-active-cancelled", name: "Alquiler", type: "expense", amount_cents: 1000,
+      category_id: "cat-casa-alquiler", account_id: "acc-n26", counter_account_id: "", frequency: "monthly",
+      due_day: 1, due_month: null, is_shared: 0, is_active: 1, is_subscription: 1, cancelled_at: "2026-06-12",
+      created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 0 });
+  });
+  assert.match(validateImport(withActive).join("\n"),
+    /pestaña «recurring_rules» fila 2: cancelled_at no puede tener valor con is_active=1/);
+
+  const inactive = parse((x) => {
+    x.recurring_rules.push({ id: "rr-inactive-cancelled", name: "Alquiler", type: "expense", amount_cents: 1000,
+      category_id: "cat-casa-alquiler", account_id: "acc-n26", counter_account_id: "", frequency: "monthly",
+      due_day: 1, due_month: null, is_shared: 0, is_active: 0, is_subscription: 1, cancelled_at: "2026-06-12",
+      created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 0 });
+  });
+  assert.deepEqual(validateImport(inactive), []);
 });
 
 test("import: replaceAll fusiona meta — conserva claves que la hoja no trae", () => {

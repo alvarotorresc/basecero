@@ -104,6 +104,16 @@ export const SQL = {
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.period_id=? AND t.deleted=0
     ORDER BY t.date DESC, t.created_at DESC`,
+  // Ventana de la memoria de comercios (merchant-memory.js). Solo gastos/ingresos/devoluciones:
+  // una transferencia o un ajuste no tienen comercio que recordar. `LIMIT ?` lo pone el repo con
+  // MEMORY_WINDOW. Sirve el índice tx_date (schema.sql:48): no hace falta uno nuevo sobre merchant
+  // — la app es de un único usuario, y 500 filas ordenadas por fecha se resuelven de sobra con el
+  // índice que ya existe.
+  merchantHistory: `SELECT merchant, category_id, account_id, is_shared, share_pct_override,
+      paid_by, date, type
+    FROM transactions
+    WHERE deleted=0 AND merchant<>'' AND type IN ('expense','income','refund')
+    ORDER BY date DESC, id DESC LIMIT ?`,
   getTransaction: `SELECT * FROM transactions WHERE id=? AND deleted=0`,
   updateTransaction: `UPDATE transactions SET type=?, amount_cents=?, date=?, category_id=?, account_id=?,
     counter_account_id=?, merchant=?, note=?, is_shared=?, share_pct_override=?, paid_by=?, ref_id=?, rule_id=?, status=?,
@@ -290,12 +300,35 @@ export const SQL = {
   listRules: `SELECT * FROM recurring_rules WHERE deleted=0 ORDER BY is_active DESC, name`,
   getRule: `SELECT * FROM recurring_rules WHERE id=? AND deleted=0`,
   insertRule: `INSERT INTO recurring_rules (id,name,type,amount_cents,category_id,account_id,counter_account_id,
-    frequency,due_day,due_month,is_shared,is_active,created_at,updated_at,deleted)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
+    frequency,due_day,due_month,is_shared,is_active,is_subscription,cancelled_at,created_at,updated_at,deleted)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
   updateRule: `UPDATE recurring_rules SET name=?, type=?, amount_cents=?, category_id=?, account_id=?,
-    counter_account_id=?, frequency=?, due_day=?, due_month=?, is_shared=?, is_active=?, updated_at=?
+    counter_account_id=?, frequency=?, due_day=?, due_month=?, is_shared=?, is_active=?, is_subscription=?,
+    cancelled_at=?, updated_at=?
     WHERE id=?`,
   softDeleteRule: `UPDATE recurring_rules SET deleted=1, updated_at=? WHERE id=?`,
+
+  // Cancela una suscripción (Task 2): apaga is_active Y sella cancelled_at en el MISMO UPDATE — no
+  // existe el estado intermedio (spec §5.2). No toca una regla ya borrada.
+  cancelRule: `UPDATE recurring_rules SET is_active=0, cancelled_at=?, updated_at=? WHERE id=? AND deleted=0`,
+
+  // Enlaza un cargo ya cobrado con la regla que acaba de aceptarse (subscription-detect.js /
+  // acceptSubscriptionCandidate). `rule_id=''` en el WHERE es lo que lo hace idempotente y lo que
+  // evita pisar un enlace que ya existiera (un cargo que ya cuenta para otra regla no se toca).
+  linkTxsToRule: `UPDATE transactions SET rule_id=?, updated_at=? WHERE id=? AND rule_id='' AND deleted=0`,
+
+  // Cargos candidatos a suscripción (subscription-detect.js). Solo gastos MÍOS con comercio: un
+  // gasto con paid_by='partner' no salió de ninguna cuenta mía y además lleva account_id='' (ver
+  // FKS.optionalWhen en contract.js), así que no podría convertirse en una recurring_rule, cuyo
+  // account_id es NOT NULL. La ventana es por FECHA y no por número de filas porque la cadencia
+  // anual necesita dos cargos separados más de un año (DETECT_WINDOW_DAYS = 760, ver
+  // subscription-detect.js). El LIMIT es solo un tope de seguridad; como el ORDER BY es date DESC,
+  // truncar recorta los cargos MÁS ANTIGUOS — puede acortar una racha, nunca inventar un hueco falso.
+  // Índice: tx_date (schema.sql). No hace falta ninguno nuevo.
+  subscriptionCharges: `SELECT id, date, merchant, amount_cents, category_id, account_id, rule_id
+    FROM transactions
+    WHERE deleted=0 AND type='expense' AND paid_by='me' AND merchant<>'' AND date>=?
+    ORDER BY date DESC, id DESC LIMIT ?`,
 
   // Previsión (Task 11). Una regla se da por pagada este periodo si hay una transacción
   // ligada por rule_id, O (fallback del dashboard, para movimientos metidos a mano sin

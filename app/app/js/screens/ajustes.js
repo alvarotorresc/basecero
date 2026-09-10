@@ -1,9 +1,11 @@
 import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta, setMetaMany, allCategoriesById, retranslateSeedNames, updatePeriodSharePct } from "../repo.js";
 import { PCT_STEP, normalizePct, stepPct } from "../share-pct.js";
+import { quickRegisterEnabled } from "../registro-mode.js";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
 import { hoyISO, fmtDiaCorto, fmtMoney } from "../format.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 import { renderRecurrentes } from "./recurrentes.js";
+import { renderSuscripciones } from "./suscripciones.js";
 import { renderCategorias } from "./categorias.js";
 import { pushBack, goBack } from "../back.js";
 import { importCsv, importWithProfile } from "../n26.js";
@@ -173,6 +175,11 @@ function importResultText(res, partnerName) {
   let text = t("ajustes.importResult.summary", { created: res.created, reconciled: res.reconciled, skipped: res.skipped });
   if (res.omitted) {
     text += t("ajustes.importResult.omitted", { n: res.omitted });
+  }
+  // Registro v2 §5.5: solo cuenta las filas CREADAS que la memoria de comercios pudo categorizar
+  // (n26.js#runImportPipeline); una conciliación nunca toca la categoría de la fila existente.
+  if (res.categorized) {
+    text += t("ajustes.importResult.categorized", { n: res.categorized });
   }
   text += t("ajustes.importResult.tail");
   if (partnerName && res.via === "n26") {
@@ -360,6 +367,22 @@ export async function renderAjustes(container) {
       </div>
 
       <div class="card" style="margin-bottom:12px">
+        <button type="button" id="btn-suscripciones" class="list-row"
+          style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+          <div class="list-row-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3.5" y="5" width="17" height="15.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path>
+            </svg>
+          </div>
+          <div class="list-row-body">
+            <div class="list-row-title">${t("ajustes.subscriptions.title")}</div>
+            <div class="list-row-sub">${t("ajustes.subscriptions.sub")}</div>
+          </div>
+          <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
+        </button>
+      </div>
+
+      <div class="card" style="margin-bottom:12px">
         <button type="button" id="btn-categorias" class="list-row"
           style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
           <div class="list-row-icon">
@@ -392,6 +415,16 @@ export async function renderAjustes(container) {
         <p style="font-weight:600;margin-bottom:4px">${t("ajustes.prefs.title")}</p>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
           ${t("ajustes.prefs.body")}</p>
+        <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;cursor:pointer;margin-bottom:4px;">
+          <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+            <span style="font-size:15px;font-weight:600;">${t("ajustes.prefs.quickRegisterLabel")}</span>
+            <span style="font-size:12px;color:var(--text-3);">${t("ajustes.prefs.quickRegisterHint")}</span>
+          </div>
+          <span class="toggle">
+            <input type="checkbox" id="pref-quick-register" ${quickRegisterEnabled(metaCfg.quick_register) ? "checked" : ""}>
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+          </span>
+        </label>
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <div style="flex:1;background:var(--card2);border-radius:0;padding:8px 12px;">
             <div class="section-title" style="margin-bottom:2px;">${t("ajustes.prefs.currency")}</div>
@@ -454,6 +487,11 @@ export async function renderAjustes(container) {
     container.querySelector("#btn-recurrentes").onclick = () => {
       pushBack(() => renderAjustes(container));
       renderRecurrentes(container, goBack);
+    };
+
+    container.querySelector("#btn-suscripciones").onclick = () => {
+      pushBack(() => renderAjustes(container));
+      renderSuscripciones(container, goBack);
     };
 
     container.querySelector("#btn-categorias").onclick = () => {
@@ -635,6 +673,23 @@ export async function renderAjustes(container) {
         }
       };
     }
+
+    // Un interruptor no es un formulario: guarda AL INSTANTE con setMeta, sin esperar al botón
+    // «Guardar preferencias» de la tarjeta (mismo criterio que el toggle de compartido de
+    // Registro) — y no recarga la página: currency/locale/lang si tocan textos ya resueltos en la
+    // pantalla, esto no cambia nada visible fuera de Ajustes.
+    container.querySelector("#pref-quick-register").onchange = async (e) => {
+      const value = e.target.checked ? "1" : "0";
+      try {
+        await setMeta("quick_register", value);
+        metaCfg.quick_register = value;
+        showToast(t("toast.saved"));
+      } catch (err) {
+        e.target.checked = !e.target.checked;
+        state.errors = [t("ajustes.prefs.saveFailed", { error: userMessage(err) })];
+        render();
+      }
+    };
 
     container.querySelector("#btn-prefs-save").onclick = async () => {
       // Leer los inputs ANTES de render(): reconstruye el DOM desde metaCfg (el valor

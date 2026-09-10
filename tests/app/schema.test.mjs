@@ -19,7 +19,34 @@ test("esquema aplica y las 8 tablas existen", () => {
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name);
   for (const t of ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"])
     assert.ok(tables.includes(t), t);
-  assert.equal(db.prepare("SELECT value FROM meta WHERE key='schema_version'").get().value, "2");
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='schema_version'").get().value, "3");
+});
+
+// Suscripciones (v3): las dos columnas nuevas de recurring_rules llegan con su default en una BD
+// nueva (schema.sql las declara, ver contrato §4.1), y las dos claves de meta llegan sembradas.
+test("recurring_rules: is_subscription y cancelled_at existen en una BD nueva con su NOT NULL y su default", () => {
+  const db = freshDb();
+  const cols = db.prepare("PRAGMA table_info(recurring_rules)").all();
+  const isSub = cols.find((c) => c.name === "is_subscription");
+  const cancelledAt = cols.find((c) => c.name === "cancelled_at");
+  assert.ok(isSub, "is_subscription existe");
+  assert.equal(isSub.notnull, 1);
+  assert.equal(isSub.dflt_value, "0");
+  assert.ok(cancelledAt, "cancelled_at existe");
+  assert.equal(cancelledAt.notnull, 1);
+  assert.equal(cancelledAt.dflt_value, "''");
+});
+
+test("meta: subscription_ignored y renewal_snoozed llegan sembrados y un INSERT OR IGNORE posterior no pisa un valor ya escrito", () => {
+  const db = freshDb();
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='subscription_ignored'").get().value, "[]");
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='renewal_snoozed'").get().value, "{}");
+
+  db.prepare("UPDATE meta SET value='[\"netflix\"]' WHERE key='subscription_ignored'").run();
+  db.prepare("UPDATE meta SET value='{\"rule-1\":\"2026-09-14\"}' WHERE key='renewal_snoozed'").run();
+  db.exec(schema);
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='subscription_ignored'").get().value, "[\"netflix\"]");
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='renewal_snoozed'").get().value, "{\"rule-1\":\"2026-09-14\"}");
 });
 
 test("semillas: 0 cuentas (las crea el usuario) y 41 categorías con integridad", () => {
@@ -75,6 +102,14 @@ test("meta: semillas incluyen locale es-ES y currency EUR", () => {
   const meta = Object.fromEntries(db.prepare(SQL.allMeta).all().map((r) => [r.key, r.value]));
   assert.equal(meta.locale, "es-ES");
   assert.equal(meta.currency, "EUR");
+});
+
+// Registro v2 §4.1: una BD nueva trae el modo «Registro rápido» activado por defecto. El
+// INSERT OR IGNORE corre en cada arranque (db-worker.js:20), así que esto también alcanza a las
+// BD que ya existen: en el siguiente arranque reciben la clave con valor "1" sin migración.
+test("meta: semillas incluyen quick_register a \"1\" (Registro rápido activado por defecto)", () => {
+  const db = freshDb();
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='quick_register'").get().value, "1");
 });
 
 test("meta: las claves de cuenta entran vacías con INSERT OR IGNORE", () => {

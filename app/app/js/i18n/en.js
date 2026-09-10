@@ -155,7 +155,7 @@ export const EN = {
       periodEnd: { one: "This period closes in {n} day.", other: "This period closes in {n} days." },
       periodEndToday: "This period closes today.",
       action: {
-        renewal: "View recurring",
+        renewal: "View subscriptions",
         limit: "View categories",
         idle: "Log an expense",
         periodEnd: "Open the next one",
@@ -189,6 +189,24 @@ export const EN = {
       transfer: "Save transfer",
       refund: "Save refund",
       adjustment: "Save adjustment",
+      expenseWithAmount: "Save expense of {amount}",
+    },
+    categories: {
+      showAll: "See all {n} categories",
+    },
+    more: {
+      toggle: "More",
+      summaryNoNote: "no note or photo",
+      summaryPhoto: "has a photo",
+      summaryToday: "today",
+    },
+    merchant: {
+      remembered: "remembered from last time",
+      listLabel: "Recent merchants",
+    },
+    limit: {
+      remaining: "This leaves {amount} of {name}",
+      over: "This goes {amount} over {name}",
     },
     refund: {
       unlink: "Remove link",
@@ -433,7 +451,13 @@ export const EN = {
       delete: "Delete rule",
       deleteTitle: "Delete this rule?",
       deleteMessage: "{name}. It will stop being suggested each period; transactions already recorded are untouched.",
+      subscriptionLabel: "It's a subscription",
+      subscriptionHint: "Shows up in the subscription radar, with its renewal and its yearly cost.",
+      perYear: "a year",
+      cancelSubscription: "Cancel the subscription",
     },
+    badge: { subscription: "subscription" },
+    radarLink: "View the subscription radar",
   },
   categorias: {
     error: { load: "Couldn’t load categories: {error}" },
@@ -575,6 +599,7 @@ export const EN = {
       closeNote: "Closing it sets the end date. Open it the day your paycheck arrives.",
     },
     recurring: { title: "Recurring expenses and income" },
+    subscriptions: { title: "Subscriptions", sub: "The yearly cost of what you pay each month" },
     categories: {
       title: "Categories",
       subtitleWithCount: "{n} categories · colors and icons",
@@ -588,6 +613,8 @@ export const EN = {
     prefs: {
       title: "Currency and format",
       body: "Currency for amounts, and number and date format. Applied on save (reloads the app).",
+      quickRegisterLabel: "Quick register",
+      quickRegisterHint: "Opening Register only asks for the amount and category. Everything else folds behind “More”.",
       currency: "Currency",
       format: "Format",
       language: "Language",
@@ -613,6 +640,7 @@ export const EN = {
     importResult: {
       summary: "New: {created} · Reconciled: {reconciled} · Duplicates (skipped): {skipped}",
       omitted: { one: " · 1 unreadable row skipped", other: " · {n} unreadable rows skipped" },
+      categorized: { one: " · 1 categorized from the merchant", other: " · {n} categorized from the merchant" },
       tail: ". Check the “uncategorized” tray in Transactions.",
       bizumHint: " Settle up in Home before importing: an incoming Bizum reconciles itself; one you send comes in as a new transaction.",
     },
@@ -741,6 +769,57 @@ export const EN = {
     limitSaved: "Limit saved",
     limitRemoved: "Limit removed",
     profileSaved: "Bank profile saved",
+    subscriptionCancelled: "Subscription cancelled",
+    subscriptionAdded: "Subscription added",
+    subscriptionIgnored: "Merchant ignored",
+    renewalSnoozed: "Reminder snoozed until the next renewal",
+  },
+  suscripciones: {
+    title: "Subscriptions",
+    error: { load: "Couldn't load your subscriptions: {error}" },
+    empty: {
+      title: "No subscriptions yet",
+      body: "Mark a recurring rule as a subscription, or wait for the radar to detect a charge that repeats with the same amount.",
+    },
+    hero: {
+      label: "They cost you a year",
+      perMonth: "a month",
+      activeCount: { one: "{n} active", other: "{n} active" },
+    },
+    notice: {
+      question: "{name} renews on {when} for {amount}. Still using it?",
+      keep: "Still using it",
+      cancel: "I'll cancel it",
+    },
+    section: {
+      active: "Active",
+      activeHint: "by renewal date",
+      candidates: "This might be a subscription",
+      cancelled: "Cancelled",
+    },
+    row: {
+      renewsOn: "renews on {date}",
+      renewsInDays: { one: "renews on {date}, in {n} day", other: "renews on {date}, in {n} days" },
+      renewsWeekly: "renews every week",
+      perYear: "/year",
+      noDate: "no renewal date",
+    },
+    candidate: {
+      sameAmountOn: "same amount on {dates}",
+      add: "Yes, add it",
+      ignore: "Ignore",
+    },
+    cancelled: {
+      on: "cancelled on {date}",
+      saved: "saved since then",
+      paused: "paused",
+    },
+    cancel: {
+      title: "Cancel the subscription?",
+      message: "{name}. It will stop counting as pending and we'll start counting what you save. You can turn it back on whenever you want.",
+      confirm: "Cancel",
+    },
+    footer: "These come from your recurring rules marked as subscriptions and from charges that repeat with the same amount. Cancelling one here turns off its recurring rule and starts counting what you save.",
   },
   errors: {
     generic: "Something went wrong. Try again.",
@@ -806,6 +885,7 @@ export const EN = {
       paidByAccount: "sheet “transactions” row {row}: an expense paid by your partner cannot have an account",
       refundOfPartnerPaid: "sheet “transactions” row {row}: a refund cannot link an expense paid by the partner",
       budgetDuplicate: "sheet “budgets” row {row}: another live limit already exists for the same period/category pair (row {first})",
+      cancelledActive: "sheet “recurring_rules” row {row}: cancelled_at can't have a value with is_active=1",
     },
     csvGeneric: {
       invalidHeaders: "invalid headers",
@@ -846,6 +926,7 @@ export const EN = {
     stamp: "Saved",
     total: "Total",
     undo: "Undo",
+    undone: "Movement undone",
     myPart: "Your share",
     undoFailed: "Could not undo: {error}",
   },

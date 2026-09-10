@@ -160,7 +160,7 @@ export const ES = {
       periodEnd: { one: "Este periodo se cierra en {n} día.", other: "Este periodo se cierra en {n} días." },
       periodEndToday: "Este periodo se cierra hoy.",
       action: {
-        renewal: "Ver recurrentes",
+        renewal: "Ver suscripciones",
         limit: "Ver categorías",
         idle: "Registrar un gasto",
         periodEnd: "Abrir el siguiente",
@@ -194,6 +194,24 @@ export const ES = {
       transfer: "Guardar transferencia",
       refund: "Guardar devolución",
       adjustment: "Guardar ajuste",
+      expenseWithAmount: "Guardar gasto de {amount}",
+    },
+    categories: {
+      showAll: "Ver las {n} categorías",
+    },
+    more: {
+      toggle: "Más",
+      summaryNoNote: "sin nota ni foto",
+      summaryPhoto: "con foto",
+      summaryToday: "hoy",
+    },
+    merchant: {
+      remembered: "recordado de la última vez",
+      listLabel: "Comercios recientes",
+    },
+    limit: {
+      remaining: "Con este gasto quedan {amount} de {name}",
+      over: "Con este gasto te pasas {amount} de {name}",
     },
     refund: {
       unlink: "Quitar vínculo",
@@ -441,7 +459,13 @@ export const ES = {
       delete: "Borrar regla",
       deleteTitle: "¿Borrar la regla?",
       deleteMessage: "{name}. Dejará de proponerse cada periodo; los movimientos ya registrados no se tocan.",
+      subscriptionLabel: "Es una suscripción",
+      subscriptionHint: "Entra en el radar de suscripciones, con su renovación y su coste anual.",
+      perYear: "al año",
+      cancelSubscription: "Cancelar la suscripción",
     },
+    badge: { subscription: "suscripción" },
+    radarLink: "Ver el radar de suscripciones",
   },
   categorias: {
     error: { load: "No se pudieron cargar las categorías: {error}" },
@@ -583,6 +607,7 @@ export const ES = {
       closeNote: "Al cerrar fijarás la fecha final. Ábrelo el día que entre la nómina.",
     },
     recurring: { title: "Gastos e ingresos recurrentes" },
+    subscriptions: { title: "Suscripciones", sub: "El coste anual de lo que pagas cada mes" },
     categories: {
       title: "Categorías",
       subtitleWithCount: "{n} categorías · colores e iconos",
@@ -596,6 +621,8 @@ export const ES = {
     prefs: {
       title: "Moneda y formato",
       body: "Divisa de los importes y formato de números y fechas. Se aplican al guardar (recarga la app).",
+      quickRegisterLabel: "Registro rápido",
+      quickRegisterHint: "Al abrir Registro solo pide importe y categoría. El resto queda plegado tras «Más».",
       currency: "Moneda",
       format: "Formato",
       language: "Idioma",
@@ -621,6 +648,7 @@ export const ES = {
     importResult: {
       summary: "Nuevas: {created} · Conciliadas: {reconciled} · Duplicadas (saltadas): {skipped}",
       omitted: { one: " · 1 fila ilegible omitida", other: " · {n} filas ilegibles omitidas" },
+      categorized: { one: " · 1 categorizado por el comercio", other: " · {n} categorizados por el comercio" },
       tail: ". Revisa la bandeja «sin categorizar» en Movimientos.",
       bizumHint: " Liquida en Inicio antes de importar: el Bizum que recibes se concilia solo; el que envías entra como movimiento nuevo.",
     },
@@ -751,6 +779,59 @@ export const ES = {
     limitSaved: "Límite guardado",
     limitRemoved: "Límite quitado",
     profileSaved: "Perfil de banco guardado",
+    subscriptionCancelled: "Suscripción cancelada",
+    subscriptionAdded: "Suscripción añadida",
+    subscriptionIgnored: "Comercio ignorado",
+    renewalSnoozed: "Aviso silenciado hasta la próxima renovación",
+  },
+  // Suscripciones (N6, «el radar»): cancelar desde el formulario de Recurrentes O desde la propia
+  // pantalla del radar comparten este mismo modal — mismas claves para las dos entradas.
+  suscripciones: {
+    title: "Suscripciones",
+    error: { load: "No se pudieron cargar las suscripciones: {error}" },
+    empty: {
+      title: "Todavía no hay ninguna suscripción",
+      body: "Marca una recurrente como suscripción, o espera a que el radar detecte un cargo que se repite con el mismo importe.",
+    },
+    hero: {
+      label: "Te cuestan al año",
+      perMonth: "al mes",
+      activeCount: { one: "{n} activa", other: "{n} activas" },
+    },
+    notice: {
+      question: "{name} se renueva el {when} por {amount}. ¿Lo sigues usando?",
+      keep: "Lo sigo usando",
+      cancel: "Voy a cancelarlo",
+    },
+    section: {
+      active: "Activas",
+      activeHint: "por fecha de renovación",
+      candidates: "Puede que sea una suscripción",
+      cancelled: "Canceladas",
+    },
+    row: {
+      renewsOn: "renueva el {date}",
+      renewsInDays: { one: "renueva el {date}, en {n} día", other: "renueva el {date}, en {n} días" },
+      renewsWeekly: "renueva cada semana",
+      perYear: "/año",
+      noDate: "sin fecha de renovación",
+    },
+    candidate: {
+      sameAmountOn: "mismo importe el {dates}",
+      add: "Sí, añádela",
+      ignore: "Ignorar",
+    },
+    cancelled: {
+      on: "cancelada el {date}",
+      saved: "ahorrados desde entonces",
+      paused: "pausada",
+    },
+    cancel: {
+      title: "¿Cancelar la suscripción?",
+      message: "{name}. Dejará de contar como pendiente y empezaremos a contar lo que te ahorras. Puedes volver a activarla cuando quieras.",
+      confirm: "Cancelar",
+    },
+    footer: "Salen de tus recurrentes marcados como suscripción y de los cargos que se repiten con el mismo importe. Cancelar una aquí desactiva su recurrente y empieza a contar lo que te ahorras.",
   },
   // Task 5 (PR i18n): errores de capas no-UI (repo/n26/xlsx/csv-generic/backup-crypto/db-worker) —
   // el string ES es el mensaje literal que ya lanzaban esas capas (byte-exacto, lo pinnean los
@@ -823,6 +904,7 @@ export const ES = {
       paidByAccount: "pestaña «transactions» fila {row}: un gasto que pagó la contraparte no puede llevar cuenta",
       refundOfPartnerPaid: "pestaña «transactions» fila {row}: una devolución no puede enlazar un gasto pagado por la contraparte",
       budgetDuplicate: "pestaña «budgets» fila {row}: ya hay otro límite vivo para la misma pareja periodo/categoría (fila {first})",
+      cancelledActive: "pestaña «recurring_rules» fila {row}: cancelled_at no puede tener valor con is_active=1",
     },
     csvGeneric: {
       invalidHeaders: "cabeceras inválidas",
@@ -865,6 +947,7 @@ export const ES = {
     stamp: "Guardado",
     total: "Total",
     undo: "Deshacer",
+    undone: "Movimiento deshecho",
     myPart: "Tu parte",
     undoFailed: "No se pudo deshacer: {error}",
   },

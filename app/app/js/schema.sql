@@ -1,5 +1,12 @@
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version','2'),('currency','EUR'),('created_with','basecero-pwa'),('locale','es-ES'),('import_account_id',''),('default_account_id',''),('partner_name',''),('category_style','{}'),('csv_profile',''),('lang',''),('account_loans','{}');
+-- quick_register (Registro v2 §4.1): "1" activa el modo «Registro rápido» — ES el default de
+-- producto. El INSERT OR IGNORE inserta las filas que no chocan y salta las que ya existen, y
+-- corre en CADA arranque (db-worker.js:20): una BD que ya existe recibe la clave en el siguiente
+-- arranque, con valor "1", sin necesidad de migración.
+-- subscription_ignored/renewal_snoozed (Suscripciones, N6): CONFIG-IN-META igual que
+-- account_loans/category_style — sin migración de esquema, repo.js:697. subscription_ignored es
+-- un array JSON de comercios normalizados ignorados; renewal_snoozed es un objeto {ruleId: fecha}.
+INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version','3'),('currency','EUR'),('created_with','basecero-pwa'),('locale','es-ES'),('import_account_id',''),('default_account_id',''),('partner_name',''),('category_style','{}'),('csv_profile',''),('lang',''),('account_loans','{}'),('quick_register','1'),('subscription_ignored','[]'),('renewal_snoozed','{}');
 
 CREATE TABLE IF NOT EXISTS accounts (
   id TEXT PRIMARY KEY, name TEXT NOT NULL,
@@ -61,6 +68,11 @@ CREATE TABLE IF NOT EXISTS recurring_rules (
   frequency TEXT NOT NULL CHECK (frequency IN ('weekly','monthly','quarterly','yearly')),
   due_day INTEGER, due_month INTEGER,
   is_shared INTEGER NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 1,
+  -- Suscripciones (N6): is_subscription decide si la regla entra en el radar; cancelled_at es la
+  -- FECHA (YYYY-MM-DD) de la baja, NO un timestamp pese al sufijo _at — comparable con hoyISO().
+  -- Invariante de dominio: cancelled_at <> '' ⇒ is_active = 0 (repo.js#cancelSubscription/updateRule,
+  -- xlsx.js#validateImport).
+  is_subscription INTEGER NOT NULL DEFAULT 0, cancelled_at TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE IF NOT EXISTS goals (
