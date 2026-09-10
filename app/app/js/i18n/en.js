@@ -768,13 +768,55 @@ export const EN = {
     limitRemoved: "Limit removed",
     profileSaved: "Bank profile saved",
     subscriptionCancelled: "Subscription cancelled",
+    subscriptionAdded: "Subscription added",
+    subscriptionIgnored: "Merchant ignored",
   },
   suscripciones: {
+    title: "Subscriptions",
+    error: { load: "Couldn't load your subscriptions: {error}" },
+    empty: {
+      title: "No subscriptions yet",
+      body: "Mark a recurring rule as a subscription, or wait for the radar to detect a charge that repeats with the same amount.",
+    },
+    hero: {
+      label: "They cost you a year",
+      perMonth: "a month",
+      activeCount: { one: "{n} active", other: "{n} active" },
+    },
+    notice: {
+      question: "{name} renews on {when} for {amount}. Still using it?",
+      keep: "Still using it",
+      cancel: "I'll cancel it",
+    },
+    section: {
+      active: "Active",
+      activeHint: "by renewal date",
+      candidates: "This might be a subscription",
+      cancelled: "Cancelled",
+    },
+    row: {
+      renewsOn: "renews on {date}",
+      renewsInDays: "renews on {date}, in {days} days",
+      renewsWeekly: "renews every week",
+      perYear: "/year",
+      noDate: "no renewal date",
+    },
+    candidate: {
+      sameAmountOn: "same amount on {dates}",
+      add: "Yes, add it",
+      ignore: "Ignore",
+    },
+    cancelled: {
+      on: "cancelled on {date}",
+      saved: "saved since then",
+      paused: "paused",
+    },
     cancel: {
       title: "Cancel the subscription?",
       message: "{name}. It will stop counting as pending and we'll start counting what you save. You can turn it back on whenever you want.",
       confirm: "Cancel",
     },
+    footer: "These come from your recurring rules marked as subscriptions and from charges that repeat with the same amount. Cancelling one here turns off its recurring rule and starts counting what you save.",
   },
   errors: {
     generic: "Something went wrong. Try again.",

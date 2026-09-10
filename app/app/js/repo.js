@@ -11,6 +11,7 @@ import { isValidPct } from "./share-pct.js";
 import { UserError } from "./errors.js";
 import { MEMORY_WINDOW, merchantMemory } from "./merchant-memory.js";
 import { IGNORED_MAX, parseIgnored, parseSnoozed } from "./subscriptions.js";
+import { DETECT_WINDOW_DAYS } from "./subscription-detect.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -534,6 +535,15 @@ export function acceptSubscriptionCandidateStmts(candidate, fallbackAccountId) {
 export async function acceptSubscriptionCandidate(candidate) {
   const fallbackAccountId = candidate.accountId ? "" : await defaultAccountId();
   await execMany(acceptSubscriptionCandidateStmts(candidate, fallbackAccountId));
+}
+
+/** Cargos candidatos a suscripción, ventana de DETECT_WINDOW_DAYS días desde `todayIso` — la
+ *  alimenta subscription-detect.js#detectSubscriptions desde la pantalla Suscripciones. `todayIso`
+ *  se inyecta (determinismo, mismo criterio que el resto de funciones que tocan "hoy"). */
+export function subscriptionCharges(todayIso) {
+  const start = new Date(todayIso + "T12:00:00");
+  start.setDate(start.getDate() - DETECT_WINDOW_DAYS);
+  return query(SQL.subscriptionCharges, [start.toLocaleDateString("sv-SE"), 5000]);
 }
 
 export const accountBalanceCents = async (accountId, atDateIso) =>

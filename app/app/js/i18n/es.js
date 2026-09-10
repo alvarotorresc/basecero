@@ -778,15 +778,57 @@ export const ES = {
     limitRemoved: "Límite quitado",
     profileSaved: "Perfil de banco guardado",
     subscriptionCancelled: "Suscripción cancelada",
+    subscriptionAdded: "Suscripción añadida",
+    subscriptionIgnored: "Comercio ignorado",
   },
   // Suscripciones (N6, «el radar»): cancelar desde el formulario de Recurrentes O desde la propia
   // pantalla del radar comparten este mismo modal — mismas claves para las dos entradas.
   suscripciones: {
+    title: "Suscripciones",
+    error: { load: "No se pudieron cargar las suscripciones: {error}" },
+    empty: {
+      title: "Todavía no hay ninguna suscripción",
+      body: "Marca una recurrente como suscripción, o espera a que el radar detecte un cargo que se repite con el mismo importe.",
+    },
+    hero: {
+      label: "Te cuestan al año",
+      perMonth: "al mes",
+      activeCount: { one: "{n} activa", other: "{n} activas" },
+    },
+    notice: {
+      question: "{name} se renueva el {when} por {amount}. ¿Lo sigues usando?",
+      keep: "Lo sigo usando",
+      cancel: "Voy a cancelarlo",
+    },
+    section: {
+      active: "Activas",
+      activeHint: "por fecha de renovación",
+      candidates: "Puede que sea una suscripción",
+      cancelled: "Canceladas",
+    },
+    row: {
+      renewsOn: "renueva el {date}",
+      renewsInDays: "renueva el {date}, en {days} días",
+      renewsWeekly: "renueva cada semana",
+      perYear: "/año",
+      noDate: "sin fecha de renovación",
+    },
+    candidate: {
+      sameAmountOn: "mismo importe el {dates}",
+      add: "Sí, añádela",
+      ignore: "Ignorar",
+    },
+    cancelled: {
+      on: "cancelada el {date}",
+      saved: "ahorrados desde entonces",
+      paused: "pausada",
+    },
     cancel: {
       title: "¿Cancelar la suscripción?",
       message: "{name}. Dejará de contar como pendiente y empezaremos a contar lo que te ahorras. Puedes volver a activarla cuando quieras.",
       confirm: "Cancelar",
     },
+    footer: "Salen de tus recurrentes marcados como suscripción y de los cargos que se repiten con el mismo importe. Cancelar una aquí desactiva su recurrente y empieza a contar lo que te ahorras.",
   },
   // Task 5 (PR i18n): errores de capas no-UI (repo/n26/xlsx/csv-generic/backup-crypto/db-worker) —
   // el string ES es el mensaje literal que ya lanzaban esas capas (byte-exacto, lo pinnean los
