@@ -33,8 +33,7 @@ import { userMessage } from "../errors.js";
 import { showToast } from "../toast.js";
 import { skeletonHtml } from "../skeleton.js";
 
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+import { escHtml, escAttr } from "../esc.js";
 // Porcentaje entero con espacio duro antes del «%» — mismo patrón que gasto-por-categoria.js
 // (fmtPctInt): sin el U+00A0 el «%» se parte en su propia línea al estrecharse el contenedor.
 // `format.js#fmtPct0` (Task 10) hará esto mismo vía Intl; hasta entonces el porcentaje de la

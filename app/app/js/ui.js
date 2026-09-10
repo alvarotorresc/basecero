@@ -1,12 +1,8 @@
 /** Piezas de chrome compartidas por las 28 pantallas (SISTEMA.md §4.2, §1). Módulo PURO: solo
- *  importa icons.js y t() —los dos sin DOM ni db—, y devuelve HTML.
- *  escHtml/escAttr son copia local, como en cada screens/*.js: centralizarlos es un refactor
- *  aparte (BACKLOG), no la excusa de este helper. */
+ *  importa icons.js, t() y esc.js —los tres sin DOM ni db—, y devuelve HTML. */
 import { icon } from "./icons.js";
 import { t } from "./i18n/index.js";
-
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+import { escHtml, escAttr } from "./esc.js";
 
 /** Cabecera de subpantalla (§4.2). Emite SIEMPRE tres celdas —44px / flex:1 / 44px— para que el
  *  título quede centrado de verdad, con acción a la derecha o sin ella. Cinco formas, una firma:

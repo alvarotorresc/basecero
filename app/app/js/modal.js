@@ -1,4 +1,5 @@
 import { pushBack, goBack } from "./back.js";
+import { escHtml } from "./esc.js";
 
 /** Modal de confirmación reutilizable: un `<dialog>` nativo abierto con `showModal()`, no un `<div>`
  *  con trampa de foco a mano. Trampa de foco, Escape y fondo inerte los da el navegador; con
@@ -12,10 +13,6 @@ import { pushBack, goBack } from "./back.js";
  *
  *  Cuelga de <body>, no de #screen: mismo motivo que toast.js — las pantallas se repintan enteras
  *  con innerHTML y se lo llevarían por delante. */
-
-// & y < porque son los que pueden romper el HTML; > también, aunque no rompa nada al ir dentro de
-// un atributo o texto: un nombre de comercio con "<b>" no debe verse como una etiqueta a medias.
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /** Interior del <dialog>. Cancelar va PRIMERO en el DOM: primero en la tabulación, primero en la
  *  lectura y es quien recibe el foco inicial — la salida segura por defecto. */

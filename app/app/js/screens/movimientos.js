@@ -20,8 +20,7 @@ import { skeletonHtml } from "../skeleton.js";
 import { showConfirm } from "../modal.js";
 import { showToast } from "../toast.js";
 
-const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+import { escHtml, escAttr } from "../esc.js";
 const needsCategory = (tipo) => tipo === "expense" || tipo === "income" || tipo === "refund";
 
 /** ¿Es el detalle de un gasto compartido que pagó la contraparte? Gatea la sección de cuentas, el

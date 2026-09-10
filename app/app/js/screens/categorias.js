@@ -13,8 +13,7 @@ import { showConfirm } from "../modal.js";
 import { subHeaderHtml } from "../ui.js";
 import { icon } from "../icons.js";
 
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+import { escHtml, escAttr } from "../esc.js";
 
 // Slug determinista para la sugerencia de color en creación (Task 6, decisión cerrada — ver
 // openForm): quita diacríticos y normaliza mayúsculas/espacios para que "Mascotas"/"mascotas "

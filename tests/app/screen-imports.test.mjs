@@ -40,10 +40,11 @@ function listScreenFiles() {
 }
 
 // Helpers compartidos que una pantalla puede usar sin ser su dueña — los candidatos reales a "lo
-// usa sin importarlo" porque viven en un módulo aparte y se usan por toda la app. escHtml/
-// escAttr normalmente NO hace falta importarlos: cada pantalla suele declarar su propia copia
-// local (mismo patrón en todo el código) — ahí el check de "lo define localmente" los deja pasar;
-// solo fallarían si alguna pantalla los LLAMA sin tener ni su propia copia ni un import.
+// usa sin importarlo" porque viven en un módulo aparte y se usan por toda la app. Hasta la PR
+// chore/esc-html, escHtml/escAttr no hacía falta importarlos: cada pantalla declaraba su propia
+// copia local (mismo patrón repetido en todo el código) y el check de "lo define localmente" los
+// dejaba pasar. Ahora viven en esc.js como cualquier otro helper compartido — esc.test.mjs
+// vigila, además, que ninguna copia local vuelva a aparecer.
 const HELPERS = [
   { name: "subHeaderHtml", from: "ui.js" },
   { name: "metaHtml", from: "ui.js" },
@@ -53,8 +54,8 @@ const HELPERS = [
   { name: "fmtDiaCorto", from: "format.js" },
   { name: "fmtDiaLargo", from: "format.js" },
   { name: "t", from: "i18n/index.js" },
-  { name: "escHtml", from: "(local, por convención)" },
-  { name: "escAttr", from: "(local, por convención)" },
+  { name: "escHtml", from: "esc.js" },
+  { name: "escAttr", from: "esc.js" },
 ];
 
 // Quita comentarios de bloque y de línea ANTES de buscar llamadas: sin esto, un JSDoc que

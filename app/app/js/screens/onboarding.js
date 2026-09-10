@@ -22,8 +22,7 @@ import { showToast } from "../toast.js";
 import { attachments } from "../attachments.js";
 import { unpackRestore } from "../bundle.js";
 
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+import { escHtml, escAttr } from "../esc.js";
 
 // Mandatory ledger pattern (waves 1-2, ver patrimonio.js ACCOUNT_TYPES/GOAL_TYPES): se guarda la
 // CLAVE del diccionario, no el texto — se resuelve con t() en cada render.

@@ -24,8 +24,7 @@ import { download } from "../download.js";
 import { subHeaderHtml, metaHtml } from "../ui.js";
 import { icon } from "../icons.js";
 
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+import { escHtml, escAttr } from "../esc.js";
 
 // Botón secundario del sistema (app.css .btn-secondary: píldora --card2, sin borde) — width:100%
 // por instancia porque aquí sigue siendo un CTA de ancho completo (mismo criterio de tap-target
