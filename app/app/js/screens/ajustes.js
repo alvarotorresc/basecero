@@ -5,6 +5,7 @@ import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
 import { hoyISO, fmtDiaCorto, fmtMoney } from "../format.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 import { renderRecurrentes } from "./recurrentes.js";
+import { renderSuscripciones } from "./suscripciones.js";
 import { renderCategorias } from "./categorias.js";
 import { pushBack, goBack } from "../back.js";
 import { importCsv, importWithProfile } from "../n26.js";
@@ -366,6 +367,22 @@ export async function renderAjustes(container) {
       </div>
 
       <div class="card" style="margin-bottom:12px">
+        <button type="button" id="btn-suscripciones" class="list-row"
+          style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+          <div class="list-row-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3.5" y="5" width="17" height="15.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path>
+            </svg>
+          </div>
+          <div class="list-row-body">
+            <div class="list-row-title">${t("ajustes.subscriptions.title")}</div>
+            <div class="list-row-sub">${t("ajustes.subscriptions.sub")}</div>
+          </div>
+          <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
+        </button>
+      </div>
+
+      <div class="card" style="margin-bottom:12px">
         <button type="button" id="btn-categorias" class="list-row"
           style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
           <div class="list-row-icon">
@@ -470,6 +487,11 @@ export async function renderAjustes(container) {
     container.querySelector("#btn-recurrentes").onclick = () => {
       pushBack(() => renderAjustes(container));
       renderRecurrentes(container, goBack);
+    };
+
+    container.querySelector("#btn-suscripciones").onclick = () => {
+      pushBack(() => renderAjustes(container));
+      renderSuscripciones(container, goBack);
     };
 
     container.querySelector("#btn-categorias").onclick = () => {

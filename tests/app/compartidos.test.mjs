@@ -447,7 +447,7 @@ test("hasShared: detecta transacciones y reglas compartidas activas (borradas no
 
   db.prepare(SQL.insertRule).run(
     "rule-shared", "Netflix", "expense", 1500, "cat-casa-alquiler", "acc-n26", "",
-    "monthly", 1, null, 1, 1, T, T,
+    "monthly", 1, null, 1, 1, 0, "", T, T,
   );
   assert.equal(has(), true, "una regla recurrente compartida activa también cuenta");
 

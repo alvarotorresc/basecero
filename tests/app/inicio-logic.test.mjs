@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   nextAccountId, daysLeftOfPeriod, dailyAllowanceCents, foldedMovements, groupByDay,
-  savingsSentence, streakDays, daysSinceLastEntry, nextDueDateIso, huchaMessage, HUCHA,
+  savingsSentence, streakDays, daysSinceLastEntry, huchaMessage, HUCHA,
 } from "../../app/app/js/inicio-logic.js";
 
 const ACC = [{ id: "a" }, { id: "b" }, { id: "c" }];
@@ -87,28 +87,6 @@ test("daysSinceLastEntry", () => {
 test("daysSinceLastEntry: ignora las fechas futuras (> todayIso)", () => {
   assert.equal(daysSinceLastEntry(["2026-10-01", "2026-09-06"], "2026-09-09"), 3);
   assert.equal(daysSinceLastEntry(["2026-10-01"], "2026-09-09"), null);
-});
-
-const rule = (o) => ({ frequency: "monthly", due_day: 14, due_month: null, is_active: 1, ...o });
-
-test("nextDueDateIso: mensual este mes y el que viene", () => {
-  assert.equal(nextDueDateIso(rule({}), "2026-09-09"), "2026-09-14");
-  assert.equal(nextDueDateIso(rule({}), "2026-09-20"), "2026-10-14");
-  assert.equal(nextDueDateIso(rule({}), "2026-09-14"), "2026-09-14");   // hoy cuenta
-});
-
-test("nextDueDateIso: el día 31 se acota al largo del mes", () => {
-  assert.equal(nextDueDateIso(rule({ due_day: 31 }), "2026-02-05"), "2026-02-28");
-});
-
-test("nextDueDateIso: semanal se trata como mensual (RULING de prevision.js:5-8)", () => {
-  assert.equal(nextDueDateIso(rule({ frequency: "weekly" }), "2026-09-09"), "2026-09-14");
-});
-
-test("nextDueDateIso: trimestral, anual y sin due_day", () => {
-  assert.equal(nextDueDateIso(rule({ frequency: "quarterly", due_month: 3, due_day: 5 }), "2026-09-09"), "2026-12-05");
-  assert.equal(nextDueDateIso(rule({ frequency: "yearly", due_month: 3, due_day: 5 }), "2026-09-09"), "2027-03-05");
-  assert.equal(nextDueDateIso(rule({ due_day: null }), "2026-09-09"), null);
 });
 
 const CTX = {

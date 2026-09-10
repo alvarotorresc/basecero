@@ -2,13 +2,14 @@ import {
   getOpenPeriod, spentOfPeriod, incomeOfPeriod, listByDay, allCategoriesById,
   pendingSettlements, pendingSettlementNetCents, budgetsOfPeriod, previsionOfPeriod,
   spentByRootCategory, balancesAt, spentByDayAndRootCategory, recentTxDates,
-  getMetaAll, setMeta, hasSharedData,
+  getMetaAll, setMeta, hasSharedData, listRules, getSnoozedRenewals, snoozeRenewal,
 } from "../repo.js";
+import { renewalNotice } from "../subscriptions.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, moneyPartsHtml, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtPct0 } from "../format.js";
 import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
 import {
-  nextAccountId, daysLeftOfPeriod, dailyAllowanceCents, nextDueDateIso, streakDays,
+  nextAccountId, daysLeftOfPeriod, dailyAllowanceCents, streakDays,
   daysSinceLastEntry, huchaMessage, foldedMovements, groupByDay, savingsSentence,
   remainingAfterRecurringCents,
 } from "../inicio-logic.js";
@@ -20,6 +21,7 @@ import { renderLiquidar } from "./liquidar.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 import { renderGastoPorCategoria } from "./gasto-por-categoria.js";
 import { renderRecurrentes } from "./recurrentes.js";
+import { renderSuscripciones } from "./suscripciones.js";
 import { renderRegistro } from "./registro.js";
 import { renderSemana } from "./semana.js";
 import { pushBack, goBack } from "../back.js";
@@ -485,7 +487,7 @@ export async function renderInicio(container) {
   }
   const hoy = hoyISO();
   let period, spent, income, rows, byId, sharedRows, netCents, budgets, prevision, rootRows,
-    cuentas, weekRootRows, recentDates, meta, partnerName, showPartnerBanner;
+    cuentas, weekRootRows, recentDates, meta, partnerName, showPartnerBanner, rules, snoozedRenewals;
   try {
     period = await getOpenPeriod();
     if (!period) {
@@ -496,7 +498,7 @@ export async function renderInicio(container) {
     // fuente, así que Inicio no puede llevar una tercera.
     const week = weekRange(hoy);
     [spent, income, rows, byId, sharedRows, netCents, budgets, prevision, rootRows,
-      cuentas, weekRootRows, recentDates, meta] = await Promise.all([
+      cuentas, weekRootRows, recentDates, meta, rules, snoozedRenewals] = await Promise.all([
       spentOfPeriod(period.id),
       incomeOfPeriod(period.id),
       listByDay(period.id),
@@ -510,6 +512,8 @@ export async function renderInicio(container) {
       spentByDayAndRootCategory(period.id, week.start, week.end),
       recentTxDates(),
       getMetaAll(),
+      listRules(),
+      getSnoozedRenewals(),
     ]);
     partnerName = (meta.partner_name || "").trim();
     // Sin nombre, comprobamos si hay compartidos "huérfanos" (Task 5): con nombre ya configurado
@@ -540,12 +544,23 @@ export async function renderInicio(container) {
 
   // -- Racha (§3.17) y la hucha (§8): las dos usan recentTxDates(), sin filtro de periodo.
   const racha = streakDays(recentDates, hoy);
-  const renewals = prevision.items
-    .filter((it) => !it.paid && it.rule.type !== "income")
-    // N6: cuando exista recurring_rules.is_subscription, aquí entra .filter(it => it.rule.is_subscription).
-    .map((it) => ({ id: it.rule.id, name: it.rule.name, amountCents: it.myCents, dueDateIso: nextDueDateIso(it.rule, hoy) }))
-    .filter((r) => r.dueDateIso != null)
-    .sort((a, b) => a.dueDateIso.localeCompare(b.dueDateIso));
+  // N6: la renovación de la hucha sale del radar de suscripciones (subscriptions.js#renewalNotice),
+  // no de toda recurrente pendiente — ya filtra marcadas, activas, no semanales, ≤7 días y
+  // respeta lo silenciado con «Ahora no» (snoozeRenewal). huchaMessage sigue decidiendo la
+  // prioridad entre esta y las demás reglas; aquí solo se adapta la forma de su única candidata.
+  const notice = renewalNotice(rules, hoy, snoozedRenewals);
+  // La hucha no puede reñir por un cargo que "Queda por pagar" (pendingHtml, de prevision.items)
+  // ya da por resuelto: si la regla de `notice` tiene un item en prevision.items y ese item está
+  // `paid` (ya se registró el cargo este periodo), se descarta el aviso entero. Si tiene item y
+  // no está pagado, se usa su `myCents` — el importe YA prorrateado por my_share_pct, el mismo
+  // que enseña "Queda por pagar" — en vez del importe ÍNTEGRO de notice.amountCents (D3 de
+  // subscriptions.js es correcto para el radar, pero aquí la hucha y la lista de pendientes
+  // tienen que coincidir en la misma cifra). notice.amountCents queda solo de reserva por si la
+  // regla no aparece en prevision.items (p. ej. no aplica este mes por algún borde de ruleApplies).
+  const noticeItem = notice ? prevision.items.find((it) => it.rule.id === notice.ruleId) : null;
+  const renewals = notice && !noticeItem?.paid
+    ? [{ id: notice.ruleId, name: notice.name, amountCents: noticeItem ? noticeItem.myCents : notice.amountCents, dueDateIso: notice.dueIso }]
+    : [];
   const huchaCategories = rootRows
     .filter((r) => (budgetByCategory[r.root_id] ?? 0) > 0)
     .map((r) => ({ id: r.root_id, name: r.name, pct: pctOf(r.spent_cents, budgetByCategory[r.root_id]) }));
@@ -639,14 +654,29 @@ export async function renderInicio(container) {
   };
 
   if (hucha) {
-    container.querySelector("#inicio-hucha-dismiss").onclick = () => {
+    const huchaDismissBtn = container.querySelector("#inicio-hucha-dismiss");
+    huchaDismissBtn.onclick = async () => {
+      // La renovación, además del descarte de sesión, silencia ESA fecha de verdad (persistida en
+      // meta.renewal_snoozed): sin esto, «Ahora no» solo duraría hasta el próximo repintado de
+      // Inicio, no hasta la próxima sesión (spec suscripciones §8).
+      if (hucha.kind === "renewal") {
+        huchaDismissBtn.disabled = true;
+        try {
+          await snoozeRenewal(hucha.key.slice("renewal:".length), hucha.params.date, hoy);
+          showToast(t("toast.renewalSnoozed"));
+        } catch {
+          // Baja fricción, sin banner propio: se reintenta tocando otra vez.
+          huchaDismissBtn.disabled = false;
+          return;
+        }
+      }
       huchaDismissed.add(hucha.key);
       renderInicio(container);
     };
     container.querySelector("#inicio-hucha-action").onclick = () => {
       if (hucha.kind === "renewal") {
         pushBack(() => renderInicio(container));
-        renderRecurrentes(container, goBack);
+        renderSuscripciones(container, goBack);
       } else if (hucha.kind === "limit") {
         pushBack(() => renderInicio(container));
         renderGastoPorCategoria(container, goBack);

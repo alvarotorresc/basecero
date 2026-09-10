@@ -1,4 +1,4 @@
-const CACHE = "bc-v39";
+const CACHE = "bc-v40";
 // sqlite3-opfs-async-proxy.js queda fuera a propósito: solo lo usa el VFS "opfs" clásico (requiere COOP/COEP), no el sahpool que usamos.
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon.svg", "icons/icon-maskable.svg",
   "css/tokens.css", "css/app.css", "vendor/pure.js", "vendor/xlsx/xlsx.full.min.js", "vendor/fonts/fonts.css",
@@ -7,8 +7,8 @@ const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon.svg", "ic
   "js/sql.js", "js/seeds.js", "js/category-colors.js", "js/category-order.js", "js/category-spend.js", "js/repo.js",
   "js/account-defaults.js", "js/onboarding-steps.js", "js/contract.js", "js/xlsx.js", "js/xlsx-loader.js", "js/prevision.js", "js/inicio-logic.js", "js/semana-logic.js", "js/charts.js", "js/n26.js", "js/csv-generic.js", "js/backup-crypto.js",
   "js/onboarding.js", "js/screens/registro.js", "js/screens/inicio.js", "js/screens/semana.js",
-  "js/movimientos-filter.js", "js/open-tx.js", "js/screens/movimientos.js", "js/screens/liquidar.js", "js/screens/periodo-nuevo.js",
-  "js/screens/gasto-por-categoria.js", "js/screens/recurrentes.js", "js/screens/patrimonio.js",
+  "js/movimientos-filter.js", "js/open-tx.js", "js/screens/movimientos.js", "js/screens/liquidar.js", "js/screens/periodo-nuevo.js", "js/subscriptions.js", "js/subscription-detect.js",
+  "js/screens/gasto-por-categoria.js", "js/screens/recurrentes.js", "js/screens/patrimonio.js", "js/screens/suscripciones.js",
   "js/screens/ajustes.js", "js/screens/categorias.js", "js/screens/onboarding.js",
   "vendor/sqlite-wasm/jswasm/sqlite3.mjs", "vendor/sqlite-wasm/jswasm/sqlite3.wasm"];
 self.addEventListener("install", (e) => {

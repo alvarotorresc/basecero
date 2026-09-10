@@ -10,6 +10,8 @@ import { t, monthShort } from "./i18n/index.js";
 import { isValidPct } from "./share-pct.js";
 import { UserError } from "./errors.js";
 import { MEMORY_WINDOW, merchantMemory } from "./merchant-memory.js";
+import { IGNORED_MAX, parseIgnored, parseSnoozed } from "./subscriptions.js";
+import { DETECT_WINDOW_DAYS } from "./subscription-detect.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -402,7 +404,9 @@ export const getRule = async (id) => (await query(SQL.getRule, [id]))[0] ?? null
 /** Crea una regla recurrente. fields camelCase (ver recurrentes.js): is_active por defecto
  *  activa (1) si no se indica, igual criterio que el DEFAULT 1 del schema. name pasa por
  *  bcSanitizeCell como merchant/note de addTransaction: es texto libre tecleado por el usuario
- *  que via exportAllJson acaba en una celda .xlsx (mismo riesgo de inyección de fórmula). */
+ *  que via exportAllJson acaba en una celda .xlsx (mismo riesgo de inyección de fórmula).
+ *  isSubscription/cancelledAt (Suscripciones, N6): por defecto no es suscripción y sin fecha de
+ *  baja — el mismo default que schema.sql. */
 export async function createRule(fields) {
   const now = nowIso();
   await exec(SQL.insertRule, [
@@ -410,6 +414,7 @@ export async function createRule(fields) {
     fields.categoryId ?? "", fields.accountId, fields.counterAccountId ?? "",
     fields.frequency, fields.dueDay ?? null, fields.dueMonth ?? null,
     fields.isShared ? 1 : 0, fields.isActive === false ? 0 : 1,
+    fields.isSubscription ? 1 : 0, fields.cancelledAt ?? "",
     now, now,
   ]);
 }
@@ -419,6 +424,7 @@ export async function createRule(fields) {
 export async function updateRule(id, fields) {
   const cur = await getRule(id);
   if (!cur) throw new UserError(t("errors.repo.ruleNotFound"));
+  const isActive = fields.isActive ?? !!cur.is_active;
   const f = {
     name: fields.name ?? cur.name,
     type: fields.type ?? cur.type,
@@ -430,16 +436,115 @@ export async function updateRule(id, fields) {
     dueDay: fields.dueDay !== undefined ? fields.dueDay : cur.due_day,
     dueMonth: fields.dueMonth !== undefined ? fields.dueMonth : cur.due_month,
     isShared: fields.isShared ?? !!cur.is_shared,
-    isActive: fields.isActive ?? !!cur.is_active,
+    isActive,
+    isSubscription: fields.isSubscription ?? !!cur.is_subscription,
+    // Reactivar CANCELA la cancelación. Sin esta línea, el toggle «Activa» del formulario de
+    // Recurrentes (recurrentes.js) dejaría una fila con is_active=1 y cancelled_at<>'': un estado
+    // que la propia app exporta y que su propio validateImport rechaza — se rompería el
+    // round-trip, que es el test crítico del proyecto. Es también el ÚNICO «deshacer» de una
+    // cancelación (spec §5.1).
+    cancelledAt: isActive ? "" : (fields.cancelledAt ?? cur.cancelled_at),
   };
   const now = nowIso();
   await exec(SQL.updateRule, [
     bcSanitizeCell(f.name), f.type, f.amountCents, f.categoryId ?? "", f.accountId, f.counterAccountId ?? "",
-    f.frequency, f.dueDay, f.dueMonth, f.isShared ? 1 : 0, f.isActive ? 1 : 0, now, id,
+    f.frequency, f.dueDay, f.dueMonth, f.isShared ? 1 : 0, f.isActive ? 1 : 0,
+    f.isSubscription ? 1 : 0, f.cancelledAt, now, id,
   ]);
 }
 
 export const softDeleteRule = (id) => exec(SQL.softDeleteRule, [nowIso(), id]);
+
+/** Cancela una suscripción: deja de generar pendientes (is_active=0, ver prevision.js#ruleApplies)
+ *  y SELLA el día de la baja, que es desde el que se cuenta lo ahorrado (subscriptions.js#
+ *  savedSinceCancelCents). Las dos columnas en el MISMO UPDATE: no existe el estado intermedio.
+ *  `todayIso` se inyecta (determinismo, mismo criterio que workbookToRows). Reactivar se hace
+ *  desde updateRule, que limpia cancelled_at cuando isActive vuelve a true. */
+export const cancelSubscription = (id, todayIso) => exec(SQL.cancelRule, [todayIso, nowIso(), id]);
+
+/** Comercios (clave NORMALIZADA) que el usuario mandó ignorar. Read-modify-write sobre meta,
+ *  mismo patrón exacto que setCategoryStyle/setAccountLoan (repo.js#setAccountLoan). Se guarda la
+ *  clave normalizada y no el texto: «NETFLIX.COM» y «Netflix» son el mismo comercio y deben
+ *  ignorarse juntos. Tope de IGNORED_MAX entradas, las MÁS RECIENTES: es una lista de descartes,
+ *  no un archivo — `key` se quita de donde estuviera y se vuelve a añadir al final. */
+export async function ignoreSubscriptionMerchant(key) {
+  const meta = await getMetaAll();
+  const list = parseIgnored(meta.subscription_ignored).filter((k) => k !== key);
+  list.push(key);
+  await setMeta("subscription_ignored", JSON.stringify(list.slice(-IGNORED_MAX)));
+}
+export async function getIgnoredMerchants() {
+  const meta = await getMetaAll();
+  return parseIgnored(meta.subscription_ignored);
+}
+
+/** Silencia UNA renovación concreta: {ruleId: "YYYY-MM-DD"}. La fecha es la clave del asunto —
+ *  «Ahora no» calla la del 14 de septiembre, no la suscripción; la del 14 de octubre vuelve a
+ *  avisar sola, sin que nadie tenga que reactivar nada (renewalNotice compara la fecha exacta).
+ *  Al escribir se podan las entradas cuya fecha ya pasó: el mapa se limpia solo y nunca crece. */
+export async function snoozeRenewal(ruleId, dueIso, todayIso) {
+  const meta = await getMetaAll();
+  const map = parseSnoozed(meta.renewal_snoozed);
+  map[ruleId] = dueIso;
+  const pruned = {};
+  for (const [id, iso] of Object.entries(map)) if (iso >= todayIso) pruned[id] = iso;
+  await setMeta("renewal_snoozed", JSON.stringify(pruned));
+}
+export async function getSnoozedRenewals() {
+  const meta = await getMetaAll();
+  return parseSnoozed(meta.renewal_snoozed);
+}
+
+/** Construye los statements para aceptar una candidata detectada (subscription-detect.js#
+ *  detectSubscriptions): un insertRule YA marcado como suscripción + un linkTxsToRule por cada
+ *  cargo de la racha. `fallbackAccountId` llega YA resuelto (defaultAccountId() no es pura): así
+ *  la función es testeable en Node sin Worker (mismo criterio que replaceAllStmts/
+ *  settleAllSharedStmts). due_day/due_month se deducen del cargo MÁS RECIENTE de la racha
+ *  (candidate.lastDates[0]) — también en weekly, aunque el formulario no lo use para esa
+ *  frecuencia (recurrentes.js exige 1-31 igualmente). isShared es SIEMPRE false: marcar solo un
+ *  gasto como compartido cambiaría en silencio lo que la contraparte debe, y eso lo decide una
+ *  persona (mismo argumento textual que registro-v2-design.md §5.5).
+ *  bcUlid/bcSanitizeCell son globales (vendor/pure.js), igual que en createRule. */
+export function acceptSubscriptionCandidateStmts(candidate, fallbackAccountId) {
+  const now = nowIso();
+  const ruleId = bcUlid();
+  const anchor = candidate.lastDates?.[0] ?? "";
+  const dueDay = anchor ? Number(anchor.slice(8, 10)) : null;
+  const dueMonth = candidate.frequency === "yearly" && anchor ? Number(anchor.slice(5, 7)) : null;
+  const stmts = [{
+    sql: SQL.insertRule,
+    bind: [
+      ruleId, bcSanitizeCell(candidate.merchant), "expense", candidate.amountCents,
+      candidate.categoryId || "", candidate.accountId || fallbackAccountId, "",
+      candidate.frequency, dueDay, dueMonth,
+      0, 1, 1, "",
+      now, now,
+    ],
+  }];
+  for (const txId of candidate.txIds ?? []) stmts.push({ sql: SQL.linkTxsToRule, bind: [ruleId, now, txId] });
+  return stmts;
+}
+
+/** Acepta una candidata: crea la regla marcada como suscripción y ENLAZA sus cargos pasados por
+ *  rule_id, todo en un execMany. Atómico a propósito: una regla creada sin enlazar volvería a
+ *  proponerse en el siguiente render (los cargos siguen sin rule_id), y unos cargos enlazados a
+ *  una regla que no llegó a existir romperían la FK del contrato.
+ *  Efecto secundario BUSCADO: el cargo de este periodo pasa a marcar la regla como pagada en
+ *  Previsión (SQL.paidRuleIds), así que aceptar una suscripción que ya se cobró NO la suma como
+ *  pendiente (spec §12.5). */
+export async function acceptSubscriptionCandidate(candidate) {
+  const fallbackAccountId = candidate.accountId ? "" : await defaultAccountId();
+  await execMany(acceptSubscriptionCandidateStmts(candidate, fallbackAccountId));
+}
+
+/** Cargos candidatos a suscripción, ventana de DETECT_WINDOW_DAYS días desde `todayIso` — la
+ *  alimenta subscription-detect.js#detectSubscriptions desde la pantalla Suscripciones. `todayIso`
+ *  se inyecta (determinismo, mismo criterio que el resto de funciones que tocan "hoy"). */
+export function subscriptionCharges(todayIso) {
+  const start = new Date(todayIso + "T12:00:00");
+  start.setDate(start.getDate() - DETECT_WINDOW_DAYS);
+  return query(SQL.subscriptionCharges, [start.toLocaleDateString("sv-SE"), 5000]);
+}
 
 export const accountBalanceCents = async (accountId, atDateIso) =>
   (await query(SQL.accountBalance, [atDateIso, accountId]))[0].balance_cents;

@@ -6,7 +6,11 @@ export const CONTRACT = {
   categories: { cols: ["id","name","parent_id","flow","need_type","display_order","is_archived","created_at","updated_at","deleted"] },
   periods: { cols: ["id","name","start_date","end_date","status","my_share_pct","notes","created_at","updated_at","deleted"] },
   transactions: { cols: ["id","date","period_id","type","amount_cents","account_id","counter_account_id","category_id","merchant","note","is_shared","share_pct_override","paid_by","settled","ref_id","rule_id","external_id","status","created_at","updated_at","deleted"] },
-  recurring_rules: { cols: ["id","name","type","amount_cents","category_id","account_id","counter_account_id","frequency","due_day","due_month","is_shared","is_active","created_at","updated_at","deleted"] },
+  // is_subscription/cancelled_at (Suscripciones, N6) entre is_active y created_at — mismo criterio
+  // de colocación semántica que paid_by en transactions. cancelled_at es una FECHA (YYYY-MM-DD),
+  // NO un timestamp pese al sufijo _at: es el día de la baja, comparable con hoyISO() (ver xlsx.js
+  // DATE_COLS, NO TIMESTAMP_COLS).
+  recurring_rules: { cols: ["id","name","type","amount_cents","category_id","account_id","counter_account_id","frequency","due_day","due_month","is_shared","is_active","is_subscription","cancelled_at","created_at","updated_at","deleted"] },
   goals: { cols: ["id","name","type","target_amount_cents","target_months","target_pct","target_date","account_id","category_id","is_active","created_at","updated_at","deleted"] },
   budgets: { cols: ["id","period_id","category_id","amount_cents","created_at","updated_at","deleted"] },
 };
@@ -23,7 +27,7 @@ export const ENUMS = {
 export const BOOL_COLS = {
   accounts: ["is_archived","deleted"], categories: ["is_archived","deleted"],
   periods: ["deleted"], transactions: ["is_shared","settled","deleted"],
-  recurring_rules: ["is_shared","is_active","deleted"], goals: ["is_active","deleted"],
+  recurring_rules: ["is_shared","is_active","is_subscription","deleted"], goals: ["is_active","deleted"],
   budgets: ["deleted"], meta: [],
 };
 

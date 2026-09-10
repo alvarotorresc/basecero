@@ -20,9 +20,9 @@ async function init(seedLang = "es") {
   db.exec(schema);
   // Migraciones de una BD ya existente (schema.sql no altera tablas ya creadas) — ver migrations.js.
   // PRAGMA table_info se lee con la MISMA forma que el op "query" de este worker (db-worker.js:72),
-  // una vez por cada tabla DISTINTA que MIGRATIONS declara (hoy solo "transactions"): así una
-  // migración futura sobre otra tabla no dispara un ALTER en cada arranque solo porque esa tabla
-  // nunca llegó a consultarse aquí.
+  // una vez por cada tabla DISTINTA que MIGRATIONS declara (hoy "transactions" y "recurring_rules"):
+  // así una migración futura sobre otra tabla no dispara un ALTER en cada arranque solo porque esa
+  // tabla nunca llegó a consultarse aquí.
   // Va DESPUÉS del esquema (la tabla meta tiene que existir) y ANTES de las semillas.
   const colsByTable = {};
   for (const table of [...new Set(MIGRATIONS.map((m) => m.table))]) {

@@ -24,7 +24,11 @@ export function rowsToWorkbook(X, dump) {
   return wb;
 }
 
-const DATE_COLS = new Set(["date", "start_date", "end_date", "target_date"]);
+// cancelled_at (recurring_rules, Suscripciones) es una FECHA pese al sufijo _at — NO entra en
+// REQUIRED_DATE_COLS (vacío es el estado normal, "no cancelada") ni en TIMESTAMP_COLS (más abajo):
+// el riesgo de que alguien lo detecte algún día por un endsWith("_at") queda anotado aquí y en
+// contract.js, y el test de xlsx.test.mjs fija que valida como fecha, no como marca de tiempo.
+const DATE_COLS = new Set(["date", "start_date", "end_date", "target_date", "cancelled_at"]);
 
 // 5c: created_at/updated_at son NOT NULL en schema.sql, pero "" satisface NOT NULL (se guarda
 // como texto vacío) — un residuo de storage silencioso que ningún check de validateImport
@@ -260,6 +264,15 @@ export function validateImport(data) {
     if (row.type !== "refund" || !row.ref_id) return;
     if (txById[row.ref_id]?.paid_by === "partner")
       errs.push(t("errors.xlsx.refundOfPartnerPaid", { row: i + 2 }));
+  });
+
+  // cancelled_at sella una baja: una regla cancelada NO puede seguir activa, porque entonces
+  // seguiría contando como pendiente en Previsión mientras el radar la enseña como cancelada y le
+  // suma el ahorro. La app nunca crea ese estado (cancelSubscription escribe las dos columnas a la
+  // vez, y updateRule limpia cancelled_at al reactivar), así que la única puerta es una hoja
+  // editada a mano.
+  (data.recurring_rules ?? []).forEach((row, i) => {
+    if (row.cancelled_at && row.is_active === 1) errs.push(t("errors.xlsx.cancelledActive", { row: i + 2 }));
   });
 
   // Columnas numéricas NO-*_cents del contrato: workbookToRows las deja pasar tal cual llegan
