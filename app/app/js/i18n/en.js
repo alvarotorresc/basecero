@@ -239,6 +239,17 @@ export const EN = {
     type: { transfer: "Transfer" },
     detail: {
       lockedNote: "It has a linked settlement entry (refund or adjustment): delete it first to change the amount or the split.",
+      tagLabel: "Tag",
+      noTag: "No tag",
+      newTag: "New tag",
+    },
+    tagCard: {
+      movements: { one: "{n} movement", other: "{n} movements" },
+      ofLimit: "of {limit}",
+      periodLine: {
+        one: "{amount} in {period}, {n} movement",
+        other: "{amount} in {period}, {n} movements",
+      },
     },
     shared: {
       fallbackName: "the other party",

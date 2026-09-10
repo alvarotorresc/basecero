@@ -246,6 +246,17 @@ export const ES = {
     type: { transfer: "Transferencia" },
     detail: {
       lockedNote: "Tiene un apunte de liquidación enlazado (devolución o ajuste): para cambiar el importe o el reparto, bórralo antes.",
+      tagLabel: "Etiqueta",
+      noTag: "Sin etiqueta",
+      newTag: "Nueva etiqueta",
+    },
+    tagCard: {
+      movements: { one: "{n} movimiento", other: "{n} movimientos" },
+      ofLimit: "de {limit}",
+      periodLine: {
+        one: "{amount} en {period}, {n} movimiento",
+        other: "{amount} en {period}, {n} movimientos",
+      },
     },
     shared: {
       fallbackName: "la contraparte",

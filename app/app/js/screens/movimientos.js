@@ -1,9 +1,10 @@
 import {
   listPeriods, listAllByDay, getTransaction, updateTransaction, softDeleteTransaction, countUncategorized,
   listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById, hasActiveLinkedSettlement,
-  getMetaAll,
+  getMetaAll, listTags, createTag, tagTotals, tagTotalsOfPeriod,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory, rootOf } from "../category-colors.js";
+import { budgetStatus } from "../category-spend.js";
 import { matchesFilter, isUncategorized } from "../movimientos-filter.js";
 import { fmtMoney, moneyPartsHtml, fmtDiaLargo, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
@@ -56,6 +57,16 @@ function groupByDay(rows) {
 const ICON_TRANSFER = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="stroke:var(--text-2);" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l-3 3 3 3M4 13h13M17 8l3-3-3-3M20 5H7"></path></svg>`;
 // Icono "+" del dotico punteado de una fila sin categorizar (artboard Movimientos.dc.html:46-48).
 const ICON_UNCAT = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="stroke:var(--text-2);" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>`;
+// Icono "etiqueta" del repertorio SISTEMA.md §3, mismo path que screens/etiquetas.js#ICON_TAG.
+// `currentColor` (no un `--ink-2` fijo) para heredar el tinte de donde se use: el texto normal de
+// una chip inactiva, o el fondo invertido de una chip activa (.chip.active del sistema).
+const ICON_TAG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V4h7l9 9-7 7z"></path><circle cx="8" cy="8" r="1.2"></circle></svg>`;
+const ICON_PLUS_SMALL = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>`;
+
+// Toda anchura de barra de la tarjeta de etiqueta activa pasa por aquí, mismo criterio que
+// etiquetas.js#clampPct/gasto-por-categoria.js#clampPct: budgetStatus() no capa su `.pct`, y
+// `width:120%`/`width:-8%` es CSS inválido que el navegador descarta (la barra se queda vacía).
+const clampPct = (pct) => Math.min(100, Math.max(0, pct));
 
 function movRowHtml(r, byId, accById, partnerName) {
   if (r.type === "transfer") {
@@ -137,11 +148,11 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     container.dataset.screen = "movimientos";
     container.innerHTML = skeletonHtml([72, 56, 320]);
   }
-  let periods, expenseCats, incomeCats, accountsAll, byId, meta;
+  let periods, expenseCats, incomeCats, accountsAll, byId, meta, tagsAll;
   try {
-    [periods, expenseCats, incomeCats, accountsAll, byId, meta] = await Promise.all([
+    [periods, expenseCats, incomeCats, accountsAll, byId, meta, tagsAll] = await Promise.all([
       listPeriods(), listExpenseLeafCategories(), listIncomeCategories(), listAccounts(), allCategoriesById(),
-      getMetaAll(),
+      getMetaAll(), listTags(),
     ]);
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">${t("movimientos.error.load", { error: escHtml(userMessage(e)) })}</div>`;
@@ -160,6 +171,8 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     periodId: periods.find((p) => p.status === "open")?.id ?? periods[0].id,
     rows: [],
     uncategorizedCount: 0,
+    tagTotalsPeriod: [], // Task 12: n/spent_cents por etiqueta EN ESTE periodo (chips + línea de la tarjeta)
+    tagTotalsAll: [], // Task 12: total de SIEMPRE por etiqueta (D7) — nombre, límite y barra de la tarjeta
     // Task 4: filtro cliente sobre state.rows (buscador + chips por categoría raíz). Los tres
     // campos se combinan con AND en matchesFilter (movimientos-filter.js); la UI garantiza que
     // rootCatId y uncat no estén activos a la vez (chips de selección única, ver wireList).
@@ -179,8 +192,9 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
   let errorMsg = "";
 
   async function loadPeriodData() {
-    [state.rows, state.uncategorizedCount] = await Promise.all([
+    [state.rows, state.uncategorizedCount, state.tagTotalsPeriod, state.tagTotalsAll] = await Promise.all([
       listAllByDay(state.periodId), countUncategorized(state.periodId),
+      tagTotalsOfPeriod(state.periodId), tagTotals(),
     ]);
     // sin esto, categorizar/borrar el último movimiento sin categorizar con el filtro activo
     // deja la lista vacía sin forma de volver: el chip desaparece (count=0) pero el filtro seguía activo.
@@ -189,6 +203,11 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     // se recategoriza/borra, su chip desaparece de presentRootCats() (ya no hay nada que mostrar
     // en ella) pero el filtro seguía activo — la lista se quedaría vacía con ninguna chip marcada.
     if (state.filter.rootCatId && !presentRootCats().includes(state.filter.rootCatId)) state.filter.rootCatId = null;
+    // D13: filter.tagId NUNCA se autolimpia aquí, a propósito — a diferencia de rootCatId arriba.
+    // Una etiqueta es transversal a los periodos (D7): que en ESTE periodo no quede ningún
+    // movimiento con esa etiqueta no significa que el filtro "esté mal", solo que la lista sale
+    // vacía (mismo mensaje que cualquier otro filtro sin resultados) — el usuario decide si lo
+    // quita, igual que decide si cambia de periodo con una búsqueda de texto puesta.
   }
 
   function categoriesFor(tipo) {
@@ -210,6 +229,82 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       if (!seen.has(root)) { seen.add(root); out.push(root); }
     }
     return out;
+  }
+
+  /** Nombre de una etiqueta por id, resuelto contra tagTotalsAll (D7: TODAS las vivas, archivadas
+   *  incluidas) y no contra `tagsAll` (solo activas, listTags — selector de alta): un movimiento
+   *  guardado puede llevar una etiqueta archivada después, y su nombre tiene que seguir resolviendo. */
+  function tagName(id) {
+    return state.tagTotalsAll.find((tg) => tg.id === id)?.name ?? "";
+  }
+
+  /** Opciones del selector inline del detalle: las activas (`tagsAll`, mismo criterio que Registro,
+   *  Task 13) más la asignada actualmente si es una archivada que ya no está en `tagsAll` — así no
+   *  desaparece de golpe del selector al abrirlo (mismo criterio que etiquetas.js, que sigue
+   *  enseñando las archivadas en su propia lista, atenuadas, en vez de ocultarlas). */
+  function tagOptions() {
+    const currentId = state.detail?.tagId;
+    if (!currentId || tagsAll.some((tg) => tg.id === currentId)) return tagsAll;
+    const current = state.tagTotalsAll.find((tg) => tg.id === currentId);
+    return current ? [...tagsAll, current] : tagsAll;
+  }
+
+  /** Segunda fila de chips (Task 12, artboard Movimientos.dc.html:50-59): una por etiqueta con
+   *  movimientos EN ESTE PERIODO, más siempre la activa (aunque su periodo dé n=0, para que el
+   *  filtro puesto siga teniendo una chip que lo represente y se pueda quitar tocándola). No es
+   *  is_archived quien decide si aparece: tagTotalsOfPeriod ya incluye archivadas a propósito (un
+   *  movimiento del periodo puede llevar una que se archivó después), ver su comentario en sql.js. */
+  function tagChipsHtml() {
+    const activeId = state.filter.tagId;
+    const periodById = Object.fromEntries(state.tagTotalsPeriod.map((tg) => [tg.id, tg]));
+    const visible = state.tagTotalsAll.filter((tg) => (periodById[tg.id]?.n ?? 0) > 0 || tg.id === activeId);
+    if (visible.length === 0) return "";
+    return `<div class="chips-row" style="margin-bottom:14px;">
+      ${visible.map((tg) => {
+        const active = tg.id === activeId;
+        return `<button type="button" class="chip${active ? " active" : ""}" data-chip-tag="${escAttr(tg.id)}"
+          style="padding:0 14px;display:inline-flex;align-items:center;gap:7px;">${ICON_TAG}${escHtml(tg.name)}</button>`;
+      }).join("")}
+    </div>`;
+  }
+
+  /** Tarjeta de la etiqueta activa (Task 12, artboard Movimientos.dc.html:61-83): nombre + nº de
+   *  movimientos de SIEMPRE (tagTotalsAll, D7), total global con barra SOLO si tiene límite, y la
+   *  línea del periodo abierto (tagTotalsPeriod). Nada si no hay ninguna etiqueta activa o si la
+   *  etiqueta activa ya no existe (borrado real, fuera del alcance de esta app — ver D5: solo se
+   *  archiva — pero una FK huérfana no debe reventar el render). */
+  function tagCardHtml() {
+    const tagId = state.filter.tagId;
+    if (!tagId) return "";
+    const tag = state.tagTotalsAll.find((tg) => tg.id === tagId);
+    if (!tag) return "";
+    const periodTag = state.tagTotalsPeriod.find((tg) => tg.id === tagId) ?? { n: 0, spent_cents: 0 };
+    const hasLimit = tag.budget_cents > 0;
+    const periodName = periods.find((p) => p.id === state.periodId)?.name ?? "";
+    let limitHtml = "";
+    if (hasLimit) {
+      const st = budgetStatus(tag.spent_cents, tag.budget_cents);
+      limitHtml = `
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;">
+          <span class="num" style="font-size:20px;font-weight:700;">${fmtMoney(tag.spent_cents)}</span>
+          <span class="num" style="font-size:13px;color:var(--text-3);">${t("movimientos.tagCard.ofLimit", { limit: fmtMoney(tag.budget_cents) })}</span>
+        </div>
+        <div class="bar" style="--cat:var(--ink-2);"><i style="width:${clampPct(st.pct)}%;"></i></div>
+      </div>`;
+    }
+    return `
+    <div class="card" style="display:flex;flex-direction:column;gap:12px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="display:flex;align-items:center;gap:7px;">
+          <span style="display:flex;color:var(--text-2);">${ICON_TAG}</span>
+          <span style="font-size:15px;font-weight:600;">${escHtml(tag.name)}</span>
+        </div>
+        <span style="font-size:11px;font-weight:500;color:var(--text-3);">${t("movimientos.tagCard.movements", { n: tag.n })}</span>
+      </div>
+      ${limitHtml}
+      <span style="font-size:13px;font-weight:500;color:var(--text-3);">${t("movimientos.tagCard.periodLine", { amount: fmtMoney(periodTag.spent_cents), period: escHtml(periodName), n: periodTag.n })}</span>
+    </div>`;
   }
 
   function updateDetail(patch) {
@@ -258,6 +353,9 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       note: row.note,
       refId: row.ref_id,
       ruleId: row.rule_id,
+      tagId: row.tag_id || null,
+      tagPickerOpen: false, // Task 12: solo UI, nunca se manda al guardar
+      newTagDraft: null, // Task 12: != null mientras se escribe el nombre de una etiqueta nueva
     };
     state.linkedExpense = null;
     // El apunte de liquidación tiene DOS formas desde Task 3: la devolución ENTRANTE (refund) y el
@@ -338,6 +436,38 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     </div>`;
   }
 
+  /** Control «Etiqueta» del detalle (Task 12, artboard MovimientoDetalle.dc.html:102-105): chip
+   *  cerrado con la etiqueta actual (o "Sin etiqueta" en punteado si no lleva) que al tocarlo abre
+   *  el selector inline — lista de activas, "Sin etiqueta" y "Nueva etiqueta" (esta última se
+   *  convierte en un campo de texto in situ, sin modal: mismo criterio de "un campo menos que
+   *  pedir" que el resto del detalle). Registro (Task 13) reutiliza este mismo patrón de UI. */
+  function renderTagControl(d) {
+    if (!d.tagPickerOpen) {
+      const hasTag = !!d.tagId;
+      return `
+      <button type="button" class="chip${hasTag ? " active" : ""}" id="mov-tag-chip"
+        style="align-self:flex-start;padding:0 14px;display:inline-flex;align-items:center;gap:7px;${hasTag ? "" : "background:transparent;border:1px dashed var(--rule);"}">
+        ${ICON_TAG}${hasTag ? escHtml(tagName(d.tagId)) : t("movimientos.detail.noTag")}
+      </button>`;
+    }
+    const options = tagOptions();
+    return `
+    <div class="chips">
+      <button type="button" class="chip${!d.tagId ? " active" : ""}" data-tag-pick="">${t("movimientos.detail.noTag")}</button>
+      ${options.map((tg) => `<button type="button" class="chip${d.tagId === tg.id ? " active" : ""}" data-tag-pick="${escAttr(tg.id)}">${ICON_TAG}${escHtml(tg.name)}</button>`).join("")}
+      ${d.newTagDraft == null ? `
+      <button type="button" id="mov-tag-new" class="chip" style="background:transparent;border:1px dashed var(--rule);">${ICON_PLUS_SMALL}${t("movimientos.detail.newTag")}</button>
+      ` : `
+      <span style="display:inline-flex;align-items:center;gap:6px;">
+        <input type="text" id="mov-tag-new-input" value="${escAttr(d.newTagDraft)}" placeholder="${escAttr(t("etiquetas.form.namePlaceholder"))}"
+          style="height:44px;min-width:0;border:1px solid var(--rule);border-radius:999px;padding:0 14px;background:none;color:var(--text);font:14px inherit;">
+        <button type="button" id="mov-tag-new-save" class="icon-btn" aria-label="${t("common.save")}" style="width:44px;height:44px;flex-shrink:0;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"></path></svg>
+        </button>
+      </span>`}
+    </div>`;
+  }
+
   function renderDetail() {
     const d = state.detail;
     const cats = categoriesFor(d.type);
@@ -408,6 +538,11 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
           <input type="date" id="mov-fecha" value="${escAttr(d.fecha)}">
         </label>
       </div>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+        <div class="section-title">${t("movimientos.detail.tagLabel")}</div>
+        ${renderTagControl(d)}
+      </div>
+
       <label class="field field-stack" style="margin-bottom:18px;">
         <span class="field-label">${t("common.note")}</span>
         <input type="text" id="mov-note" value="${escAttr(d.note)}" placeholder="${t("common.optional")}">
@@ -513,6 +648,39 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     container.querySelector("#mov-note").oninput = (e) => { d.note = e.target.value; };
     container.querySelector("#mov-fecha").onchange = (e) => updateDetail({ fecha: e.target.value || hoyISO() });
 
+    // Selector de etiqueta (Task 12): abrir/cerrar y elegir son puro estado de UI en state.detail,
+    // ninguno toca la BD hasta pulsar «Guardar» (igual que categoryId/accountId más arriba).
+    const tagChip = container.querySelector("#mov-tag-chip");
+    if (tagChip) tagChip.onclick = () => updateDetail({ tagPickerOpen: true });
+    container.querySelectorAll("[data-tag-pick]").forEach((b) => {
+      b.onclick = () => updateDetail({ tagId: b.dataset.tagPick || null, tagPickerOpen: false, newTagDraft: null });
+    });
+    const tagNewBtn = container.querySelector("#mov-tag-new");
+    if (tagNewBtn) tagNewBtn.onclick = () => updateDetail({ newTagDraft: "" });
+    const tagNewInput = container.querySelector("#mov-tag-new-input");
+    if (tagNewInput) {
+      // Sin render() en oninput (perdería el foco, mismo motivo que #mov-raw/#mov-merchant): el
+      // valor tecleado solo se lee al guardar, ver submitNewTag.
+      tagNewInput.oninput = (e) => { d.newTagDraft = e.target.value; };
+      tagNewInput.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); submitNewTag(); } };
+    }
+    const tagNewSave = container.querySelector("#mov-tag-new-save");
+    if (tagNewSave) tagNewSave.onclick = () => submitNewTag();
+
+    async function submitNewTag() {
+      const btn = container.querySelector("#mov-tag-new-save");
+      if (btn) btn.disabled = true;
+      try {
+        const newId = await createTag({ name: d.newTagDraft });
+        [tagsAll, state.tagTotalsAll] = await Promise.all([listTags(), tagTotals()]);
+        updateDetail({ tagId: newId, tagPickerOpen: false, newTagDraft: null });
+      } catch (e) {
+        if (btn) btn.disabled = false;
+        errorMsg = t("common.saveFailed", { error: userMessage(e) });
+        render();
+      }
+    }
+
     const sharedToggle = container.querySelector("#mov-shared");
     if (sharedToggle) sharedToggle.onchange = (e) => updateDetail({ isShared: e.target.checked });
 
@@ -569,6 +737,7 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
           paidBy: d.settledLocked ? undefined : (withCategory && d.type === "expense" && d.isShared ? d.paidBy : "me"),
           refId: d.refId,
           ruleId: d.ruleId,
+          tagId: d.tagId || "",
         });
         await loadPeriodData();
         goBack();
@@ -703,6 +872,9 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
         ${uncatChipHtml}
       </div>
 
+      ${tagChipsHtml()}
+      ${tagCardHtml()}
+
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
       <div id="mov-list-body">${listBodyHtml()}</div>
@@ -713,7 +885,9 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
   function wireList() {
     container.querySelector("#mov-period").onchange = async (e) => {
       state.periodId = e.target.value;
-      state.filter = { query: "", rootCatId: null, uncat: false };
+      // D13: tagId sobrevive a un cambio de periodo (una etiqueta es transversal, D7) — el resto
+      // del filtro sí es intrínseco al periodo que se deja atrás y se resetea como siempre.
+      state.filter = { query: "", rootCatId: null, uncat: false, tagId: state.filter.tagId };
       state.searchOpen = false;
       try {
         await loadPeriodData();
@@ -765,6 +939,17 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       if (state.filter.uncat) state.filter.rootCatId = null;
       render();
     };
+
+    // Chips de etiqueta (Task 12): filtro independiente de categoría/sin-categoría — se combinan
+    // con AND en matchesFilter, ninguno toca al otro. Tocar la ya activa vuelve a "Todas" (mismo
+    // toggle que la chip "Sin categoría"); no hay chip "Todas" propia de esta fila.
+    container.querySelectorAll("[data-chip-tag]").forEach((b) => {
+      b.onclick = () => {
+        const id = b.dataset.chipTag;
+        state.filter.tagId = state.filter.tagId === id ? null : id;
+        render();
+      };
+    });
 
     wireListBody();
   }
