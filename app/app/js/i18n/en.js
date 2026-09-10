@@ -657,7 +657,7 @@ export const EN = {
     },
     tags: {
       title: "Project tags",
-      sub: "{n} active",
+      sub: { one: "{n} active", other: "{n} active" },
     },
     bank: {
       title: "Bank",

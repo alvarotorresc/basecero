@@ -670,7 +670,7 @@ export const ES = {
     },
     tags: {
       title: "Etiquetas de proyecto",
-      sub: "{n} activas",
+      sub: { one: "{n} activa", other: "{n} activas" },
     },
     bank: {
       title: "Banco",
