@@ -265,6 +265,7 @@ export const ES = {
     type: { transfer: "Transferencia" },
     detail: {
       lockedNote: "Tiene un apunte de liquidación enlazado (devolución o ajuste): para cambiar el importe o el reparto, bórralo antes.",
+      typeLabel: "Tipo",
       tagLabel: "Etiqueta",
       noTag: "Sin etiqueta",
       newTag: "Nueva etiqueta",

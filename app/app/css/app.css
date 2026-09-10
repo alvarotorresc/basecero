@@ -375,10 +375,11 @@ main#screen {
   font-weight: 700;
 }
 
-/* rejilla ESTÁTICA de categorías en Registro (Registro v2 §4.3): repeat(4, 1fr), sin scroll
-   horizontal — sustituye a .chips-scroll SOLO en esta pantalla; recurrentes.js y movimientos.js
-   siguen con el scroller de 2 filas y no se tocan. .chip-v dentro de esta rejilla pierde su ancho
-   fijo de 74px (pensado para el auto-flow de .chips-scroll) para poder ocupar la columna entera. */
+/* rejilla ESTÁTICA de categorías (Registro v2 §4.3, MovimientoDetalle §2.2): repeat(4, 1fr), sin
+   scroll horizontal — sustituye a .chips-scroll en Registro y en el detalle de Movimientos;
+   recurrentes.js sigue con el scroller de 2 filas hasta que P4 lo migre. .chip-v dentro de esta
+   rejilla pierde su ancho fijo de 74px (pensado para el auto-flow de .chips-scroll) para poder
+   ocupar la columna entera. */
 .chips-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1095,3 +1096,24 @@ body.onboarding .fab { display: none; }
   -webkit-tap-highlight-color: transparent;
 }
 .period-picker button:disabled { opacity: .5; cursor: default; }
+
+/* ===== píldora de tipo, informativa (MovimientoDetalle.dc.html:38-44) ===== */
+/* NO es un chip de acción (el tipo de un movimiento guardado no se toca aquí) ni .state-pill
+   (20px, para una sola palabra de estado): 34px de lectura, sin el mínimo táctil de 44px porque
+   no es tocable — SISTEMA.md §2 lo dice explícitamente para este bloque. */
+.type-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 13px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--hairline-strong);
+  color: var(--ink-2);
+  font: 500 13px var(--font-sans);
+}
+.type-pill.active {
+  background: var(--surface-2);
+  border-color: transparent;
+  color: var(--ink);
+  font-weight: 600;
+}

@@ -439,11 +439,31 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
         </div>
       </div>`;
     }
+    // Cuenta en una sola fila (MovimientoDetalle.dc.html:84-90): etiqueta a la izquierda, chips
+    // alineados a la derecha — a diferencia de De/Hacia arriba, que sí apilan (el artboard no
+    // dibuja un origen/destino de transferencia).
     return `
-    <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-      <div class="section-title">${d.type === "refund" ? t("common.destAccount") : t("common.account")}</div>
-      <div class="chips">
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:18px;">
+      <div class="section-title" style="flex-shrink:0;">${d.type === "refund" ? t("common.destAccount") : t("common.account")}</div>
+      <div class="chips" style="flex:1; justify-content:flex-end;">
         ${accounts.map((a) => `<button type="button" class="chip${d.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
+      </div>
+    </div>`;
+  }
+
+  /** Fila «Tipo» (MovimientoDetalle.dc.html:38-44): dos píldoras de SOLO LECTURA — el tipo de un
+   *  movimiento guardado no se cambia aquí, así que van como <span>, no como chip de acción.
+   *  Solo se pinta para gasto/ingreso: transferencia, devolución y ajuste ya llevan su nombre
+   *  completo en el título de la cabecera (TIPO_KEY) y no hay "el otro tipo" que enseñar junto
+   *  al suyo — la dualidad Gasto/Ingreso del artboard no se extiende a los cinco tipos. */
+  function typePillsHtml(tipo) {
+    if (tipo !== "expense" && tipo !== "income") return "";
+    return `
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+      <span class="section-title">${t("movimientos.detail.typeLabel")}</span>
+      <div style="display:flex; gap:6px;">
+        <span class="type-pill${tipo === "expense" ? " active" : ""}">${t("common.type.expense")}</span>
+        <span class="type-pill${tipo === "income" ? " active" : ""}">${t("common.type.income")}</span>
       </div>
     </div>`;
   }
@@ -490,8 +510,6 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     // ver refundLocked en openDetail.
     const amountLocked = locked || !!d.refundLocked;
 
-    const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
-
     container.innerHTML = `
       ${subHeaderHtml({ id: "mov-back", title: t(TIPO_KEY[d.type]) })}
 
@@ -505,16 +523,18 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
         <div class="amount-display" style="align-items:center;">
           ${d.type === "adjustment" ? `<button type="button" class="icon-btn" id="mov-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;${amountLocked ? "opacity:.5;" : ""}" ${amountLocked ? "disabled" : ""}>${d.sign}</button>` : ""}
           <input type="text" inputmode="decimal" id="mov-raw" value="${escAttr(d.raw)}" placeholder="0" ${amountLocked ? "disabled" : ""}
-            style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;${amountLocked ? "opacity:.5;" : ""}">
+            style="border:0;background:none;color:var(--text);font:var(--t-figure-xl);letter-spacing:-.015em;width:100%;outline:none;${amountLocked ? "opacity:.5;" : ""}">
           <span class="amount-currency">${currencySymbol()}</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
       </div>
 
+      ${typePillsHtml(d.type)}
+
       ${cats.length ? `
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
         <div class="section-title">${t("common.category")}</div>
-        <div class="chips-scroll">
+        <div class="chips-grid">
           ${cats.map((c) => {
             const color = colorForCategory(c.id, byId);
             // catIcon: mismo criterio que movRowHtml — deja el nombre `icon` libre para la
@@ -610,11 +630,6 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
         ${t("movimientos.delete.button")}
       </button>
     `;
-
-    if (prevChipsScroll != null) {
-      const chipsEl = container.querySelector(".chips-scroll");
-      if (chipsEl) chipsEl.scrollLeft = prevChipsScroll;
-    }
 
     wireDetail();
   }

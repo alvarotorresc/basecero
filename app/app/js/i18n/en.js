@@ -257,6 +257,7 @@ export const EN = {
     type: { transfer: "Transfer" },
     detail: {
       lockedNote: "It has a linked settlement entry (refund or adjustment): delete it first to change the amount or the split.",
+      typeLabel: "Type",
       tagLabel: "Tag",
       noTag: "No tag",
       newTag: "New tag",
