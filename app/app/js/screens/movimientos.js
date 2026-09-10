@@ -50,22 +50,6 @@ function groupByDay(rows) {
   return groups;
 }
 
-// SVG del icono de transferencia — no existe ningún SVG de transferencia ya integrado en la app
-// (recurrentes.js/inicio.js usan el emoji "⇄" como icono de sustitución); se copia tal cual del
-// artboard de referencia (design/material-expresivo/Movimientos.dc.html:64-67), no se inventa.
-// El color va en `style="stroke:..."` (no en el atributo de presentación `stroke="var(...)"`,
-// que ningún otro SVG de la app usa con un custom property — ACCOUNT_ICON de patrimonio.js usa
-// hex literal, ICON_BACK de registro.js usa currentColor) para no depender de que el motor de
-// render resuelva var() dentro de un atributo de presentación SVG.
-const ICON_TRANSFER = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="stroke:var(--text-2);" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l-3 3 3 3M4 13h13M17 8l3-3-3-3M20 5H7"></path></svg>`;
-// Icono "+" del dotico punteado de una fila sin categorizar (artboard Movimientos.dc.html:46-48).
-const ICON_UNCAT = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="stroke:var(--text-2);" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>`;
-// Icono "etiqueta" del repertorio SISTEMA.md §3, mismo path que screens/etiquetas.js#ICON_TAG.
-// `currentColor` (no un `--ink-2` fijo) para heredar el tinte de donde se use: el texto normal de
-// una chip inactiva, o el fondo invertido de una chip activa (.chip.active del sistema).
-const ICON_TAG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V4h7l9 9-7 7z"></path><circle cx="8" cy="8" r="1.2"></circle></svg>`;
-const ICON_PLUS_SMALL = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>`;
-
 // Toda anchura de barra de la tarjeta de etiqueta activa pasa por aquí, mismo criterio que
 // etiquetas.js#clampPct/gasto-por-categoria.js#clampPct: budgetStatus() no capa su `.pct`, y
 // `width:120%`/`width:-8%` es CSS inválido que el navegador descarta (la barra se queda vacía).
@@ -77,7 +61,7 @@ function movRowHtml(r, byId, accById, partnerName) {
     const to = accById[r.counter_account_id]?.name ?? "?";
     return `
     <button type="button" class="tx-row" data-tx="${r.id}" style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-      <div class="dotico" style="--cat:var(--card2);">${ICON_TRANSFER}</div>
+      <div class="dotico" style="--cat:var(--card2);">${icon("transfer", { size: 16, stroke: "var(--ink-3)" })}</div>
       <div class="tx-body">
         <div class="tx-title">${escHtml(from)} → ${escHtml(to)}</div>
         <div class="tx-sub">${escHtml(r.merchant || r.note || t("movimientos.type.transfer"))}</div>
@@ -101,7 +85,9 @@ function movRowHtml(r, byId, accById, partnerName) {
   const catName = cat?.name ?? "";
   const uncategorized = isUncategorized(r);
   const color = uncategorized ? "var(--card2)" : colorForCategory(r.category_id, byId);
-  const icon = uncategorized ? ICON_UNCAT : iconForCategory(r.category_id, byId);
+  // catIcon, no `icon`: ese nombre queda para la función importada de icons.js, y un `const icon`
+  // local aquí la taparía con un error de TDZ en la propia línea (uncategorized ? icon(...) : ...).
+  const catIcon = uncategorized ? icon("plus", { size: 15, width: 2, stroke: "var(--ink-3)" }) : iconForCategory(r.category_id, byId);
   const dashedStyle = uncategorized ? "border:1.5px dashed var(--rule);" : "";
   const title = r.merchant || catName || t("movimientos.uncategorized");
   const subBase = uncategorized ? t("movimientos.tapToCategorize") : (catName || t("movimientos.uncategorized"));
@@ -121,7 +107,7 @@ function movRowHtml(r, byId, accById, partnerName) {
   const amountClasses = ["tx-amount", "num", amountClass].filter(Boolean).join(" ");
   return `
   <button type="button" class="tx-row" data-tx="${r.id}" style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-    <div class="dotico" style="--cat:${color};${dashedStyle}">${icon}</div>
+    <div class="dotico" style="--cat:${color};${dashedStyle}">${catIcon}</div>
     <div class="tx-body">
       <div class="tx-title">${escHtml(title)}</div>
       <div class="tx-sub" style="${uncategorized ? "color:var(--amber);" : ""}">${escHtml(subBase)}${escHtml(shareSuffix)}</div>
@@ -270,7 +256,7 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       ${visible.map((tg) => {
         const active = tg.id === activeId;
         return `<button type="button" class="chip${active ? " active" : ""}" data-chip-tag="${escAttr(tg.id)}"
-          style="padding:0 14px;display:inline-flex;align-items:center;gap:7px;">${ICON_TAG}${escHtml(tg.name)}</button>`;
+          style="padding:0 14px;display:inline-flex;align-items:center;gap:7px;">${icon("tag", { size: 14 })}${escHtml(tg.name)}</button>`;
       }).join("")}
     </div>`;
   }
@@ -304,7 +290,7 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     <div class="card" style="display:flex;flex-direction:column;gap:12px;margin-bottom:14px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
         <div style="display:flex;align-items:center;gap:7px;">
-          <span style="display:flex;color:var(--text-2);">${ICON_TAG}</span>
+          <span style="display:flex;color:var(--text-2);">${icon("tag", { size: 14 })}</span>
           <span style="font-size:15px;font-weight:600;">${escHtml(tag.name)}</span>
         </div>
         <span style="font-size:11px;font-weight:500;color:var(--text-3);">${t("movimientos.tagCard.movements", { n: tag.n })}</span>
@@ -454,16 +440,16 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       return `
       <button type="button" class="chip${hasTag ? " active" : ""}" id="mov-tag-chip"
         style="align-self:flex-start;padding:0 14px;display:inline-flex;align-items:center;gap:7px;${hasTag ? "" : "background:transparent;border:1px dashed var(--rule);"}">
-        ${ICON_TAG}${hasTag ? escHtml(tagName(d.tagId)) : t("movimientos.detail.noTag")}
+        ${icon("tag", { size: 14 })}${hasTag ? escHtml(tagName(d.tagId)) : t("movimientos.detail.noTag")}
       </button>`;
     }
     const options = tagOptions();
     return `
     <div class="chips">
       <button type="button" class="chip${!d.tagId ? " active" : ""}" data-tag-pick="">${t("movimientos.detail.noTag")}</button>
-      ${options.map((tg) => `<button type="button" class="chip${d.tagId === tg.id ? " active" : ""}" data-tag-pick="${escAttr(tg.id)}">${ICON_TAG}${escHtml(tg.name)}</button>`).join("")}
+      ${options.map((tg) => `<button type="button" class="chip${d.tagId === tg.id ? " active" : ""}" data-tag-pick="${escAttr(tg.id)}">${icon("tag", { size: 14 })}${escHtml(tg.name)}</button>`).join("")}
       ${d.newTagDraft == null ? `
-      <button type="button" id="mov-tag-new" class="chip" style="background:transparent;border:1px dashed var(--rule);">${ICON_PLUS_SMALL}${t("movimientos.detail.newTag")}</button>
+      <button type="button" id="mov-tag-new" class="chip" style="background:transparent;border:1px dashed var(--rule);">${icon("plus", { size: 13 })}${t("movimientos.detail.newTag")}</button>
       ` : `
       <span style="display:inline-flex;align-items:center;gap:6px;">
         <input type="text" id="mov-tag-new-input" value="${escAttr(d.newTagDraft)}" placeholder="${escAttr(t("etiquetas.form.namePlaceholder"))}"
@@ -512,10 +498,12 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
         <div class="chips-scroll">
           ${cats.map((c) => {
             const color = colorForCategory(c.id, byId);
-            const icon = iconForCategory(c.id, byId);
+            // catIcon: mismo criterio que movRowHtml — deja el nombre `icon` libre para la
+            // función importada de icons.js.
+            const catIcon = iconForCategory(c.id, byId);
             const active = d.categoryId === c.id;
             return `<button type="button" class="chip-v${active ? " active" : ""}" data-cat="${c.id}" style="--cat:${color};">
-              <span class="chip-icon">${icon}</span><span>${escHtml(c.name)}</span>
+              <span class="chip-icon">${catIcon}</span><span>${escHtml(c.name)}</span>
             </button>`;
           }).join("")}
         </div>
@@ -835,10 +823,12 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     // círculo — el artboard aquí es texto plano con el emoji delante).
     const catChipsHtml = rootCats.map((catId) => {
       const active = state.filter.rootCatId === catId;
-      const icon = iconForCategory(catId, byId);
+      // catIcon: mismo criterio que movRowHtml — deja el nombre `icon` libre para la función
+      // importada de icons.js, que esta misma función renderList ya usa más abajo.
+      const catIcon = iconForCategory(catId, byId);
       const name = byId[catId]?.name ?? "";
       const color = textColorForCategory(catId, byId);
-      return `<button type="button" class="chip${active ? " active" : ""}" data-chip-cat="${catId}" style="padding:0 14px;${active ? "" : `color:${color};`}">${icon} ${escHtml(name)}</button>`;
+      return `<button type="button" class="chip${active ? " active" : ""}" data-chip-cat="${catId}" style="padding:0 14px;${active ? "" : `color:${color};`}">${catIcon} ${escHtml(name)}</button>`;
     }).join("");
 
     // Chip "Sin categoría · N" (artboard Movimientos.dc.html:35): activa = tinta invertida;
