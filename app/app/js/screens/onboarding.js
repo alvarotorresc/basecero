@@ -19,6 +19,8 @@ import { icon } from "../icons.js";
 import { subHeaderHtml } from "../ui.js";
 import { showConfirm } from "../modal.js";
 import { showToast } from "../toast.js";
+import { attachments } from "../attachments.js";
+import { unpackRestore } from "../bundle.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -405,7 +407,7 @@ export async function renderOnboarding(container, { onDone }) {
       const f = e.target.files[0];
       e.target.value = ""; // permite re-seleccionar el MISMO fichero (p.ej. tras corregirlo y reintentar)
       if (!f) return;
-      imp.fileName = f.name; imp.errors = []; imp.pending = null; imp.needsPass = false;
+      imp.fileName = f.name; imp.errors = []; imp.pending = null; imp.pendingAttachments = null; imp.needsPass = false;
       try {
         const buf = new Uint8Array(await f.arrayBuffer());
         if (isEncryptedBackup(buf)) { imp.buffer = buf; imp.needsPass = true; render(); return; }
@@ -440,6 +442,14 @@ export async function renderOnboarding(container, { onDone }) {
       try {
         // Sin backup previo (a diferencia de Ajustes): la BD todavía está virgen.
         await replaceAll(imp.pending);
+        // Foto del ticket (N5, §9.6): mismo orden y mismo motivo que ajustes.js#btn-import-confirm
+        // — las fotos van DESPUÉS del reemplazo y SOLO si fue bien, con TODOS los await antes del
+        // reload (en un móvil lento, "en paralelo" a la recarga las pierde a medias). sweep() usa
+        // los ids de imp.pending (la BD YA IMPORTADA), nunca los de antes de importar.
+        if (attachments) {
+          for (const f of imp.pendingAttachments ?? []) await attachments.put(f.id, f.data);
+          await attachments.sweep(imp.pending.transactions.map((r) => r.id));
+        }
         location.reload(); // boot() reevalúa el gate: con periodos en la copia, el onboarding no vuelve.
       } catch (e) { imp.busy = false; imp.errors = [t("onboarding.import.loadFailed", { error: userMessage(e) })]; imp.pending = null; render(); }
     };
@@ -448,11 +458,17 @@ export async function renderOnboarding(container, { onDone }) {
   async function parseAndOffer(imp, plainBuf) {
     try {
       const XLSX = await loadXlsx();
-      const wb = XLSX.read(plainBuf, { type: "array" });
+      // unpackRestore distingue un paquete CFB (xlsx + fotos) de un .bce antiguo (xlsx pelado)
+      // sin que este código tenga que saber cuál es cuál — ver bundle.js.
+      const { xlsx, attachments: fotos } = unpackRestore(XLSX.CFB, plainBuf);
+      const wb = XLSX.read(xlsx, { type: "array" });
       const { data, errors: parseErrors } = workbookToRows(XLSX, wb);
       const errors = [...parseErrors, ...validateImport(data)];
       if (errors.length) { imp.errors = errors.slice(0, 5); render(); return; }
       imp.pending = data;
+      // Las fotos sobreviven a «cancelar» (#onb-imp-clear/#onb-imp-back descartan `imp` entero):
+      // nada toca OPFS hasta #onb-imp-go.
+      imp.pendingAttachments = fotos;
       imp.summary = [
         t("onboarding.import.summaryAccounts", { n: data.accounts.length }),
         t("onboarding.import.summaryPeriods", { n: data.periods.length }),

@@ -112,13 +112,18 @@ test("import: fila totalmente vacía en una pestaña de datos (no meta) se desca
 const parse = (mutate) => workbookToRows(X, wbFromSeed(mutate)).data;
 
 test("validate: base semilla válida", () => { assert.deepEqual(validateImport(parse()), []); });
-test("validate: schema_version distinta de 1, 2, 3 o 4", () => {
+test("validate: schema_version distinta de 1, 2, 3, 4 o 5", () => {
   const d = parse((x) => { x.meta.find((m) => m.key === "schema_version").value = "9"; });
   assert.match(validateImport(d)[0], /schema_version/);
 });
 
 test("validate: una hoja schema_version=3 (Suscripciones) se acepta", () => {
   const d = parse((x) => { x.meta.find((m) => m.key === "schema_version").value = "3"; });
+  assert.deepEqual(validateImport(d), []);
+});
+
+test("validate: una hoja schema_version=4 (Etiquetas) se acepta", () => {
+  const d = parse((x) => { x.meta.find((m) => m.key === "schema_version").value = "4"; });
   assert.deepEqual(validateImport(d), []);
 });
 
@@ -218,7 +223,7 @@ function txRow(over) {
   return { id: "tx-x", date: "2026-08-02", period_id: "per-1", type: "expense",
     amount_cents: 10000, account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler",
     merchant: "M", note: "", is_shared: 0, share_pct_override: null, paid_by: "me", settled: 0,
-    ref_id: "", rule_id: "", tag_id: "", external_id: "", status: "pending",
+    ref_id: "", rule_id: "", tag_id: "", external_id: "", has_attachment: 0, status: "pending",
     created_at: "2026-08-02T00:00:00Z", updated_at: "2026-08-02T00:00:00Z", deleted: 0, ...over };
 }
 
@@ -247,7 +252,7 @@ test("import: replaceAll NO importa el schema_version de la hoja", () => {
   };
   for (const s of replaceAllStmts(data)) db.prepare(s.sql).run(...(s.bind ?? []));
   const meta = Object.fromEntries(db.prepare("SELECT key, value FROM meta").all().map((r) => [r.key, r.value]));
-  assert.equal(meta.schema_version, "4", "la versión es propiedad de ESTA BD, no de la hoja");
+  assert.equal(meta.schema_version, "5", "la versión es propiedad de ESTA BD, no de la hoja");
   assert.equal(meta.currency, "USD", "el resto de claves de la hoja sí se aplican");
 });
 test("validate: created_with dual — acepta hoja y pwa, rechaza otros", () => {
@@ -297,7 +302,7 @@ test("validate: importe no positivo salvo adjustment", () => {
   const base = { id: "tx-1", date: "2026-08-01", period_id: "per-1", type: "expense", amount_cents: 0,
     account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler", merchant: "", note: "",
     is_shared: 0, share_pct_override: null, paid_by: "me", settled: 0, ref_id: "", rule_id: "", external_id: "",
-    status: "pending", created_at: "x", updated_at: "x", deleted: 0 };
+    has_attachment: 0, status: "pending", created_at: "x", updated_at: "x", deleted: 0 };
   d.transactions.push(base);
   assert.match(validateImport(d)[0], /amount/);
   d.transactions[0] = { ...base, type: "adjustment", amount_cents: -500, category_id: "" };
@@ -329,7 +334,7 @@ test("validate: amount no numérico → SOLO numericInvalid, sin amountNotPositi
 const txBase = { id: "tx-x", date: "2026-08-01", period_id: "per-1", type: "expense", amount_cents: 100,
   account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler", merchant: "", note: "",
   is_shared: 0, share_pct_override: null, paid_by: "me", settled: 0, ref_id: "", rule_id: "", external_id: "",
-  status: "pending", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 0 };
+  has_attachment: 0, status: "pending", created_at: "2026-08-01T00:00:00Z", updated_at: "2026-08-01T00:00:00Z", deleted: 0 };
 
 test("validate: categoría con parent_id === id → error", () => {
   const d = parse((x) => {
@@ -735,7 +740,7 @@ test("ROUND-TRIP: export → import → mismos datos", () => {
     ({ id, date: "2026-08-02", period_id: "per-1", type, amount_cents: cents, account_id: "acc-n26",
        counter_account_id: "", category_id: type === "transfer" || type === "adjustment" ? "" : "cat-casa-alquiler",
        merchant: "M", note: "", is_shared: 0, share_pct_override: null, paid_by: "me", settled: 0, ref_id: "", rule_id: "",
-       tag_id: "", external_id: "", status: "pending", created_at: T2, updated_at: T2, deleted: 0, ...extra })[c]));
+       tag_id: "", external_id: "", has_attachment: 0, status: "pending", created_at: T2, updated_at: T2, deleted: 0, ...extra })[c]));
   tx("tx-e", "expense", 900, { is_shared: 1 });
   tx("tx-i", "income", 215000, { category_id: "cat-nomina" });
   tx("tx-t", "transfer", 5000, { counter_account_id: "acc-revolut" });
@@ -745,6 +750,9 @@ test("ROUND-TRIP: export → import → mismos datos", () => {
   tx("tx-mio", "expense", 10000, { is_shared: 1, paid_by: "me" });
   tx("tx-suyo", "expense", 10000, { is_shared: 1, paid_by: "partner", account_id: "" });
   tx("tx-liq", "adjustment", -6000, { ref_id: "tx-suyo", merchant: "Liquidacion con Alex" });
+  // Foto del ticket (N5): una fila con has_attachment=1 en el ROUND-TRIP general — el test SAGRADO
+  // que fija que un boolean no-cero sobrevive export -> import -> replaceAllStmts byte a byte.
+  tx("tx-foto", "expense", 4200, { has_attachment: 1 });
   db.prepare(insertSql("recurring_rules")).run("rr-1","Alquiler","expense",90000,"cat-casa-alquiler","acc-n26","","monthly",1,null,1,1,0,"",T2,T2,0);
   db.prepare(insertSql("goals")).run("goal-1","Fondo emergencia","emergency_fund",null,6,null,"","acc-revolut","",1,T2,T2,0);
   db.prepare(insertSql("budgets")).run("bud-1","per-1","cat-casa",70000,T2,T2,0);
@@ -754,16 +762,43 @@ test("ROUND-TRIP: export → import → mismos datos", () => {
   const { data, errors } = workbookToRows(X, X.read(buf, { type: "buffer" }));
   assert.deepEqual(errors, []);
   assert.deepEqual(validateImport(data), []);
+  assert.strictEqual(data.transactions.find((r) => r.id === "tx-foto").has_attachment, 1,
+    "has_attachment=1 sobrevive export -> X.write -> X.read -> workbookToRows como 1, no como truthy cualquiera");
 
   const db2 = openDb(); // aplicar el import con la MISMA lógica que replaceAll (fusión de meta incluida)
   for (const s of replaceAllStmts(data)) db2.prepare(s.sql).run(...(s.bind ?? []));
   assert.deepEqual(dumpAll(db2), original);
 });
 
-test("ROUND-TRIP sobre una BD MIGRADA (tag_id físicamente la última): los dumps coinciden", () => {
-  // El ALTER TABLE del runner deja tag_id al FINAL de la tabla (la última migración en aplicarse
-  // sobre esta BD v1: paid_by y luego tag_id); schema.sql las declara en medio. Nada del código
-  // depende del orden físico (todo nombra columnas), y esto lo demuestra.
+// Una hoja v4 (o v1/v2/v3): la columna has_attachment no existía — ninguna app anterior a esta PR
+// sabía de fotos. No es una hoja rota, es una hoja de antes del adjunto (spec §9.1/§9.2): la
+// columna ausente se rellena con 0, exactamente el mundo "nadie tenía fotos todavía".
+test("import: una hoja v4 sin la columna has_attachment entra limpia y deja el flag en 0", () => {
+  const wb = wbFromSeed((dump) => {
+    dump.transactions.push({ id: "tx-v4", date: "2026-08-02", period_id: "per-1", type: "expense",
+      amount_cents: 1000, account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa-alquiler",
+      merchant: "M", note: "", is_shared: 0, share_pct_override: null, paid_by: "me", settled: 0,
+      ref_id: "", rule_id: "", tag_id: "", external_id: "", has_attachment: 0, status: "pending",
+      created_at: "2026-08-02T00:00:00Z", updated_at: "2026-08-02T00:00:00Z", deleted: 0 });
+  });
+  const ws = wb.Sheets.transactions;
+  const fullHeader = X.utils.sheet_to_json(ws, { header: 1 })[0];
+  const rows = X.utils.sheet_to_json(ws, { defval: "" });
+  const header = fullHeader.filter((h) => h !== "has_attachment");   // hoja v4: la columna no existe
+  wb.Sheets.transactions = X.utils.aoa_to_sheet([header, ...rows.map((r) => header.map((h) => r[h]))]);
+
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  assert.ok(data.transactions.length > 0);
+  for (const r of data.transactions) assert.equal(r.has_attachment, 0);
+  assert.deepEqual(validateImport(data), []);
+});
+
+test("ROUND-TRIP sobre una BD MIGRADA (has_attachment físicamente la última): los dumps coinciden", () => {
+  // El ALTER TABLE del runner deja has_attachment al FINAL de la tabla (la última migración en
+  // aplicarse sobre esta BD v1: paid_by, luego tag_id, luego has_attachment); schema.sql las
+  // declara en medio. Nada del código depende del orden físico (todo nombra columnas), y esto lo
+  // demuestra.
   // La BD de partida se construye creando PRIMERO la tabla vieja (el DDL literal de helpers.mjs,
   // el MISMO que usa migraciones.test.mjs) y ejecutando schema.sql DESPUÉS: sus CREATE TABLE IF
   // NOT EXISTS dejan intacta la transactions que ya existe —justo el motivo por el que migrations.js
@@ -784,13 +819,15 @@ test("ROUND-TRIP sobre una BD MIGRADA (tag_id físicamente la última): los dump
     recurring_rules: db.prepare("PRAGMA table_info(recurring_rules)").all().map((c) => c.name),
   }))
     (s.bind?.length ? db.prepare(s.sql).run(...s.bind) : db.exec(s.sql));
-  assert.equal(db.prepare("PRAGMA table_info(transactions)").all().at(-1).name, "tag_id");
+  // El ALTER del runner se aplica en el orden de MIGRATIONS: paid_by (v2), tag_id (v4) y
+  // has_attachment (v5) — la última en aplicarse queda física al final de la tabla.
+  assert.equal(db.prepare("PRAGMA table_info(transactions)").all().at(-1).name, "has_attachment");
   seedMinimal(db);
   db.prepare(insertSql("transactions")).run(...CONTRACT.transactions.cols.map((c) =>
     ({ id: "tx-mig", date: "2026-08-02", period_id: "per-1", type: "expense", amount_cents: 10000,
        account_id: "", counter_account_id: "", category_id: "cat-casa-alquiler", merchant: "M", note: "",
        is_shared: 1, share_pct_override: null, paid_by: "partner", settled: 0, ref_id: "", rule_id: "",
-       tag_id: "", external_id: "", status: "pending", created_at: "2026-08-02T00:00:00Z",
+       tag_id: "", external_id: "", has_attachment: 0, status: "pending", created_at: "2026-08-02T00:00:00Z",
        updated_at: "2026-08-02T00:00:00Z", deleted: 0 })[c]));
 
   const original = dumpAll(db);
@@ -977,7 +1014,7 @@ test("ROUND-TRIP: una etiqueta con límite, otra sin límite y un movimiento eti
     ({ id: "tx-etiquetada", date: "2026-08-04", period_id: "per-1", type: "expense", amount_cents: 5000,
        account_id: "acc-n26", counter_account_id: "", category_id: "cat-casa", merchant: "M", note: "",
        is_shared: 0, share_pct_override: null, paid_by: "me", settled: 0, ref_id: "", rule_id: "",
-       tag_id: "tag-japon", external_id: "", status: "pending", created_at: T4, updated_at: T4, deleted: 0 })[c]));
+       tag_id: "tag-japon", external_id: "", has_attachment: 0, status: "pending", created_at: T4, updated_at: T4, deleted: 0 })[c]));
 
   const original = dumpAll(db);
   const buf = X.write(rowsToWorkbook(X, original), { type: "buffer", bookType: "xlsx" });

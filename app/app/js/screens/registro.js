@@ -1,15 +1,16 @@
 import {
   addTransaction, getOpenPeriod, listExpenseLeafCategories, listIncomeCategories,
   listAccounts, allCategoriesById, recentForRefund, getMetaAll, softDeleteTransaction,
-  loadMerchantMemory, spentByRootCategory, budgetsOfPeriod, listTags, createTag,
+  loadMerchantMemory, spentByRootCategory, budgetsOfPeriod, listTags, createTag, setAttachmentFlag,
 } from "../repo.js";
+import { attachments, compressImage } from "../attachments.js";
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
 import { budgetMap } from "../category-spend.js";
 import { limitWarning } from "../limit-warning.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { icon } from "../icons.js";
-import { t } from "../i18n/index.js";
+import { t, activeLang } from "../i18n/index.js";
 import { metaHtml, subHeaderHtml } from "../ui.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { userMessage } from "../errors.js";
@@ -18,6 +19,8 @@ import { showReceipt } from "../recibo.js";
 import { showToast } from "../toast.js";
 import { quickRegisterEnabled, detailsOpen, foldedSummaryParts, visibleCategories } from "../registro-mode.js";
 import { normalizeMerchant, memoryPatch } from "../merchant-memory.js";
+import { parseNaturalExpense } from "../natural.js";
+import { speech } from "../speech.js";
 
 // labelKey/SAVE_KEY en vez de texto resuelto: son consts de módulo, evaluadas al importar el
 // fichero (antes de que boot() llame a initI18n con el idioma real) — si guardaran el string ya
@@ -132,6 +135,11 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     newTagDraft: null,
     adjustmentSign: "+",
     refundPickerOpen: false,
+    // Registro v2 §8.6: caja de lenguaje natural. `text` es lo tecleado o dictado (NO se
+    // interpreta en el oninput: eso mataría el cursor, igual que #reg-raw/#reg-merchant); `parsed`
+    // es el último resultado de parseNaturalExpense, y es lo que pinta los chips; `micOff` se
+    // enciende para el resto de la sesión de pantalla si el usuario deniega el permiso.
+    natural: { text: "", parsed: null, listening: false, micOff: false },
     // Registro v2 §4: quick gobierna qué se pinta (registro-mode.js#detailsOpen); expanded es el
     // «Más» tocado a mano en ESTE formulario (nunca persiste entre aperturas de Registro).
     // allCats: se pasó de las CATS_GRID_LIMIT primeras categorías a la lista entera («Ver las N
@@ -150,8 +158,28 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     // pise con lo que dice la memoria.
     touched: new Set(["categoryId", "accountId", "isShared", "paidBy", "sharePct"].filter((f) => prefill && prefill[f] !== undefined)),
     merchantRemembered: false,
+    // Foto del ticket (N5, Registro v2 §9.4): el Blob YA comprimido (compressImage), listo para
+    // subir. El fichero no se escribe en OPFS hasta tener el id del movimiento (addTransaction
+    // corre primero) — ver el handler de guardar.
+    photo: null,
   };
   let errorMsg = "";
+  // Foto del ticket (N5): URL del Blob de state.photo YA creada, o null. render() la reutiliza
+  // (crear una nueva en cada repintado filtraría memoria) y la revoca en cuanto state.photo
+  // cambia de referencia (nueva foto elegida) o se vacía — ver photoPreviewUrl() más abajo.
+  let photoObjectUrl = null;
+  // D-3/D-4 (revisión de código): vida de la pantalla. Sin esto, un callback async que resuelve
+  // DESPUÉS de que el usuario haya cerrado Registro (resultado de voz tardío, foto que tarda en
+  // comprimirse) podía repintar `container` encima de la pantalla que `nav()` ya había puesto
+  // detrás (main.js usa un único contenedor para todas las pantallas). `alive` se apaga en los dos
+  // puntos de salida de esta pantalla (✕ y guardado con éxito) y lo comprueban esos callbacks
+  // antes de tocar `state`/`render()`. `speech.stop()` no tenía NINGÚN llamante hasta este arreglo.
+  let alive = true;
+  const releasePhotoUrl = () => { if (photoObjectUrl) { URL.revokeObjectURL(photoObjectUrl); photoObjectUrl = null; } };
+  // D-5 (revisión de código): último texto ya interpretado por Enter/blur/voz — así un blur sobre
+  // un texto sin cambios desde la última interpretación no repinta (y no pisa lo que la memoria ya
+  // rellenó y el usuario pudo haber tocado a mano). Ver el onblur de #reg-nat-input en wire().
+  let lastInterpreted = null;
 
   const categoriesFor = () => {
     if (state.tipo === "income") return incomeCats;
@@ -191,6 +219,107 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
 
   function clearRefundLink() {
     state.refId = "";
+    render();
+  }
+
+  /** Caja de lenguaje natural (Registro v2 §8.6). Vacía: fila de reposo de 44px con el micro (solo
+   *  si `speech.supported` y el usuario no lo ha apagado esta sesión) y el ejemplo. Con texto: el
+   *  bloque interpretado sobre --accent-tint con la frase entre comillas, el enlace «Borrar» y
+   *  hasta cuatro chips — importe/categoría/comercio/compartido, uno por cada campo que el parser
+   *  SÍ entendió (spec: "lo que el parser no entendió simplemente no produce chip"). Solo para
+   *  gasto e ingreso: una frase no puede describir una transferencia, devolución ni ajuste.
+   *  Estilos inline (nunca app.css, spec §8.6/§8.7: el fichero queda fuera de los dos paquetes de
+   *  esta PR para que el único cherry-pick delicado —dos paquetes tocando registro.js— no tenga
+   *  que fundir también una hoja de estilos). */
+  function naturalBoxHtml() {
+    if (state.tipo !== "expense" && state.tipo !== "income") return "";
+    const { text } = state.natural;
+    const micAvailable = !!speech?.supported && !state.natural.micOff;
+    // §13.10 de la spec (a validar por Álvaro, recomendación adoptada): el reconocimiento de voz
+    // del navegador NO es local — el audio sale a un servidor del fabricante. Se dice bajo la caja,
+    // solo cuando el micro está disponible (si no hay soporte, o el usuario ya lo apagó esta
+    // sesión, no hay nada que avisar).
+    const micNotice = micAvailable
+      ? `<span style="font-size:11px; color:var(--ink-3);">${t("registro.natural.micNotice")}</span>` : "";
+    if (!text.trim()) {
+      // Mientras el reconocedor está abierto no hay input editable que mostrar: la fila se
+      // sustituye por «Escuchando…» (registro.natural.micListening) hasta que llegue el resultado
+      // o el error — ver el handler de #reg-nat-mic en wire().
+      const rowInner = state.natural.listening
+        ? `${icon("mic", { size: 20, stroke: "var(--accent)" })}<span style="font-size:14px; color:var(--ink-3);">${t("registro.natural.micListening")}</span>`
+        : `${micAvailable ? `<button type="button" id="reg-nat-mic" aria-label="${escAttr(t("registro.natural.mic"))}" style="border:0; background:transparent; padding:0; display:flex; align-items:center; flex-shrink:0; cursor:pointer;">${icon("mic", { size: 20, stroke: "var(--accent)" })}</button>` : ""}
+           <input type="text" id="reg-nat-input" value="${escAttr(text)}" placeholder="${escAttr(t("registro.natural.placeholder"))}" autocomplete="off"
+             style="flex:1; min-width:0; border:0; background:none; color:var(--ink); font-size:14px; outline:none;">`;
+      return `
+      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
+        <div style="display:flex; align-items:center; gap:11px; height:44px; background:var(--surface-2); border:1px solid var(--hairline); padding:0 14px; box-sizing:border-box;">
+          ${rowInner}
+        </div>
+        ${micNotice}
+      </div>`;
+    }
+    const parsed = state.natural.parsed;
+    const chips = [];
+    if (parsed?.cents != null) {
+      chips.push(`<button type="button" data-nat-chip="amount" style="height:44px;border-radius:999px;border:1px solid var(--hairline-strong);background:var(--surface-2);color:var(--ink);font:600 13px var(--font-num);padding:0 13px;cursor:pointer;">${escHtml(fmtMoney(parsed.cents))}</button>`);
+    }
+    if (parsed?.categoryId && byId[parsed.categoryId]) {
+      const color = colorForCategory(parsed.categoryId, byId);
+      const textColor = textColorForCategory(parsed.categoryId, byId);
+      const catEmoji = iconForCategory(parsed.categoryId, byId);
+      chips.push(`<button type="button" data-nat-chip="category" style="height:44px;border-radius:999px;border:1px solid color-mix(in srgb, ${color} 42%, transparent);background:color-mix(in srgb, ${color} 16%, transparent);color:${textColor};font-size:13px;font-weight:500;padding:0 12px;display:flex;align-items:center;gap:6px;cursor:pointer;"><span style="font-size:13px;" aria-hidden="true">${catEmoji}</span>${escHtml(byId[parsed.categoryId].name)}</button>`);
+    }
+    if (parsed?.merchant) {
+      chips.push(`<button type="button" data-nat-chip="merchant" style="height:44px;border-radius:999px;border:1px solid var(--hairline-strong);background:var(--surface-2);color:var(--ink);font-size:13px;font-weight:500;padding:0 13px;cursor:pointer;">${escHtml(parsed.merchant)}</button>`);
+    }
+    if (parsed?.shared && state.tipo === "expense") {
+      // M-5 (revisión de código): el guardado descarta isShared/sharePct para income
+      // (effectiveIsShared, más abajo) — el chip no debe prometer un reparto que no se guarda.
+      chips.push(`<button type="button" data-nat-chip="shared" style="height:44px;border-radius:999px;border:1px solid var(--hairline-strong);background:var(--surface-2);color:var(--ink);font-size:13px;font-weight:500;padding:0 13px;cursor:pointer;">${escHtml(t("registro.natural.sharedChip", { name: partnerName, pct: parsed.sharePct ?? state.sharePct }))}</button>`);
+    }
+    return `
+    <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
+      <div style="display:flex; flex-direction:column; gap:11px; padding:16px; background:var(--accent-tint);">
+        <div style="display:flex; align-items:flex-start; gap:11px;">
+          ${icon("mic", { size: 20, stroke: "var(--accent)", style: "flex-shrink:0;margin-top:1px;" })}
+          <span style="font-size:15px; line-height:1.4; color:var(--ink); flex:1; min-width:0;">${chips.length ? `«${escHtml(text)}»` : escHtml(t("registro.natural.notUnderstood"))}</span>
+          <button type="button" id="reg-nat-reset" style="border:0; background:transparent; color:var(--ink-3); font-size:13px; font-weight:500; padding:0; height:24px; flex-shrink:0; cursor:pointer;">${t("registro.natural.reset")}</button>
+        </div>
+        ${chips.length ? `<div style="display:flex; flex-wrap:wrap; gap:7px;">${chips.join("")}</div>` : ""}
+      </div>
+      ${micNotice}
+    </div>`;
+  }
+
+  /** Interpreta `text` (tecleado o dictado) y aplica al formulario lo que el parser entendió
+   *  (Registro v2 §8.6). LA FRASE GANA SOBRE `touched`: es el acto explícito más reciente del
+   *  usuario, así que cada campo que toca aquí entra también en `state.touched` para que el
+   *  `oninput` del comercio (memoryPatch, más abajo) no lo vuelva a pisar después con lo que diga
+   *  la memoria — la memoria sigue cediendo, igual que hoy. `sharePct` pasa por `normalizePct`,
+   *  igual que el parche de la memoria. No pide foco: el foco al importe lo pide SIEMPRE quien
+   *  llama, después de esta función (invariante de foco, `:862-871` — nunca desde aquí ni desde
+   *  render()). */
+  function applyNatural(text) {
+    state.natural.text = text;
+    const parsed = parseNaturalExpense(text, {
+      categories: categoriesFor(), accounts, merchants: merchantMemoryMap,
+      counterpartName: partnerName, today: hoyISO(), lang: activeLang(),
+    });
+    state.natural.parsed = parsed;
+    if (parsed.cents != null) { state.cents = parsed.cents; state.raw = centsToRaw(parsed.cents); }
+    if (parsed.merchant != null) state.merchant = parsed.merchant;
+    if (parsed.categoryId != null) { state.categoryId = parsed.categoryId; state.touched.add("categoryId"); }
+    if (parsed.accountId != null) { state.accountId = parsed.accountId; state.touched.add("accountId"); }
+    // D-1 (revisión de código): findDate SIEMPRE devuelve una fecha (today cuando no encuentra
+    // nada, natural.js#findDate), así que `parsed.date != null` nunca es falso — una frase sin
+    // fecha pisaba la que el usuario ya había elegido a mano. `spans.date` sí distingue "la frase
+    // decía una fecha" de "no decía nada".
+    if (parsed.spans?.date) state.fecha = parsed.date;
+    if (parsed.shared) {
+      state.isShared = true;
+      state.touched.add("isShared");
+      if (parsed.sharePct != null) { state.sharePct = normalizePct(parsed.sharePct, state.sharePct); state.touched.add("sharePct"); }
+    }
     render();
   }
 
@@ -336,7 +465,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       ? t("common.sharedWith", { name: partnerName })
       : "";
     const tagLabel = state.tagId ? tagName(state.tagId) : "";
-    const parts = foldedSummaryParts({ accountName, dateLabel, hasNote, hasPhoto: false, sharedLabel, tagName: tagLabel }, t);
+    const parts = foldedSummaryParts({ accountName, dateLabel, hasNote, hasPhoto: !!state.photo, sharedLabel, tagName: tagLabel }, t);
     const summaryHtml = parts.map((p, i) => (i === 0 ? "" : `<span style="width:1px;height:11px;background:var(--hairline-strong);flex-shrink:0;"></span>`)
       + `<span style="font-size:12px;font-weight:500;color:var(--text-3);">${escHtml(p)}</span>`).join("");
     return `
@@ -406,6 +535,8 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
 
     container.innerHTML = `
       ${subHeaderHtml({ id: null, title: t("registro.title"), action: { id: "reg-close", icon: "close", label: t("registro.close") } })}
+
+      ${naturalBoxHtml()}
 
       ${typeSelectorHtml(formOpen)}
 
@@ -487,6 +618,30 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         ${renderTagControl()}
       </div>
 
+      ${attachments?.available() ? (() => {
+        // Foto del ticket (N5, §9.3): el módulo devuelve un Blob, nunca una URL — la pantalla es
+        // dueña del par crear/revocar. Se reutiliza la URL ya creada mientras state.photo no
+        // cambie de referencia (evita filtrar una foto por cada repintado); el onchange de
+        // #reg-photo-input (wire()) es quien revoca la anterior al elegir una nueva.
+        if (state.photo && !photoObjectUrl) photoObjectUrl = URL.createObjectURL(state.photo);
+        if (!state.photo && photoObjectUrl) { URL.revokeObjectURL(photoObjectUrl); photoObjectUrl = null; }
+        return `
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:18px;">
+        ${state.photo ? `
+        <div style="position:relative; flex-shrink:0;">
+          <img src="${escAttr(photoObjectUrl)}" alt="" style="width:44px;height:44px;object-fit:cover;background:var(--surface-2);border:1px solid var(--hairline-strong);display:block;">
+          <button type="button" id="reg-photo-remove" aria-label="${escAttr(t("registro.photo.remove"))}"
+            style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:1px solid var(--hairline-strong);background:var(--surface-1);color:var(--ink-3);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;">
+            ${icon("close", { size: 11 })}
+          </button>
+        </div>` : ""}
+        <button type="button" id="reg-photo-btn" style="height:44px;border-radius:999px;border:1px solid var(--hairline-strong);background:transparent;color:var(--ink-3);font-size:13px;font-weight:500;padding:0 14px;display:inline-flex;align-items:center;gap:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+          ${icon("camera", { size: 18 })}${state.photo ? t("registro.photo.replace") : t("registro.photo.add")}
+        </button>
+        <input type="file" id="reg-photo-input" accept="image/*" capture="environment" style="display:none">
+      </div>`;
+      })() : ""}
+
       <label class="field field-stack" style="margin-bottom:18px;">
         <span class="field-label">${t("common.note")}</span>
         <input type="text" id="reg-note" value="${escAttr(state.note)}" placeholder="${t("common.optional")}">
@@ -545,7 +700,102 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
   }
 
   function wire() {
-    container.querySelector("#reg-close").onclick = () => onDone();
+    container.querySelector("#reg-close").onclick = () => {
+      alive = false;
+      speech?.stop();
+      releasePhotoUrl();
+      onDone();
+    };
+
+    // PB-1 · Lenguaje natural (Registro v2 §8.6): un único camino de interpretación para el texto,
+    // Enter, blur y el resultado de voz. El oninput de la caja SOLO guarda el texto y NUNCA repinta
+    // ni interpreta — repintar en cada tecla mataría el cursor, mismo criterio que #reg-raw/
+    // #reg-merchant/#reg-tag-new-input.
+    const natInput = container.querySelector("#reg-nat-input");
+    if (natInput) {
+      natInput.oninput = (e) => { state.natural.text = e.target.value; };
+      natInput.onkeydown = (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        lastInterpreted = natInput.value;
+        applyNatural(natInput.value);
+        focusInput(container.querySelector("#reg-raw"));
+      };
+      // D-5 (revisión de código): en el estado interpretado no hay `<input>` (naturalBoxHtml
+      // cambia de rama), así que un `applyNatural` síncrono en el blur reconstruye el `innerHTML`
+      // ANTES de que el click que provocó el blur llegue a su objetivo (importe/categoría/
+      // «Guardar») — el primer toque se perdía. Diferir con un `setTimeout(0)` deja que ese click
+      // termine de despachar sobre el DOM de ahora antes de repintar. `lastInterpreted` evita
+      // reinterpretar (y repintar) un texto que no ha cambiado desde la última vez — así un blur
+      // sin edición real no vuelve a mover nada bajo el dedo. `alive` cubre el caso de haber
+      // cerrado Registro entre el blur y el propio `setTimeout`.
+      natInput.onblur = () => {
+        const value = natInput.value;
+        if (!value.trim() || value === lastInterpreted) return;
+        setTimeout(() => {
+          if (!alive) return;
+          lastInterpreted = value;
+          applyNatural(value);
+        }, 0);
+      };
+    }
+
+    const natMicBtn = container.querySelector("#reg-nat-mic");
+    if (natMicBtn) natMicBtn.onclick = () => {
+      state.natural.listening = true;
+      render();
+      speech.start(
+        // D-4: guard de vida — un resultado que llega después de cerrar Registro no debe repintar
+        // encima de la pantalla que haya quedado detrás.
+        (resultText) => {
+          if (!alive) return;
+          state.natural.listening = false;
+          lastInterpreted = resultText;
+          applyNatural(resultText);
+          focusInput(container.querySelector("#reg-raw"));
+        },
+        () => {
+          if (!alive) return;
+          state.natural.listening = false;
+          state.natural.micOff = true;
+          render();
+          showToast(t("registro.natural.micDenied"));
+        },
+      );
+    };
+
+    const natReset = container.querySelector("#reg-nat-reset");
+    if (natReset) natReset.onclick = () => {
+      // micOff NO se resetea: es de sesión de pantalla (spec §8.6), sobrevive a «Borrar». Tampoco
+      // deshace lo que ya rellenó en el formulario — eso lo edita el usuario campo a campo.
+      state.natural = { text: "", parsed: null, listening: false, micOff: state.natural.micOff };
+      lastInterpreted = null;
+      render();
+    };
+
+    container.querySelectorAll("[data-nat-chip]").forEach((b) => {
+      b.onclick = () => {
+        const field = b.dataset.natChip;
+        // Solo comercio y compartido viven dentro del bloque plegable de "Más" (registro.js real:
+        // la rejilla de categorías y el importe están SIEMPRE visibles, nunca detrás de "Más" —
+        // desviación de la redacción literal de la spec §8.6 respecto al código real, que pide
+        // "despliega Más si hace falta" también para el chip de categoría; se resuelve a favor del
+        // código, que ya garantiza la categoría elegida visible vía visibleCategories, :429).
+        const needsExpand = (field === "merchant" || field === "shared")
+          && !detailsOpen({ quick: state.quick, expanded: state.expanded, tipo: state.tipo });
+        if (needsExpand) state.expanded = true;
+        render();
+        if (field === "amount") {
+          focusInput(container.querySelector("#reg-raw"));
+        } else if (field === "category" && state.categoryId) {
+          container.querySelector(`[data-cat="${state.categoryId}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+        } else if (field === "merchant") {
+          focusInput(container.querySelector("#reg-merchant"));
+        } else if (field === "shared") {
+          container.querySelector("#reg-shared")?.scrollIntoView({ block: "nearest" });
+        }
+      };
+    });
 
     container.querySelectorAll("[data-tipo]").forEach((b) => {
       b.onclick = () => {
@@ -563,6 +813,11 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         // Cierra el desplegable manual: typeSelectorHtml lo reabre solo si el tipo elegido es uno
         // de los tres que vive dentro de él.
         state.typeMoreOpen = false;
+        // M-4 (revisión de código): un chip de una interpretación anterior no debe sobrevivir al
+        // cambio de tipo — apuntaría a una categoryId que el guard de arriba acaba de poner a
+        // null. micOff SÍ sobrevive: es de sesión de pantalla, mismo criterio que #reg-nat-reset.
+        state.natural = { text: "", parsed: null, listening: false, micOff: state.natural.micOff };
+        lastInterpreted = null;
         errorMsg = "";
         render();
       };
@@ -700,6 +955,35 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     const fechaInput = container.querySelector("#reg-fecha");
     if (fechaInput) fechaInput.onchange = (e) => { state.fecha = e.target.value || hoyISO(); };
 
+    // Foto del ticket (N5, Registro v2 §9.4): el botón dispara el input oculto (patrón exacto de
+    // #btn-n26-import/#n26-file-input, ajustes.js), que comprime la foto elegida y la guarda en
+    // state.photo — el fichero no se escribe en OPFS hasta el guardado (ver el handler de abajo).
+    const photoBtn = container.querySelector("#reg-photo-btn");
+    if (photoBtn) photoBtn.onclick = () => container.querySelector("#reg-photo-input").click();
+    const photoInput = container.querySelector("#reg-photo-input");
+    if (photoInput) photoInput.onchange = async (e) => {
+      const file = e.target.files[0];
+      e.target.value = ""; // permite re-elegir el MISMO fichero
+      if (!file) return;
+      try {
+        const compressed = await compressImage(file);
+        // D-4: compressImage es async — si Registro se cerró mientras comprimía, no repintar.
+        if (!alive) return;
+        // Reemplazar una foto ya elegida ("Otra foto"): la URL vieja apunta al Blob viejo y
+        // render() no la recrearía sola (solo lo hace cuando photoObjectUrl está a null) — sin
+        // esto la miniatura se queda enseñando la foto anterior mientras se guarda la nueva.
+        if (photoObjectUrl) { URL.revokeObjectURL(photoObjectUrl); photoObjectUrl = null; }
+        state.photo = compressed;
+        render();
+      } catch (err) {
+        if (!alive) return;
+        // El formulario NO pierde nada: state.photo se queda como estaba.
+        showToast(t("errors.attachments.writeFailed", { error: userMessage(err) }));
+      }
+    };
+    const photoRemoveBtn = container.querySelector("#reg-photo-remove");
+    if (photoRemoveBtn) photoRemoveBtn.onclick = () => { state.photo = null; render(); };
+
     // Selector de etiqueta (Task 13): mismo criterio que movimientos.js#wireDetail — puro estado
     // de UI hasta guardar. Invariante del foco (§4.5): SOLO el handler de «Nueva etiqueta» pide
     // foco tras su propio render(), nunca desde render() en sí — el foco de #reg-raw al arrancar
@@ -817,6 +1101,20 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
           ruleId: state.ruleId,
           tagId: state.tagId || "",
         });
+        // Foto del ticket (N5, §9.4): SIEMPRE DESPUÉS de que newId exista y ANTES de onDone() (la
+        // pantalla ya cedió el sitio después). Orden que protege lo que importa: si la foto falla,
+        // el gasto YA está guardado — addTransaction se llamó sin hasAttachment (default false).
+        if (state.photo) {
+          try {
+            await attachments.put(newId, state.photo);
+            await setAttachmentFlag(newId, true);
+          } catch { showToast(t("registro.photo.savedWithout")); }
+        }
+        // D-3/D-4: guardar con éxito es el otro punto de salida de la pantalla (el primero es
+        // #reg-close, arriba) — se apaga la vida y se sueltan el reconocedor y la URL del Blob.
+        alive = false;
+        speech?.stop();
+        releasePhotoUrl();
         onDone();   // primero: el ticket cae sobre la pantalla ya repintada (ReciboGuardado.dc.html)
         const [y, m, d] = state.fecha.split("-");
         const now = new Date();

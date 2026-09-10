@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { SCHEMA_VERSION, ACCEPTED_SCHEMA_VERSIONS, MIGRATIONS, pendingMigrations } from "../../app/app/js/migrations.js";
 import { readFileSync } from "node:fs";
-import { openDb, OLD_TRANSACTIONS_DDL, V2_RULES_DDL, V3_TRANSACTIONS_DDL } from "./helpers.mjs";
+import { openDb, OLD_TRANSACTIONS_DDL, V2_RULES_DDL, V3_TRANSACTIONS_DDL, V4_TRANSACTIONS_DDL } from "./helpers.mjs";
 
 const T = "2026-08-24T18:00:00Z";
 const SCHEMA_SQL = readFileSync(new URL("../../app/app/js/schema.sql", import.meta.url), "utf8");
@@ -58,6 +58,22 @@ function v3Db() {
   return db;
 }
 
+/** BD "v4" real: transactions tiene paid_by Y tag_id pero NO has_attachment (V4_TRANSACTIONS_DDL),
+ *  recurring_rules ya está al día (V3_RULES_DDL, sin cambios desde v3). Es el estado exacto de una
+ *  BD migrada a v4 por `feat/etiquetas-y-comparativa` que todavía no ha visto esta PR. */
+function v4Db() {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+  db.prepare(`INSERT INTO meta (key,value) VALUES ('schema_version','4'),('currency','EUR')`).run();
+  db.exec(V4_TRANSACTIONS_DDL);
+  db.exec(V3_RULES_DDL);
+  db.exec(`CREATE TABLE tags (
+    id TEXT PRIMARY KEY, name TEXT NOT NULL, budget_cents INTEGER,
+    is_archived INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0)`);
+  return db;
+}
+
 const colNames = (db, table) => db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
 const versionOf = (db) => db.prepare("SELECT value FROM meta WHERE key='schema_version'").get().value;
 /** name/type/notnull/dflt_value de cada columna, en orden — lo que compara el test anti-deriva del
@@ -94,7 +110,7 @@ test("migración: una BD sin paid_by recibe la columna, el default y salta a la 
   insOld(db, "t-vieja");
 
   const stmts = runMigrations(db);
-  assert.equal(stmts.length, 7, "paid_by + tags + tag_id + los dos ALTER de recurring_rules + el índice tx_tag + el upsert de la versión");
+  assert.equal(stmts.length, 8, "paid_by + tags + tag_id + los dos ALTER de recurring_rules + has_attachment + el índice tx_tag + el upsert de la versión");
 
   const col = db.prepare("PRAGMA table_info(transactions)").all().find((c) => c.name === "paid_by");
   assert.ok(col, "la columna existe tras el ALTER");
@@ -214,7 +230,7 @@ test("MIGRATIONS: las versiones son ÚNICAS", () => {
 test("ACCEPTED_SCHEMA_VERSIONS incluye la nueva y sigue ordenada", () => {
   assert.ok(ACCEPTED_SCHEMA_VERSIONS.includes(SCHEMA_VERSION));
   assert.deepEqual(ACCEPTED_SCHEMA_VERSIONS, [...ACCEPTED_SCHEMA_VERSIONS].sort());
-  assert.deepEqual(ACCEPTED_SCHEMA_VERSIONS, ["1", "2", "3", "4"]);
+  assert.deepEqual(ACCEPTED_SCHEMA_VERSIONS, ["1", "2", "3", "4", "5"]);
 });
 
 // --- v4: tags + transactions.tag_id (spec §5.3) -------------------------------------------
@@ -222,7 +238,7 @@ test("ACCEPTED_SCHEMA_VERSIONS incluye la nueva y sigue ordenada", () => {
 test("migración a v4: una BD v3 recibe la tabla tags y transactions.tag_id", () => {
   const db = v3Db();
   const stmts = runMigrations(db);
-  assert.equal(stmts.length, 4, "CREATE TABLE tags + el ALTER de tag_id + el índice tx_tag + el upsert de la versión");
+  assert.equal(stmts.length, 5, "CREATE TABLE tags + el ALTER de tag_id + has_attachment + el índice tx_tag + el upsert de la versión");
 
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map((r) => r.name);
   assert.ok(tables.includes("tags"), "la tabla tags existe tras la migración");
@@ -282,4 +298,56 @@ test("el DDL de tags es idéntico por los dos caminos (schema.sql y MIGRATIONS)"
   runMigrations(migrated);
   const b = infoOf(migrated, "tags");
   assert.deepEqual(a, b);
+});
+
+// --- v5: has_attachment (Registro v2 §9.1, foto del ticket) -----------------------------------
+
+test("migración a v5: una BD v4 recibe has_attachment con su default y su NOT NULL", () => {
+  const db = v4Db();
+  const stmts = runMigrations(db);
+  assert.equal(stmts.length, 3, "el ALTER de has_attachment + el índice tx_tag (idempotente) + el upsert de la versión");
+
+  const col = db.prepare("PRAGMA table_info(transactions)").all().find((c) => c.name === "has_attachment");
+  assert.ok(col, "has_attachment existe tras el ALTER");
+  assert.equal(col.notnull, 1);
+  assert.equal(col.dflt_value, "0");
+  assert.equal(versionOf(db), SCHEMA_VERSION);
+});
+
+test("migración a v5: las filas viejas quedan con has_attachment a 0", () => {
+  const db = v4Db();
+  insOld(db, "t-vieja");
+  runMigrations(db);
+  assert.equal(db.prepare("SELECT has_attachment FROM transactions WHERE id='t-vieja'").get().has_attachment, 0,
+    "las filas preexistentes quedan en 0: el mundo que describe una BD sin fotos");
+});
+
+test("migración a v5: idempotente (la segunda pasada solo reescribe la versión)", () => {
+  const db = v4Db();
+  runMigrations(db);
+  const colsTrasPrimera = colNames(db, "transactions");
+
+  const stmts2 = runMigrations(db);
+  assert.equal(stmts2.length, 2, "la segunda vez solo quedan el índice tx_tag (idempotente) y el upsert de meta.schema_version");
+  assert.deepEqual(colNames(db, "transactions"), colsTrasPrimera, "no se añade otra columna");
+  assert.equal(versionOf(db), SCHEMA_VERSION);
+});
+
+test("migración a v5: una BD nueva no dispara ningún ALTER", () => {
+  const db = openDb();
+  const stmts = pendingMigrations({
+    transactions: colNames(db, "transactions"),
+    recurring_rules: colNames(db, "recurring_rules"),
+  });
+  assert.equal(stmts.length, 2, "el índice tx_tag (idempotente) + el upsert de la versión: has_attachment ya viene en schema.sql");
+  runMigrations(db);
+  assert.equal(versionOf(db), SCHEMA_VERSION);
+});
+
+test("migración a v5: una versión pisada por un import se recoloca sola", () => {
+  const db = openDb();
+  db.prepare("UPDATE meta SET value='1' WHERE key='schema_version'").run();
+  const stmts = runMigrations(db);
+  assert.equal(stmts.length, 2, "no se intenta añadir una columna que ya está (queda el índice idempotente + el upsert)");
+  assert.equal(versionOf(db), SCHEMA_VERSION);
 });

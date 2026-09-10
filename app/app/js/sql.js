@@ -25,8 +25,8 @@ export const SQL = {
   insertPeriod: `INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
     VALUES (?,?,?,'','open',?,'',?,?,0)`,
   insertTransaction: `INSERT INTO transactions (id,date,period_id,type,amount_cents,account_id,counter_account_id,
-    category_id,merchant,note,is_shared,share_pct_override,paid_by,settled,ref_id,rule_id,tag_id,external_id,status,created_at,updated_at,deleted)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
+    category_id,merchant,note,is_shared,share_pct_override,paid_by,settled,ref_id,rule_id,tag_id,external_id,has_attachment,status,created_at,updated_at,deleted)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
   spentOfPeriod: `SELECT COALESCE(SUM(CASE
       WHEN t.type='expense' THEN ${MY_AMOUNT}
       WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT}
@@ -128,6 +128,10 @@ export const SQL = {
     counter_account_id=?, merchant=?, note=?, is_shared=?, share_pct_override=?, paid_by=?, ref_id=?, rule_id=?, tag_id=?, status=?,
     updated_at=? WHERE id=?`,
   softDeleteTransaction: `UPDATE transactions SET deleted=1, updated_at=? WHERE id=?`,
+  // Foto del ticket (N5, Registro v2 §9.4): UPDATE de una sola columna, aparte de
+  // insertTransaction/updateTransaction — se llama DESPUÉS de que el fichero ya esté escrito en
+  // OPFS (attachments.put), nunca antes: así una fila nunca promete una foto que no existe.
+  setAttachmentFlag: `UPDATE transactions SET has_attachment=?, updated_at=? WHERE id=?`,
   // Al borrar un apunte de liquidación enlazado (ref_id) —la devolución ENTRANTE de un gasto mío o
   // el ajuste SALIENTE de uno que pagó la contraparte— revierte settled=1 del gasto original SOLO
   // si no queda ningún otro apunte activo apuntándole — bind: [refId, apunteIdBorrado, now, refId].

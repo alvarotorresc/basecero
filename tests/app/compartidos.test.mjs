@@ -30,13 +30,13 @@ function ins(db, over = {}) {
     date: "2026-08-20", period: "per-1", type: "expense", cents: 4520,
     account: "acc-n26", counterAccount: "", category: "cat-casa-alquiler",
     merchant: "", note: "", shared: 0, override: null, paidBy: "me", settled: 0,
-    ref: "", rule: "", tag: "", external: "", status: "pending",
+    ref: "", rule: "", tag: "", external: "", hasAttachment: 0, status: "pending",
     ...over,
   };
   db.prepare(SQL.insertTransaction).run(
     v.id, v.date, v.period, v.type, v.cents, v.account, v.counterAccount,
     v.category, v.merchant, v.note, v.shared, v.override, v.paidBy, v.settled,
-    v.ref, v.rule, v.tag, v.external, v.status, T, T,
+    v.ref, v.rule, v.tag, v.external, v.hasAttachment, v.status, T, T,
   );
   return v.id;
 }
@@ -53,7 +53,7 @@ function settleShared(db, origId, accountId, now, openPeriodId = "per-1") {
   const refundId = "refund-" + origId;
   db.prepare(SQL.insertTransaction).run(
     refundId, "2026-08-24", openPeriodId, "refund", row.settle_cents, accountId, "",
-    row.category_id, row.merchant, t("liquidar.note"), 0, null, "me", 0, origId, "", "", "", "pending", now, now,
+    row.category_id, row.merchant, t("liquidar.note"), 0, null, "me", 0, origId, "", "", "", 0, "pending", now, now,
   );
   db.prepare("UPDATE transactions SET settled=1, updated_at=? WHERE id=?").run(now, origId);
   return refundId;
@@ -275,7 +275,7 @@ function execManyRaw(db, stmts) {
  *  en Node (depende del Worker vía query/execMany, mismo motivo por el que la liquidación de una
  *  sola fila y openNextPeriod de este mismo fichero se reproducen en vez de importarse). El ARRAY de
  *  statements NO se reproduce a mano aquí: se delega en la settleAllSharedStmts REAL importada de
- *  repo.js (arriba) — así un bug en el bind de insertTransaction (orden de los 21 campos) lo
+ *  repo.js (arriba) — así un bug en el bind de insertTransaction (orden de los 22 campos) lo
  *  detectaría este test, cosa que una copia manual del bind no podría hacer. "Alex" es el
  *  partner_name que repo.settleAllShared saca de meta y pasa como sexto argumento. */
 function settleAllSharedReproduced(db, ids, accountId, now, periodId = "per-1") {
@@ -803,17 +803,17 @@ test("settleAllSharedStmts: una devolución entrante por lo que me deben y un aj
   const stmts = settleAllSharedStmts(rows, "acc-n26", "per-1", "2026-08-24", T2, "Alex");
   assert.equal(stmts.length, 4, "un insert + un settled=1 por cada una de las dos filas");
 
-  // El id es un ULID nuevo: se compara la cola del bind (los otros 20 valores).
+  // El id es un ULID nuevo: se compara la cola del bind (los otros 21 valores).
   assert.deepEqual(stmts[0].bind.slice(1), [
     "2026-08-24", "per-1", "refund", 4000, "acc-n26", "", "cat-casa-alquiler", "IKEA", t("liquidar.note"),
-    0, null, "me", 0, a, "", "", "", "pending", T2, T2,
-  ], "lo que pagué yo: devolución entrante por lo que me debe, con la categoría y el comercio del gasto (tag_id='' siempre)");
+    0, null, "me", 0, a, "", "", "", 0, "pending", T2, T2,
+  ], "lo que pagué yo: devolución entrante por lo que me debe, con la categoría y el comercio del gasto (tag_id='' siempre, has_attachment=0 siempre)");
   assert.deepEqual(stmts[1], { sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [T2, a] });
 
   assert.deepEqual(stmts[2].bind.slice(1), [
     "2026-08-24", "per-1", "adjustment", -6000, "acc-n26", "", "", "Liquidación con Alex", t("liquidar.note"),
-    0, null, "me", 0, b, "", "", "", "pending", T2, T2,
-  ], "lo que pagó ella: apunte de SALIDA negativo, sin categoría (no es gasto: mi parte ya contó), tag_id='' siempre");
+    0, null, "me", 0, b, "", "", "", 0, "pending", T2, T2,
+  ], "lo que pagó ella: apunte de SALIDA negativo, sin categoría (no es gasto: mi parte ya contó), tag_id='' siempre, has_attachment=0 siempre");
   assert.deepEqual(stmts[3], { sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [T2, b] });
 });
 

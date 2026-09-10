@@ -202,6 +202,19 @@ export const ES = {
     title: "Registrar",
     close: "Cerrar",
     type: { transfer: "Transfer.", more: "Más tipos de apunte" },
+    natural: {
+      placeholder: "Dilo o escríbelo: «12,50 en el bar»",
+      mic: "Dictar el gasto",
+      micListening: "Escuchando…",
+      micDenied: "No se pudo usar el micro. Escríbelo.",
+      notUnderstood: "No he entendido nada de esa frase.",
+      reset: "Borrar",
+      sharedChip: "{name} {pct} %",
+      // §13.10 de la spec (a validar por Álvaro): el reconocimiento de voz del navegador no es
+      // local, el audio sale a un servidor del fabricante. Se dice bajo la caja, solo con el micro
+      // disponible.
+      micNotice: "El dictado usa el reconocimiento de voz del navegador, que envía lo que dices a su servidor. Escribirlo no sale de tu móvil.",
+    },
     save: {
       expense: "Guardar gasto",
       income: "Guardar ingreso",
@@ -236,6 +249,16 @@ export const ES = {
       // devolución. Se marca distinto de alreadyRefunded para que no se lean como lo mismo.
       settledLabel: "Liquidado, {amount}",
     },
+    // Foto del ticket (N5, Registro v2 §9). viewAria se reutiliza también en el visor a pantalla
+    // completa del detalle de movimiento (movimientos.js), como movimientos.detail.tagLabel ya se
+    // reutiliza aquí.
+    photo: {
+      add: "Foto del ticket",
+      replace: "Otra foto",
+      remove: "Quitar la foto",
+      viewAria: "Ver la foto del ticket",
+      savedWithout: "El gasto se guardó, pero no se pudo adjuntar la foto",
+    },
   },
   movimientos: {
     error: {
@@ -268,6 +291,8 @@ export const ES = {
       tagLabel: "Etiqueta",
       noTag: "Sin etiqueta",
       newTag: "Nueva etiqueta",
+      // Foto del ticket (N5): aria-label del velo a pantalla completa que enseña la foto.
+      photoClose: "Cerrar la foto",
     },
     tagCard: {
       movements: { one: "{n} movimiento", other: "{n} movimientos" },
@@ -672,6 +697,9 @@ export const ES = {
     sheet: {
       title: "Tu hoja de cálculo",
       body: "Exporta todos tus datos a un .xlsx editable en LibreOffice/Sheets, o importa una hoja para sustituir los datos actuales. La copia cifrada (.bce) también se importa desde aquí.",
+      // Foto del ticket (N5, §9.6/§9.7): la foto es un adjunto, no un dato del contrato — solo
+      // viaja en la copia cifrada.
+      attachmentsNote: "La copia cifrada (.bce) incluye las fotos; la hoja (.xlsx) no",
       exportBtn: "Exportar hoja (.xlsx)",
       importBtn: "Importar hoja (.xlsx)",
       encWarn: {
@@ -999,6 +1027,12 @@ export const ES = {
       newerVersion: "Copia de una versión más nueva (formato {version}). Actualiza BaseCero.",
       invalidHeader: "Cabecera inválida (iteraciones fuera de rango)",
       wrongPassphrase: "Contraseña incorrecta o archivo dañado",
+    },
+    // Foto del ticket (N5, Registro v2 §9). bundleCorrupt es el mensaje del UserError que lanza
+    // unpackBundle (bundle.js): CFB.read es de una librería que no controlamos.
+    attachments: {
+      writeFailed: "No se pudo guardar la foto: {error}",
+      bundleCorrupt: "La copia está dañada y no se pudieron leer las fotos.",
     },
     xlsx: {
       missingSheet: "falta la pestaña «{table}»",

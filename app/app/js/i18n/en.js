@@ -196,6 +196,16 @@ export const EN = {
     title: "Log transaction",
     close: "Close",
     type: { transfer: "Transfer", more: "More entry types" },
+    natural: {
+      placeholder: "Say it or type it: 12.50 at the bar",
+      mic: "Dictate the expense",
+      micListening: "Listening…",
+      micDenied: "Couldn’t use the microphone. Type it instead.",
+      notUnderstood: "I didn’t understand that sentence.",
+      reset: "Clear",
+      sharedChip: "{name} {pct}%",
+      micNotice: "Dictation uses the browser’s speech recognition, which sends what you say to its server. Typing never leaves your phone.",
+    },
     save: {
       expense: "Save expense",
       income: "Save income",
@@ -227,6 +237,13 @@ export const EN = {
       sharedSuffix: " (shared)",
       alreadyRefunded: "Already refunded, {amount}",
       settledLabel: "Settled, {amount}",
+    },
+    photo: {
+      add: "Photo of the receipt",
+      replace: "Another photo",
+      remove: "Remove the photo",
+      viewAria: "View the receipt photo",
+      savedWithout: "The expense was saved, but the photo could not be attached",
     },
   },
   movimientos: {
@@ -260,6 +277,7 @@ export const EN = {
       tagLabel: "Tag",
       noTag: "No tag",
       newTag: "New tag",
+      photoClose: "Close the photo",
     },
     tagCard: {
       movements: { one: "{n} movement", other: "{n} movements" },
@@ -651,6 +669,7 @@ export const EN = {
     sheet: {
       title: "Your spreadsheet",
       body: "Export all your data to an editable .xlsx (LibreOffice/Sheets), or import a spreadsheet to replace your current data. The encrypted backup (.bce) is also imported from here.",
+      attachmentsNote: "The encrypted backup (.bce) includes the photos; the spreadsheet (.xlsx) doesn’t",
       exportBtn: "Export spreadsheet (.xlsx)",
       importBtn: "Import spreadsheet (.xlsx)",
       encWarn: {
@@ -941,6 +960,10 @@ export const EN = {
       newerVersion: "Backup from a newer version (format {version}). Update BaseCero.",
       invalidHeader: "Invalid header (iterations out of range)",
       wrongPassphrase: "Incorrect password or corrupted file",
+    },
+    attachments: {
+      writeFailed: "The photo could not be saved: {error}",
+      bundleCorrupt: "The backup is damaged and the photos could not be read.",
     },
     xlsx: {
       missingSheet: "missing sheet “{table}”",
