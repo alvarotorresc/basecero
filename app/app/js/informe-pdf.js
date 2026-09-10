@@ -1,5 +1,5 @@
 import { barRowsGeometry } from "./charts.js";
-import { fmtMoney, fmtDiaCorto } from "./format.js";
+import { fmtMoney, fmtDiaCorto, fmtPct } from "./format.js";
 import { t } from "./i18n/index.js";
 
 /** Presentador PDF del Informe del periodo. Dos mitades, mismo criterio que charts.js: misma
@@ -87,6 +87,14 @@ export const MARGIN = 40;
 const FOOTER_H = 16;
 const BAR_ROW_H = 16;
 const BAR_H = 6;
+// Insignia de categoría (comparativa por categoría): un cuadrado pequeño antes del nombre, del
+// mismo color que la barra de abajo — BADGE_INDENT es lo que empuja el texto de esa fila para
+// hacerle sitio (BADGE_SIZE + el hueco).
+const BADGE_SIZE = 6;
+const BADGE_INDENT = BADGE_SIZE + 6;
+// La barra atenuada del periodo anterior (mismo color, menos opacidad): mismo 0.35 que
+// charts.js#comparisonBarsSvg, para que pantalla y PDF lean la misma comparativa.
+const COMPARISON_OPACITY = 0.35;
 
 function newPage() {
   return { blocks: [] };
@@ -108,25 +116,31 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
       y = pageSize.h - margin;
     }
   }
-  function text(section, str, { size = 10, align = "left", bold = false, color, mono = false } = {}) {
+  // `indent` (Task: insignia de categoría) empuja el texto a la derecha sin mover la `y`: devuelve
+  // la `y` de la fila para que el llamante pueda colocar la insignia en la misma línea.
+  function text(section, str, { size = 10, align = "left", bold = false, color, mono = false, indent = 0 } = {}) {
     const lineH = size + 4;
     ensure(lineH);
     y -= lineH;
     page().blocks.push({
-      kind: "text", section, text: String(str ?? ""), x: margin, y, align,
-      maxX: margin + contentW, maxWidth: contentW, size, bold, color, mono,
+      kind: "text", section, text: String(str ?? ""), x: margin + indent, y, align,
+      maxX: margin + contentW, maxWidth: contentW - indent, size, bold, color, mono,
     });
+    return y;
   }
   function rule(section) {
     ensure(10);
     y -= 10;
     page().blocks.push({ kind: "rule", section, x: margin, y, w: contentW });
   }
-  function bar(section, { value, max, color }) {
+  // `opacity` (Task: comparativa por categoría): la barra atenuada del periodo anterior reutiliza
+  // el color de la categoría con menos opacidad, mismo criterio que charts.js#comparisonBarsSvg
+  // (fill-opacity 0.35) — nunca un gris nuevo que la pantalla y el PDF no comparten.
+  function bar(section, { value, max, color, opacity = 1 }) {
     ensure(BAR_ROW_H);
     y -= BAR_ROW_H;
     const [g] = barRowsGeometry([{ key: "row", value, max, color }], { width: contentW, rowH: BAR_ROW_H, barH: BAR_H });
-    page().blocks.push({ kind: "rect", section, x: margin + g.x, y, w: g.w, h: g.h, color: g.color });
+    page().blocks.push({ kind: "rect", section, x: margin + g.x, y, w: g.w, h: g.h, color: g.color, opacity });
   }
 
   // 1. Cabecera
@@ -153,6 +167,14 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
     text("summary", report.summary.savingsRatePct >= 0
       ? t("informe.pdf.savingsRate", { pct: report.summary.savingsRatePct })
       : t("informe.pdf.savingsRateNegative"));
+    // «En agosto, el 43 %.» — la segunda mitad de la frase de ahorro (screens/informe.js#summaryHtml):
+    // solo con tasa previa Y nombre del periodo anterior, y solo si esa tasa previa no es negativa
+    // (no hay "el -12 %" con el que comparar tampoco, mismo criterio que la pantalla).
+    if (report.summary.prevSavingsRatePct != null && report.summary.prevSavingsRatePct >= 0 && report.summary.prevPeriodName) {
+      text("summary", t("informe.pdf.savingsRateVsPrev", {
+        name: report.summary.prevPeriodName, pct: report.summary.prevSavingsRatePct,
+      }));
+    }
   }
   rule("summary");
 
@@ -172,11 +194,29 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
   // 4. Gasto por categoría
   text("categories", t("informe.pdf.categories"), { size: 13, bold: true });
   const maxSpent = Math.max(0, ...report.categories.rows.map((c) => c.spentCents));
+  const hasPrevCategories = !!report.categories.hasPrev;
   for (const c of report.categories.rows) {
     // El nombre de la categoría va SIEMPRE en tinta de papel (SISTEMA §2.1): el color de
-    // categoría solo rellena la barra de abajo, nunca el texto (D5/D7 de la spec).
-    text("categories", `${c.name}  ${fmtMoney(c.spentCents)}`, { mono: true });
+    // categoría solo rellena la barra de abajo (y, con comparativa, la insignia), nunca el
+    // texto (D5/D7 de la spec). Con comparativa, BADGE_INDENT le hace sitio a la insignia.
+    const rowY = text("categories", `${c.name}  ${fmtMoney(c.spentCents)}`, { mono: true, indent: hasPrevCategories ? BADGE_INDENT : 0 });
     bar("categories", { value: c.spentCents, max: maxSpent, color: c.color });
+    if (hasPrevCategories) {
+      // Segunda barra, atenuada, con el gasto del periodo anterior — misma escala (mismo
+      // maxSpent, mismo bar()) que la barra de arriba: el pie del Informe promete esta
+      // comparativa (informe.footer) y hasta ahora el PDF no la llevaba.
+      bar("categories", { value: c.prevCents ?? 0, max: maxSpent, color: c.color, opacity: COMPARISON_OPACITY });
+      if (c.deltaPct != null) {
+        // Flecha ASCII en vez de ↓/↑ (winAnsiSafe no las codifica, ver cabecera del fichero):
+        // "+3,2 %" / "-12,8 %", igual que la pantalla pero sin depender de un glifo Unicode.
+        const sign = c.deltaPct > 0 ? "+" : c.deltaPct < 0 ? "-" : "";
+        text("categories", `${sign}${fmtPct(Math.abs(c.deltaPct) / 100)}`, { size: 9 });
+      }
+      // Insignia del color de categoría, antes del nombre — se pinta DESPUÉS de la barra
+      // principal (arriba) para no robarle el puesto: comparten color, y el test que busca "el
+      // primer rect de este color" (barRowsGeometry) tiene que seguir encontrando la barra real.
+      page().blocks.push({ kind: "rect", section: "categories", x: margin, y: rowY, w: BADGE_SIZE, h: BADGE_SIZE, color: c.color });
+    }
   }
   text("categories", t("informe.pdf.categoriesTotal", { amount: fmtMoney(report.categories.totalCents) }), { bold: true, mono: true });
   rule("categories");
@@ -274,7 +314,8 @@ function truncateToFit(font, text, size, maxWidth) {
 }
 
 /** Adaptador: recorre layoutReport y dibuja con pdf-lib. Fondo `--paper`, StandardFonts
- *  Helvetica/HelveticaBold/Courier (Courier para las cifras, `--font-mono` del sistema).
+ *  Helvetica/HelveticaBold/Courier/CourierBold (Courier para las cifras, `--font-mono` del
+ *  sistema; CourierBold cuando además son totales — bold Y mono a la vez).
  *  `drawText` con `winAnsiSafe` SIEMPRE — es la única frontera de saneo del módulo (Task 2).
  *  Devuelve Uint8Array. */
 export async function buildPdfBytes(PDFLib, report, opts) {
@@ -283,6 +324,7 @@ export async function buildPdfBytes(PDFLib, report, opts) {
   const helvetica = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
   const helveticaBold = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
   const courier = await doc.embedFont(PDFLib.StandardFonts.Courier);
+  const courierBold = await doc.embedFont(PDFLib.StandardFonts.CourierBold);
   const paper = rgbFromParts(PDFLib, PAPER);
   const ink = rgbFromParts(PDFLib, PAPER_INK);
   const dim = rgbFromParts(PDFLib, PAPER_DIM);
@@ -294,9 +336,13 @@ export async function buildPdfBytes(PDFLib, report, opts) {
       if (b.kind === "rule") {
         pdfPage.drawRectangle({ x: b.x, y: b.y, width: b.w, height: 1, color: dim });
       } else if (b.kind === "rect") {
-        if (b.w > 0 && b.h > 0) pdfPage.drawRectangle({ x: b.x, y: b.y, width: b.w, height: b.h, color: rgbFromHex(PDFLib, b.color) });
+        if (b.w > 0 && b.h > 0) {
+          pdfPage.drawRectangle({ x: b.x, y: b.y, width: b.w, height: b.h, color: rgbFromHex(PDFLib, b.color), opacity: b.opacity ?? 1 });
+        }
       } else if (b.kind === "text") {
-        const font = b.bold ? helveticaBold : b.mono ? courier : helvetica;
+        // Los totales van bold Y mono (cifras): CourierBold, no HelveticaBold — hasta ahora el
+        // orden de este ternario los mandaba siempre a Helvetica en negrita.
+        const font = b.bold && b.mono ? courierBold : b.bold ? helveticaBold : b.mono ? courier : helvetica;
         const safe = winAnsiSafe(b.text);
         const fitted = truncateToFit(font, safe, b.size, b.maxWidth);
         const width = font.widthOfTextAtSize(fitted, b.size);

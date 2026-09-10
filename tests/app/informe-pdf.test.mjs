@@ -197,6 +197,86 @@ test("layoutReport: los rects de las barras salen de barRowsGeometry", () => {
   assert.equal(rect.h, expected.h);
 });
 
+// ---- Comparativa por categoria en el PDF (el pie del Informe la promete, el PDF no la llevaba) --
+
+/** `smallReport()` sin comparativa: mismo shape, `hasPrev` a false y cada fila sin prevCents. */
+function reportWithoutComparison() {
+  const base = smallReport();
+  return {
+    ...base,
+    categories: {
+      ...base.categories,
+      hasPrev: false,
+      rows: base.categories.rows.map((r) => ({ ...r, prevCents: null, deltaCents: null, deltaPct: null, direction: "new" })),
+    },
+  };
+}
+
+test("layoutReport: con comparativa hay mas rects por categoria que sin ella", () => {
+  const categoryRects = (report) => layoutReport(report).pages.flatMap((p) => p.blocks)
+    .filter((b) => b.kind === "rect" && b.section === "categories");
+  const rows = smallReport().categories.rows.length;
+  const sinComparativa = categoryRects(reportWithoutComparison());
+  const conComparativa = categoryRects(smallReport());
+  assert.equal(sinComparativa.length, rows, "sin comparativa, solo la barra principal por categoria");
+  assert.ok(conComparativa.length > sinComparativa.length, "con comparativa hay barra atenuada + insignia de mas");
+});
+
+test("layoutReport: la barra principal sigue siendo el primer rect de ese color (la insignia no le roba el puesto)", () => {
+  // Regresion del test de arriba ("los rects de las barras salen de barRowsGeometry"): la
+  // insignia comparte el color de la categoria, así que tiene que pintarse DESPUÉS de la barra
+  // real en el array de bloques, o `.find()` la encontraria a ella primero.
+  const report = smallReport();
+  const { pageSize, margin } = layoutReport(report);
+  const contentW = pageSize.w - margin * 2;
+  const casa = report.categories.rows.find((r) => r.rootId === "cat-casa");
+  const maxSpent = Math.max(...report.categories.rows.map((r) => r.spentCents));
+  const [expected] = barRowsGeometry(
+    [{ key: "row", value: casa.spentCents, max: maxSpent, color: casa.color }],
+    { width: contentW, rowH: 16, barH: 6 },
+  );
+  const rect = layoutReport(report).pages.flatMap((p) => p.blocks)
+    .find((b) => b.kind === "rect" && b.section === "categories" && b.color === casa.color);
+  assert.equal(rect.w, expected.w);
+  assert.equal(rect.h, expected.h);
+});
+
+test("layoutReport: el porcentaje de la comparativa lleva el signo (flecha ASCII)", () => {
+  const texts = layoutReport(smallReport()).pages.flatMap((p) => p.blocks)
+    .filter((b) => b.kind === "text" && b.section === "categories").map((b) => b.text);
+  assert.ok(texts.some((s) => s.startsWith("+") && s.includes("3,2")), "Casa sube un 3,2 %");
+  assert.ok(texts.some((s) => s.startsWith("-") && s.includes("12,8")), "Alimentacion baja un 12,8 %");
+});
+
+test("layoutReport: sin comparativa no hay ningun porcentaje con signo", () => {
+  const texts = layoutReport(reportWithoutComparison()).pages.flatMap((p) => p.blocks)
+    .filter((b) => b.kind === "text" && b.section === "categories").map((b) => b.text);
+  assert.ok(!texts.some((s) => /^[+-]/.test(s)));
+});
+
+test("layoutReport: con comparativa, las paginas del PDF siguen siendo las que dijo layoutReport", async () => {
+  const report = smallReport();
+  const bytes = await buildPdfBytes(PDFLib, report);
+  const doc = await PDFLib.PDFDocument.load(bytes);
+  assert.equal(doc.getPageCount(), layoutReport(report).pages.length);
+});
+
+// «Ahorras el 54 % de lo que ingresas. En agosto, el 43 %.» — el PDF no llevaba la segunda mitad.
+test("layoutReport: con tasa del periodo anterior (>= 0) y su nombre, imprime la segunda mitad", () => {
+  const report = { ...smallReport(), summary: { ...smallReport().summary, prevSavingsRatePct: 43, prevPeriodName: "Agosto 2026" } };
+  const summaryLines = layoutReport(report).pages[0].blocks.filter((b) => b.section === "summary" && b.kind === "text").map((b) => b.text);
+  assert.ok(summaryLines.includes(t("informe.pdf.savingsRateVsPrev", { name: "Agosto 2026", pct: 43 })));
+});
+
+test("layoutReport: sin nombre del periodo anterior (o con tasa previa negativa), omite la segunda mitad", () => {
+  const sinNombre = { ...smallReport(), summary: { ...smallReport().summary, prevSavingsRatePct: 43, prevPeriodName: null } };
+  const conTasaNegativa = { ...smallReport(), summary: { ...smallReport().summary, prevSavingsRatePct: -12, prevPeriodName: "Agosto 2026" } };
+  for (const report of [sinNombre, conTasaNegativa]) {
+    const summaryLines = layoutReport(report).pages[0].blocks.filter((b) => b.section === "summary" && b.kind === "text").map((b) => b.text);
+    assert.ok(!summaryLines.some((l) => l.startsWith("En ") || l.startsWith("In ")));
+  }
+});
+
 // ---- Task 10: buildPdfBytes y pdf-loader.js -----------------------------------------------------
 // pdf-lib se carga con createRequire, igual que tests/app/helpers.mjs:5-6 hace con xlsx (el UMD
 // expone module.exports).

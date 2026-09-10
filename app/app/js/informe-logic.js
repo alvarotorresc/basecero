@@ -38,7 +38,7 @@ function buildMeta({ period, todayIso }) {
   };
 }
 
-function buildSummary({ incomeCents, spentCents, budgets, prevIncomeCents, prevSpentCents }) {
+function buildSummary({ incomeCents, spentCents, budgets, prevIncomeCents, prevSpentCents, prevPeriod }) {
   const savedCents = incomeCents - spentCents;
   const budgetTotalCents = Object.values(budgetMap(budgets ?? [])).reduce((s, c) => s + c, 0);
   const availableCents = budgetTotalCents - spentCents;
@@ -51,6 +51,10 @@ function buildSummary({ incomeCents, spentCents, budgets, prevIncomeCents, prevS
   return {
     incomeCents, spentCents, savedCents, availableCents, budgetTotalCents,
     savingsRatePct, prevSavingsRatePct,
+    // La pantalla (screens/informe.js) ya tiene el nombre del periodo anterior aparte, en
+    // inputs.prevPeriod — pero informe-pdf.js solo recibe este `report`, así que la segunda mitad
+    // de la frase de ahorro necesita su propia copia aquí para poder imprimirla en el PDF.
+    prevPeriodName: prevPeriod?.name ?? null,
   };
 }
 

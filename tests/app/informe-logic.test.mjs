@@ -140,6 +140,14 @@ test("buildReport: sin ingresos previos (o sin periodo anterior) la tasa previa 
   assert.equal(buildReport(cleanFixture()).summary.prevSavingsRatePct, null);
 });
 
+// El PDF (informe-pdf.js) solo recibe `report`, nunca los `inputs` crudos: para poder imprimir
+// «En agosto, el 43 %.» necesita el NOMBRE del periodo anterior dentro del propio resumen (la
+// pantalla lo tiene aparte, en inputs.prevPeriod.name).
+test("buildReport: el resumen lleva el nombre del periodo anterior, null sin uno", () => {
+  assert.equal(buildReport(fixture()).summary.prevPeriodName, "Agosto 2026");
+  assert.equal(buildReport(cleanFixture()).summary.prevPeriodName, null);
+});
+
 // REGRESION del off-by-one: SQL.accountBalance filtra t.date <= ? (sql.js:280), asi que el
 // saldo de apertura es el del DIA ANTERIOR a start_date (repo.reportInputs pasa prevDayIso). Aqui
 // se comprueba el lado de buildReport: toma accountsStart TAL CUAL llega, sin volver a filtrar
