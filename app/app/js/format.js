@@ -131,9 +131,22 @@ export function classifyStorageFailure(e) {
   if (name === "NoModificationAllowedError" || msg.includes("Access Handle")) return "locked";
   return "unsupported";
 }
+// Recorta la abreviatura de mes de Intl a tres letras si viene más larga (Node 22 da "sept" para
+// septiembre en es-ES; los artboards escriben "sep") — conserva el punto final si lo trae, y no
+// toca nada más. Sube al transversal (spec §1.10): lo consumen Semana, Liquidar, Movimientos y el
+// sello del recibo, cuatro pantallas de tres paquetes.
+function shortMonth(s) {
+  const dot = s.endsWith(".") ? "." : "";
+  const letters = dot ? s.slice(0, -1) : s;
+  return letters.length > 3 ? letters.slice(0, 3) + dot : s;
+}
+
 // Formato corto ("12 ago") — filas de Liquidar y el pie del bloque de compartidos en Inicio.
 export const fmtDiaCorto = (iso) =>
-  new Date(iso + "T12:00:00").toLocaleDateString(locale, { day: "numeric", month: "short" });
+  new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" })
+    .formatToParts(new Date(iso + "T12:00:00"))
+    .map((p) => (p.type === "month" ? shortMonth(p.value) : p.value))
+    .join("");
 
 // Inicial del día de la semana (tarjeta "Flujo de gasto" de Inicio, Task 12), vía i18n —
 // getDay(): 0=domingo..6=sábado, de ahí que i18n.weekdays empiece en D/S (es/en).

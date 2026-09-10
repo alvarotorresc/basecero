@@ -6,9 +6,12 @@ import {
 import { colorForCategory, iconForCategory, textColorForCategory, rootOf } from "../category-colors.js";
 import { budgetStatus } from "../category-spend.js";
 import { matchesFilter, isUncategorized } from "../movimientos-filter.js";
-import { fmtMoney, moneyPartsHtml, fmtDiaLargo, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { fmtMoney, moneyPartsHtml, fmtDiaLargo, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw, appLocale } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
+import { metaHtml, subHeaderHtml } from "../ui.js";
+import { icon } from "../icons.js";
+import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
@@ -47,22 +50,6 @@ function groupByDay(rows) {
   return groups;
 }
 
-// SVG del icono de transferencia — no existe ningún SVG de transferencia ya integrado en la app
-// (recurrentes.js/inicio.js usan el emoji "⇄" como icono de sustitución); se copia tal cual del
-// artboard de referencia (design/material-expresivo/Movimientos.dc.html:64-67), no se inventa.
-// El color va en `style="stroke:..."` (no en el atributo de presentación `stroke="var(...)"`,
-// que ningún otro SVG de la app usa con un custom property — ACCOUNT_ICON de patrimonio.js usa
-// hex literal, ICON_BACK de registro.js usa currentColor) para no depender de que el motor de
-// render resuelva var() dentro de un atributo de presentación SVG.
-const ICON_TRANSFER = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="stroke:var(--text-2);" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l-3 3 3 3M4 13h13M17 8l3-3-3-3M20 5H7"></path></svg>`;
-// Icono "+" del dotico punteado de una fila sin categorizar (artboard Movimientos.dc.html:46-48).
-const ICON_UNCAT = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="stroke:var(--text-2);" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>`;
-// Icono "etiqueta" del repertorio SISTEMA.md §3, mismo path que screens/etiquetas.js#ICON_TAG.
-// `currentColor` (no un `--ink-2` fijo) para heredar el tinte de donde se use: el texto normal de
-// una chip inactiva, o el fondo invertido de una chip activa (.chip.active del sistema).
-const ICON_TAG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V4h7l9 9-7 7z"></path><circle cx="8" cy="8" r="1.2"></circle></svg>`;
-const ICON_PLUS_SMALL = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>`;
-
 // Toda anchura de barra de la tarjeta de etiqueta activa pasa por aquí, mismo criterio que
 // etiquetas.js#clampPct/gasto-por-categoria.js#clampPct: budgetStatus() no capa su `.pct`, y
 // `width:120%`/`width:-8%` es CSS inválido que el navegador descarta (la barra se queda vacía).
@@ -74,7 +61,7 @@ function movRowHtml(r, byId, accById, partnerName) {
     const to = accById[r.counter_account_id]?.name ?? "?";
     return `
     <button type="button" class="tx-row" data-tx="${r.id}" style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-      <div class="dotico" style="--cat:var(--card2);">${ICON_TRANSFER}</div>
+      <div class="dotico" style="--cat:var(--card2);">${icon("transfer", { size: 16, stroke: "var(--ink-3)" })}</div>
       <div class="tx-body">
         <div class="tx-title">${escHtml(from)} → ${escHtml(to)}</div>
         <div class="tx-sub">${escHtml(r.merchant || r.note || t("movimientos.type.transfer"))}</div>
@@ -98,7 +85,9 @@ function movRowHtml(r, byId, accById, partnerName) {
   const catName = cat?.name ?? "";
   const uncategorized = isUncategorized(r);
   const color = uncategorized ? "var(--card2)" : colorForCategory(r.category_id, byId);
-  const icon = uncategorized ? ICON_UNCAT : iconForCategory(r.category_id, byId);
+  // catIcon, no `icon`: ese nombre queda para la función importada de icons.js, y un `const icon`
+  // local aquí la taparía con un error de TDZ en la propia línea (uncategorized ? icon(...) : ...).
+  const catIcon = uncategorized ? icon("plus", { size: 15, width: 2, stroke: "var(--ink-3)" }) : iconForCategory(r.category_id, byId);
   const dashedStyle = uncategorized ? "border:1.5px dashed var(--rule);" : "";
   const title = r.merchant || catName || t("movimientos.uncategorized");
   const subBase = uncategorized ? t("movimientos.tapToCategorize") : (catName || t("movimientos.uncategorized"));
@@ -118,7 +107,7 @@ function movRowHtml(r, byId, accById, partnerName) {
   const amountClasses = ["tx-amount", "num", amountClass].filter(Boolean).join(" ");
   return `
   <button type="button" class="tx-row" data-tx="${r.id}" style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-    <div class="dotico" style="--cat:${color};${dashedStyle}">${icon}</div>
+    <div class="dotico" style="--cat:${color};${dashedStyle}">${catIcon}</div>
     <div class="tx-body">
       <div class="tx-title">${escHtml(title)}</div>
       <div class="tx-sub" style="${uncategorized ? "color:var(--amber);" : ""}">${escHtml(subBase)}${escHtml(shareSuffix)}</div>
@@ -159,12 +148,16 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     return;
   }
   if (periods.length === 0) {
-    container.innerHTML = `<header class="screen-header"><h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">${t("common.movements")}</h1></header>
+    container.innerHTML = `<header class="screen-header"><h1 style="font: var(--t-title); letter-spacing:-.01em;">${t("common.movements")}</h1></header>
       <div class="banner-aviso red">${t("movimientos.noPeriods")}</div>`;
     return;
   }
   const accById = Object.fromEntries(accountsAll.map((a) => [a.id, a]));
   const partnerName = (meta.partner_name || "").trim();
+  // Cabecera §4.1: el subtítulo «día N de M» siempre describe el periodo ABIERTO, no el que se
+  // esté navegando con el selector de flechas — dayIndexOfPeriod cuenta días desde hoy, así que
+  // solo tiene sentido para el periodo en curso (un periodo cerrado daría un "día 47 de 31").
+  const openPeriod = periods.find((p) => p.status === "open") ?? null;
 
   const state = {
     view: "list",
@@ -263,7 +256,7 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       ${visible.map((tg) => {
         const active = tg.id === activeId;
         return `<button type="button" class="chip${active ? " active" : ""}" data-chip-tag="${escAttr(tg.id)}"
-          style="padding:0 14px;display:inline-flex;align-items:center;gap:7px;">${ICON_TAG}${escHtml(tg.name)}</button>`;
+          style="padding:0 14px;display:inline-flex;align-items:center;gap:7px;">${icon("tag", { size: 14 })}${escHtml(tg.name)}</button>`;
       }).join("")}
     </div>`;
   }
@@ -297,13 +290,32 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     <div class="card" style="display:flex;flex-direction:column;gap:12px;margin-bottom:14px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
         <div style="display:flex;align-items:center;gap:7px;">
-          <span style="display:flex;color:var(--text-2);">${ICON_TAG}</span>
+          <span style="display:flex;color:var(--text-2);">${icon("tag", { size: 14 })}</span>
           <span style="font-size:15px;font-weight:600;">${escHtml(tag.name)}</span>
         </div>
         <span style="font-size:11px;font-weight:500;color:var(--text-3);">${t("movimientos.tagCard.movements", { n: tag.n })}</span>
       </div>
       ${limitHtml}
       <span style="font-size:13px;font-weight:500;color:var(--text-3);">${t("movimientos.tagCard.periodLine", { amount: fmtMoney(periodTag.spent_cents), period: escHtml(periodName), n: periodTag.n })}</span>
+    </div>`;
+  }
+
+  /** Nota de cierre del filtro de etiqueta (Movimientos.dc.html:146-148): cuántos movimientos de
+   *  la etiqueta activa quedan FUERA de este periodo — tagTotalsAll.n (de siempre) menos
+   *  tagTotalsPeriod.n (de este periodo). Solo se pinta con una etiqueta activa y resto > 0: es
+   *  el mismo dato que ya calcula tagCardHtml, sin cargar nada nuevo. */
+  function tagOlderNoteHtml() {
+    const tagId = state.filter.tagId;
+    if (!tagId) return "";
+    const tag = state.tagTotalsAll.find((tg) => tg.id === tagId);
+    if (!tag) return "";
+    const periodTag = state.tagTotalsPeriod.find((tg) => tg.id === tagId);
+    const older = tag.n - (periodTag?.n ?? 0);
+    if (older <= 0) return "";
+    const periodName = periods.find((p) => p.id === state.periodId)?.name ?? "";
+    return `
+    <div style="padding-top:22px;">
+      <span style="font:var(--t-label);color:var(--ink-3);line-height:1.45;display:block;">${t("movimientos.tag.olderNote", { n: older, tag: escHtml(tag.name), period: escHtml(periodName) })}</span>
     </div>`;
   }
 
@@ -427,11 +439,31 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
         </div>
       </div>`;
     }
+    // Cuenta en una sola fila (MovimientoDetalle.dc.html:84-90): etiqueta a la izquierda, chips
+    // alineados a la derecha — a diferencia de De/Hacia arriba, que sí apilan (el artboard no
+    // dibuja un origen/destino de transferencia).
     return `
-    <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-      <div class="section-title">${d.type === "refund" ? t("common.destAccount") : t("common.account")}</div>
-      <div class="chips">
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:18px;">
+      <div class="section-title" style="flex-shrink:0;">${d.type === "refund" ? t("common.destAccount") : t("common.account")}</div>
+      <div class="chips" style="flex:1; justify-content:flex-end;">
         ${accounts.map((a) => `<button type="button" class="chip${d.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
+      </div>
+    </div>`;
+  }
+
+  /** Fila «Tipo» (MovimientoDetalle.dc.html:38-44): dos píldoras de SOLO LECTURA — el tipo de un
+   *  movimiento guardado no se cambia aquí, así que van como <span>, no como chip de acción.
+   *  Solo se pinta para gasto/ingreso: transferencia, devolución y ajuste ya llevan su nombre
+   *  completo en el título de la cabecera (TIPO_KEY) y no hay "el otro tipo" que enseñar junto
+   *  al suyo — la dualidad Gasto/Ingreso del artboard no se extiende a los cinco tipos. */
+  function typePillsHtml(tipo) {
+    if (tipo !== "expense" && tipo !== "income") return "";
+    return `
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+      <span class="section-title">${t("movimientos.detail.typeLabel")}</span>
+      <div style="display:flex; gap:6px;">
+        <span class="type-pill${tipo === "expense" ? " active" : ""}">${t("common.type.expense")}</span>
+        <span class="type-pill${tipo === "income" ? " active" : ""}">${t("common.type.income")}</span>
       </div>
     </div>`;
   }
@@ -447,16 +479,16 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       return `
       <button type="button" class="chip${hasTag ? " active" : ""}" id="mov-tag-chip"
         style="align-self:flex-start;padding:0 14px;display:inline-flex;align-items:center;gap:7px;${hasTag ? "" : "background:transparent;border:1px dashed var(--rule);"}">
-        ${ICON_TAG}${hasTag ? escHtml(tagName(d.tagId)) : t("movimientos.detail.noTag")}
+        ${icon("tag", { size: 14 })}${hasTag ? escHtml(tagName(d.tagId)) : t("movimientos.detail.noTag")}
       </button>`;
     }
     const options = tagOptions();
     return `
     <div class="chips">
       <button type="button" class="chip${!d.tagId ? " active" : ""}" data-tag-pick="">${t("movimientos.detail.noTag")}</button>
-      ${options.map((tg) => `<button type="button" class="chip${d.tagId === tg.id ? " active" : ""}" data-tag-pick="${escAttr(tg.id)}">${ICON_TAG}${escHtml(tg.name)}</button>`).join("")}
+      ${options.map((tg) => `<button type="button" class="chip${d.tagId === tg.id ? " active" : ""}" data-tag-pick="${escAttr(tg.id)}">${icon("tag", { size: 14 })}${escHtml(tg.name)}</button>`).join("")}
       ${d.newTagDraft == null ? `
-      <button type="button" id="mov-tag-new" class="chip" style="background:transparent;border:1px dashed var(--rule);">${ICON_PLUS_SMALL}${t("movimientos.detail.newTag")}</button>
+      <button type="button" id="mov-tag-new" class="chip" style="background:transparent;border:1px dashed var(--rule);">${icon("plus", { size: 13 })}${t("movimientos.detail.newTag")}</button>
       ` : `
       <span style="display:inline-flex;align-items:center;gap:6px;">
         <input type="text" id="mov-tag-new-input" value="${escAttr(d.newTagDraft)}" placeholder="${escAttr(t("etiquetas.form.namePlaceholder"))}"
@@ -466,6 +498,22 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
         </button>
       </span>`}
     </div>`;
+  }
+
+  /** Caja de fecha de solo lectura APARENTE (MovimientoDetalle.dc.html:97-101): icono calendario +
+   *  fecha en dd/mm/aaaa mono. El `<input type="date">` real sigue ahí — mismo id `mov-fecha`,
+   *  mismo onchange de wireDetail() — pero transparente y a sangre sobre la caja: tocar CUALQUIER
+   *  punto de la caja abre el selector nativo, en vez de solo el pequeño icono de calendario que
+   *  pinta el navegador. `.field-date:focus-within` (bloque P1 de app.css) le da el anillo de foco
+   *  que un input con opacity:0 no puede pintarse a sí mismo. */
+  function fechaBoxHtml(d) {
+    const display = new Date(d.fecha + "T12:00:00").toLocaleDateString(appLocale(), { day: "2-digit", month: "2-digit", year: "numeric" });
+    return `
+    <label class="field-date">
+      ${icon("calendar", { size: 18, stroke: "var(--ink-3)" })}
+      <span class="num" style="font-size:13px;font-weight:500;">${escHtml(display)}</span>
+      <input type="date" id="mov-fecha" value="${escAttr(d.fecha)}" aria-label="${escAttr(t("common.date"))}">
+    </label>`;
   }
 
   function renderDetail() {
@@ -478,14 +526,8 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     // ver refundLocked en openDetail.
     const amountLocked = locked || !!d.refundLocked;
 
-    const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
-
     container.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="mov-back" aria-label="${t("common.goBack")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
-        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${t(TIPO_KEY[d.type])}</h1>
-        <span style="width:36px;"></span>
-      </div>
+      ${subHeaderHtml({ id: "mov-back", title: t(TIPO_KEY[d.type]) })}
 
       ${locked ? `
       <div class="banner-aviso" style="margin-bottom:18px;">
@@ -497,22 +539,26 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
         <div class="amount-display" style="align-items:center;">
           ${d.type === "adjustment" ? `<button type="button" class="icon-btn" id="mov-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;${amountLocked ? "opacity:.5;" : ""}" ${amountLocked ? "disabled" : ""}>${d.sign}</button>` : ""}
           <input type="text" inputmode="decimal" id="mov-raw" value="${escAttr(d.raw)}" placeholder="0" ${amountLocked ? "disabled" : ""}
-            style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;${amountLocked ? "opacity:.5;" : ""}">
+            style="border:0;background:none;color:var(--text);font:var(--t-figure-xl);letter-spacing:-.015em;width:100%;outline:none;${amountLocked ? "opacity:.5;" : ""}">
           <span class="amount-currency">${currencySymbol()}</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
       </div>
 
+      ${typePillsHtml(d.type)}
+
       ${cats.length ? `
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
         <div class="section-title">${t("common.category")}</div>
-        <div class="chips-scroll">
+        <div class="chips-grid">
           ${cats.map((c) => {
             const color = colorForCategory(c.id, byId);
-            const icon = iconForCategory(c.id, byId);
+            // catIcon: mismo criterio que movRowHtml — deja el nombre `icon` libre para la
+            // función importada de icons.js.
+            const catIcon = iconForCategory(c.id, byId);
             const active = d.categoryId === c.id;
             return `<button type="button" class="chip-v${active ? " active" : ""}" data-cat="${c.id}" style="--cat:${color};">
-              <span class="chip-icon">${icon}</span><span>${escHtml(c.name)}</span>
+              <span class="chip-icon">${catIcon}</span><span>${escHtml(c.name)}</span>
             </button>`;
           }).join("")}
         </div>
@@ -523,23 +569,16 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       ${d.type === "refund" && state.linkedExpense ? `
       <div class="card" style="padding:12px 14px; margin-bottom:18px;">
         <div style="font-size:10px; color:var(--text-3);">${t("common.linkedTo")}</div>
-        <div style="font-size:14px; font-weight:600;">
-          ${escHtml(state.linkedExpense.merchant || byId[state.linkedExpense.category_id]?.name || t("common.type.expense"))} · ${fmtMoney(state.linkedExpense.amount_cents)}
-        </div>
+        ${metaHtml([state.linkedExpense.merchant || byId[state.linkedExpense.category_id]?.name || t("common.type.expense"), fmtMoney(state.linkedExpense.amount_cents)])}
       </div>` : ""}
 
-      <div style="display:flex; gap:8px; margin-bottom:12px;">
-        <label class="field field-stack" style="flex:1;">
-          <span class="field-label">${t("common.merchant")}</span>
-          <input type="text" id="mov-merchant" value="${escAttr(d.merchant)}" placeholder="${t("common.optional")}">
-        </label>
-        <label class="field field-stack" style="flex:1;">
-          <span class="field-label">${t("common.date")}</span>
-          <input type="date" id="mov-fecha" value="${escAttr(d.fecha)}">
-        </label>
-      </div>
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">${t("movimientos.detail.tagLabel")}</div>
+      <label class="field field-stack" style="margin-bottom:12px;">
+        <span class="field-label">${t("common.merchant")}</span>
+        <input type="text" id="mov-merchant" value="${escAttr(d.merchant)}" placeholder="${t("common.optional")}">
+      </label>
+
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
+        ${fechaBoxHtml(d)}
         ${renderTagControl(d)}
       </div>
 
@@ -549,7 +588,7 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       </label>
 
       ${needsCategory(d.type) && d.type !== "income" && (d.wasShared || partnerName) ? `
-      <div class="card" style="padding:0 16px; margin-bottom:18px;">
+      <div class="card" style="background:var(--surface); padding:14px 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:${locked ? "default" : "pointer"};${locked ? "opacity:.5;" : ""}">
           <span style="font-size:15px; font-weight:600;">${t("common.sharedWith", { name: escHtml(partnerName) || t("movimientos.shared.fallbackName") })}</span>
           <span class="toggle">
@@ -580,11 +619,11 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
           </div>
           <div style="display:flex; gap:8px;">
             <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
-              <div style="font-size:10px; color:var(--text-3);">${t("common.myShare", { pct: d.sharePct })}</div>
+              <div style="font-size:10px; color:var(--text-3);">${metaHtml([t("common.myShare"), t("common.pctValue", { pct: d.sharePct })])}</div>
               <div class="num" id="mov-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
             </div>
             <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
-              <div style="font-size:10px; color:var(--text-3);">${partnerPaid(d) ? t("common.paidFull", { name: escHtml(partnerName) || t("movimientos.shared.fallbackLabel") }) : `${escHtml(partnerName) || t("movimientos.shared.fallbackLabel")} · ${100 - d.sharePct}%`}</div>
+              <div style="font-size:10px; color:var(--text-3);">${partnerPaid(d) ? metaHtml([t("common.paidByName", { name: partnerName || t("movimientos.shared.fallbackLabel") }), t("common.paidTotal")]) : metaHtml([partnerName || t("movimientos.shared.fallbackLabel"), t("common.pctValue", { pct: 100 - d.sharePct })])}</div>
               <div class="num" id="mov-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerPaid(d) ? d.cents : partnerCents)}</div>
             </div>
           </div>
@@ -594,17 +633,8 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
       <button type="button" class="btn-primary" id="mov-save" style="margin-bottom:10px;">${t("common.save")}</button>
-      <button type="button" id="mov-delete"
-        style="width:100%;background:transparent;color:var(--red);
-          border:1px solid var(--red);border-radius:var(--radius-sm);padding:16px;font:600 16px var(--font-ui);cursor:pointer;">
-        ${t("movimientos.delete.button")}
-      </button>
+      <button type="button" class="btn-danger" id="mov-delete">${t("movimientos.delete.button")}</button>
     `;
-
-    if (prevChipsScroll != null) {
-      const chipsEl = container.querySelector(".chips-scroll");
-      if (chipsEl) chipsEl.scrollLeft = prevChipsScroll;
-    }
 
     wireDetail();
   }
@@ -749,7 +779,11 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     };
 
     container.querySelector("#mov-delete").onclick = () => {
-      const what = `${d.merchant || byId[d.categoryId]?.name || t(TIPO_KEY[d.type])} · ${fmtMoney(d.cents)}`;
+      const what = t("movimientos.delete.what", {
+        merchant: d.merchant || byId[d.categoryId]?.name || t(TIPO_KEY[d.type]),
+        amount: fmtMoney(d.cents),
+        date: fmtDiaLargo(d.fecha),
+      });
       showConfirm({
         title: t("movimientos.delete.title"),
         message: t("movimientos.delete.message", { what }),
@@ -798,7 +832,7 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     return `<div class="card" style="display:flex;flex-direction:column;gap:16px;">
         <div style="display:flex;flex-direction:column;gap:12px;">
           ${groupByDay(visible).map((g) => `
-            <div class="day-label">${g.date === hoy ? t("common.today") : fmtDiaLargo(g.date)}</div>
+            <div class="day-label" style="font:var(--t-label);font-weight:600;color:var(--ink);">${g.date === hoy ? t("common.today") : fmtDiaCorto(g.date)}</div>
             ${g.rows.map((r) => movRowHtml(r, byId, accById, partnerName)).join("")}
           `).join("")}
         </div>
@@ -823,19 +857,28 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
   function renderList() {
     const rootCats = presentRootCats();
     const allActive = !state.filter.rootCatId && !state.filter.uncat;
+    // Índice de state.periodId en `periods` (ORDER BY start_date DESC, sql.js#listPeriods): el
+    // índice 0 es el más reciente. "Periodo anterior" (icon back, izquierda) avanza el índice
+    // hacia atrás en el tiempo → +1; "Periodo siguiente" (chevronRight, derecha) → -1.
+    const periodIdx = periods.findIndex((p) => p.id === state.periodId);
+    const currentPeriod = periods[periodIdx] ?? periods[0];
 
     // Chips por categoría raíz (artboard Movimientos.dc.html:32-35): activa = tinta invertida
-    // (.chip.active del sistema). Un color inline SIEMPRE gana sobre una regla de clase, así que
-    // fijar style="color:X" también cuando está activa taparía el color:var(--bg) de .chip.active
-    // y rompería la inversión — por eso el textColorForCategory de la raíz solo se fija inline
-    // cuando la chip NO está activa; sin tinte de fondo (a diferencia de .chip-icon, que sí lleva
-    // círculo — el artboard aquí es texto plano con el emoji delante).
+    // (.chip.active del sistema); inactiva = texto en --ink-2 neutro (el color de .chip por
+    // defecto), SOLO el emoji lleva el tinte de la categoría — el artboard aquí es texto plano
+    // con el emoji delante, sin tinte de fondo (a diferencia de .chip-icon, que sí lleva círculo).
+    // Por eso el color va en un <span> alrededor del emoji, nunca en el botón entero: un color
+    // inline en el botón SIEMPRE ganaría sobre .chip.active y rompería la inversión al activarse.
     const catChipsHtml = rootCats.map((catId) => {
       const active = state.filter.rootCatId === catId;
-      const icon = iconForCategory(catId, byId);
+      // catIcon: mismo criterio que movRowHtml — deja el nombre `icon` libre para la función
+      // importada de icons.js, que esta misma función renderList ya usa más abajo.
+      const catIcon = iconForCategory(catId, byId);
       const name = byId[catId]?.name ?? "";
       const color = textColorForCategory(catId, byId);
-      return `<button type="button" class="chip${active ? " active" : ""}" data-chip-cat="${catId}" style="padding:0 14px;${active ? "" : `color:${color};`}">${icon} ${escHtml(name)}</button>`;
+      return `<button type="button" class="chip${active ? " active" : ""}" data-chip-cat="${catId}" style="padding:0 14px;">
+        <span style="${active ? "" : `color:${color};`}">${catIcon}</span> ${escHtml(name)}
+      </button>`;
     }).join("");
 
     // Chip "Sin categoría · N" (artboard Movimientos.dc.html:35): activa = tinta invertida;
@@ -846,11 +889,12 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       : "";
 
     container.innerHTML = `
-      <header class="screen-header" style="flex-direction:row;align-items:center;justify-content:space-between;">
-        <h1 style="font-size:24px;font-weight:800;letter-spacing:-0.02em;">${t("common.movements")}</h1>
-        <button type="button" class="icon-btn" id="mov-search-toggle" aria-label="${t("movimientos.search.toggle")}">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4.2-4.2"></path></svg>
-        </button>
+      <header class="screen-header" style="flex-direction:row;align-items:flex-start;justify-content:space-between;">
+        <div style="display:flex;flex-direction:column;gap:3px;">
+          <h1 style="font: var(--t-title); letter-spacing:-.01em;">${t("common.movements")}</h1>
+          ${openPeriod ? `<span style="font:var(--t-label);color:var(--ink-3);">${t("inicio.header.dayOf", { period: escHtml(openPeriod.name), day: dayIndexOfPeriod(openPeriod.start_date, hoyISO()), total: expectedPeriodDays(openPeriod.start_date) })}</span>` : ""}
+        </div>
+        <button type="button" class="icon-btn" id="mov-search-toggle" aria-label="${t("movimientos.filter.toggle")}">${icon("filter")}</button>
       </header>
 
       ${state.searchOpen ? `
@@ -859,12 +903,14 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
         <input type="text" id="mov-search-input" value="${escAttr(state.filter.query)}" placeholder="${t("movimientos.search.placeholder")}">
       </label>` : ""}
 
-      <label class="field field-stack" style="margin-bottom:14px;">
-        <span class="field-label">${t("movimientos.periodLabel")}</span>
-        <select id="mov-period">
-          ${periods.map((p) => `<option value="${p.id}" ${p.id === state.periodId ? "selected" : ""}>${escHtml(p.name)}</option>`).join("")}
-        </select>
-      </label>
+      <div class="period-picker">
+        <button type="button" id="mov-period-prev" aria-label="${t("movimientos.period.prev")}" ${periodIdx >= periods.length - 1 ? "disabled" : ""}>${icon("back", { size: 18 })}</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${icon("calendar", { size: 17, stroke: "var(--ink-3)" })}
+          <span style="font-size:15px;font-weight:600;color:var(--ink);">${escHtml(currentPeriod.name)}</span>
+        </div>
+        <button type="button" id="mov-period-next" aria-label="${t("movimientos.period.next")}" ${periodIdx <= 0 ? "disabled" : ""}>${icon("chevronRight", { size: 18 })}</button>
+      </div>
 
       <div class="chips-row" style="margin-bottom:14px;">
         <button type="button" data-chip-all class="chip${allActive ? " active" : ""}" style="padding:0 14px;">${t("movimientos.chipAll")}</button>
@@ -878,23 +924,35 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
       <div id="mov-list-body">${listBodyHtml()}</div>
+      ${tagOlderNoteHtml()}
     `;
     wireList();
   }
 
+  async function changePeriod(id) {
+    state.periodId = id;
+    // D13: tagId sobrevive a un cambio de periodo (una etiqueta es transversal, D7) — el resto
+    // del filtro sí es intrínseco al periodo que se deja atrás y se resetea como siempre.
+    state.filter = { query: "", rootCatId: null, uncat: false, tagId: state.filter.tagId };
+    state.searchOpen = false;
+    try {
+      await loadPeriodData();
+    } catch (err) {
+      errorMsg = t("movimientos.error.loadPeriod", { error: userMessage(err) });
+    }
+    render();
+  }
+
   function wireList() {
-    container.querySelector("#mov-period").onchange = async (e) => {
-      state.periodId = e.target.value;
-      // D13: tagId sobrevive a un cambio de periodo (una etiqueta es transversal, D7) — el resto
-      // del filtro sí es intrínseco al periodo que se deja atrás y se resetea como siempre.
-      state.filter = { query: "", rootCatId: null, uncat: false, tagId: state.filter.tagId };
-      state.searchOpen = false;
-      try {
-        await loadPeriodData();
-      } catch (err) {
-        errorMsg = t("movimientos.error.loadPeriod", { error: userMessage(err) });
-      }
-      render();
+    // Los botones ya llegan `disabled` en el extremo correspondiente (ver renderList): un botón
+    // disabled no dispara click, así que no hace falta repetir aquí la comprobación de índice.
+    container.querySelector("#mov-period-prev").onclick = () => {
+      const idx = periods.findIndex((p) => p.id === state.periodId);
+      if (idx < periods.length - 1) changePeriod(periods[idx + 1].id);
+    };
+    container.querySelector("#mov-period-next").onclick = () => {
+      const idx = periods.findIndex((p) => p.id === state.periodId);
+      if (idx > 0) changePeriod(periods[idx - 1].id);
     };
 
     const searchToggle = container.querySelector("#mov-search-toggle");

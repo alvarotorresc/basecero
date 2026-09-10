@@ -375,10 +375,11 @@ main#screen {
   font-weight: 700;
 }
 
-/* rejilla ESTÁTICA de categorías en Registro (Registro v2 §4.3): repeat(4, 1fr), sin scroll
-   horizontal — sustituye a .chips-scroll SOLO en esta pantalla; recurrentes.js y movimientos.js
-   siguen con el scroller de 2 filas y no se tocan. .chip-v dentro de esta rejilla pierde su ancho
-   fijo de 74px (pensado para el auto-flow de .chips-scroll) para poder ocupar la columna entera. */
+/* rejilla ESTÁTICA de categorías (Registro v2 §4.3, MovimientoDetalle §2.2): repeat(4, 1fr), sin
+   scroll horizontal — sustituye a .chips-scroll en Registro y en el detalle de Movimientos;
+   recurrentes.js sigue con el scroller de 2 filas hasta que P4 lo migre. .chip-v dentro de esta
+   rejilla pierde su ancho fijo de 74px (pensado para el auto-flow de .chips-scroll) para poder
+   ocupar la columna entera. */
 .chips-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -476,7 +477,6 @@ main#screen {
 .list-row-icon svg { width: 20px; height: 20px; }
 .list-row-body { display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0; }
 .list-row-title { font-size: 15px; font-weight: 600; }
-.list-row-sub { font-size: 11px; color: var(--text-3); }
 .list-row-chevron { flex-shrink: 0; color: var(--text-3); width: 17px; height: 17px; }
 
 /* ===== campos de formulario (SISTEMA.md §4.5): sin caja, filete inferior ===== */
@@ -743,31 +743,6 @@ body.onboarding .fab { display: none; }
   background: var(--cat, var(--accent));
 }
 
-/* anillo de progreso conic-gradient con hueco central; el consumidor fija --pct (0-100, número)
-   y opcionalmente --cat para el color; el contenido (icono/span) se centra sobre el hueco */
-.ring {
-  width: 46px;
-  height: 46px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  position: relative;
-  display: grid;
-  place-items: center;
-  background: conic-gradient(var(--cat, var(--green)) calc(var(--pct, 0) * 1%), var(--surface-2) 0);
-}
-.ring::after {
-  content: "";
-  position: absolute;
-  inset: 5px;
-  border-radius: 50%;
-  background: var(--bg);
-}
-.ring > * {
-  position: relative;
-  z-index: 1;
-  font-size: 16px;
-}
-
 /* importe héroe de sección (SISTEMA.md §2.3): los céntimos y el símbolo van en .money-cents/.money-cur */
 .amount-hero {
   font: var(--t-figure-xl);
@@ -788,11 +763,6 @@ body.onboarding .fab { display: none; }
   40%, 60% { transform: translateX(4px); }
 }
 .shake { animation: bc-shake 0.4s; }
-
-/* ---- Onboarding (PR F): indicador de progreso de 4 pasos ---- */
-.onb-dots { display: flex; gap: 6px; justify-content: center; }
-.onb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--surface-2); }
-.onb-dot.on { background: var(--accent); width: 20px; border-radius: 999px; }
 
 /* ===== accesibilidad (Task 2 P2) ===== */
 /* foco visible global: reemplaza los `outline: none` de .field input/select y .budget-input
@@ -984,3 +954,230 @@ body.onboarding .fab { display: none; }
   border-left: 2px solid var(--accent);
   margin-bottom: var(--gap-section);
 }
+
+/* ===================== P0 · Transversal (SISTEMA.md §4.2, §4.6, §4.7, §1) ===================== */
+
+/* ===== cabecera de subpantalla (SISTEMA.md §4.2 · helper ui.js#subHeaderHtml) ===== */
+/* Tres celdas 44 / flex:1 / 44: el título queda centrado de verdad, lleve acción a la derecha o
+   un hueco. Va a sangre —filete inferior de borde a borde y pegada al techo— con márgenes
+   negativos que compensan el `padding: 20px var(--pad-screen)` de main#screen (app.css:21),
+   igual que .limit-band. NO reutiliza .screen-header: esa es la cabecera de PESTAÑA (§4.1). */
+.sub-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: -20px calc(var(--pad-screen) * -1) var(--s-5);
+  padding: 18px var(--pad-screen);
+  border-bottom: 1px solid var(--hairline);
+}
+.sub-header-body { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+/* 17px sans 600 sin token propio, igual que .modal-title: §2.3 no publica ese tamaño y no se
+   amplía la escala del sistema por un solo uso (ver D2 de la spec). */
+.sub-header-title { font: var(--t-section); font-size: 17px; color: var(--ink); margin: 0; }
+.sub-header-sub { font: var(--t-micro); font-size: 12px; color: var(--ink-3); text-align: center; }
+.sub-header-slot { width: 44px; height: 44px; flex-shrink: 0; }
+/* Variante de asistente (PeriodoNuevo.dc.html:24, Onboarding2-4): título --t-title a la
+   izquierda, subtítulo --t-label, sin hueco derecho. */
+.sub-header.is-start .sub-header-body { align-items: flex-start; }
+.sub-header.is-start .sub-header-title { font: var(--t-title); letter-spacing: -.01em; }
+.sub-header.is-start .sub-header-sub { font: var(--t-label); text-align: left; }
+
+/* ===== metadatos con divisor de 1px (SISTEMA.md §1 · helper ui.js#metaHtml) ===== */
+/* Sustituye al punto medio, que §1 prohíbe explícitamente. La altura del divisor es la del
+   artboard (11px en fila de lista, 12px en cabecera de sección): 11px es el caso mayoritario y
+   la diferencia no se ve, así que hay un solo valor. */
+.meta-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font: var(--t-label); color: var(--ink-3); }
+.meta-sep { width: 1px; height: 11px; background: var(--hairline-strong); flex-shrink: 0; }
+
+/* ===== botón destructivo de pantalla (SISTEMA.md §4.7) ===== */
+/* 46px. El del MODAL es .modal-danger (52px, app.css:881): son dos alturas distintas porque §4.12
+   le da al destructivo del modal la altura del primario, y §4.7 al de pantalla la del secundario. */
+.btn-danger {
+  height: 46px;
+  width: 100%;
+  border-radius: var(--r-pill);
+  background: var(--danger-tint);
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  font: 600 15px var(--font-sans);
+  cursor: pointer;
+}
+
+/* .amount-hero es el TOTAL DE SECCIÓN de §2.3 (34px). El número héroe de una pantalla —el saldo
+   de Inicio, el neto de Liquidar, el patrimonio, el pendiente de Recurrentes— es 56px: §2.3 lo
+   dice con esas palabras. Inicio ya lo tiene resuelto en su propia clase (.hero-account .balance,
+   app.css:925); esto es el equivalente genérico para las otras tres pantallas. */
+.amount-hero.lg { font: var(--t-hero); letter-spacing: -.02em; }
+/* .text-green/.text-red solo tiñen el contenedor, y .money-cents/.money-cur fijan su propio color
+   (app.css:780-781): sin esto, el neto «a tu favor» de Liquidar sale con el entero verde y los
+   céntimos grises. Es el mismo remedio que app.css:931-933 hace para .hero-account. */
+.amount-hero.text-green, .amount-hero.text-green .money-cents, .amount-hero.text-green .money-cur { color: var(--pos); }
+.amount-hero.text-red,   .amount-hero.text-red   .money-cents, .amount-hero.text-red   .money-cur { color: var(--danger); }
+
+/* ===== insignia de categoría: los tres tamaños de §4.3 ===== */
+/* .dotico base son los 44px de «fila de movimiento». Los otros dos tamaños del sistema:
+   36px «lista compacta» (Liquidar, subcategoría, fila de Gasto por categoría) y 64px
+   «destacado» (la vista previa de CategoriaForm). */
+.dotico.sm { width: 36px; height: 36px; font-size: 16px; }
+.dotico.lg { width: 64px; height: 64px; font-size: 28px; }
+
+/* ===== etiqueta de estado (SISTEMA.md §4.6, segundo bloque) ===== */
+/* NO es un chip: solo se lee, así que no le aplica el mínimo táctil de 44px. Si algún día es
+   pulsable, deja de ser etiqueta y pasa a ser .chip. */
+.state-pill {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 8px;
+  border-radius: var(--r-pill); background: var(--surface-2); color: var(--ink-2);
+  font: var(--t-micro); flex-shrink: 0;
+}
+.state-pill.warn { background: var(--warn-tint); color: var(--warn); }
+.state-pill.pos { background: var(--pos-tint); color: var(--pos); }
+
+/* ===================== P1 · Movimientos ===================== */
+
+/* ===== selector de periodo con flechas (Movimientos.dc.html:29-40) ===== */
+/* Sustituye a <select id="mov-period">: caja de 48px con filete, SIN radio (SISTEMA.md §1 no
+   deja nada aquí que parezca .chip/.field), con dos botones circulares de 40px a los lados del
+   nombre del periodo. Los botones no llevan borde propio: el filete ya lo pone la caja. */
+.period-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  height: 48px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-0);
+  padding: 0 6px;
+  margin-bottom: 14px;
+  box-sizing: border-box;
+}
+.period-picker button {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-circle);
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.period-picker button:disabled { opacity: .5; cursor: default; }
+
+/* ===== píldora de tipo, informativa (MovimientoDetalle.dc.html:38-44) ===== */
+/* NO es un chip de acción (el tipo de un movimiento guardado no se toca aquí) ni .state-pill
+   (20px, para una sola palabra de estado): 34px de lectura, sin el mínimo táctil de 44px porque
+   no es tocable — SISTEMA.md §2 lo dice explícitamente para este bloque. */
+.type-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 13px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--hairline-strong);
+  color: var(--ink-2);
+  font: 500 13px var(--font-sans);
+}
+.type-pill.active {
+  background: var(--surface-2);
+  border-color: transparent;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ===== caja de fecha con input nativo transparente (MovimientoDetalle.dc.html:97-101) ===== */
+/* El <input type="date"> real queda a sangre encima de la caja (opacity 0, cubre todo el filete)
+   para que tocar cualquier punto abra el selector nativo, no solo el diminuto icono de calendario
+   del navegador. Como el input queda invisible, :focus-within pinta el anillo en su lugar — el
+   :focus-visible global (app.css) nunca llegaría a verse en un elemento con opacity:0. */
+.field-date {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-0);
+  padding: 0 13px;
+  box-sizing: border-box;
+}
+.field-date input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+.field-date:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* ===================== P3 · Liquidar ===================== */
+
+/* ===== casilla de selección (SISTEMA.md §4.8 bis) ===== */
+/* 22x22 cuadrada, dentro de una fila de 60px que ya da el objetivo táctil: la casilla no lleva
+   padding propio de 44px porque le robaría ancho al contenido de la fila (§2.4 lo dice así). */
+.check-box {
+  width: 22px; height: 22px; flex-shrink: 0; box-sizing: border-box;
+  border-radius: var(--r-0); border: 1px solid var(--hairline-strong);
+  background: transparent; color: transparent;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+}
+.check-box[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+/* ===================== P4 · Recurrentes ===================== */
+
+/* El importe de una fila de Recurrentes (screens/recurrentes.js#ruleRowHtml) tiñe las TRES partes
+   de moneyPartsHtml —entero, céntimos, símbolo—, no solo la principal: a diferencia de
+   .tx-amount.positive (app.css:440), que deja .money-cents/.money-cur en su gris por defecto,
+   Recurrentes.dc.html:141-143 (Nómina, +1.850,00 €) y :151 (transferencia, 200,00 €) pintan el
+   importe entero de un color, mismo remedio que .amount-hero.text-green (app.css:1044). Clase
+   propia (no se toca .tx-amount: no está en la lista de selectores que este paquete puede tocar). */
+.rec-amount-pos, .rec-amount-pos .money-cents, .rec-amount-pos .money-cur { color: var(--pos); }
+.rec-amount-muted, .rec-amount-muted .money-cents, .rec-amount-muted .money-cur { color: var(--ink-3); }
+
+/* El toggle real de la fila (D7) es un <button role="switch"> reutilizando .toggle/.toggle-track/
+   .toggle-knob (app.css:539-585), pero SIN el <input type="checkbox"> oculto del que depende el
+   anillo de foco de esas reglas (`input:focus-visible ~ .toggle-track`): sin esto, el botón no
+   muestra foco por teclado. Clase propia — .toggle no está en la lista de selectores de P4. */
+.rec-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* ===================== P6 · Ajustes ===================== */
+
+/* .meta-row ya fija --ink-3 (app.css P0): las notas de detección del asistente de import
+   (ImportAsistente.dc.html, spec §7.2 bloque 3) van en --pos con un icon("check") delante en
+   vez del glifo de texto que llevaban — este modificador es lo único que falta para que
+   metaHtml() pueda pintarlas en ese color sin tocar la regla compartida de P0. */
+.meta-row.pos { color: var(--pos); }
+/* ===================== P7 · Onboarding ===================== */
+
+/* ===== progreso del onboarding (Onboarding1-4.dc.html:19-24) ===== */
+.onb-bars { display: flex; align-items: center; gap: 6px; }
+.onb-bar { flex: 1; height: 3px; border-radius: var(--r-pill); background: var(--surface-2); }
+.onb-bar.on { background: var(--accent); }
+/* ===================== P8 · Pantallas nuevas ===================== */
+/* Suscripciones (§9.4): el subtítulo de la fila activa («renueva el martes, 15 de…») se trunca
+   con la elipsis de .tx-sub cuando el nombre del día es largo. El artboard deja que la línea
+   quepa entera — modificador solo para esta pantalla. */
+.tx-sub.wrap { overflow: visible; text-overflow: unset; white-space: normal; }
+/* Semana (§9.2): el nombre de día sale de i18n.weekdaysLong en minúscula porque esa clave la usan
+   también frases donde el día va en medio de una oración; aquí se capitaliza en el markup. */
+.week-day-name { text-transform: capitalize; }
+/* Etiqueta de proyecto elegida (SISTEMA.md §4.16bis, Registro): una etiqueta es transversal a las
+   categorías y no tiene color propio — chip neutro, nunca el lima de .chip.active. */
+.chip.is-tag {
+  background: var(--surface-2);
+  border: 1px solid var(--hairline-strong);
+  color: var(--ink);
+  font-weight: 500;
+}
+/* Gasto por categoría (§9.7): el € es ahora la cifra destacada de la cabecera de fila (16px), pero
+   .money-cents/.money-cur son proporciones EM pensadas para figuras de 34-56px (SISTEMA §2.3) —
+   a 16px salen ilegibles (9/6.7px). Selector con ámbito (no se toca .money-cents/.money-cur en
+   sí) para que esta fila concreta lea 16/13/12, como el artboard. */
+.gc-amount { font-size: 16px; font-weight: 500; }
+.gc-amount .money-cents { font-size: .8125em; }
+.gc-amount .money-cur { font-size: .75em; }

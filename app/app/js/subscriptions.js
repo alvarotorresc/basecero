@@ -185,6 +185,34 @@ export function parseIgnored(raw) {
   return out;
 }
 
+/** Coste MENSUAL normalizado de todas las reglas activas que no son ingreso — el segundo dato del
+ *  héroe de Recurrentes («789,88 € al mes» en Recurrentes.dc.html:36). Deriva del anual con un
+ *  solo redondeo, igual que monthlyCents/monthlyTotalCents, para que dos vistas del mismo
+ *  conjunto no discrepen en un céntimo.
+ *  Excluye type:"income" por el mismo criterio que repo.previsionOfPeriod#comprometidoCents: un
+ *  ingreso previsto no es un compromiso mensual. SÍ incluye las transferencias: una aportación
+ *  mensual a la hucha es dinero comprometido igual que el alquiler.
+ *  Importe ÍNTEGRO, nunca prorrateado por my_share_pct (mismo criterio y mismo motivo que
+ *  annualCents: prorratear ataría la cifra al ajuste de reparto del periodo abierto). */
+export const monthlyCommitmentCents = (rules) =>
+  Math.round((rules ?? [])
+    .filter((r) => r.is_active && !r.cancelled_at && r.type !== "income")
+    .reduce((s, r) => s + annualCents(r), 0) / 12);
+
+/** Etiqueta de estado bajo el importe de una fila de Recurrentes (spec §5.1, decisión 7). `item`
+ *  es el { rule, myCents, paid } que devuelve repo.previsionOfPeriod para esta regla, o
+ *  undefined/null si la regla no aplica este mes (previsionOfPeriod la deja fuera de `items`).
+ *  El TIPO manda: una transferencia no es "pagada" ni "pendiente" —es un movimiento entre cuentas
+ *  propias— así que lleva SIEMPRE la misma etiqueta, tenga o no item este periodo. Un ingreso
+ *  previsto nunca lleva etiqueta (va con el signo + en verde, sin más). Para el resto (gasto),
+ *  la etiqueta depende de item.paid; sin item, la regla no aplica este mes y no lleva ninguna. */
+export function ruleStateKey(rule, item) {
+  if (rule.type === "transfer") return "transfer";
+  if (rule.type === "income") return null;
+  if (!item) return null;
+  return item.paid ? "paid" : "pending";
+}
+
 /** Mapa saneado {ruleId: dueIso} de meta.renewal_snoozed. Mismo criterio de defensa en
  *  profundidad que parseIgnored: JSON roto, no-objeto, o una entrada cuyo valor no es una fecha
  *  ISO con forma válida se descarta en silencio. Guard `__proto__`: `out[k]=` SÍ dispara el

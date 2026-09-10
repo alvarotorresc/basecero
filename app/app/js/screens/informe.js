@@ -9,6 +9,8 @@ import { renderSuscripciones } from "./suscripciones.js";
 import { pushBack, goBack } from "../back.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
+import { subHeaderHtml } from "../ui.js";
+import { icon } from "../icons.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -32,9 +34,10 @@ function renderInformeError(container, onBack, message, retry) {
   container.querySelector("#informe-error-back").onclick = () => onBack();
 }
 
-const BACK_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg>`;
-const CHEVRON_SVG = (deg) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${deg}deg);"><path d="M9 5l7 7-7 7"></path></svg>`;
-const DOWNLOAD_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-4px;margin-right:6px;"><path d="M12 3v13m0 0-5-5m5 5 5-5M4 21h16"></path></svg>`;
+// Chevron del repertorio (icons.js#chevronRight), girado por CSS: 0deg apunta a la derecha
+// (enlace, fila plegada), 90deg apunta hacia abajo (fila desplegada) — mismo mecanismo de
+// rotación que tenía el SVG redibujado, ahora con el trazo canónico de §3.
+const chevronSvg = (deg) => `<span style="display:inline-flex;transform:rotate(${deg}deg);">${icon("chevronRight", { size: 16 })}</span>`;
 
 function headerHtml(report, periods) {
   const m = report.meta;
@@ -44,11 +47,7 @@ function headerHtml(report, periods) {
   const now = new Date();
   const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
   return `
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-    <button type="button" class="icon-btn" id="informe-back" aria-label="${t("common.goBack")}"
-      style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;">${BACK_SVG}</button>
-    <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">${t("informe.title")}</div>
-  </div>
+  ${subHeaderHtml({ id: "informe-back", title: t("informe.title") })}
   <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;">
     <div style="font-size:17px;font-weight:700;">${escHtml(m.name)}</div>
     <div style="font-size:13px;">${statusHtml}</div>
@@ -67,7 +66,7 @@ function headerHtml(report, periods) {
 function downloadHtml(state) {
   return `
   <div style="margin-bottom:20px;">
-    <button type="button" class="btn-primary" id="informe-download" ${state.downloading ? "disabled" : ""}>${state.downloading ? t("informe.downloading") : `${DOWNLOAD_SVG}${t("informe.download")}`}</button>
+    <button type="button" class="btn-primary" id="informe-download" ${state.downloading ? "disabled" : ""}>${state.downloading ? t("informe.downloading") : `${icon("download", { size: 20, width: 2, style: "vertical-align:-4px;margin-right:6px;" })}${t("informe.download")}`}</button>
     <div style="font-size:11px;color:var(--text-3);margin-top:8px;">${t("informe.downloadHint")}</div>
     ${state.downloadError ? `<div class="banner-aviso red" style="margin-top:10px;">${escHtml(state.downloadError)}</div>` : ""}
   </div>`;
@@ -164,9 +163,14 @@ function categoriesHtml(report, prevPeriodName) {
       ? comparisonBarsSvg([{ key: r.rootId, value: r.spentCents, prevValue: r.prevCents, color: r.color }],
         { width: 22, rowH: 14, barH: 6 })
       : "";
+    // D4: la tendencia plana no lleva flecha, solo el porcentaje en --ink-3 — §4.19 solo define
+    // subida y bajada, así que "new"/"flat" se quedan sin icon().
+    const trendArrow = r.direction === "down" ? icon("trendDown", { size: 14, width: 2.2 })
+      : r.direction === "up" ? icon("trendUp", { size: 14, width: 2.2 })
+      : "";
     const trend = r.direction === "new" ? "" : `
-      <span style="color:${r.direction === "down" ? "var(--pos)" : r.direction === "up" ? "var(--danger)" : "var(--ink-3)"};">
-        ${r.direction === "down" ? "↓" : r.direction === "up" ? "↑" : "·"} ${r.deltaPct != null ? escHtml(fmtPct(Math.abs(r.deltaPct) / 100)) : ""}
+      <span style="display:inline-flex;align-items:center;gap:3px;color:${r.direction === "down" ? "var(--pos)" : r.direction === "up" ? "var(--danger)" : "var(--ink-3)"};">
+        ${trendArrow}${r.deltaPct != null ? escHtml(fmtPct(Math.abs(r.deltaPct) / 100)) : ""}
       </span>`;
     return `
     <div style="display:flex;flex-direction:column;gap:6px;">
@@ -233,7 +237,7 @@ function subscriptionsHtml(report) {
   <div style="margin-bottom:24px;">
     <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px;">
       <span class="section-title">${t("informe.subscriptions.title")}</span>
-      <button type="button" id="informe-suscripciones-link" class="link-btn" style="display:flex;align-items:center;gap:4px;">${t("informe.subscriptions.link")}${CHEVRON_SVG(0)}</button>
+      <button type="button" id="informe-suscripciones-link" class="link-btn" style="display:flex;align-items:center;gap:4px;">${t("informe.subscriptions.link")}${chevronSvg(0)}</button>
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
       <span style="font-size:14px;font-weight:500;">${t("informe.subscriptions.active", { n: s.activeCount })}</span>
@@ -271,7 +275,7 @@ function movementGroupHtml(g, expanded) {
         <span class="num" style="font-size:11px;color:var(--ink-3);">${t("informe.movements.groupCount", { n: g.count ?? g.items.length })}</span>
       </div>
       <span class="num" style="font-size:13px;font-weight:600;">${escHtml(fmtMoney(g.totalCents))}</span>
-      <span style="width:28px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--ink-3);">${CHEVRON_SVG(expanded ? 90 : 0)}</span>
+      <span style="width:28px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--ink-3);">${chevronSvg(expanded ? 90 : 0)}</span>
     </button>
     ${expanded ? `<div style="padding-left:46px;">${rowsHtml}${more}</div>` : ""}
   </div>`;

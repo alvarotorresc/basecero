@@ -8,7 +8,9 @@ import { budgetMap } from "../category-spend.js";
 import { limitWarning } from "../limit-warning.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
+import { icon } from "../icons.js";
 import { t } from "../i18n/index.js";
+import { metaHtml, subHeaderHtml } from "../ui.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { userMessage } from "../errors.js";
 import { focusInput } from "../viewport.js";
@@ -39,11 +41,9 @@ const CATS_GRID_LIMIT = 8;
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
-// Icono "etiqueta" del repertorio SISTEMA.md §3, mismo path que movimientos.js#ICON_TAG (Task 13:
-// mismo selector inline que el detalle, ver su comentario). `currentColor` para heredar el tinte
-// de la chip cerrada (etiqueta puesta/sin etiqueta) o de una opción del selector abierto.
-const ICON_TAG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V4h7l9 9-7 7z"></path><circle cx="8" cy="8" r="1.2"></circle></svg>`;
-const ICON_PLUS_SMALL = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>`;
+// Icono "etiqueta"/"más" del repertorio SISTEMA.md §3 (icons.js), ya no copias locales.
+const ICON_TAG = icon("tag", { size: 14 });
+const ICON_PLUS_SMALL = icon("plus", { size: 13, width: 2 });
 
 /** Copia de la banda de límite (Registro v2 §6.2): «Con este gasto quedan {amount} de {name}» en
  *  ok/warn, «…te pasas {amount}…» en over. Devuelve texto SIN escapar — quien la use en un
@@ -139,6 +139,9 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     quick: quickRegisterEnabled(meta.quick_register),
     expanded: false,
     allCats: false,
+    // Registro v2 §9.3: el desplegable manual de "los otros tres tipos" — se cierra al cambiar de
+    // tipo (ver el handler de [data-tipo]); typeSelectorHtml lo vuelve a abrir solo si hace falta.
+    typeMoreOpen: false,
     // Registro v2 §5.4: campos que el usuario ya tocó a mano en ESTE formulario — la memoria de
     // comercios nunca vuelve a pisarlos (registro-mode no interviene aquí; es del formulario, no
     // de la densidad). merchantRemembered pinta la pista «recordado de la última vez». Un prefill
@@ -206,7 +209,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     if (!state.tagPickerOpen) {
       const hasTag = !!state.tagId;
       return `
-      <button type="button" class="chip${hasTag ? " active" : ""}" id="reg-tag-chip"
+      <button type="button" class="chip${hasTag ? " is-tag" : ""}" id="reg-tag-chip"
         style="align-self:flex-start;padding:0 14px;display:inline-flex;align-items:center;gap:7px;${hasTag ? "" : "background:transparent;border:1px dashed var(--rule);"}">
         ${ICON_TAG}${hasTag ? escHtml(tagName(state.tagId)) : t("movimientos.detail.noTag")}
       </button>`;
@@ -255,9 +258,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       <div class="card" style="padding:12px 14px; margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
         <div style="min-width:0;">
           <div style="font-size:10px; color:var(--text-3);">${t("common.linkedTo")}</div>
-          <div style="font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-            ${escHtml(label)} · ${fmtMoney(linked.amount_cents)}
-          </div>
+          ${metaHtml([label, fmtMoney(linked.amount_cents)])}
         </div>
         <button type="button" id="reg-refund-unlink" class="icon-btn" aria-label="${t("registro.refund.unlink")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
       </div>`;
@@ -348,12 +349,40 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     </button>`;
   }
 
+  /** Selector de tipo (Registro v2 §9.3): en modo rápido, CON el bloque plegable cerrado, NO se
+   *  pinta — el formulario queda fijo a gasto. En cuanto el bloque está abierto (modo completo, o
+   *  modo rápido tras tocar «Más» — detailsOpen() es el mismo criterio que gatea cuenta/comercio/
+   *  fecha/nota) aparecen dos píldoras siempre visibles (Gasto/Ingreso) + un botón circular de
+   *  30px que despliega los otros tres tipos (transferencia/devolución/ajuste). La rejilla extra se
+   *  enseña si el usuario la ha abierto a mano O si el tipo activo ya es uno de esos tres — así un
+   *  prefill de transferencia no aterriza con su propio tipo escondido. */
+  function typeSelectorHtml(formOpen) {
+    if (!formOpen) return "";
+    const mainTipos = TIPOS.filter((tp) => tp.id === "expense" || tp.id === "income");
+    const extraTipos = TIPOS.filter((tp) => tp.id !== "expense" && tp.id !== "income");
+    const extraOpen = state.typeMoreOpen || extraTipos.some((tp) => tp.id === state.tipo);
+    const pillStyle = (active) => active
+      ? "height:44px;border-radius:999px;border:0;background:var(--surface-2);color:var(--ink);font-size:13px;font-weight:600;padding:0 13px;cursor:pointer;"
+      : "height:44px;border-radius:999px;border:1px solid var(--hairline-strong);background:transparent;color:var(--ink-3);font-size:13px;font-weight:500;padding:0 13px;cursor:pointer;";
+    return `
+    <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+      <div style="display:flex; align-items:center; gap:6px;">
+        ${mainTipos.map((tp) => `<button type="button" data-tipo="${tp.id}" style="${pillStyle(state.tipo === tp.id)}">${t(tp.labelKey)}</button>`).join("")}
+        <button type="button" id="reg-type-more" aria-label="${escAttr(t("registro.type.more"))}" aria-expanded="${extraOpen ? "true" : "false"}"
+          style="width:30px;height:30px;border-radius:999px;border:1px solid var(--hairline-strong);background:transparent;color:var(--ink-3);display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;cursor:pointer;">
+          ${icon("chevronDown", { size: 16 })}
+        </button>
+      </div>
+      ${extraOpen ? `
+      <div class="chips">
+        ${extraTipos.map((tp) => `<button type="button" data-tipo="${tp.id}" class="chip${state.tipo === tp.id ? " active" : ""}">${t(tp.labelKey)}</button>`).join("")}
+      </div>` : ""}
+    </div>`;
+  }
+
   function render() {
     const cats = categoriesFor();
     const { mine: myCents, partner: partnerCents } = state.isShared ? splitCents(state.cents, state.sharePct) : { mine: state.cents, partner: 0 };
-    // Color del display/importe y del botón de guardar: se leen del state en CADA pintado, así
-    // que basta con el render() que ya dispara el click de categoría — sin estado nuevo.
-    const amountColor = state.categoryId ? textColorForCategory(state.categoryId, byId) : "var(--text)";
     // §1 principio 2: un solo acento. El CTA es SIEMPRE lima, ya no toma el color de la categoría.
     const saveStyle = needsCategory(state.tipo) && state.categoryId
       ? `background:var(--accent);color:var(--accent-ink);`
@@ -370,32 +399,24 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     const warning = state.tipo === "expense"
       ? limitWarning({ categoryId: state.categoryId, amountCents: myCents, byId, spentByRoot, budgetByCategory })
       : null;
+    // D13: el héroe de 56px es solo el registro rápido "de verdad" (bloque plegable cerrado); en
+    // cuanto se ve el resto del formulario —modo completo, o modo rápido tras tocar «Más»— la
+    // pantalla ya es visualmente RegistroCompleto.dc.html, con el importe a 36px.
+    const formOpen = detailsOpen({ quick: state.quick, expanded: state.expanded, tipo: state.tipo });
 
     container.innerHTML = `
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-        <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${t("registro.title")}</h1>
-        <button type="button" class="icon-btn" id="reg-close" aria-label="${t("registro.close")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
-      </div>
+      ${subHeaderHtml({ id: null, title: t("registro.title"), action: { id: "reg-close", icon: "close", label: t("registro.close") } })}
 
-      <div class="segmented" style="margin-bottom:18px;border-radius:999px;">
-        ${TIPOS.map((tp) => {
-          const active = state.tipo === tp.id;
-          const segStyle = active
-            ? "border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:600;"
-            : "border-radius:999px;";
-          return `<button type="button" data-tipo="${tp.id}" class="${active ? "active" : ""}" style="${segStyle}">${t(tp.labelKey)}</button>`;
-        }).join("")}
-      </div>
+      ${typeSelectorHtml(formOpen)}
 
-      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
-        <div class="section-title">${t("common.amount")}</div>
+      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px; padding-bottom:10px; border-bottom:2px solid var(--accent);">
+        <span style="font-size:13px; font-weight:500; color:var(--accent);">${t("common.amount")}</span>
         <div class="amount-display" style="align-items:center;">
           ${state.tipo === "adjustment" ? `<button type="button" class="icon-btn" id="reg-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;">${state.adjustmentSign}</button>` : ""}
           <input type="text" inputmode="decimal" id="reg-raw" value="${escAttr(state.raw)}" placeholder="0" autocomplete="off"
-            style="border:0;background:none;color:${amountColor};font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
-          <span class="amount-currency" style="color:${amountColor};">${escHtml(currencySymbol())}</span>
+            style="border:0;background:none;color:var(--ink);font:600 ${formOpen ? "36" : "56"}px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
+          <span class="amount-currency">${escHtml(currencySymbol())}</span>
         </div>
-        <hr class="divider" style="margin-top:6px;">
       </div>
 
       ${cats.length ? (() => {
@@ -413,13 +434,15 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
           ${shown.map((c) => {
             const color = colorForCategory(c.id, byId);
             const textColor = textColorForCategory(c.id, byId);
-            const icon = iconForCategory(c.id, byId);
+            const categoryEmoji = iconForCategory(c.id, byId);
             const active = state.categoryId === c.id;
             const chipStyle = active
               ? `--cat:${color};background:color-mix(in srgb, ${color} 16%, transparent);color:${textColor};font-weight:700;`
               : `--cat:${color};`;
+            // Celda plana (Registro v2 §9.3): SIN la insignia circular de .chip-icon, que es para
+            // la fila horizontal de filtro — aquí el emoji va suelto a 21px, como el artboard.
             return `<button type="button" class="chip-v${active ? " active" : ""}" data-cat="${c.id}" style="${chipStyle}">
-              <span class="chip-icon">${icon}</span><span>${escHtml(c.name)}</span>
+              <span style="font-size:21px;line-height:1;" aria-hidden="true">${categoryEmoji}</span><span>${escHtml(c.name)}</span>
             </button>`;
           }).join("")}
         </div>
@@ -501,11 +524,11 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
           </div>
           <div style="display:flex; gap:8px;">
             <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
-              <div style="font-size:10px; color:var(--text-3);">${t("common.myShare", { pct: state.sharePct })}</div>
+              <div style="font-size:10px; color:var(--text-3);">${metaHtml([t("common.myShare"), t("common.pctValue", { pct: state.sharePct })])}</div>
               <div class="num" id="reg-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
             </div>
             <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
-              <div style="font-size:10px; color:var(--text-3);">${partnerPaid() ? t("common.paidFull", { name: escHtml(partnerName) }) : `${escHtml(partnerName)} · ${100 - state.sharePct}%`}</div>
+              <div style="font-size:10px; color:var(--text-3);">${partnerPaid() ? metaHtml([t("common.paidByName", { name: partnerName }), t("common.paidTotal")]) : metaHtml([partnerName, t("common.pctValue", { pct: 100 - state.sharePct })])}</div>
               <div class="num" id="reg-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerPaid() ? state.cents : partnerCents)}</div>
             </div>
           </div>
@@ -537,10 +560,19 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         // Un touched de un tipo anterior (p.ej. categoryId de un gasto) no tiene sentido para el
         // tipo nuevo — categoryId ya se acaba de borrar dos líneas arriba.
         state.touched = new Set();
+        // Cierra el desplegable manual: typeSelectorHtml lo reabre solo si el tipo elegido es uno
+        // de los tres que vive dentro de él.
+        state.typeMoreOpen = false;
         errorMsg = "";
         render();
       };
     });
+
+    const typeMoreBtn = container.querySelector("#reg-type-more");
+    if (typeMoreBtn) typeMoreBtn.onclick = () => {
+      state.typeMoreOpen = !state.typeMoreOpen;
+      render();
+    };
 
     container.querySelectorAll("[data-cat]").forEach((b) => {
       b.onclick = () => {

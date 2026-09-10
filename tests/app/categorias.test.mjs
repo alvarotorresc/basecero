@@ -44,6 +44,23 @@ test("computeReorder: no muta el array recibido", () => {
   assert.deepEqual(ids, ["a", "b", "c"]);
 });
 
+// Con las hijas SIEMPRE visibles (decisión 4, spec §6.1), el grupo de raíces de un flow ya no
+// ocupa posiciones contiguas en el DOM: entre "Casa" y "Alimentación" hay las filas de hijas de
+// Casa (categorias.js#wireDragHandle deriva rowEls con querySelector por id, nunca por índice
+// contiguo). computeReorder solo ve el array de IDs del grupo — nunca los rects de pantalla ni
+// las filas que hay de por medio — así que el resultado es idéntico al del mismo grupo "solo",
+// sin hijas intercaladas: es la garantía en Node de que la decisión 4 no rompe el reordenar.
+test("computeReorder: le da igual que las filas de un grupo no sean contiguas en el DOM — es una función pura sobre IDs, nunca sobre posiciones de pantalla", () => {
+  // computeReorder solo ve el array de IDs del grupo — nunca los rects de pantalla ni las filas
+  // de hijas que caen de por medio en el DOM real —, así que comprobar el resultado exacto sobre
+  // este array YA es la garantía: no hace falta (ni tiene sentido) comparar contra una segunda
+  // llamada con el mismo literal, eso pasaría para cualquier implementación, incluida una que no
+  // reordene nada.
+  const group = ["cat-casa", "cat-alimentacion", "cat-ocio"];
+  assert.deepEqual(computeReorder(group, 0, 2), ["cat-alimentacion", "cat-ocio", "cat-casa"]);
+  assert.deepEqual(computeReorder(group, 2, 0), ["cat-ocio", "cat-casa", "cat-alimentacion"]);
+});
+
 // ---- SQL directas contra node:sqlite ----------------------------------------
 
 test("SQL.insertCategory: crea una raíz con display_order = MAX+1 de SU grupo (flow+parent_id='')", () => {

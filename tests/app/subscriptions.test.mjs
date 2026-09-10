@@ -4,6 +4,7 @@ import {
   annualCents, monthlyCents, activeSubscriptions, inactiveSubscriptions,
   annualTotalCents, monthlyTotalCents, nextRenewal, daysUntil, wholeMonthsBetween, savedSinceCancelCents,
   RENEWAL_SOON_DAYS, renewalNotice, parseIgnored, parseSnoozed, IGNORED_MAX,
+  monthlyCommitmentCents, ruleStateKey,
 } from "../../app/app/js/subscriptions.js";
 
 /** Regla mínima con la forma de una fila real de recurring_rules — solo los campos que estos
@@ -289,4 +290,79 @@ test("parseSnoozed: JSON roto → vacío; entradas no-string/fechas mal formadas
   const withProto = parseSnoozed(JSON.stringify({ "rule-1": "2026-09-14", "__proto__": "2026-09-14" }));
   assert.deepEqual(withProto, { "rule-1": "2026-09-14" });
   assert.equal(({}).polluted, undefined);
+});
+
+// ---- monthlyCommitmentCents (P4, spec §5.3) ------------------------------------------------
+
+test("monthlyCommitmentCents: excluye type:\"income\"", () => {
+  const nomina = rule({ type: "income", amount_cents: 185000, frequency: "monthly" });
+  assert.equal(monthlyCommitmentCents([nomina]), 0);
+});
+
+test("monthlyCommitmentCents: excluye is_active:0 y cancelled_at", () => {
+  const pausada = rule({ type: "expense", amount_cents: 1000, frequency: "monthly", is_active: 0 });
+  const cancelada = rule({
+    type: "expense", amount_cents: 1000, frequency: "monthly",
+    is_active: 0, cancelled_at: "2026-06-01",
+  });
+  assert.equal(monthlyCommitmentCents([pausada, cancelada]), 0);
+});
+
+test("monthlyCommitmentCents: incluye type:\"transfer\"", () => {
+  const ahorro = rule({ type: "transfer", amount_cents: 20000, frequency: "monthly" });
+  assert.equal(monthlyCommitmentCents([ahorro]), 20000);
+});
+
+test("monthlyCommitmentCents: normaliza una anual y una trimestral con UN solo redondeo", () => {
+  const anual = rule({ type: "expense", amount_cents: 9999, frequency: "yearly" }); // 9999/12 = 833.25
+  const trimestral = rule({ type: "expense", amount_cents: 2500, frequency: "quarterly" }); // 2500*4/12 = 833.33
+  assert.equal(monthlyCommitmentCents([anual]), 833);
+  assert.equal(monthlyCommitmentCents([trimestral]), 833);
+});
+
+// El test que fija el diseño (spec §5.3, Recurrentes.dc.html:36): la lista del artboard da
+// EXACTAMENTE 78988 (789,88 €/mes) — 650,00 + 89,90 + 34,00 + 12,99 + 2,99, todas mensuales.
+test("monthlyCommitmentCents: la lista del artboard da 78988", () => {
+  const rules = [
+    rule({ type: "expense", amount_cents: 65000, frequency: "monthly" }),
+    rule({ type: "expense", amount_cents: 8990, frequency: "monthly" }),
+    rule({ type: "expense", amount_cents: 3400, frequency: "monthly", is_subscription: 1 }),
+    rule({ type: "expense", amount_cents: 1299, frequency: "monthly", is_subscription: 1 }),
+    rule({ type: "expense", amount_cents: 299, frequency: "monthly", is_subscription: 1 }),
+  ];
+  assert.equal(monthlyCommitmentCents(rules), 78988);
+});
+
+test("monthlyCommitmentCents: lista vacía o nula da 0", () => {
+  assert.equal(monthlyCommitmentCents([]), 0);
+  assert.equal(monthlyCommitmentCents(undefined), 0);
+});
+
+// ---- ruleStateKey (P4, spec §5.1 decisión 7) -----------------------------------------------
+
+test("ruleStateKey: una transferencia es siempre \"transfer\", tenga o no item este periodo", () => {
+  const transferRule = rule({ type: "transfer" });
+  assert.equal(ruleStateKey(transferRule, { rule: transferRule, myCents: 100, paid: false }), "transfer");
+  assert.equal(ruleStateKey(transferRule, undefined), "transfer");
+});
+
+test("ruleStateKey: un ingreso nunca lleva etiqueta, tenga o no item", () => {
+  const incomeRule = rule({ type: "income" });
+  assert.equal(ruleStateKey(incomeRule, { rule: incomeRule, myCents: 100, paid: true }), null);
+  assert.equal(ruleStateKey(incomeRule, undefined), null);
+});
+
+test("ruleStateKey: un gasto con item pagado da \"paid\"", () => {
+  const expenseRule = rule({ type: "expense" });
+  assert.equal(ruleStateKey(expenseRule, { rule: expenseRule, myCents: 100, paid: true }), "paid");
+});
+
+test("ruleStateKey: un gasto con item sin pagar da \"pending\"", () => {
+  const expenseRule = rule({ type: "expense" });
+  assert.equal(ruleStateKey(expenseRule, { rule: expenseRule, myCents: 100, paid: false }), "pending");
+});
+
+test("ruleStateKey: un gasto SIN item (no aplica este mes) no lleva etiqueta", () => {
+  const expenseRule = rule({ type: "expense" });
+  assert.equal(ruleStateKey(expenseRule, undefined), null);
 });

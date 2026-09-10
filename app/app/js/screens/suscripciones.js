@@ -16,6 +16,7 @@ import { showConfirm } from "../modal.js";
 import { showToast } from "../toast.js";
 import { skeletonHtml } from "../skeleton.js";
 import { renderRecurrentes } from "./recurrentes.js";
+import { subHeaderHtml } from "../ui.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -117,7 +118,7 @@ function activeRowHtml(rule, byId, todayIso) {
         <span>${escHtml(rule.name)}</span>
         ${rule.is_shared ? sharedPillHtml() : ""}
       </div>
-      <div class="tx-sub" style="${warn ? "color:var(--warn);font-weight:600;" : ""}">${text}</div>
+      <div class="tx-sub wrap" style="${warn ? "color:var(--warn);font-weight:600;" : ""}">${text}</div>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">
       <div class="tx-amount">${moneyPartsHtml(rule.amount_cents)}</div>
@@ -130,7 +131,7 @@ function activeRowHtml(rule, byId, todayIso) {
 function candidateHtml(candidate, byId) {
   const dates = [...candidate.lastDates].reverse().map((d) => fmtDiaCorto(d)).join(", ");
   return `
-  <div data-candidate="${escAttr(candidate.merchantKey)}" style="display:flex;flex-direction:column;gap:14px;padding:16px;background:var(--surface);margin-bottom:14px;">
+  <div style="display:flex;flex-direction:column;gap:14px;padding:16px;background:var(--surface);margin-bottom:14px;">
     <div style="display:flex;align-items:center;gap:12px;">
       ${badgeHtml(candidate, byId)}
       <div class="tx-body">
@@ -190,12 +191,7 @@ export async function renderSuscripciones(container, onBack) {
   const isEmpty = actives.length === 0 && candidates.length === 0 && inactives.length === 0;
 
   container.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
-      <button type="button" class="icon-btn" id="susc-back" aria-label="${t("common.goBack")}"
-        style="width:44px;height:44px;border-radius:50%;background:var(--surface);color:var(--ink);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"></path></svg></button>
-      <h1 style="flex:1;text-align:center;font-size:17px;font-weight:600;">${t("suscripciones.title")}</h1>
-      <span style="width:44px;flex-shrink:0;"></span>
-    </div>
+    ${subHeaderHtml({ id: "susc-back", title: t("suscripciones.title") })}
 
     ${heroHtml(rules)}
     ${noticeHtml(notice)}

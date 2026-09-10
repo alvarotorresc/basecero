@@ -363,3 +363,20 @@ export function profileMatches(profile, headers) {
   if (profile.headers.length !== headers.length) return false;
   return profile.headers.every((h, i) => h === headers[i]);
 }
+
+// ---------------------------------------------------------------------- pie del asistente
+
+// Motivos ÚNICOS de los `errors` de applyProfile, en el orden en que aparece cada uno por
+// primera vez (Task 6, PR ImportAsistente/§7.2): el pie de la vista previa enumera "2 filas no
+// se leen: {motivos}" y con `errors.length` filas puede haber solo dos o tres reason distintos
+// detrás — listar cada línea sería ilegible. Puro: solo lee `.reason`, nunca lanza.
+export function summarizeReasons(errors) {
+  const seen = new Set();
+  const out = [];
+  for (const e of errors ?? []) {
+    if (seen.has(e.reason)) continue;
+    seen.add(e.reason);
+    out.push(e.reason);
+  }
+  return out;
+}

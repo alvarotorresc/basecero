@@ -3,7 +3,7 @@ import {
   allCategoriesById, upsertBudget, deleteBudget, rootSpendHistory,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
-import { budgetStatus, pctOf, relativeWidth, limitTotals, sortRootRows, budgetMap, compareRoots, spentSeriesByRoot } from "../category-spend.js";
+import { budgetStatus, pctOf, relativeWidth, sortRootRows, budgetMap, compareRoots, spentSeriesByRoot } from "../category-spend.js";
 import { trendSvg } from "../charts.js";
 import { eurToCents } from "../contract.js";
 import { fmtMoney, moneyPartsHtml, hoyISO, currencySymbol, fmtPct } from "../format.js";
@@ -11,6 +11,8 @@ import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 import { showToast } from "../toast.js";
+import { subHeaderHtml } from "../ui.js";
+import { icon } from "../icons.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -24,12 +26,14 @@ const fmtPctInt = (pct) => `${Math.round(pct)}\u00A0%`;
 // descarta la declaración y el relleno se pinta al 100 %.
 const clampPct = (pct) => Math.min(100, Math.max(0, pct));
 
-const chevronSvg = (deg) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform:rotate(${deg}deg);"><path d="M9 5l7 7-7 7"></path></svg>`;
+// Chevron del repertorio (icons.js#chevronRight), girado por CSS — mismo mecanismo que
+// informe.js#chevronSvg: 0deg apunta a la derecha (fila plegada), 90deg hacia abajo (desplegada).
+const chevronSvg = (deg) => `<span style="display:inline-flex;transform:rotate(${deg}deg);">${icon("chevronRight", { size: 18 })}</span>`;
 
-// Flechas "tendencia sube"/"tendencia baja" del repertorio SISTEMA.md §3 — NUNCA un chevron
-// rotado (SISTEMA §4.19 lo dice explícito): son un glifo propio, no chevronSvg(±90) disfrazado.
-const ICON_TREND_UP = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5"></path></svg>`;
-const ICON_TREND_DOWN = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v13M6.5 12.5 12 18l5.5-5.5"></path></svg>`;
+// Flechas "tendencia sube"/"tendencia baja" del repertorio SISTEMA.md §3 (icons.js), NUNCA un
+// chevron rotado (SISTEMA §4.19 lo dice explícito): son un glifo propio.
+const ICON_TREND_UP = icon("trendUp", { size: 14, width: 2.2 });
+const ICON_TREND_DOWN = icon("trendDown", { size: 14, width: 2.2 });
 
 /** Pantalla «Gasto por categoría»: total del periodo + TODAS las raíces de gasto activas, cada una
  *  desplegable para ver su detalle por subcategoría y poner, cambiar o quitar su límite.
@@ -201,40 +205,40 @@ export async function renderGastoPorCategoria(container, onBack) {
     const limitCents = budgetByCategory[row.root_id] ?? 0;
     const st = budgetStatus(row.spent_cents, limitCents);
     const color = colorForCategory(row.root_id, byId);
-    const icon = iconForCategory(row.root_id, byId);
+    const categoryEmoji = iconForCategory(row.root_id, byId);
     const expanded = state.expanded.has(row.root_id);
     const noBar = row.spent_cents <= 0;
     // Una raíz sin límite y sin gasto no aporta nada este periodo: se atenúa entera para que la
     // lista completa (12 raíces de serie) no compita con las que sí tienen algo que contar.
     const dim = !st && noBar;
 
-    // Pasado el límite, el exceso va escrito: «450,00 € de 300,00 € · superado por 150,00 €».
-    // Solo en 'over' — en ok/warn el número que falta es el que queda, y ese ya sale en el pie de
-    // la tarjeta de arriba.
-    const sub = st
+    // Swap (decisión 6, §9.7): el € ya es la cifra destacada de la cabecera de fila (más abajo),
+    // así que este pie NUNCA vuelve a escribirlo — «de {límite}» en mono si hay límite y no se ha
+    // superado, «superado por {over}» en --danger si se ha superado (sustituye a la línea "de
+    // {límite}", no se pintan las dos a la vez, igual que el artboard), «sin límite» si no hay
+    // ninguno puesto. row.noLimit y row.ofLimitOver (con {spent} en la plantilla) se quedan sin
+    // consumidor: repetirían la cifra de la cabecera.
+    const subHtml = st
       ? st.level === "over"
-        ? t("gastoCategoria.row.ofLimitOver", {
-          spent: escHtml(fmtMoney(row.spent_cents)),
-          limit: escHtml(fmtMoney(limitCents)),
-          over: escHtml(fmtMoney(row.spent_cents - limitCents)),
-        })
-        : t("gastoCategoria.row.ofLimit", { spent: escHtml(fmtMoney(row.spent_cents)), limit: escHtml(fmtMoney(limitCents)) })
-      : t("gastoCategoria.row.noLimit", { spent: escHtml(fmtMoney(row.spent_cents)) });
+        ? `<span style="font-size:13px;font-weight:500;color:var(--red);">${t("gastoCategoria.row.overBy", { over: escHtml(fmtMoney(row.spent_cents - limitCents)) })}</span>`
+        : `<span class="num" style="font-size:13px;font-weight:500;color:var(--text-2);">${t("gastoCategoria.row.ofLimit", { limit: escHtml(fmtMoney(limitCents)) })}</span>`
+      : `<span style="font-size:13px;font-weight:500;color:var(--text-2);">${t("gastoCategoria.detail.noLimit")}</span>`;
 
-    const pctColor = !st ? "var(--text-2)"
-      : st.level === "over" ? "var(--red)"
-      : st.level === "warn" ? "var(--amber)"
-      : textColorForCategory(row.root_id, byId);
-    const pctText = st ? fmtPctInt(st.pct) : t("gastoCategoria.row.noPct");
-
-    let barHtml = "";
+    // Barra + porcentaje EN LA MISMA fila (swap): el % ya no es la cifra destacada de la cabecera,
+    // vive junto a la barra en --cat-x-ink (textColorForCategory), 13/600, ancho mínimo 34px.
+    let barRowHtml = "";
     if (!noBar && st) {
       const barColor = st.level === "over" ? "var(--red)" : st.level === "warn" ? "var(--amber)" : color;
-      barHtml = `<div class="bar" style="--cat:${barColor};"><i style="width:${clampPct(st.pct)}%;"></i></div>`;
+      const pctColor = st.level === "over" ? "var(--red)" : st.level === "warn" ? "var(--amber)" : textColorForCategory(row.root_id, byId);
+      barRowHtml = `
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="bar" style="flex:1;--cat:${barColor};"><i style="width:${clampPct(st.pct)}%;"></i></div>
+          <span class="num" style="min-width:34px;text-align:right;flex-shrink:0;font-size:13px;font-weight:600;color:${pctColor};">${fmtPctInt(st.pct)}</span>
+        </div>`;
     } else if (!noBar) {
       // Sin límite no hay porcentaje que enseñar: la barra pasa a ser comparativa (su gasto frente
       // al de la raíz que más gastó) y se tiñe al 55 % para que no se lea como "vas por X %".
-      barHtml = `<div class="bar" style="--cat:color-mix(in srgb, ${color} 55%, transparent);"><i style="width:${relativeWidth(row.spent_cents, maxSpent)}%;"></i></div>`;
+      barRowHtml = `<div class="bar" style="--cat:color-mix(in srgb, ${color} 55%, transparent);"><i style="width:${relativeWidth(row.spent_cents, maxSpent)}%;"></i></div>`;
     }
 
     const rootError = state.rootErrors.get(row.root_id);
@@ -250,16 +254,14 @@ export async function renderGastoPorCategoria(container, onBack) {
           <button type="button" data-root="${escAttr(row.root_id)}" aria-expanded="${expanded ? "true" : "false"}"
             style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:0;margin:0;
             color:inherit;font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-            <div class="dotico" style="--cat:${color};">${icon}</div>
-            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;">
-              <div style="font-size:13.5px;font-weight:600;">${escHtml(row.name)}</div>
-              <div class="num" style="font-size:11px;color:var(--text-2);">${sub}</div>
-            </div>
-            <div class="num" style="font-size:14px;font-weight:700;white-space:nowrap;flex-shrink:0;color:${pctColor};">${pctText}</div>
+            <div class="dotico sm" style="--cat:${color};">${categoryEmoji}</div>
+            <span style="flex:1;min-width:0;font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(row.name)}</span>
+            <div class="num gc-amount" style="flex-shrink:0;">${moneyPartsHtml(row.spent_cents)}</div>
             <span style="width:44px;height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
               color:${expanded ? "var(--text)" : "var(--text-2)"};">${chevronSvg(expanded ? 90 : 0)}</span>
           </button>
-          ${barHtml}
+          ${barRowHtml}
+          ${subHtml}
           ${comparisonLineHtml(row)}
         </div>
         ${rootError ? `<div style="font-size:11px;color:var(--red);">${escHtml(rootError)}</div>` : ""}
@@ -273,43 +275,25 @@ export async function renderGastoPorCategoria(container, onBack) {
     // El héroe es el gasto TOTAL categorizado del periodo (suma de TODAS las raíces), no solo el de
     // las que tienen límite: la pantalla ya no va del presupuesto, va del gasto.
     const totalSpent = rows.reduce((s, r) => s + r.spent_cents, 0);
-    const lim = limitTotals(rows, budgetByCategory);
-    const limPct = pctOf(lim.spent, lim.limit);
-    const remaining = lim.limit - lim.spent;
-
-    const remainingSpan = `<span class="num" style="color:var(--green);font-weight:700;">${escHtml(fmtMoney(remaining))}</span>`;
-    const overSpan = `<span class="num" style="color:var(--red);font-weight:700;">${escHtml(fmtMoney(-remaining))}</span>`;
+    // Decisión 6: el presupuesto GENERAL del periodo es la suma de TODOS los budgetsOfPeriod (no
+    // solo el de las categorías con límite) — el mismo total que bloqueTotal de PeriodoNuevo llama
+    // "presupuestado". Sustituye a limitTotals(), que solo sumaba las raíces con límite puesto.
+    const budgetTotalCents = Object.values(budgetByCategory).reduce((s, c) => s + c, 0);
+    const budgetPct = budgetTotalCents > 0 ? clampPct(pctOf(totalSpent, budgetTotalCents)) : 0;
 
     container.innerHTML = `
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-        <button type="button" class="icon-btn" id="gc-back" aria-label="${t("common.goBack")}"
-          style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
-        <div style="display:flex;flex-direction:column;gap:2px;">
-          <div style="font-size:20px;font-weight:700;letter-spacing:-0.015em;">${t("gastoCategoria.title")}</div>
-          <div style="font-size:11px;color:var(--text-3);">${t("gastoCategoria.header.dayOf", { period: escHtml(period.name), day: dayIndexOfPeriod(period.start_date, hoyISO()), total: expectedPeriodDays(period.start_date) })}</div>
-        </div>
-      </div>
+      ${subHeaderHtml({ id: "gc-back", title: t("gastoCategoria.title"), subtitle: t("gastoCategoria.header.dayOf", { period: period.name, day: dayIndexOfPeriod(period.start_date, hoyISO()), total: expectedPeriodDays(period.start_date) }) })}
 
-      <div class="card" style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px;">
-        <div style="display:flex;flex-direction:column;gap:5px;">
-          <div class="section-title">${t("gastoCategoria.total.title")}</div>
-          <div class="amount-hero num">${moneyPartsHtml(totalSpent)}</div>
-          ${lim.count > 0 ? `<div class="num" style="font-size:13px;color:var(--text-2);">${t("gastoCategoria.total.withLimit", { n: lim.count, spent: escHtml(fmtMoney(lim.spent)), limit: escHtml(fmtMoney(lim.limit)), pct: fmtPctInt(limPct) })}</div>` : ""}
-        </div>
-        ${lim.count > 0 ? `
-        <div class="bar" style="--cat:var(--text);height:10px;"><i style="width:${clampPct(limPct)}%;"></i></div>
-        <div style="font-size:11px;color:var(--text-2);">
-          ${remaining >= 0
-            ? t("gastoCategoria.total.remaining", { n: lim.count, amount: remainingSpan })
-            : t("gastoCategoria.total.over", { n: lim.count, amount: overSpan })}
-        </div>` : `
+      <div class="card" style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;">
+        <span style="font-size:13px;font-weight:500;color:var(--text-3);">${t("gastoCategoria.total.title")}</span>
+        <div class="amount-hero num">${moneyPartsHtml(totalSpent)}</div>
+        ${budgetTotalCents > 0 ? `
+        <span class="num" style="font-size:13px;font-weight:500;color:var(--text-2);">${t("gastoCategoria.total.ofBudget", { budget: escHtml(fmtMoney(budgetTotalCents)) })}</span>
+        <div class="bar"><i style="width:${budgetPct}%;"></i></div>` : `
         <div style="font-size:11px;color:var(--text-2);">${t("gastoCategoria.total.noLimits")}</div>`}
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:3px;padding-top:2px;margin-bottom:12px;">
-        <div style="font-size:15px;font-weight:700;">${t("gastoCategoria.byCategory.title")}</div>
-        <div style="font-size:11px;color:var(--text-3);">${t("gastoCategoria.byCategory.hint")}</div>
-      </div>
+      <div style="font-size:15px;font-weight:700;padding-top:2px;margin-bottom:12px;">${t("gastoCategoria.byCategory.title")}</div>
 
       ${rows.length === 0 ? `
       <div class="card" style="text-align:center;color:var(--text-3);margin-bottom:16px;">

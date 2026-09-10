@@ -36,6 +36,10 @@ test("paridad de claves es/en y valores attribute-safe", () => {
   for (const dict of [ES, EN]) for (const [k, v] of flat(dict)) {
     for (const s of typeof v === "string" ? [v] : [v.one, v.other]) {
       assert.ok(!/["<]/.test(s), `valor no attribute-safe en ${k}: ${s}`);
+      // SISTEMA.md §1 prohíbe el punto medio como separador y da la alternativa exacta (el divisor
+      // de 1px de ui.js#metaHtml). Este assert es lo que impide que vuelva a colarse: sin él, ocho
+      // paquetes en paralelo lo reintroducen sin que nadie lo vea hasta las capturas.
+      assert.ok(!s.includes("·"), `punto medio prohibido (SISTEMA.md §1) en ${k}: ${s}`);
     }
   }
 });

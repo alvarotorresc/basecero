@@ -1,16 +1,19 @@
 import {
   listRules, listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById,
   createRule, updateRule, softDeleteRule, cancelSubscription, getMetaAll,
+  getOpenPeriod, previsionOfPeriod,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, moneyPartsHtml, currencySymbol, parseCentsRaw, centsToRaw, hoyISO } from "../format.js";
-import { annualCents } from "../subscriptions.js";
+import { annualCents, monthlyCommitmentCents, ruleStateKey } from "../subscriptions.js";
 import { t, monthLong } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { showConfirm } from "../modal.js";
 import { showToast } from "../toast.js";
 import { renderSuscripciones } from "./suscripciones.js";
+import { subHeaderHtml, metaHtml } from "../ui.js";
+import { icon } from "../icons.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -37,12 +40,17 @@ const needsMonth = (freq) => freq === "quarterly" || freq === "yearly";
  *  previsión) + formulario de alta/edición con borrado en dos toques (mismo patrón que
  *  movimientos.js openDetail/backToList). onBack vuelve a quien la haya abierto (Ajustes). */
 export async function renderRecurrentes(container, onBack, opts = {}) {
-  let rules, expenseCats, incomeCats, accountsAll, byId, meta;
+  let rules, expenseCats, incomeCats, accountsAll, byId, meta, period, prevision;
   try {
-    [rules, expenseCats, incomeCats, accountsAll, byId, meta] = await Promise.all([
+    [rules, expenseCats, incomeCats, accountsAll, byId, meta, period] = await Promise.all([
       listRules(), listExpenseLeafCategories(), listIncomeCategories(), listAccounts(), allCategoriesById(),
-      getMetaAll(),
+      getMetaAll(), getOpenPeriod(),
     ]);
+    // previsionOfPeriod necesita `period` ya resuelto (start_date/end_date/my_share_pct): no puede
+    // entrar en el Promise.all de arriba, que es justo lo que lo resuelve. Sin periodo abierto no
+    // hay nada que prever: el héroe y las etiquetas de estado de la fila se ocultan (mismo
+    // criterio que el resto de la app, spec §5.1 bloque 2).
+    prevision = period ? await previsionOfPeriod(period) : null;
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">${t("recurrentes.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
@@ -53,20 +61,36 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
   const state = { view: "list", rules, editId: null, form: null };
   let errorMsg = "";
 
+  // Recarga reglas + previsión juntas: cualquier alta/edición/borrado/toggle puede cambiar tanto
+  // la lista como lo que el héroe da por pendiente este periodo (un cargo que pasa a activo, por
+  // ejemplo). `period` no cambia en la vida de esta pantalla (no hay forma de cerrar el periodo
+  // desde aquí), así que solo se vuelve a pedir la previsión, no el periodo.
+  async function reloadRules() {
+    state.rules = await listRules();
+    if (period) prevision = await previsionOfPeriod(period);
+  }
+
   const categoriesFor = (tipo) => (tipo === "income" ? incomeCats : tipo === "expense" ? expenseCats : []);
 
-  function ruleIconColor(r) {
-    if (r.type === "transfer") return { color: "var(--text-2)", icon: "⇄" };
-    return { color: colorForCategory(r.category_id, byId), icon: iconForCategory(r.category_id, byId) };
+  // Insignia de la fila: emoji de su categoría (mismo patrón que el resto de la app) o, para una
+  // transferencia, el SVG del repertorio (§1.8: sustituye el glifo de texto «⇄»). El fondo de una
+  // transferencia es --surface-2 liso, NO el color-mix(--cat) de .dotico: no hay categoría que
+  // teñir, y es el gris plano que pinta Recurrentes.dc.html:151 (misma pareja fondo/trazo que el
+  // icono de transferencia de movimientos.js).
+  function ruleIconHtml(r) {
+    if (r.type === "transfer") {
+      return `<div class="dotico" style="background:var(--surface-2);">${icon("transfer", { stroke: "var(--ink-2)" })}</div>`;
+    }
+    const color = colorForCategory(r.category_id, byId);
+    return `<div class="dotico" style="--cat:${color};">${iconForCategory(r.category_id, byId)}</div>`;
   }
 
   // Sub de cada fila: frecuencia + día SIEMPRE visibles (la lista queda plana, sin agrupar por
   // frecuencia como el artboard — ver informe de la tarea, brecha documentada), + "próximo: {mes}"
-  // para trimestral/anual (due_month, dato real de la regla), cuentas origen→destino en
-  // transferencias (accountsAll ya cargado) y "compartido"/"pausada" como banderas de datos reales
-  // (is_shared/is_active) — SIN inventar el "compartido 40 %" del artboard: ese % no existe en la
-  // regla (solo en el periodo abierto), así que se muestra el texto sin porcentaje.
-  function ruleSubtitle(r) {
+  // para trimestral/anual (due_month, dato real de la regla) y cuentas origen→destino en
+  // transferencias (accountsAll ya cargado). "compartido"/"suscripción" salen de aquí: pasan a ser
+  // .state-pill en la línea del nombre (ruleRowHtml), no texto del subtítulo.
+  function ruleSubtitleParts(r) {
     const freqKey = FREQ_KEY[r.frequency];
     const freqLabel = freqKey ? t(freqKey).toLowerCase() : r.frequency;
     // día SIEMPRE visible (antes se omitía en trimestral/anual a favor de "próximo: {mes}",
@@ -81,42 +105,52 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
       const from = accountsAll.find((a) => a.id === r.account_id)?.name;
       const to = accountsAll.find((a) => a.id === r.counter_account_id)?.name;
       if (from && to) parts.push(t("recurrentes.subtitle.transferRoute", { from, to }));
-    } else if (r.is_shared) {
-      parts.push(t("recurrentes.subtitle.shared"));
     }
     if (!r.is_active) parts.push(t("recurrentes.subtitle.paused"));
-    return parts.join(" · ");
+    return parts;
   }
 
   // Fila plana (sin card propia) dentro de la lista compartida — mismo patrón que
   // rootRowHtml/cuentaRowHtml/rowHtml de gasto-por-categoria.js/patrimonio.js/liquidar.js (tarea 7):
-  // una única .card con <hr class="divider"> entre filas. Toggle de la derecha: indicador visual
-  // (NO interactivo — sin <input>, pointer-events:none) de is_active con los colores exactos del
-  // brief; el toggle REAL (que sí cambia el dato) vive en el formulario, y toda la fila sigue
-  // abriendo la edición al tocar en cualquier punto (mismo onclick que antes).
-  function ruleRowHtml(r, withDivider) {
-    const { color, icon } = ruleIconColor(r);
-    const amountColor = r.type === "transfer" ? "color:var(--text-3);" : "";
+  // una única .card con <hr class="divider"> entre filas. El toggle (D7) es un <button role="switch">
+  // HERMANO del botón que abre la edición, no un hijo suyo: dos <button> anidados es HTML inválido
+  // y además duplicaría el toque (el de fuera abriría el formulario Y activaría el toggle). El
+  // botón de abrir cubre icono+cuerpo+importe; el wrapper que los envuelve a los dos NO es un
+  // <button> (evita el anidado), así que la opacidad de "pausada" va en el botón de abrir, no en
+  // el wrapper — si no, el propio toggle (el único control que reactiva la regla) se atenuaría.
+  function ruleRowHtml(r, withDivider, item) {
+    const stateKey = ruleStateKey(r, item);
+    const isIncome = r.type === "income";
+    const amountCls = isIncome ? " rec-amount-pos" : r.type === "transfer" ? " rec-amount-muted" : "";
+    const stateColor = stateKey === "pending" ? "var(--warn)" : "var(--ink-3)";
     return `
     ${withDivider ? '<hr class="divider">' : ""}
-    <button type="button" data-rule="${r.id}"
-      style="width:100%;display:flex;align-items:center;gap:12px;padding:13px 0;background:none;border:0;
-      text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;${!r.is_active ? "opacity:0.55;" : ""}">
-      <div class="dotico" style="--cat:${color};">${icon}</div>
-      <div class="tx-body">
-        <div class="tx-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span>${escHtml(r.name)}</span>
-          ${r.is_subscription ? `<span style="display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;background:var(--surface-2);color:var(--ink-2);font-size:11px;font-weight:500;flex-shrink:0;">${t("recurrentes.badge.subscription")}</span>` : ""}
+    <div style="display:flex;align-items:center;gap:12px;min-height:64px;">
+      <button type="button" data-rule="${r.id}"
+        style="flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:12px 0;background:none;border:0;
+        text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;${!r.is_active ? "opacity:0.55;" : ""}">
+        ${ruleIconHtml(r)}
+        <div class="tx-body">
+          <div class="tx-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span>${escHtml(r.name)}</span>
+            ${r.is_shared ? `<span class="state-pill">${t("recurrentes.badge.shared")}</span>` : ""}
+            ${r.is_subscription ? `<span class="state-pill">${t("recurrentes.badge.subscription")}</span>` : ""}
+          </div>
+          ${metaHtml(ruleSubtitleParts(r))}
         </div>
-        <div class="tx-sub">${escHtml(ruleSubtitle(r))}</div>
-      </div>
-      <div class="num" style="font-size:14px;font-weight:700;flex-shrink:0;${amountColor}">${fmtMoney(r.amount_cents)}</div>
-      <span class="toggle" style="pointer-events:none;cursor:default;" aria-hidden="true">
-        <span class="toggle-track" style="background:${r.is_active ? "var(--green)" : "var(--card2)"};">
-          <span class="toggle-knob" style="background:${r.is_active ? "var(--bg)" : "var(--text-2)"};${r.is_active ? "transform:translateX(20px);" : ""}"></span>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">
+          <div class="num${amountCls}" style="font-size:16px;font-weight:500;">${isIncome ? "+" : ""}${moneyPartsHtml(r.amount_cents)}</div>
+          ${stateKey ? `<span style="font-size:11px;font-weight:500;color:${stateColor};">${t(`recurrentes.state.${stateKey}`)}</span>` : ""}
+        </div>
+      </button>
+      <button type="button" role="switch" aria-checked="${r.is_active ? "true" : "false"}"
+        aria-label="${escAttr(t("recurrentes.toggle.aria", { name: r.name }))}"
+        class="toggle rec-toggle" data-toggle="${r.id}" style="border:0;background:none;padding:0;flex-shrink:0;">
+        <span class="toggle-track" style="${r.is_active ? "background:var(--accent);" : ""}">
+          <span class="toggle-knob" style="${r.is_active ? "background:var(--accent-ink);transform:translateX(20px);" : ""}"></span>
         </span>
-      </span>
-    </button>`;
+      </button>
+    </div>`;
   }
 
   function openNew() {
@@ -198,31 +232,50 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
     </div>`;
   }
 
+  // Héroe "Pendiente este periodo" (spec §5.1 bloque 2): el mismo número que Inicio ya enseña en
+  // "Queda por pagar" (repo.previsionOfPeriod#comprometidoCents), con el compromiso mensual del
+  // conjunto de reglas como segunda línea (subscriptions.js#monthlyCommitmentCents). Sin periodo
+  // abierto no hay nada que prever — ni héroe ni etiquetas de estado en las filas.
+  function heroHtml() {
+    if (!period) return "";
+    return `
+    <div style="display:flex;flex-direction:column;gap:7px;padding-bottom:22px;">
+      <span style="font-size:13px;font-weight:500;color:var(--ink-3);">${t("recurrentes.hero.pending")}</span>
+      <div class="amount-hero lg num">${moneyPartsHtml(prevision.comprometidoCents)}</div>
+      <div style="display:flex;align-items:center;gap:10px;padding-top:4px;">
+        <span class="num" style="font-size:14px;font-weight:600;">${escHtml(fmtMoney(monthlyCommitmentCents(state.rules)))}</span>
+        <span style="font-size:14px;font-weight:500;color:var(--ink-2);">${t("recurrentes.hero.perMonth")}</span>
+      </div>
+    </div>`;
+  }
+
+  // Item de previsionOfPeriod para esta regla (myCents/paid), o undefined si no aplica este mes.
+  const itemFor = (r) => prevision?.items.find((it) => it.rule.id === r.id);
+
   function renderList() {
     container.innerHTML = `
-      <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="rec-back" aria-label="${t("common.goBack")}"
-          style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
-        <h1 style="flex:1; font-size:20px; font-weight:700; letter-spacing:-0.015em;">${t("recurrentes.title")}</h1>
-        <button type="button" id="rec-new"
-          style="height:44px;padding:0 18px;border-radius:999px;background:var(--text);color:var(--bg);border:0;
-          font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">${t("common.addNew")}</button>
-      </div>
+      ${subHeaderHtml({ id: "rec-back", title: t("recurrentes.title"), action: { id: "rec-new", icon: "plus", label: t("recurrentes.newRule") } })}
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
-      <div class="card" style="padding:4px 16px; display:flex; flex-direction:column;">
+      ${heroHtml()}
+
+      <div class="section-title" style="margin-bottom:6px;">${t("recurrentes.section.all")}</div>
+
+      <div class="card" style="display:flex; flex-direction:column;">
         ${state.rules.length === 0
           ? `<p style="text-align:center;color:var(--text-3);padding:16px 0;">${t("recurrentes.empty")}</p>`
-          : state.rules.map((r, i) => ruleRowHtml(r, i > 0)).join("")}
+          : state.rules.map((r, i) => ruleRowHtml(r, i > 0, itemFor(r))).join("")}
         <hr class="divider">
         <button type="button" id="rec-radar-link"
           style="width:100%;display:flex;align-items:center;gap:12px;padding:16px 0;min-height:56px;
           background:transparent;border:0;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
           <span style="flex:1;font-size:14px;font-weight:600;color:var(--accent);">${t("recurrentes.radarLink")}</span>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M9.5 5 16 12l-6.5 7"/></svg>
+          ${icon("chevronRight", { size: 18, stroke: "var(--accent)" })}
         </button>
       </div>
+
+      <p style="font-size:12px;font-weight:500;color:var(--ink-3);line-height:1.5;padding-top:20px;">${t("recurrentes.footNote")}</p>
     `;
     wireList();
   }
@@ -234,6 +287,28 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
       b.onclick = () => {
         const r = state.rules.find((x) => x.id === b.dataset.rule);
         if (r) openEdit(r);
+      };
+    });
+    // Toggle real (D7): hermano del botón que abre la edición, con su propio stopPropagation por
+    // si algún día un ancestro común gana un listener de clic (defensivo, mismo criterio que pide
+    // la spec). Tras guardar, se devuelve el foco al MISMO botón (por id de regla, no por índice:
+    // reloadRules() puede reordenar la lista) — sin esto, cada toque pierde el foco al repintar.
+    container.querySelectorAll("[data-toggle]").forEach((btn) => {
+      btn.onclick = async (e) => {
+        e.stopPropagation();
+        const ruleId = btn.dataset.toggle;
+        const r = state.rules.find((x) => x.id === ruleId);
+        if (!r) return;
+        btn.disabled = true;
+        try {
+          await updateRule(r.id, { isActive: !r.is_active });
+          await reloadRules();
+          render();
+          container.querySelector(`[data-toggle="${ruleId}"]`)?.focus();
+        } catch (err) {
+          errorMsg = t("common.saveFailed", { error: userMessage(err) });
+          render();
+        }
       };
     });
     container.querySelector("#rec-radar-link").onclick = () => {
@@ -255,45 +330,38 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
     const saved = state.rules.find((r) => r.id === state.editId);
     const canCancelSubscription = !!(saved?.is_subscription && saved?.is_active);
 
-    const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
-
     container.innerHTML = `
-      <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
-        <button type="button" class="icon-btn" id="rec-form-back" aria-label="${t("common.goBack")}"
-          style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--text);font-size:18px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg></button>
-        <h1 style="flex:1; font-size:20px; font-weight:700; letter-spacing:-0.015em;">${state.editId ? t("recurrentes.form.title.edit") : t("recurrentes.form.title.new")}</h1>
-        <span style="width:44px;"></span>
-      </div>
+      ${subHeaderHtml({ id: "rec-form-back", title: state.editId ? t("recurrentes.form.title.edit") : t("recurrentes.form.title.new") })}
 
       <label class="field field-stack" style="margin-bottom:18px;">
         <span class="field-label">${t("common.name")}</span>
         <input type="text" id="rec-name" value="${escAttr(f.name)}" placeholder="${t("common.egPlaceholder", { example: t("recurrentes.form.namePlaceholderExample") })}">
       </label>
 
-      <div class="segmented" style="margin-bottom:18px;">
-        ${TIPOS_RULE.map((tr) => `<button type="button" data-tipo="${tr.id}" class="${f.type === tr.id ? "active" : ""}">${t(tr.labelKey)}</button>`).join("")}
-      </div>
-
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
         <div class="section-title">${t("common.amount")}</div>
         <div class="amount-display" style="align-items:center;">
           <input type="text" inputmode="decimal" id="rec-raw" value="${escAttr(f.raw)}" placeholder="0"
-            style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
-          <span class="amount-currency">${currencySymbol()}</span>
+            style="border:0;background:none;color:var(--text);font:var(--t-figure-xl);letter-spacing:-.015em;width:100%;outline:none;">
+          <span class="amount-currency" style="font-size:17px;">${currencySymbol()}</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
+      </div>
+
+      <div class="segmented" style="margin-bottom:18px;">
+        ${TIPOS_RULE.map((tr) => `<button type="button" data-tipo="${tr.id}" class="${f.type === tr.id ? "active" : ""}">${t(tr.labelKey)}</button>`).join("")}
       </div>
 
       ${cats.length ? `
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
         <div class="section-title">${t("common.category")}</div>
-        <div class="chips-scroll">
+        <div class="chips-grid">
           ${cats.map((c) => {
             const color = colorForCategory(c.id, byId);
-            const icon = iconForCategory(c.id, byId);
+            const catIcon = iconForCategory(c.id, byId);
             const active = f.categoryId === c.id;
             return `<button type="button" class="chip-v${active ? " active" : ""}" data-cat="${c.id}" style="--cat:${color};">
-              <span class="chip-icon">${icon}</span><span>${escHtml(c.name)}</span>
+              <span class="chip-icon">${catIcon}</span><span>${escHtml(c.name)}</span>
             </button>`;
           }).join("")}
         </div>
@@ -371,17 +439,10 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
         ${t("recurrentes.form.cancelSubscription")}
       </button>` : ""}
       ${state.editId ? `
-      <button type="button" id="rec-delete"
-        style="width:100%;background:transparent;color:var(--red);
-          border:1px solid var(--red);border-radius:var(--radius-sm);padding:16px;font:600 16px var(--font-ui);cursor:pointer;">
+      <button type="button" class="btn-danger" id="rec-delete">
         ${t("recurrentes.form.delete")}
       </button>` : ""}
     `;
-
-    if (prevChipsScroll != null) {
-      const chipsEl = container.querySelector(".chips-scroll");
-      if (chipsEl) chipsEl.scrollLeft = prevChipsScroll;
-    }
 
     wireForm();
   }
@@ -472,7 +533,7 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
         };
         if (state.editId) await updateRule(state.editId, fields);
         else await createRule(fields);
-        state.rules = await listRules();
+        await reloadRules();
         goBack();
       } catch (e) {
         btn.disabled = false;
@@ -495,7 +556,7 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
           if (btn) btn.disabled = true;
           try {
             await cancelSubscription(state.editId, hoyISO());
-            state.rules = await listRules();
+            await reloadRules();
             showToast(t("toast.subscriptionCancelled"));
             goBack();
           } catch (e) {
@@ -519,7 +580,7 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
           if (btn) btn.disabled = true;
           try {
             await softDeleteRule(state.editId);
-            state.rules = await listRules();
+            await reloadRules();
             goBack();
           } catch (e) {
             if (btn) btn.disabled = false;
