@@ -285,9 +285,12 @@ function spineRowCompactHtml(day, isLast, max, byId) {
     : hasBar
       ? `width:10px;height:10px;background:${colorForCategory(day.dominantRootId || "", byId)};`
       : "width:8px;height:8px;background:var(--bg);border:1px solid var(--hairline-strong);box-sizing:border-box;";
+  // flex:1 inline: esta espina es horizontal (día · barra · importe), a diferencia de la de
+  // Semana y de la barra de categoría de Inicio (ambas en columna) — ver el comentario de
+  // .day-bar en app.css sobre por qué el flex:1 no puede vivir en la clase.
   const barHtml = hasBar
-    ? `<div class="day-bar">${day.segments.map((seg) => `<div class="day-seg" style="width:${relativeWidth(seg.cents, max)}%;--cat:${colorForCategory(seg.rootId || "", byId)};"></div>`).join("")}</div>`
-    : `<div class="day-bar"></div>`;
+    ? `<div class="day-bar" style="flex:1;min-width:0;">${day.segments.map((seg) => `<div class="day-seg" style="width:${relativeWidth(seg.cents, max)}%;--cat:${colorForCategory(seg.rootId || "", byId)};"></div>`).join("")}</div>`
+    : `<div class="day-bar" style="flex:1;min-width:0;"></div>`;
   const dayNum = new Date(day.date + "T12:00:00").getDate();
   // El rail es hijo directo de .spine-row (que hace stretch por defecto) para que la línea de 2px
   // siga continua entre filas; el contenido va en un flex interno aparte para poder centrarlo

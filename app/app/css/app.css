@@ -909,8 +909,13 @@ body.onboarding .fab { display: none; }
 .spine-node { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; }
 
 /* Barra apilada por categoría de un día (decisión 8: apila, no "color dominante") — mismo patrón
-   que .bar/.bar>i pero SIN radio por segmento (los tramos van a hueso, solo la pista es píldora). */
-.day-bar { flex: 1; height: 8px; border-radius: var(--r-pill); background: var(--surface-2); overflow: hidden; display: flex; }
+   que .bar/.bar>i pero SIN radio por segmento (los tramos van a hueso, solo la pista es píldora).
+   `width:100%` (no `flex:1`) a propósito: esta pista se usa tanto DENTRO de una fila en columna
+   (Semana, la barra de categoría de Inicio I3 — ahí `flex:1` colapsaría a flex-basis:0 y la
+   pista se quedaría a 0px de alto) como DENTRO de una fila horizontal (la espina compacta de
+   Inicio I2, que SÍ necesita flex:1 para ocupar el hueco entre la etiqueta y el importe — se
+   añade inline en ese único call site, pisando este width). */
+.day-bar { width: 100%; height: 8px; border-radius: var(--r-pill); background: var(--surface-2); overflow: hidden; display: flex; }
 .day-seg { height: 100%; background: var(--cat, var(--accent)); }
 
 /* Chip de categoría de «Dónde se ha ido esta semana» (Semana): tinte al 16% del color, mismo
