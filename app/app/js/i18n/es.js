@@ -868,6 +868,8 @@ export const ES = {
       categoryHasChildren: "Esta categoría tiene subcategorías: solo se permiten dos niveles, no puede convertirse en subcategoría de otra",
       colorUnavailable: "Ese color no está disponible",
       iconUnavailable: "Ese icono no está disponible",
+      tagNameEmpty: "El nombre de la etiqueta no puede estar vacío",
+      tagNotFound: "Etiqueta no encontrada",
     },
     // Compartida entre repo.js y n26.js (3 sitios, mismo mensaje EXACTO): distinta de
     // common.noOpenPeriod (esa lleva punto final, esta no — no son byte-idénticas).

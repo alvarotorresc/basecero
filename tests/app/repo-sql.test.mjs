@@ -8,6 +8,7 @@ import { prevDayIso } from "../../app/app/js/format.js";
 
 const schema = readFileSync(new URL("../../app/app/js/schema.sql", import.meta.url), "utf8");
 const T = "2026-08-24T18:00:00Z";
+const T2 = "2026-08-24T19:00:00Z";
 function db() {
   const d = new DatabaseSync(":memory:");
   d.exec(schema);
@@ -245,4 +246,124 @@ test("SQL.accountBalance: prevDayIso(start_date) excluye un movimiento del prime
 
   assert.equal(conFechaDeInicio, 98000, "balancesAt(start_date) YA descontaría el gasto del primer día — la trampa del off-by-one");
   assert.equal(conDiaAnterior, 100000, "el día anterior no ve ningún movimiento del periodo: la apertura correcta");
+});
+
+// ---- Etiquetas de proyecto (Task 4): CRUD --------------------------------------------------
+
+test("SQL.insertTag: guarda con budget_cents null (sin límite)", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", null, T, T);
+  const row = d.prepare("SELECT * FROM tags WHERE id='tag-japon'").get();
+  assert.equal(row.name, "Viaje Japón");
+  assert.equal(row.budget_cents, null);
+  assert.equal(row.is_archived, 0);
+  assert.equal(row.deleted, 0);
+});
+
+test("SQL.insertTag: guarda con budget_cents con límite", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", 150000, T, T);
+  assert.equal(d.prepare("SELECT budget_cents FROM tags WHERE id='tag-japon'").get().budget_cents, 150000);
+});
+
+test("SQL.updateTag: cambia name/budget_cents + updated_at, nunca created_at", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", 150000, T, T);
+  d.prepare(SQL.updateTag).run("Viaje a Japón", 200000, T2, "tag-japon");
+  const row = d.prepare("SELECT * FROM tags WHERE id='tag-japon'").get();
+  assert.equal(row.name, "Viaje a Japón");
+  assert.equal(row.budget_cents, 200000);
+  assert.equal(row.updated_at, T2);
+  assert.equal(row.created_at, T);
+});
+
+test("SQL.updateTag: budget_cents a NULL quita el límite", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", 150000, T, T);
+  d.prepare(SQL.updateTag).run("Viaje Japón", null, T2, "tag-japon");
+  assert.equal(d.prepare("SELECT budget_cents FROM tags WHERE id='tag-japon'").get().budget_cents, null);
+});
+
+test("SQL.setTagArchived: marca is_archived + updated_at, en los dos sentidos", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-reforma", "Reforma baño", null, T, T);
+  d.prepare(SQL.setTagArchived).run(1, T2, "tag-reforma");
+  assert.equal(d.prepare("SELECT is_archived, updated_at FROM tags WHERE id='tag-reforma'").get().is_archived, 1);
+  d.prepare(SQL.setTagArchived).run(0, T, "tag-reforma");
+  assert.equal(d.prepare("SELECT is_archived FROM tags WHERE id='tag-reforma'").get().is_archived, 0);
+});
+
+test("SQL.listTags: deja fuera archivadas y borradas", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", 150000, T, T);
+  d.prepare(SQL.insertTag).run("tag-reforma", "Reforma baño", null, T, T);
+  d.prepare(SQL.insertTag).run("tag-archivada", "Boda", null, T, T);
+  d.prepare(SQL.setTagArchived).run(1, T, "tag-archivada");
+  d.prepare(SQL.insertTag).run("tag-borrada", "Vieja", null, T, T);
+  d.prepare("UPDATE tags SET deleted=1 WHERE id='tag-borrada'").run();
+
+  const rows = d.prepare(SQL.listTags).all();
+  assert.deepEqual(rows.map((r) => r.id).sort(), ["tag-japon", "tag-reforma"]);
+});
+
+test("SQL.getTag: trae la fila por id, undefined si no existe o está borrada", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", 150000, T, T);
+  assert.equal(d.prepare(SQL.getTag).get("tag-japon").name, "Viaje Japón");
+  assert.equal(d.prepare(SQL.getTag).get("no-existe"), undefined);
+  d.prepare("UPDATE tags SET deleted=1 WHERE id='tag-japon'").run();
+  assert.equal(d.prepare(SQL.getTag).get("tag-japon"), undefined);
+});
+
+// ---- createTag/updateTag (reproducidos): el merge-on-current de repo.js, no alcanzable en Node
+// sin Worker (mismo criterio que updateCategoryReproduced/updateGoalReproduced en otros ficheros) --
+
+function createTagReproduced(d, { name, budgetCents }, now = T) {
+  const trimmed = String(name ?? "").trim();
+  if (!trimmed) throw new Error("errors.repo.tagNameEmpty");
+  const id = "tag-" + Math.floor(Math.random() * 1e9);
+  d.prepare(SQL.insertTag).run(id, trimmed, budgetCents ?? null, now, now);
+  return id;
+}
+function updateTagReproduced(d, id, fields, now = T2) {
+  const cur = d.prepare(SQL.getTag).get(id);
+  if (!cur) throw new Error("errors.repo.tagNotFound");
+  let name = cur.name;
+  if (fields.name !== undefined) {
+    const trimmed = String(fields.name).trim();
+    if (!trimmed) throw new Error("errors.repo.tagNameEmpty");
+    name = trimmed;
+  }
+  const budgetCents = fields.budgetCents !== undefined ? fields.budgetCents : cur.budget_cents;
+  d.prepare(SQL.updateTag).run(name, budgetCents, now, id);
+}
+
+test("updateTag (reproducido): renombrar NO toca el límite", () => {
+  const d = db();
+  const id = createTagReproduced(d, { name: "Viaje Japón", budgetCents: 150000 });
+  updateTagReproduced(d, id, { name: "Viaje a Japón" });
+  const row = d.prepare(SQL.getTag).get(id);
+  assert.equal(row.name, "Viaje a Japón");
+  assert.equal(row.budget_cents, 150000, "el límite no se toca: la clave budgetCents ni siquiera vino");
+});
+
+test("updateTag (reproducido): cambiar solo el límite NO toca el nombre", () => {
+  const d = db();
+  const id = createTagReproduced(d, { name: "Viaje Japón", budgetCents: 150000 });
+  updateTagReproduced(d, id, { budgetCents: 200000 });
+  const row = d.prepare(SQL.getTag).get(id);
+  assert.equal(row.name, "Viaje Japón");
+  assert.equal(row.budget_cents, 200000);
+});
+
+test("updateTag (reproducido): budgetCents:null quita el límite explícitamente", () => {
+  const d = db();
+  const id = createTagReproduced(d, { name: "Viaje Japón", budgetCents: 150000 });
+  updateTagReproduced(d, id, { budgetCents: null });
+  assert.equal(d.prepare(SQL.getTag).get(id).budget_cents, null);
+});
+
+test("createTag (reproducido): rechaza nombre vacío tras el recorte (trim)", () => {
+  const d = db();
+  assert.throws(() => createTagReproduced(d, { name: "   " }), /tagNameEmpty/);
 });

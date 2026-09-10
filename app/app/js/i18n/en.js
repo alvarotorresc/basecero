@@ -849,6 +849,8 @@ export const EN = {
       categoryHasChildren: "This category has subcategories: only two levels are allowed, it can’t become a subcategory of another one",
       colorUnavailable: "That color isn’t available",
       iconUnavailable: "That icon isn’t available",
+      tagNameEmpty: "The tag name can’t be empty",
+      tagNotFound: "Tag not found",
     },
     common: {
       noOpenPeriod: "There’s no open period",

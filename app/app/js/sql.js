@@ -438,5 +438,15 @@ export const SQL = {
   // renombrada por el usuario ("Mi casa"), no matchean nada (0 filas, no-op). Bind:
   // [nombreNuevo, now, id, nombreSemillaDelOtroIdioma].
   retranslateCategory: `UPDATE categories SET name = ?, updated_at = ? WHERE id = ? AND name = ? AND deleted = 0`,
+
+  // ---- Etiquetas de proyecto (N11, Task 4: CRUD) -----------------------------
+
+  getTag: `SELECT * FROM tags WHERE id=? AND deleted=0`,
+  insertTag: `INSERT INTO tags (id,name,budget_cents,is_archived,created_at,updated_at,deleted)
+    VALUES (?,?,?,0,?,?,0)`,
+  updateTag: `UPDATE tags SET name=?, budget_cents=?, updated_at=? WHERE id=?`,
+  setTagArchived: `UPDATE tags SET is_archived=?, updated_at=? WHERE id=?`,
+  // Selector de Registro y del detalle: solo activas, barata.
+  listTags: `SELECT id, name, budget_cents FROM tags WHERE deleted=0 AND is_archived=0 ORDER BY created_at`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets","tags"];

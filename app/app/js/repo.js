@@ -1176,3 +1176,43 @@ export function replaceAllStmts(data) {
 export async function replaceAll(data) {
   await execMany(replaceAllStmts(data));
 }
+
+// ---- Etiquetas de proyecto (N11) ---------------------------------------------
+
+export const listTags = () => query(SQL.listTags);
+const getTag = async (id) => (await query(SQL.getTag, [id]))[0] ?? null;
+
+/** Crea una etiqueta y devuelve su id. El nombre se recorta y no puede quedar vacío (mismo guard
+ *  que createCategory: el repo es la última línea de defensa). `budgetCents` ausente o `null` es
+ *  «sin límite» (D4). No hay guard de nombres duplicados, igual que en categorías. OJO TDZ
+ *  (repo.js): esta función llama al t() de i18n, así que NO puede declarar ningún `const t` local. */
+export async function createTag({ name, budgetCents } = {}) {
+  const trimmed = String(name ?? "").trim();
+  if (!trimmed) throw new UserError(t("errors.repo.tagNameEmpty"));
+  const id = bcUlid();
+  const now = nowIso();
+  await exec(SQL.insertTag, [id, bcSanitizeCell(trimmed), budgetCents ?? null, now, now]);
+  return id;
+}
+
+/** Merge-on-current (mismo criterio que updateCategory/updateRule/updateGoal): un campo ausente
+ *  conserva el valor actual. `budgetCents: null` quita el límite explícitamente — por eso compara
+ *  con `!== undefined` y no con `??`, que resucitaría el límite anterior. OJO TDZ: ningún `const t`
+ *  local aquí tampoco. */
+export async function updateTag(id, fields) {
+  const cur = await getTag(id);
+  if (!cur) throw new UserError(t("errors.repo.tagNotFound"));
+  let name = cur.name;
+  if (fields.name !== undefined) {
+    const trimmed = String(fields.name).trim();
+    if (!trimmed) throw new UserError(t("errors.repo.tagNameEmpty"));
+    name = bcSanitizeCell(trimmed);
+  }
+  const budgetCents = fields.budgetCents !== undefined ? fields.budgetCents : cur.budget_cents;
+  const now = nowIso();
+  await exec(SQL.updateTag, [name, budgetCents, now, id]);
+}
+
+/** Archiva/desarchiva (D5: no hay deleteTag — solo archivar). Sin cascada: una etiqueta no tiene
+ *  hijas. */
+export const setTagArchived = (id, archived) => exec(SQL.setTagArchived, [archived ? 1 : 0, nowIso(), id]);
