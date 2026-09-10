@@ -9,8 +9,7 @@ import { goToTab } from "../tabs.js";
 import { subHeaderHtml, metaHtml } from "../ui.js";
 import { icon } from "../icons.js";
 
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+import { escHtml, escAttr } from "../esc.js";
 
 // Toda anchura de barra pasa por aquí, mismo criterio que gasto-por-categoria.js#clampPct: un
 // límite quitado a mitad de sesión o una cifra inconsistente no debe producir CSS inválido.

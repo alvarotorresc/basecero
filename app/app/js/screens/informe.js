@@ -12,8 +12,7 @@ import { userMessage } from "../errors.js";
 import { subHeaderHtml } from "../ui.js";
 import { icon } from "../icons.js";
 
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+import { escHtml, escAttr } from "../esc.js";
 
 const BTN_SECONDARY = "background:var(--card2);color:var(--text);border:0;"
   + "border-radius:999px;padding:16px;flex:1;font:600 16px var(--font-ui);cursor:pointer;";

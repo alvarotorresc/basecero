@@ -14,8 +14,7 @@ import { showToast } from "../toast.js";
 import { subHeaderHtml } from "../ui.js";
 import { icon } from "../icons.js";
 
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+import { escHtml, escAttr } from "../esc.js";
 
 // Espacio DURO (U+00A0) antes del %: sin él el porcentaje se parte en dos líneas al estrecharse el
 // contenedor. fmtPct de format.js no sirve: emite un decimal ("38,8 %").

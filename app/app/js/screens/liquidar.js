@@ -8,8 +8,7 @@ import { metaHtml, subHeaderHtml } from "../ui.js";
 import { icon } from "../icons.js";
 import { netOfSelected } from "../share-pct.js";
 
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+import { escHtml, escAttr } from "../esc.js";
 
 /** Fila de gasto pendiente: casilla + `.dotico.sm` (36px) + nombre + sub (fecha · importe
  *  original · % de quien debe esa parte: el de la contraparte en las filas 'partner_owes', el

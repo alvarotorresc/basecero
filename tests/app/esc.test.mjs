@@ -7,6 +7,8 @@
 // contra copias que este commit todavía no ha tocado.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync, readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { escHtml, escAttr } from "../../app/app/js/esc.js";
 
 test("escHtml escapa los cinco caracteres especiales", () => {
@@ -45,4 +47,43 @@ test("idempotente sobre texto sin caracteres especiales", () => {
   const texto = "Supermercado de la esquina 123";
   assert.equal(escHtml(texto), texto);
   assert.equal(escAttr(texto), texto);
+});
+
+// ---- escaneo: ninguna copia local fuera de esc.js -------------------------------------------
+
+const JS_DIR = fileURLToPath(new URL("../../app/app/js/", import.meta.url));
+
+function listAppJsFiles() {
+  const files = [];
+  function walk(dir, rel) {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        walk(dir + entry.name + "/", rel + entry.name + "/");
+      } else if (entry.isFile() && entry.name.endsWith(".js")) {
+        files.push(rel + entry.name);
+      }
+    }
+  }
+  walk(JS_DIR, "");
+  return files;
+}
+
+// Mismo patrón que screen-imports.test.mjs#definesLocally: solo cuentan declaraciones de nivel de
+// módulo (columna 0), función o const/let, con y sin `export`.
+function definesLocally(src, name) {
+  const asFunction = new RegExp(`^(?:export\\s+)?function\\s+${name}\\b`, "m");
+  const asVariable = new RegExp(`^(?:export\\s+)?(?:const|let)\\s+${name}\\s*=`, "m");
+  return asFunction.test(src) || asVariable.test(src);
+}
+
+test("ningún fichero de app/app/js, salvo esc.js, vuelve a definir escHtml/escAttr localmente", () => {
+  const offenders = [];
+  for (const rel of listAppJsFiles()) {
+    if (rel === "esc.js") continue;
+    const src = readFileSync(JS_DIR + rel, "utf8");
+    for (const name of ["escHtml", "escAttr"]) {
+      if (definesLocally(src, name)) offenders.push(`${rel}: define ${name} localmente`);
+    }
+  }
+  assert.deepEqual(offenders, []);
 });

@@ -13,8 +13,7 @@ import { showConfirm } from "../modal.js";
 import { subHeaderHtml, metaHtml } from "../ui.js";
 import { icon } from "../icons.js";
 
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+import { escHtml, escAttr } from "../esc.js";
 
 // ---- tarjeta "Patrimonio neto" --------------------------------------------
 

@@ -15,8 +15,7 @@ import { renderSuscripciones } from "./suscripciones.js";
 import { subHeaderHtml, metaHtml } from "../ui.js";
 import { icon } from "../icons.js";
 
-const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+import { escHtml, escAttr } from "../esc.js";
 
 const TIPOS_RULE = [
   { id: "expense", labelKey: "common.type.expense" },

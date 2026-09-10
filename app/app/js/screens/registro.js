@@ -21,6 +21,7 @@ import { quickRegisterEnabled, detailsOpen, foldedSummaryParts, visibleCategorie
 import { normalizeMerchant, memoryPatch } from "../merchant-memory.js";
 import { parseNaturalExpense } from "../natural.js";
 import { speech } from "../speech.js";
+import { escHtml, escAttr } from "../esc.js";
 
 // labelKey/SAVE_KEY en vez de texto resuelto: son consts de módulo, evaluadas al importar el
 // fichero (antes de que boot() llame a initI18n con el idioma real) — si guardaran el string ya
@@ -40,9 +41,6 @@ const needsCategory = (tipo) => tipo === "expense" || tipo === "income" || tipo 
 // §4.2 de la spec: dos filas de cuatro (Registro.dc.html). El literal vive aquí, no en
 // registro-mode.js — el módulo puro solo decide CUÁNTAS entran, no el número en sí.
 const CATS_GRID_LIMIT = 8;
-
-const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
 // Icono "etiqueta"/"más" del repertorio SISTEMA.md §3 (icons.js), ya no copias locales.
 const ICON_TAG = icon("tag", { size: 14 });

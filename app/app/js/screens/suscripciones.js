@@ -18,8 +18,7 @@ import { skeletonHtml } from "../skeleton.js";
 import { renderRecurrentes } from "./recurrentes.js";
 import { subHeaderHtml } from "../ui.js";
 
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+import { escHtml, escAttr } from "../esc.js";
 
 /** «renueva el X» (--warn + ", en N días" si faltan ≤7), "renueva cada semana" para las
  *  semanales (D5: sin ancla semanal, nunca aviso), o "sin fecha" para datos incompletos.

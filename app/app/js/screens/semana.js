@@ -11,8 +11,7 @@ import { userMessage } from "../errors.js";
 import { openTxDetail } from "../open-tx.js";
 import { subHeaderHtml } from "../ui.js";
 
-const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+import { escHtml, escAttr } from "../esc.js";
 
 const chevronSvg = (open, color) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="${color}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${open ? "M19 14.5 12 8l-7 6.5" : "M5 9.5 12 16l7-6.5"}"></path></svg>`;
 
