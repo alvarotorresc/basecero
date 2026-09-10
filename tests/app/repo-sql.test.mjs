@@ -148,6 +148,8 @@ test("recentTxDates: fechas distintas, DESC, sin borradas ni transfer/adjustment
   tx(d, { date: "2026-08-23", type: "adjustment", cents: 50, category: "" });
   const rows = d.prepare(SQL.recentTxDates).all();
   assert.deepEqual(rows.map((r) => r.date), ["2026-08-20", "2026-08-18"]);
+});
+
 // Registro v2 §5.3: SQL.merchantHistory, la ventana que merchant-memory.js pliega en memoria.
 test("merchantHistory: excluye las filas borradas", () => {
   const d = db();
