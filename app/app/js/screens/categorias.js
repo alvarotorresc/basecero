@@ -1,8 +1,11 @@
 import {
   listCategoriesAdmin, allCategoriesById, createCategory, updateCategory,
   archiveCategory, unarchiveCategory, setCategoryStyle, reorderCategories, computeReorder,
+  getOpenPeriod, spentByRootCategory, budgetsOfPeriod,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, POOL, CURATED_ICONS, hashIndex } from "../category-colors.js";
+import { budgetMap } from "../category-spend.js";
+import { fmtMoney } from "../format.js";
 import { t } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
@@ -29,14 +32,13 @@ function slug(s) {
   return out;
 }
 
-// need_type ('need'|'want'|'savings'|'') → etiqueta de lista, por presencia del valor y NO por
-// flow: una raíz de ingreso con need_type (caso raro pero el schema lo permite) también lleva
-// etiqueta; las de ingreso sembradas ('' need_type) simplemente no calzan ninguna clave y caen al
-// "solo el conteo" que pide el brief.
+// need_type ('need'|'want'|'savings') → etiqueta de la línea "{tipo}, {necesidad}" de la vista
+// previa de CategoriaForm (previewKindText, Task 6): solo se resuelve para flow='expense' — el
+// segmento Necesario/Prescindible del formulario ni siquiera se muestra para flow='income'.
 // Guarda la CLAVE del diccionario, no el texto resuelto: es un const de módulo, evaluado antes de
 // initI18n(meta) — resolver aquí con t() congelaría el idioma en el que arrancó la app.
-// rootSubtitle() resuelve con t() en cada render, ya con el idioma real (misma ledger ruling que
-// FREQ_KEY en recurrentes.js).
+// previewKindText() resuelve con t() en cada render, ya con el idioma real (misma ledger ruling
+// que FREQ_KEY en recurrentes.js).
 const NEED_LABEL_KEY = { need: "categorias.needLabel.need", want: "categorias.needLabel.want", savings: "categorias.needLabel.savings" };
 
 const subcatCount = (n) => t("categorias.subcatCount", { n });
@@ -62,12 +64,27 @@ function chipStyle(active) {
     -webkit-tap-highlight-color:transparent;`;
 }
 
+// Chip de alternancia binaria (Tipo, Necesario/Prescindible — CategoriaForm.dc.html): a
+// diferencia de chipStyle() (chips de "Dentro de", con icono a la izquierda y fondo neutro en
+// reposo), aquí la inactiva lleva filete y fondo transparente y no icono — el propio artboard las
+// dibuja distintas (`height:44px;padding:0 18px`, sin la geometría de icono+texto de chipStyle).
+function toggleChipStyle(active) {
+  return `height:44px;padding:0 18px;border-radius:999px;font-size:14px;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;${active
+      ? "border:0;background:var(--accent);color:var(--accent-ink);font-weight:600;"
+      : "border:1px solid var(--hairline-strong);background:transparent;color:var(--ink-2);font-weight:500;"}`;
+}
+
 /** Pantalla "Categorías" (PR D): lista de administración (Task 5) + subvista de formulario de
  *  alta/edición con estilo (Task 6). Dos subvistas sobre el mismo container (mismo patrón que
  *  patrimonio.js: state.view decide qué pinta render(), backToList limpia y vuelve). onBack
  *  vuelve a quien haya abierto la pantalla (Ajustes). */
 export async function renderCategorias(container, onBack) {
   let rows, byId, roots, childrenByParent;
+  // Datos del periodo abierto para la vista previa de CategoriaForm (Task 6.2, bloque 8) — ver
+  // loadData() y previewSpendText(). null/{} si no hay periodo abierto: la tercera línea de la
+  // vista previa simplemente no se pinta.
+  let period = null, budgetByCategory = {}, spentByRoot = {};
 
   // Árbol en cliente por parent_id — NUNCA por adyacencia de filas: listCategoriesAdmin ordena
   // (flow, parent_id, display_order), así que TODAS las raíces salen primero y LUEGO todas las
@@ -89,6 +106,21 @@ export async function renderCategorias(container, onBack) {
   async function loadData() {
     [rows, byId] = await Promise.all([listCategoriesAdmin(), allCategoriesById()]);
     buildTree();
+    // Gasto/límite del periodo abierto para la vista previa (Task 6.2, bloque 8): SOLO para
+    // raíces — `grep -rn "upsertBudget(" app/app/js` da un único call site en toda la app
+    // (gasto-por-categoria.js), siempre con un rootId, así que una hoja nunca tiene límite propio
+    // puesto desde la UI (ver previewSpendText). spentByRoot cubre el total del subárbol de cada
+    // raíz (spentByRootCategory ya lo suma, hijas incluidas); budgetByCategory (budgetMap) cubre
+    // el límite VIVO de cada categoría con uno puesto este periodo.
+    period = await getOpenPeriod();
+    if (period) {
+      const [budgetRows, spentRows] = await Promise.all([budgetsOfPeriod(period.id), spentByRootCategory(period.id)]);
+      budgetByCategory = budgetMap(budgetRows);
+      spentByRoot = Object.fromEntries(spentRows.map((r) => [r.root_id, r.spent_cents]));
+    } else {
+      budgetByCategory = {};
+      spentByRoot = {};
+    }
   }
 
   try {
@@ -200,8 +232,39 @@ export async function renderCategorias(container, onBack) {
     return { color: "var(--text-2)", icon: "▫️" };
   }
 
+  // Copy propio del botón (decisión 2: sigue archivando, con el patrón destructivo §4.7) —
+  // categorias.archive.archive/.unarchive se quedan solo para el título/confirmText del modal de
+  // onArchiveClick: "Archivar categoría" coincide con categorias.archive.archive, pero
+  // "Desarchivar categoría" NO es categorias.archive.unarchive ("Desarchivar" a secas) — de ahí
+  // las dos claves nuevas del namespace form.
   function archiveButtonLabel(form) {
-    return form.isArchived ? t("categorias.archive.unarchive") : t("categorias.archive.archive");
+    return form.isArchived ? t("categorias.form.unarchiveBtn") : t("categorias.form.archiveBtn");
+  }
+
+  /** "{tipo}, {necesidad}" (CategoriaForm.dc.html: "Gasto, prescindible"), o solo "{tipo}" para
+   *  ingreso — el segmento Necesario/Prescindible del formulario ni siquiera se muestra para
+   *  flow='income' (ver renderForm), así que la vista previa tampoco inventa una necesidad que el
+   *  usuario no ha elegido. */
+  function previewKindText(form) {
+    const typeLabel = t(form.flow === "income" ? "common.type.income" : "common.type.expense");
+    if (form.flow !== "expense") return typeLabel;
+    const needLabel = t(NEED_LABEL_KEY[form.needType] ?? NEED_LABEL_KEY.need);
+    return t("categorias.form.previewKind", { type: typeLabel, need: needLabel });
+  }
+
+  /** "{gastado} de {límite} este periodo", o "" si la tercera línea no se pinta (spec §6.2,
+   *  bloque 8: nunca se inventa un "sin límite" que el artboard no dibuja). No se pinta sin
+   *  periodo abierto, en creación (sin id todavía guardado) o en una hija: `upsertBudget` no
+   *  tiene NINGÚN call site que le pase algo que no sea el id de una raíz en toda la app (ver el
+   *  comentario de loadData), así que una hija nunca tiene límite propio. Tampoco se pinta sin
+   *  límite puesto este periodo (0/ausente = "sin límite", mismo criterio que
+   *  category-spend.js#limitTotals). */
+  function previewSpendText(form) {
+    if (form.mode !== "edit" || form.parentId || !period) return "";
+    const limitCents = budgetByCategory[form.id];
+    if (!(limitCents > 0)) return "";
+    const spentCents = spentByRoot[form.id] ?? 0;
+    return t("categorias.form.previewSpend", { spent: fmtMoney(spentCents), limit: fmtMoney(limitCents) });
   }
 
   function renderForm() {
@@ -211,29 +274,25 @@ export async function renderCategorias(container, onBack) {
     const lockedParent = editing && form.childrenCount > 0;
     const preview = previewStyle(form);
     const parents = availableParents(form);
+    const spendLine = previewSpendText(form);
 
     container.innerHTML = `
       ${subHeaderHtml({ id: "cf-back", title: t(form.titleKey) })}
 
       <div style="display:flex;flex-direction:column;gap:16px;">
 
-        <div style="background:var(--card2);border-radius:0;padding:12px 16px;display:flex;align-items:center;gap:12px;">
-          <div id="cf-preview-dot" class="dotico" style="width:40px;height:40px;font-size:18px;flex-shrink:0;--cat:${preview.color};">${preview.icon}</div>
-          <input type="text" id="cf-name" value="${escAttr(form.name)}" placeholder="${t("categorias.form.namePlaceholder")}"
-            style="flex:1;min-width:0;border:0;background:none;outline:none;color:var(--text);
-            font-size:16px;font-weight:700;font-family:inherit;">
-        </div>
+        <label class="field field-stack">
+          <span class="field-label">${t("common.name")}</span>
+          <input type="text" id="cf-name" value="${escAttr(form.name)}" placeholder="${t("categorias.form.namePlaceholder")}">
+        </label>
 
         <div>
           <div class="section-title" style="margin-bottom:8px;">${t("common.typeLabel")}</div>
-          <div class="segmented" style="border-radius:999px;${editing ? "opacity:0.6;" : ""}">
+          <div style="display:flex;gap:8px;${editing ? "opacity:0.6;" : ""}">
             ${[["expense", t("common.type.expense")], ["income", t("common.type.income")]].map(([id, label]) => {
               const active = form.flow === id;
-              const segStyle = active
-                ? "border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:600;"
-                : "border-radius:999px;";
-              return `<button type="button" data-cf-flow="${id}" class="${active ? "active" : ""}"
-                style="${segStyle}${editing ? "pointer-events:none;cursor:default;" : ""}">${label}</button>`;
+              return `<button type="button" data-cf-flow="${id}"
+                style="${toggleChipStyle(active)}${editing ? "pointer-events:none;cursor:default;" : ""}">${label}</button>`;
             }).join("")}
           </div>
           ${editing ? `<div style="font-size:11px;color:var(--text-3);margin-top:6px;">${t("categorias.form.typeLockedNote")}</div>` : ""}
@@ -242,13 +301,10 @@ export async function renderCategorias(container, onBack) {
         ${form.flow === "expense" ? `
         <div>
           <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.needSectionTitle")}</div>
-          <div class="segmented" style="border-radius:999px;">
+          <div style="display:flex;gap:8px;">
             ${[["need", t("categorias.needType.need")], ["want", t("categorias.needType.want")]].map(([id, label]) => {
               const active = form.needType === id;
-              const segStyle = active
-                ? "border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:600;"
-                : "border-radius:999px;";
-              return `<button type="button" data-cf-need="${id}" class="${active ? "active" : ""}" style="${segStyle}">${label}</button>`;
+              return `<button type="button" data-cf-need="${id}" style="${toggleChipStyle(active)}">${label}</button>`;
             }).join("")}
           </div>
           <div style="font-size:11px;color:var(--text-3);margin-top:6px;">${t("categorias.form.needHint")}</div>
@@ -263,8 +319,8 @@ export async function renderCategorias(container, onBack) {
           <div style="display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;">
             <button type="button" data-cf-parent="" style="${chipStyle(!form.parentId)}">${t("categorias.form.newRootChip")}</button>
             ${parents.map((r) => {
-              const icon = iconForCategory(r.id, byId);
-              return `<button type="button" data-cf-parent="${escAttr(r.id)}" style="${chipStyle(form.parentId === r.id)}">${icon} ${escHtml(r.name)}</button>`;
+              const parentIcon = iconForCategory(r.id, byId);
+              return `<button type="button" data-cf-parent="${escAttr(r.id)}" style="${chipStyle(form.parentId === r.id)}">${parentIcon} ${escHtml(r.name)}</button>`;
             }).join("")}
           </div>
           <div style="font-size:11px;color:var(--text-3);margin-top:6px;">${t("categorias.form.inheritNote")}</div>
@@ -274,12 +330,14 @@ export async function renderCategorias(container, onBack) {
         ${isRoot ? `
         <div>
           <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.colorSectionTitle")}</div>
-          <div style="display:grid;grid-template-columns:repeat(6, minmax(0, 1fr));gap:8px;">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;">
             ${POOL.map((c) => {
               const active = form.color === c;
-              return `<button type="button" data-cf-color="${c}" aria-label="${t("categorias.form.pickColorAria")}"
-                style="width:100%;aspect-ratio:1;border:0;padding:0;border-radius:0;background:${c};cursor:pointer;
-                -webkit-tap-highlight-color:transparent;${active ? "outline:2px solid var(--text);outline-offset:3px;" : ""}"></button>`;
+              return `<button type="button" data-cf-color="${c}" aria-label="${t("categorias.form.pickColorAria")}" aria-pressed="${active}"
+                style="width:44px;height:44px;border-radius:var(--r-circle);border:0;padding:0;background:${c};
+                display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;">${
+                  active ? icon("check", { size: 20, width: 2.25, stroke: "var(--accent-ink)" }) : ""
+                }</button>`;
             }).join("")}
           </div>
           <div style="font-size:11px;color:var(--text-3);margin-top:8px;">${t("categorias.form.colorHint")}</div>
@@ -287,13 +345,14 @@ export async function renderCategorias(container, onBack) {
 
         <div>
           <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.iconSectionTitle")}</div>
-          <div style="display:grid;grid-template-columns:repeat(8, minmax(0, 1fr));gap:8px;">
-            ${form.iconOrder.map((ic) => {
-              const active = form.icon === ic;
-              return `<button type="button" data-cf-icon="${escAttr(ic)}" aria-label="${t("categorias.form.pickIconAria")}"
-                style="aspect-ratio:1;border:0;padding:0;border-radius:0;background:var(--card2);font-size:20px;cursor:pointer;
-                display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;
-                ${active ? "outline:2px solid var(--text);outline-offset:2px;" : ""}">${ic}</button>`;
+          <div style="display:flex;flex-wrap:wrap;gap:10px;">
+            ${form.iconOrder.map((catIcon) => {
+              const active = form.icon === catIcon;
+              return `<button type="button" data-cf-icon="${escAttr(catIcon)}" aria-label="${t("categorias.form.pickIconAria")}" aria-pressed="${active}"
+                style="width:44px;height:44px;border-radius:var(--r-circle);box-sizing:border-box;
+                border:2px solid ${active ? "var(--accent)" : "transparent"};background:var(--card2);font-size:19px;
+                display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;
+                -webkit-tap-highlight-color:transparent;">${catIcon}</button>`;
             }).join("")}
           </div>
           <div style="font-size:11px;color:var(--text-3);margin-top:8px;">${t("categorias.form.iconHint")}</div>
@@ -305,6 +364,18 @@ export async function renderCategorias(container, onBack) {
         </div>
         `}
 
+        <div>
+          <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.previewTitle")}</div>
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div id="cf-preview-dot" class="dotico lg" style="--cat:${preview.color};flex-shrink:0;">${preview.icon}</div>
+            <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
+              <span id="cf-preview-name" style="font-size:17px;font-weight:600;color:var(--text);">${escHtml(form.name)}</span>
+              <span style="font-size:13px;font-weight:500;color:var(--text-3);">${previewKindText(form)}</span>
+              ${spendLine ? `<span class="num" style="font-size:13px;font-weight:500;color:var(--text-3);">${spendLine}</span>` : ""}
+            </div>
+          </div>
+        </div>
+
         ${state.formError ? `<div class="banner-aviso red">${escHtml(state.formError)}</div>` : ""}
 
         <button type="button" class="btn-primary" id="cf-save" style="${isRoot ? `background:var(--accent);color:var(--accent-ink);` : ""}">
@@ -312,9 +383,7 @@ export async function renderCategorias(container, onBack) {
         </button>
 
         ${editing ? `
-        <button type="button" id="cf-archive"
-          style="border:0;cursor:pointer;font-size:13px;font-weight:600;text-align:center;
-          background:none;color:var(--red);padding:4px 0 0;">
+        <button type="button" id="cf-archive" class="btn-danger">
           ${archiveButtonLabel(form)}
         </button>` : ""}
 
@@ -455,24 +524,29 @@ export async function renderCategorias(container, onBack) {
     // blur reconstruye el DOM entero (innerHTML) y el botón original queda desconectado, así que
     // el click nunca llega — el primer tap se pierde en silencio y hace falta un segundo tap.
     //
-    // Para que el preview SÍ sea vivo sin ese riesgo, cuando cambia el color sugerido (nombre sin
-    // tocar un swatch, en una raíz) se parchea a mano SOLO el circulito y el outline del swatch —
-    // dos nodos ya existentes, nunca innerHTML — así el input y cualquier otro control nunca se
-    // desconectan a media pulsación.
+    // Para que el preview SÍ sea vivo sin ese riesgo, el nombre y (cuando cambia el color
+    // sugerido, en una raíz sin swatch tocado) el circulito y el check del swatch activo se
+    // parchean a mano — nodos ya existentes, nunca innerHTML del formulario entero — así el input
+    // y cualquier otro control nunca se desconectan a media pulsación.
     const nameInput = container.querySelector("#cf-name");
     nameInput.oninput = (e) => {
       form.name = e.target.value;
       state.formError = "";
+      const previewName = container.querySelector("#cf-preview-name");
+      if (previewName) previewName.textContent = form.name;
       if (form.colorTouched || form.parentId) return; // hija: el circulito no depende del nombre
       const nextColor = POOL[hashIndex(slug(form.name))];
       if (nextColor === form.color) return;
       form.color = nextColor;
       const dot = container.querySelector("#cf-preview-dot");
       if (dot) dot.style.setProperty("--cat", form.color);
+      // Rejilla circular (Task 6.2): el activo se marca con el check DENTRO, no con un outline —
+      // se repinta el innerHTML del botón que gana/pierde el check (dos nodos), nunca el DOM
+      // entero.
       container.querySelectorAll("[data-cf-color]").forEach((b) => {
         const active = b.dataset.cfColor === form.color;
-        b.style.outline = active ? "2px solid var(--text)" : "";
-        b.style.outlineOffset = active ? "3px" : "";
+        b.setAttribute("aria-pressed", String(active));
+        b.innerHTML = active ? icon("check", { size: 20, width: 2.25, stroke: "var(--accent-ink)" }) : "";
       });
       const saveBtn = container.querySelector("#cf-save");
       if (saveBtn) saveBtn.style.background = form.color;

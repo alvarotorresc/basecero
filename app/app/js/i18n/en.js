@@ -577,6 +577,11 @@ export const EN = {
       iconHint: "Curated set — no system emoji picker (maybe in v1.1).",
       colorIconSectionTitle: "Color and icon",
       create: "Create category",
+      previewTitle: "Preview",
+      previewKind: "{type}, {need}",
+      previewSpend: "{spent} of {limit} this period",
+      archiveBtn: "Archive category",
+      unarchiveBtn: "Unarchive category",
     },
   },
   etiquetas: {

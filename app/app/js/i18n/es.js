@@ -590,6 +590,11 @@ export const ES = {
       iconHint: "Set curado — sin picker de emojis del sistema (v1.1 si acaso).",
       colorIconSectionTitle: "Color e icono",
       create: "Crear categoría",
+      previewTitle: "Vista previa",
+      previewKind: "{type}, {need}",
+      previewSpend: "{spent} de {limit} este periodo",
+      archiveBtn: "Archivar categoría",
+      unarchiveBtn: "Desarchivar categoría",
     },
   },
   etiquetas: {
