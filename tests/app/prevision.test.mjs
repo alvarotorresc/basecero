@@ -33,12 +33,12 @@ function insRule(db, over = {}) {
     name: "Alquiler", type: "expense", cents: 90000,
     category: "cat-casa-alquiler", account: "acc-n26", counterAccount: "",
     frequency: "monthly", dueDay: 1, dueMonth: null,
-    shared: 0, active: 1,
+    shared: 0, active: 1, isSubscription: 0, cancelledAt: "",
     ...over,
   };
   db.prepare(SQL.insertRule).run(
     v.id, v.name, v.type, v.cents, v.category, v.account, v.counterAccount,
-    v.frequency, v.dueDay, v.dueMonth, v.shared, v.active, T, T,
+    v.frequency, v.dueDay, v.dueMonth, v.shared, v.active, v.isSubscription, v.cancelledAt, T, T,
   );
   return v.id;
 }

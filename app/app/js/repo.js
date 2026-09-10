@@ -402,7 +402,9 @@ export const getRule = async (id) => (await query(SQL.getRule, [id]))[0] ?? null
 /** Crea una regla recurrente. fields camelCase (ver recurrentes.js): is_active por defecto
  *  activa (1) si no se indica, igual criterio que el DEFAULT 1 del schema. name pasa por
  *  bcSanitizeCell como merchant/note de addTransaction: es texto libre tecleado por el usuario
- *  que via exportAllJson acaba en una celda .xlsx (mismo riesgo de inyección de fórmula). */
+ *  que via exportAllJson acaba en una celda .xlsx (mismo riesgo de inyección de fórmula).
+ *  isSubscription/cancelledAt (Suscripciones, N6): por defecto no es suscripción y sin fecha de
+ *  baja — el mismo default que schema.sql. */
 export async function createRule(fields) {
   const now = nowIso();
   await exec(SQL.insertRule, [
@@ -410,6 +412,7 @@ export async function createRule(fields) {
     fields.categoryId ?? "", fields.accountId, fields.counterAccountId ?? "",
     fields.frequency, fields.dueDay ?? null, fields.dueMonth ?? null,
     fields.isShared ? 1 : 0, fields.isActive === false ? 0 : 1,
+    fields.isSubscription ? 1 : 0, fields.cancelledAt ?? "",
     now, now,
   ]);
 }
@@ -419,6 +422,7 @@ export async function createRule(fields) {
 export async function updateRule(id, fields) {
   const cur = await getRule(id);
   if (!cur) throw new UserError(t("errors.repo.ruleNotFound"));
+  const isActive = fields.isActive ?? !!cur.is_active;
   const f = {
     name: fields.name ?? cur.name,
     type: fields.type ?? cur.type,
@@ -430,16 +434,31 @@ export async function updateRule(id, fields) {
     dueDay: fields.dueDay !== undefined ? fields.dueDay : cur.due_day,
     dueMonth: fields.dueMonth !== undefined ? fields.dueMonth : cur.due_month,
     isShared: fields.isShared ?? !!cur.is_shared,
-    isActive: fields.isActive ?? !!cur.is_active,
+    isActive,
+    isSubscription: fields.isSubscription ?? !!cur.is_subscription,
+    // Reactivar CANCELA la cancelación. Sin esta línea, el toggle «Activa» del formulario de
+    // Recurrentes (recurrentes.js) dejaría una fila con is_active=1 y cancelled_at<>'': un estado
+    // que la propia app exporta y que su propio validateImport rechaza — se rompería el
+    // round-trip, que es el test crítico del proyecto. Es también el ÚNICO «deshacer» de una
+    // cancelación (spec §5.1).
+    cancelledAt: isActive ? "" : (fields.cancelledAt ?? cur.cancelled_at),
   };
   const now = nowIso();
   await exec(SQL.updateRule, [
     bcSanitizeCell(f.name), f.type, f.amountCents, f.categoryId ?? "", f.accountId, f.counterAccountId ?? "",
-    f.frequency, f.dueDay, f.dueMonth, f.isShared ? 1 : 0, f.isActive ? 1 : 0, now, id,
+    f.frequency, f.dueDay, f.dueMonth, f.isShared ? 1 : 0, f.isActive ? 1 : 0,
+    f.isSubscription ? 1 : 0, f.cancelledAt, now, id,
   ]);
 }
 
 export const softDeleteRule = (id) => exec(SQL.softDeleteRule, [nowIso(), id]);
+
+/** Cancela una suscripción: deja de generar pendientes (is_active=0, ver prevision.js#ruleApplies)
+ *  y SELLA el día de la baja, que es desde el que se cuenta lo ahorrado (subscriptions.js#
+ *  savedSinceCancelCents). Las dos columnas en el MISMO UPDATE: no existe el estado intermedio.
+ *  `todayIso` se inyecta (determinismo, mismo criterio que workbookToRows). Reactivar se hace
+ *  desde updateRule, que limpia cancelled_at cuando isActive vuelve a true. */
+export const cancelSubscription = (id, todayIso) => exec(SQL.cancelRule, [todayIso, nowIso(), id]);
 
 export const accountBalanceCents = async (accountId, atDateIso) =>
   (await query(SQL.accountBalance, [atDateIso, accountId]))[0].balance_cents;

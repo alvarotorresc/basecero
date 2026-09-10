@@ -14,12 +14,31 @@ function insRule(db, over = {}) {
     name: "Alquiler", type: "expense", cents: 90000,
     category: "cat-casa-alquiler", account: "acc-n26", counterAccount: "",
     frequency: "monthly", dueDay: 1, dueMonth: null,
-    shared: 0, active: 1,
+    shared: 0, active: 1, isSubscription: 0, cancelledAt: "",
     ...over,
   };
   db.prepare(SQL.insertRule).run(
     v.id, v.name, v.type, v.cents, v.category, v.account, v.counterAccount,
-    v.frequency, v.dueDay, v.dueMonth, v.shared, v.active, T, T,
+    v.frequency, v.dueDay, v.dueMonth, v.shared, v.active, v.isSubscription, v.cancelledAt, T, T,
+  );
+  return v.id;
+}
+
+/** Inserta una transacción usando la firma de SQL.insertTransaction (mismo helper que
+ *  tests/app/prevision.test.mjs y tests/app/compartidos.test.mjs). */
+function insTx(db, over = {}) {
+  const v = {
+    id: "t" + Math.floor(Math.random() * 1e9),
+    date: "2026-08-20", period: "per-1", type: "expense", cents: 1299,
+    account: "acc-n26", counterAccount: "", category: "cat-casa-alquiler",
+    merchant: "Spotify", note: "", shared: 0, override: null, paidBy: "me", settled: 0,
+    ref: "", rule: "", external: "", status: "pending",
+    ...over,
+  };
+  db.prepare(SQL.insertTransaction).run(
+    v.id, v.date, v.period, v.type, v.cents, v.account, v.counterAccount,
+    v.category, v.merchant, v.note, v.shared, v.override, v.paidBy, v.settled,
+    v.ref, v.rule, v.external, v.status, T, T,
   );
   return v.id;
 }
@@ -90,7 +109,7 @@ test("updateRule: cambia los campos editables y updated_at, nunca created_at", (
 
   db.prepare(SQL.updateRule).run(
     "Renombrada", "expense", 2500, "cat-casa-alquiler", "acc-n26", "",
-    "yearly", 10, 6, 1, 0, T2, id,
+    "yearly", 10, 6, 1, 0, 0, "", T2, id,
   );
 
   const after = db.prepare("SELECT * FROM recurring_rules WHERE id=?").get(id);
@@ -104,6 +123,98 @@ test("updateRule: cambia los campos editables y updated_at, nunca created_at", (
   assert.equal(after.updated_at, T2);
   assert.equal(after.created_at, before.created_at);
   assert.notEqual(after.updated_at, before.updated_at);
+});
+
+// ---- Suscripciones (Task 2): is_subscription / cancelled_at, cancelRule, linkTxsToRule,
+// subscriptionCharges ---------------------------------------------------------------------
+
+test("insertRule: guarda is_subscription y cancelled_at; por defecto 0 y ''", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const id = insRule(db, { name: "Spotify" });
+  const row = db.prepare(SQL.listRules).all().find((r) => r.id === id);
+  assert.equal(row.is_subscription, 0);
+  assert.equal(row.cancelled_at, "");
+});
+
+test("insertRule: acepta is_subscription=1 y cancelled_at con fecha", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const id = insRule(db, { name: "Spotify", isSubscription: 1, cancelledAt: "2026-06-12" });
+  const row = db.prepare(SQL.listRules).all().find((r) => r.id === id);
+  assert.equal(row.is_subscription, 1);
+  assert.equal(row.cancelled_at, "2026-06-12");
+});
+
+test("updateRule: actualiza is_subscription y cancelled_at", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const id = insRule(db, { name: "Spotify" });
+
+  db.prepare(SQL.updateRule).run(
+    "Spotify", "expense", 1299, "cat-casa-alquiler", "acc-n26", "",
+    "monthly", 14, null, 0, 0, 1, "2026-06-12", T2, id,
+  );
+
+  const row = db.prepare("SELECT * FROM recurring_rules WHERE id=?").get(id);
+  assert.equal(row.is_subscription, 1);
+  assert.equal(row.cancelled_at, "2026-06-12");
+});
+
+test("SQL.cancelRule: deja is_active=0 y cancelled_at en el mismo UPDATE, y no toca una regla borrada", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const id = insRule(db, { name: "Spotify", isSubscription: 1, active: 1 });
+
+  db.prepare(SQL.cancelRule).run("2026-06-12", T2, id);
+  const row = db.prepare("SELECT * FROM recurring_rules WHERE id=?").get(id);
+  assert.equal(row.is_active, 0);
+  assert.equal(row.cancelled_at, "2026-06-12");
+  assert.equal(row.updated_at, T2);
+
+  const borrada = insRule(db, { name: "Borrada", isSubscription: 1, active: 1 });
+  db.prepare("UPDATE recurring_rules SET deleted=1 WHERE id=?").run(borrada);
+  db.prepare(SQL.cancelRule).run("2026-06-12", T2, borrada);
+  const rowBorrada = db.prepare("SELECT * FROM recurring_rules WHERE id=?").get(borrada);
+  assert.equal(rowBorrada.is_active, 1, "una regla borrada no se toca");
+  assert.equal(rowBorrada.cancelled_at, "");
+});
+
+test("SQL.linkTxsToRule: enlaza un cargo con rule_id='', no pisa uno que ya tenía otro rule_id, y es idempotente", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const ruleId = insRule(db, { name: "Netflix" });
+  const otherRuleId = insRule(db, { name: "Otra" });
+  const txId = insTx(db, { merchant: "Netflix" });
+  const txWithOther = insTx(db, { merchant: "Netflix", rule: otherRuleId });
+
+  db.prepare(SQL.linkTxsToRule).run(ruleId, T2, txId);
+  assert.equal(db.prepare("SELECT rule_id FROM transactions WHERE id=?").get(txId).rule_id, ruleId);
+
+  db.prepare(SQL.linkTxsToRule).run(ruleId, T2, txWithOther);
+  assert.equal(db.prepare("SELECT rule_id FROM transactions WHERE id=?").get(txWithOther).rule_id, otherRuleId,
+    "no pisa un rule_id que ya existía");
+
+  // idempotente: volver a enlazar el mismo cargo con la misma regla no falla ni cambia nada
+  db.prepare(SQL.linkTxsToRule).run(ruleId, T2, txId);
+  assert.equal(db.prepare("SELECT rule_id FROM transactions WHERE id=?").get(txId).rule_id, ruleId);
+});
+
+test("SQL.subscriptionCharges: deja fuera borrados, ingresos, transferencias, paid_by='partner', comercio vacío y lo anterior a la ventana; ordena date DESC", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const vivo = insTx(db, { id: "tx-vivo", date: "2026-08-02", merchant: "Netflix" });
+  const masReciente = insTx(db, { id: "tx-reciente", date: "2026-09-02", merchant: "Netflix" });
+  const borrado = insTx(db, { id: "tx-borrado", date: "2026-08-02", merchant: "Netflix" });
+  db.prepare("UPDATE transactions SET deleted=1 WHERE id=?").run(borrado);
+  insTx(db, { id: "tx-ingreso", date: "2026-08-02", type: "income", category: "cat-nomina", merchant: "Nomina" });
+  insTx(db, { id: "tx-transfer", date: "2026-08-02", type: "transfer", category: "", account: "acc-n26", counterAccount: "acc-revolut", merchant: "Traspaso" });
+  insTx(db, { id: "tx-partner", date: "2026-08-02", merchant: "Netflix", shared: 1, paidBy: "partner", account: "" });
+  insTx(db, { id: "tx-sin-comercio", date: "2026-08-02", merchant: "" });
+  insTx(db, { id: "tx-fuera-ventana", date: "2020-01-01", merchant: "Netflix" });
+
+  const rows = db.prepare(SQL.subscriptionCharges).all("2026-01-01", 100);
+  assert.deepEqual(rows.map((r) => r.id), [masReciente, vivo]);
 });
 
 test("softDeleteRule: marca deleted+updated_at y desaparece de listRules", () => {
