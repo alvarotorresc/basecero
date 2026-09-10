@@ -117,6 +117,9 @@ export async function compressImage(file) {
     : Object.assign(document.createElement("canvas"), { width, height });
   const ctx = canvas.getContext("2d");
   ctx.drawImage(bitmap, 0, 0, width, height);
+  // M-10 (revisión de código): sin esto, el bitmap decodificado (potencialmente varios MB para una
+  // foto de 12 Mpx) se queda esperando al GC en vez de liberarse en cuanto el canvas ya lo copió.
+  bitmap.close();
   if (canvas.convertToBlob) return canvas.convertToBlob({ type: "image/jpeg", quality: JPEG_QUALITY });
   return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY));
 }
