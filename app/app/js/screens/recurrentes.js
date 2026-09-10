@@ -7,6 +7,7 @@ import { fmtMoney, currencySymbol, parseCentsRaw, centsToRaw } from "../format.j
 import { t, monthLong } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
+import { showConfirm } from "../modal.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -46,7 +47,7 @@ export async function renderRecurrentes(container, onBack) {
   const accounts = accountsAll.filter((a) => a.type !== "liability");
   const partnerName = (meta.partner_name || "").trim();
 
-  const state = { view: "list", rules, editId: null, form: null, deleteConfirm: false };
+  const state = { view: "list", rules, editId: null, form: null };
   let errorMsg = "";
 
   const categoriesFor = (tipo) => (tipo === "income" ? incomeCats : tipo === "expense" ? expenseCats : []);
@@ -120,7 +121,6 @@ export async function renderRecurrentes(container, onBack) {
       frequency: "monthly", dueDay: "1", dueMonth: "",
       isShared: false, isActive: true,
     };
-    state.deleteConfirm = false;
     pushBack(backToList);
     state.view = "form";
     errorMsg = "";
@@ -136,7 +136,6 @@ export async function renderRecurrentes(container, onBack) {
       dueMonth: r.due_month != null ? String(r.due_month) : "",
       isShared: !!r.is_shared, isActive: !!r.is_active,
     };
-    state.deleteConfirm = false;
     pushBack(backToList);
     state.view = "form";
     errorMsg = "";
@@ -147,7 +146,6 @@ export async function renderRecurrentes(container, onBack) {
     state.view = "list";
     state.editId = null;
     state.form = null;
-    state.deleteConfirm = false;
     errorMsg = "";
     render();
   }
@@ -325,9 +323,9 @@ export async function renderRecurrentes(container, onBack) {
       </button>
       ${state.editId ? `
       <button type="button" id="rec-delete"
-        style="width:100%;background:${state.deleteConfirm ? "var(--red)" : "transparent"};color:${state.deleteConfirm ? "#fff" : "var(--red)"};
+        style="width:100%;background:transparent;color:var(--red);
           border:1px solid var(--red);border-radius:var(--radius-sm);padding:16px;font:600 16px var(--font-ui);cursor:pointer;">
-        ${state.deleteConfirm ? t("common.confirmDelete") : t("recurrentes.form.delete")}
+        ${t("recurrentes.form.delete")}
       </button>` : ""}
     `;
 
@@ -349,44 +347,41 @@ export async function renderRecurrentes(container, onBack) {
         f.categoryId = null;
         f.counterAccountId = "";
         errorMsg = "";
-        state.deleteConfirm = false;
         render();
       };
     });
 
-    container.querySelector("#rec-name").oninput = (e) => { f.name = e.target.value; state.deleteConfirm = false; };
+    container.querySelector("#rec-name").oninput = (e) => { f.name = e.target.value; };
 
     container.querySelector("#rec-raw").oninput = (e) => {
       f.raw = e.target.value;
       f.cents = parseCentsRaw(f.raw);
       errorMsg = "";
-      state.deleteConfirm = false;
     };
 
     container.querySelectorAll("[data-cat]").forEach((b) => {
-      b.onclick = () => { f.categoryId = b.dataset.cat; errorMsg = ""; state.deleteConfirm = false; render(); };
+      b.onclick = () => { f.categoryId = b.dataset.cat; errorMsg = ""; render(); };
     });
 
     container.querySelectorAll("[data-acc]").forEach((b) => {
       b.onclick = () => {
         f.accountId = b.dataset.acc;
         if (f.counterAccountId === f.accountId) f.counterAccountId = "";
-        state.deleteConfirm = false;
         render();
       };
     });
 
     container.querySelectorAll("[data-counter-acc]").forEach((b) => {
-      b.onclick = () => { f.counterAccountId = b.dataset.counterAcc; state.deleteConfirm = false; render(); };
+      b.onclick = () => { f.counterAccountId = b.dataset.counterAcc; render(); };
     });
 
     container.querySelectorAll("[data-freq]").forEach((b) => {
-      b.onclick = () => { f.frequency = b.dataset.freq; errorMsg = ""; state.deleteConfirm = false; render(); };
+      b.onclick = () => { f.frequency = b.dataset.freq; errorMsg = ""; render(); };
     });
 
-    container.querySelector("#rec-day").oninput = (e) => { f.dueDay = e.target.value; state.deleteConfirm = false; };
+    container.querySelector("#rec-day").oninput = (e) => { f.dueDay = e.target.value; };
     const monthInput = container.querySelector("#rec-month");
-    if (monthInput) monthInput.oninput = (e) => { f.dueMonth = e.target.value; state.deleteConfirm = false; };
+    if (monthInput) monthInput.oninput = (e) => { f.dueMonth = e.target.value; };
 
     const sharedToggle = container.querySelector("#rec-shared");
     if (sharedToggle) sharedToggle.onchange = (e) => { f.isShared = e.target.checked; };
@@ -432,24 +427,26 @@ export async function renderRecurrentes(container, onBack) {
     };
 
     const deleteBtn = container.querySelector("#rec-delete");
-    if (deleteBtn) deleteBtn.onclick = async () => {
-      if (!state.deleteConfirm) {
-        state.deleteConfirm = true;
-        render();
-        return;
-      }
-      const btn = container.querySelector("#rec-delete");
-      btn.disabled = true;
-      try {
-        await softDeleteRule(state.editId);
-        state.rules = await listRules();
-        goBack();
-      } catch (e) {
-        btn.disabled = false;
-        errorMsg = t("common.deleteFailed", { error: userMessage(e) });
-        state.deleteConfirm = false;
-        render();
-      }
+    if (deleteBtn) deleteBtn.onclick = () => {
+      showConfirm({
+        title: t("recurrentes.form.deleteTitle"),
+        message: t("recurrentes.form.deleteMessage", { name: f.name }),
+        cancelText: t("common.cancel"),
+        confirmText: t("common.delete"),
+        onConfirm: async () => {
+          const btn = container.querySelector("#rec-delete");
+          if (btn) btn.disabled = true;
+          try {
+            await softDeleteRule(state.editId);
+            state.rules = await listRules();
+            goBack();
+          } catch (e) {
+            if (btn) btn.disabled = false;
+            errorMsg = t("common.deleteFailed", { error: userMessage(e) });
+            render();
+          }
+        },
+      });
     };
   }
 

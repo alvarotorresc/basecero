@@ -23,6 +23,7 @@ function fakeWin({ state = null, length = 1 } = {}) {
       go: (n) => calls.push(["go", n]),
     },
     addEventListener: (type, fn) => { listeners[type] = fn; },
+    scrollTo: (x, y) => calls.push(["scrollTo", x, y]),
   };
 }
 
@@ -37,7 +38,9 @@ test("push: apunta una entrada de historial con su profundidad", () => {
   const win = fakeWin();
   const back = createBackStack(win);
   back.push(() => {});
-  assert.deepEqual(win.calls.at(-1), ["pushState", { bc: 1 }, ""]);
+  // at(-2), no at(-1): push() ahora manda un scrollTo justo después del pushState (ver los tests
+  // de scroll más abajo).
+  assert.deepEqual(win.calls.at(-2), ["pushState", { bc: 1 }, ""]);
   assert.equal(back.depth(), 1);
 });
 
@@ -76,7 +79,8 @@ test("anidado: cada popstate deshace solo su propia subpantalla", () => {
   const vistas = [];
   back.push(() => vistas.push("A"));
   back.push(() => vistas.push("B"));
-  assert.deepEqual(win.calls.at(-1), ["pushState", { bc: 2 }, ""]);
+  // at(-2): idem, push() manda un scrollTo justo después del pushState.
+  assert.deepEqual(win.calls.at(-2), ["pushState", { bc: 2 }, ""]);
   win.listeners.popstate({ state: { bc: 1 } });
   assert.deepEqual(vistas, ["B"]);
   assert.equal(back.depth(), 1);
@@ -245,4 +249,66 @@ test("resetTo con subpantallas abiertas: descarta las de arriba en UN salto, sin
   win.listeners.popstate({ state: { bc: 0 } });
   assert.deepEqual(vistas, ["patrimonio"]);
   assert.equal(back.depth(), 0);
+});
+
+// ------------------------------------------- scroll al cambiar de pantalla (fix/ux-scroll-borrar)
+
+test("push: además de apuntar la entrada, devuelve la pantalla al principio", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  back.push(() => {});
+  assert.deepEqual(win.calls.at(-1), ["scrollTo", 0, 0]);
+  // Después del pushState, no antes: si el navegador rechazara la entrada (límite de Safari), no
+  // se ha navegado y no habría que mover nada.
+  assert.deepEqual(win.calls.at(-2), ["pushState", { bc: 1 }, ""]);
+});
+
+test("popstate: vuelve al principio ANTES de repintar la pantalla de debajo", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  back.push(() => win.calls.push(["onBack"]));
+  win.listeners.popstate({ state: { bc: 0 } });
+  const scroll = win.calls.findIndex((c) => c[0] === "scrollTo" && c === win.calls.at(-2));
+  assert.deepEqual(win.calls.at(-2), ["scrollTo", 0, 0]);
+  assert.deepEqual(win.calls.at(-1), ["onBack"], "el callback pinta con la vista ya arriba");
+  assert.ok(scroll >= 0);
+});
+
+test("back() sin subpantallas: no toca ni el historial ni el scroll", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  const antes = win.calls.length;
+  back.back();
+  assert.equal(win.calls.length, antes, "no hay cambio de pantalla que resetear");
+});
+
+// ------------------------------------------- el modal no es un cambio de pantalla (fix/ux-scroll-borrar)
+
+test("push(cb, {scroll:false}): no manda la pantalla al principio", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  back.push(() => {}, { scroll: false });
+  assert.equal(win.calls.some((c) => c[0] === "scrollTo"), false);
+});
+
+test("popstate de una entrada con {scroll:false}: no resetea el scroll", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  const vistas = [];
+  back.push(() => vistas.push("modal"), { scroll: false });
+  win.listeners.popstate({ state: { bc: 0 } });
+  assert.deepEqual(vistas, ["modal"]);
+  assert.equal(win.calls.some((c) => c[0] === "scrollTo"), false);
+});
+
+test("popstate que descarta una entrada {scroll:false} junto con una de pantalla debajo: sí resetea", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  const vistas = [];
+  back.push(() => vistas.push("pantalla"));                    // scroll por defecto: true
+  back.push(() => vistas.push("modal"), { scroll: false });
+  win.listeners.popstate({ state: { bc: 0 } });
+  // Solo corre el callback de la más baja descartada (back.js:34): la de pantalla, no la del modal.
+  assert.deepEqual(vistas, ["pantalla"]);
+  assert.ok(win.calls.some((c) => c[0] === "scrollTo"));
 });

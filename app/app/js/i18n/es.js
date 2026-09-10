@@ -6,9 +6,9 @@ export const ES = {
     retry: "Reintentar",
     save: "Guardar",
     cancel: "Cancelar",
+    delete: "Borrar",
     saveFailed: "No se pudo guardar: {error}",
     saveChanges: "Guardar cambios",
-    confirmDelete: "Sí, borrar",
     deleteFailed: "No se pudo borrar: {error}",
     addNew: "+ Nueva",
     goBack: "Volver",
@@ -199,7 +199,8 @@ export const ES = {
     row: { partnerPaid: " · pagó {name} · tu parte {amount}" },
     delete: {
       button: "Borrar",
-      confirm: "Sí, borrar",
+      title: "¿Borrar este movimiento?",
+      message: "{what}. Desaparecerá de las listas y de los totales del periodo.",
     },
     empty: {
       noUncategorized: "No hay movimientos sin categorizar.",
@@ -358,6 +359,8 @@ export const ES = {
       activeLabel: "Activo",
       create: "Crear objetivo",
       delete: "Borrar objetivo",
+      deleteTitle: "¿Borrar el objetivo?",
+      deleteMessage: "{name}. Dejará de aparecer en Patrimonio; el dinero de tus cuentas no se toca.",
       validation: {
         name: "Ponle un nombre al objetivo.",
         months: "Indica cuántos meses de gasto quieres cubrir.",
@@ -400,6 +403,8 @@ export const ES = {
       activeLabel: "Activa",
       create: "Crear regla",
       delete: "Borrar regla",
+      deleteTitle: "¿Borrar la regla?",
+      deleteMessage: "{name}. Dejará de proponerse cada periodo; los movimientos ya registrados no se tocan.",
     },
   },
   categorias: {
@@ -426,8 +431,9 @@ export const ES = {
     archive: {
       unarchive: "Desarchivar",
       archive: "Archivar categoría",
-      confirm: "Sí, archivar",
-      confirmWithCount: "Sí, archivar y sus {count}",
+      title: "¿Archivar la categoría?",
+      message: "{name}. Se ocultará de los selectores; tu historial y los periodos cerrados no cambian.",
+      messageWithCount: "{name}. Se archivará junto con sus {count}; tu historial y los periodos cerrados no cambian.",
     },
     validation: { name: "Ponle un nombre a la categoría." },
     form: {

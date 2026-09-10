@@ -6,9 +6,9 @@ export const EN = {
     retry: "Retry",
     save: "Save",
     cancel: "Cancel",
+    delete: "Delete",
     saveFailed: "Couldn’t save: {error}",
     saveChanges: "Save changes",
-    confirmDelete: "Yes, delete",
     deleteFailed: "Couldn’t delete: {error}",
     addNew: "+ New",
     goBack: "Back",
@@ -196,7 +196,8 @@ export const EN = {
     row: { partnerPaid: " · {name} paid · your share {amount}" },
     delete: {
       button: "Delete",
-      confirm: "Yes, delete",
+      title: "Delete this transaction?",
+      message: "{what}. It will disappear from the lists and from the period totals.",
     },
     empty: {
       noUncategorized: "No uncategorized transactions.",
@@ -354,6 +355,8 @@ export const EN = {
       activeLabel: "Active",
       create: "Create goal",
       delete: "Delete goal",
+      deleteTitle: "Delete this goal?",
+      deleteMessage: "{name}. It will stop showing up in Net worth; the money in your accounts is untouched.",
       validation: {
         name: "Give the goal a name.",
         months: "Enter how many months of spending to cover.",
@@ -396,6 +399,8 @@ export const EN = {
       activeLabel: "Active",
       create: "Create rule",
       delete: "Delete rule",
+      deleteTitle: "Delete this rule?",
+      deleteMessage: "{name}. It will stop being suggested each period; transactions already recorded are untouched.",
     },
   },
   categorias: {
@@ -422,8 +427,9 @@ export const EN = {
     archive: {
       unarchive: "Unarchive",
       archive: "Archive category",
-      confirm: "Yes, archive",
-      confirmWithCount: "Yes, archive it and its {count}",
+      title: "Archive this category?",
+      message: "{name}. It will be hidden from the pickers; your history and closed periods stay the same.",
+      messageWithCount: "{name}. It will be archived along with its {count}; your history and closed periods stay the same.",
     },
     validation: { name: "Give the category a name." },
     form: {
