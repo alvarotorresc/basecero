@@ -5,7 +5,7 @@ export const CONTRACT = {
   accounts: { cols: ["id","name","type","opening_balance_cents","display_order","is_archived","created_at","updated_at","deleted"] },
   categories: { cols: ["id","name","parent_id","flow","need_type","display_order","is_archived","created_at","updated_at","deleted"] },
   periods: { cols: ["id","name","start_date","end_date","status","my_share_pct","notes","created_at","updated_at","deleted"] },
-  transactions: { cols: ["id","date","period_id","type","amount_cents","account_id","counter_account_id","category_id","merchant","note","is_shared","share_pct_override","paid_by","settled","ref_id","rule_id","external_id","status","created_at","updated_at","deleted"] },
+  transactions: { cols: ["id","date","period_id","type","amount_cents","account_id","counter_account_id","category_id","merchant","note","is_shared","share_pct_override","paid_by","settled","ref_id","rule_id","tag_id","external_id","status","created_at","updated_at","deleted"] },
   // is_subscription/cancelled_at (Suscripciones, N6) entre is_active y created_at — mismo criterio
   // de colocación semántica que paid_by en transactions. cancelled_at es una FECHA (YYYY-MM-DD),
   // NO un timestamp pese al sufijo _at: es el día de la baja, comparable con hoyISO() (ver xlsx.js
@@ -13,6 +13,27 @@ export const CONTRACT = {
   recurring_rules: { cols: ["id","name","type","amount_cents","category_id","account_id","counter_account_id","frequency","due_day","due_month","is_shared","is_active","is_subscription","cancelled_at","created_at","updated_at","deleted"] },
   goals: { cols: ["id","name","type","target_amount_cents","target_months","target_pct","target_date","account_id","category_id","is_active","created_at","updated_at","deleted"] },
   budgets: { cols: ["id","period_id","category_id","amount_cents","created_at","updated_at","deleted"] },
+  // Etiquetas de proyecto (N11, etiquetas-design §4/§5): la PRIMERA tabla opcional del contrato.
+  //
+  // optional:true → si la HOJA falta en el libro importado, la tabla se trata como VACÍA en vez de
+  // rechazar el libro entero (xlsx.js#workbookToRows).
+  //
+  // CRITERIO, y no admite excepciones:
+  //   Solo puede ser opcional una tabla AÑADIDA al contrato después de que ya hubiera hojas en
+  //   circulación, y cuya ausencia signifique inequívocamente «no había ninguno de estos datos».
+  //   Las OCHO tablas del núcleo (meta, accounts, categories, periods, transactions,
+  //   recurring_rules, goals, budgets) NO pueden ser opcionales nunca: si falta `budgets` el libro
+  //   está roto, y aceptarlo importaría en silencio una base de datos amputada. Marcar una tabla
+  //   del núcleo como opcional convierte el guardián de integridad del import en un aceptador de
+  //   basura, que es exactamente lo contrario de lo que hace validateImport.
+  //
+  // optional NO significa «esta hoja se valida menos»: una hoja PRESENTE se valida entera, con sus
+  // PKs, sus FKs, sus booleanos y sus números, igual que cualquier otra.
+  //
+  // Sin flow, sin parent_id, sin color, sin icono (D3, D14): un nombre, un límite opcional y un
+  // interruptor de archivado. `tags` va AL FINAL para que las ocho hojas existentes conserven su
+  // posición exacta en cualquier libro abierto en LibreOffice.
+  tags: { optional: true, cols: ["id","name","budget_cents","is_archived","created_at","updated_at","deleted"] },
 };
 
 export const ENUMS = {
@@ -28,10 +49,12 @@ export const BOOL_COLS = {
   accounts: ["is_archived","deleted"], categories: ["is_archived","deleted"],
   periods: ["deleted"], transactions: ["is_shared","settled","deleted"],
   recurring_rules: ["is_shared","is_active","is_subscription","deleted"], goals: ["is_active","deleted"],
-  budgets: ["deleted"], meta: [],
+  budgets: ["deleted"], meta: [], tags: ["is_archived","deleted"],
 };
 
-export const NULLABLE_NUM = new Set(["share_pct_override","due_day","due_month","target_amount_cents","target_months","target_pct"]);
+// budget_cents (tags): D4 — NULL = sin límite. Sin esta entrada, xlsx.js:330-332 reportaría
+// `required` para la celda del límite en blanco, que es el caso NORMAL de una etiqueta sin tope.
+export const NULLABLE_NUM = new Set(["share_pct_override","due_day","due_month","target_amount_cents","target_months","target_pct","budget_cents"]);
 
 // Valor por defecto de una columna TEXT del contrato cuando la celda llega vacía o la hoja no trae
 // su cabecera. paid_by es NOT NULL DEFAULT 'me' en la BD y su ENUM no admite "": una hoja v1 (sin
@@ -52,6 +75,10 @@ export const TEXT_DEFAULTS = { transactions: { paid_by: "me" } };
 //    backups reales y ya en producción se rechazaría de golpe.
 //  - transactions.rule_id: softDeleteRule no hace cascada; las transacciones ya generadas por esa
 //    regla (rule_id) siguen vivas y la regla puede borrarse después sin problema.
+//  - transactions.tag_id: archivar una etiqueta es is_archived, NUNCA tags.deleted=1 — la app no
+//    produce este estado. El flag es una precaución de importación (una hoja editada a mano con
+//    una etiqueta borrada no debe tirar abajo el import entero), no un camino que exista en uso
+//    normal.
 // Sin este flag, exportar y reimportar una BD real que ya esté en uno de estos estados (ambos
 // alcanzables sin ningún import de por medio) se rechazaría — el import es un guarda de INTEGRIDAD
 // ESTRUCTURAL del archivo, no debe bloquear datos que el propio repo ya permite crear.
@@ -74,6 +101,7 @@ export const FKS = [
   { table: "goals", col: "category_id", ref: "categories", optional: true },
   { table: "budgets", col: "period_id", ref: "periods", optional: false },
   { table: "budgets", col: "category_id", ref: "categories", optional: false },
+  { table: "transactions", col: "tag_id", ref: "tags", optional: true, allowDeletedRef: true },
 ];
 
 export const eurToCents = (v) => Math.round(Number(v) * 100);

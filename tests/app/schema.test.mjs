@@ -14,12 +14,25 @@ function freshDb() {
   return db;
 }
 
-test("esquema aplica y las 8 tablas existen", () => {
+test("esquema aplica y las 9 tablas existen", () => {
   const db = freshDb();
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name);
-  for (const t of ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"])
+  for (const t of ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets","tags"])
     assert.ok(tables.includes(t), t);
-  assert.equal(db.prepare("SELECT value FROM meta WHERE key='schema_version'").get().value, "3");
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='schema_version'").get().value, "4");
+});
+
+// D4 (etiquetas-design §5.1): budget_cents es NULLABLE — NULL significa «sin límite». Con
+// NOT NULL, una hoja xlsx editada a mano con la celda del límite en blanco (el caso normal)
+// reportaría `required` en vez de importar limpia (xlsx.js#validateImport).
+test("tags.budget_cents: sin NOT NULL, así que NULL es un valor legítimo (D4)", () => {
+  const db = freshDb();
+  const col = db.prepare("PRAGMA table_info(tags)").all().find((c) => c.name === "budget_cents");
+  assert.ok(col, "la columna existe");
+  assert.equal(col.notnull, 0, "budget_cents NO es NOT NULL");
+  db.prepare(`INSERT INTO tags (id,name,budget_cents,is_archived,created_at,updated_at,deleted)
+    VALUES ('tag-1','Viaje Japón',NULL,0,'t','t',0)`).run();
+  assert.equal(db.prepare("SELECT budget_cents FROM tags WHERE id='tag-1'").get().budget_cents, null);
 });
 
 // Suscripciones (v3): las dos columnas nuevas de recurring_rules llegan con su default en una BD

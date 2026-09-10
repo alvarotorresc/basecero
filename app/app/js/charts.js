@@ -68,3 +68,104 @@ export function netWorthBarsHtml(series) {
   <div style="display:flex;align-items:flex-end;gap:5px;height:44px;margin-top:10px;">${bars}</div>
   <div class="num" style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--text-2);margin-top:6px;">${labels}</div>`;
 }
+
+// ---- barRowsGeometry / categoryBarsSvg / comparisonBarsSvg (Informe del periodo) --------------
+// LA garantía de que el PDF y la pantalla no divergen: los dos presentadores del informe
+// (screens/informe.js con <svg>, informe-pdf.js con drawRectangle) consumen la MISMA geometría.
+
+/** Geometría pura de una lista de barras horizontales, en coordenadas de un lienzo
+ *  w×(n·rowH). NO devuelve SVG ni HTML: devuelve números.
+ *  rows: [{ key, value, max, color }] -> [{ key, color, x, y, w, h, trackW }]
+ *  Anchos SIEMPRE acotados a 0..width (un valor negativo, o un max<=0, dan w:0 — nunca NaN, mismo
+ *  criterio que category-spend.js#relativeWidth). trackFill controla si se devuelve el ancho de
+ *  la pista de fondo (trackW=width) o no (trackW=0) — quien pinta decide si la dibuja. */
+// `gap` no participa en la geometría de CADA fila (rowH ya reserva el hueco entre filas); se
+// acepta en las opciones igualmente para que la firma cubra lo que layoutReport (informe-pdf.js)
+// necesita pasarle junto al resto de opciones de layout de una tacada.
+export function barRowsGeometry(rows, { width, rowH, barH, trackFill = true }) {
+  return (rows ?? []).map((r, i) => {
+    const ratio = r.max > 0 ? Math.min(1, Math.max(0, r.value / r.max)) : 0;
+    return {
+      key: r.key,
+      color: r.color,
+      x: 0,
+      y: i * rowH,
+      w: width * ratio,
+      h: barH,
+      trackW: trackFill ? width : 0,
+    };
+  });
+}
+
+/** Barras horizontales por categoría, listas para innerHTML: un <rect> por fila, con el color
+ *  de esa categoría. `rows`: el mismo shape que barRowsGeometry. */
+export function categoryBarsSvg(rows, opts) {
+  const geo = barRowsGeometry(rows, opts);
+  const height = geo.length ? Math.max(...geo.map((g) => g.y + g.h)) : 0;
+  const rects = geo.map((g) => `<rect x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="3" fill="${g.color}"></rect>`).join("");
+  return `<svg width="${opts.width}" height="${height}" viewBox="0 0 ${opts.width} ${height}">${rects}</svg>`;
+}
+
+/** Comparativa de dos periodos: por fila, la barra del periodo actual y, debajo y atenuada, la
+ *  del anterior — a la MISMA escala (el máximo de LOS DOS valores de esa fila, nunca dos escalas
+ *  distintas). `rows`: [{ key, value, prevValue, color }]. Sin `prevValue` (null/undefined) no se
+ *  emite la segunda barra: es el caso de "sin periodo anterior" (spec §5.5). */
+export function comparisonBarsSvg(rows, { width, rowH, barH, gap = 0 }) {
+  const height = (rows ?? []).length * rowH;
+  const prevBarH = Math.max(2, Math.round(barH * 0.4));
+  const body = (rows ?? []).map((r, i) => {
+    const hasPrev = r.prevValue !== null && r.prevValue !== undefined;
+    const max = Math.max(r.value, hasPrev ? r.prevValue : 0);
+    const ratio = (v) => (max > 0 ? Math.min(1, Math.max(0, v / max)) : 0);
+    const y = i * rowH;
+    let svg = `<rect x="0" y="${y}" width="${width * ratio(r.value)}" height="${barH}" rx="3" fill="${r.color}"></rect>`;
+    if (hasPrev) {
+      const prevY = y + barH + gap;
+      svg += `<rect x="0" y="${prevY}" width="${width * ratio(r.prevValue)}" height="${prevBarH}" rx="2" fill="${r.color}" fill-opacity="0.35"></rect>`;
+    }
+    return svg;
+  }).join("");
+  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${body}</svg>`;
+}
+
+// ---- trendOf / trendSvg (Etiquetas, N3: mini tendencia de 3 periodos, SISTEMA §4.19) ----------
+
+export const TREND_H = 18, TREND_W = 4, TREND_GAP = 3, TREND_MIN_H = 2;
+
+/** Alturas en px de la mini tendencia de 3 periodos. PURA: devuelve números, no SVG.
+ *  values: céntimos del MÁS ANTIGUO al MÁS RECIENTE (jul, ago, sep).
+ *  null cuando no hay nada que dibujar: menos de 2 valores, o max <= 0 (una raíz con más
+ *  devoluciones que gasto existe — el mismo caso que documenta relativeWidth, category-spend.js).
+ *  Escala: h = round(v / max * 18), con max = el MAYOR de la serie (no el actual) — Alimentación
+ *  (etiquetas-design §8.2) es la fila que lo demuestra: su barra de 18px es la de AGOSTO. */
+export function trendOf(values) {
+  const vals = values ?? [];
+  if (vals.length < 2) return null;
+  const max = Math.max(...vals);
+  if (!(max > 0)) return null;
+  const heights = vals.map((v) => {
+    const h = Math.round((v / max) * TREND_H);
+    // Una barra invisible se lee como "no hay dato" en vez de "casi nada" (TREND_MIN_H no es una
+    // copia: precedente BAR_MIN_H/netWorthBarsHtml en este mismo módulo).
+    return v > 0 && h <= 0 ? TREND_MIN_H : Math.max(0, h);
+  });
+  return { heights, max };
+}
+
+/** Las barras de trendOf: las anteriores al 45 % de opacidad y la ÚLTIMA (la actual) a opacidad
+ *  plena, en el color de la categoría. Devuelve "" cuando trendOf da null: quien llama interpola
+ *  sin condicional. */
+export function trendSvg(values, color) {
+  const t = trendOf(values);
+  if (!t) return "";
+  const n = t.heights.length;
+  const width = n * TREND_W + (n - 1) * TREND_GAP;
+  const bars = t.heights.map((h, i) => {
+    const x = i * (TREND_W + TREND_GAP);
+    const y = TREND_H - h;
+    const isLast = i === n - 1;
+    const opacityAttr = isLast ? "" : ` fill-opacity="0.45"`;
+    return `<rect x="${x}" y="${y}" width="${TREND_W}" height="${h}" fill="${color}"${opacityAttr}></rect>`;
+  }).join("");
+  return `<svg width="${width}" height="${TREND_H}" viewBox="0 0 ${width} ${TREND_H}">${bars}</svg>`;
+}

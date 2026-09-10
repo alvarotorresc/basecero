@@ -54,13 +54,13 @@ function insTx(db, over = {}) {
     date: "2026-08-20", period: "per-1", type: "expense", cents: 1299,
     account: "acc-n26", counterAccount: "", category: "cat-casa-alquiler",
     merchant: "Spotify", note: "", shared: 0, override: null, paidBy: "me", settled: 0,
-    ref: "", rule: "", external: "", status: "pending",
+    ref: "", rule: "", tag: "", external: "", status: "pending",
     ...over,
   };
   db.prepare(SQL.insertTransaction).run(
     v.id, v.date, v.period, v.type, v.cents, v.account, v.counterAccount,
     v.category, v.merchant, v.note, v.shared, v.override, v.paidBy, v.settled,
-    v.ref, v.rule, v.external, v.status, T, T,
+    v.ref, v.rule, v.tag, v.external, v.status, T, T,
   );
   return v.id;
 }

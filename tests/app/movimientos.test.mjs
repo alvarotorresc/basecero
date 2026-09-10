@@ -6,20 +6,20 @@ import { openDb, seedMinimal } from "./helpers.mjs";
 const T = "2026-08-24T18:00:00Z";
 const T2 = "2026-08-24T19:00:00Z";
 
-/** Inserta una transacción usando la firma NUEVA (20 posicionales) de SQL.insertTransaction. */
+/** Inserta una transacción usando la firma NUEVA (21 posicionales) de SQL.insertTransaction. */
 function ins(db, over = {}) {
   const v = {
     id: "t" + Math.floor(Math.random() * 1e9),
     date: "2026-08-20", period: "per-1", type: "expense", cents: 4520,
     account: "acc-n26", counterAccount: "", category: "cat-casa-alquiler",
     merchant: "", note: "", shared: 0, override: null, paidBy: "me", settled: 0,
-    ref: "", rule: "", external: "", status: "pending",
+    ref: "", rule: "", tag: "", external: "", status: "pending",
     ...over,
   };
   db.prepare(SQL.insertTransaction).run(
     v.id, v.date, v.period, v.type, v.cents, v.account, v.counterAccount,
     v.category, v.merchant, v.note, v.shared, v.override, v.paidBy, v.settled,
-    v.ref, v.rule, v.external, v.status, T, T,
+    v.ref, v.rule, v.tag, v.external, v.status, T, T,
   );
   return v.id;
 }
@@ -68,7 +68,7 @@ test("updateTransaction: cambia los campos editables y updated_at, nunca created
 
   db.prepare(SQL.updateTransaction).run(
     "expense", 2500, "2026-08-21", "cat-casa-alquiler", "acc-n26", "",
-    "Actualizado", "nota nueva", 1, 50, "me", "", "", "pending", T2, id,
+    "Actualizado", "nota nueva", 1, 50, "me", "", "", "", "pending", T2, id,
   );
 
   const after = db.prepare("SELECT * FROM transactions WHERE id=?").get(id);

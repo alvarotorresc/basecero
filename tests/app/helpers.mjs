@@ -30,7 +30,7 @@ export function seedMinimal(db) {
 }
 export const dumpAll = (db) => {
   const out = {};
-  for (const t of ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"])
+  for (const t of ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets","tags"])
     out[t] = db.prepare(`SELECT * FROM ${t}`).all();
   return out;
 };
@@ -71,4 +71,26 @@ export const V2_RULES_DDL = `CREATE TABLE recurring_rules (
   frequency TEXT NOT NULL CHECK (frequency IN ('weekly','monthly','quarterly','yearly')),
   due_day INTEGER, due_month INTEGER,
   is_shared INTEGER NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0)`;
+
+/** DDL de `transactions` tal como lo deja `feat/informe-y-cierre` (v3): CON `paid_by` pero SIN
+ *  `tag_id` — el estado real de una BD ya migrada a v2/v3 que todavía no ha visto esta PR. Mismo
+ *  motivo que OLD_TRANSACTIONS_DDL: escrito entero a mano, no recortado de schema.sql con un
+ *  `.replace()` (que se vuelve un no-op silencioso en cuanto alguien reindenta el fichero). */
+export const V3_TRANSACTIONS_DDL = `CREATE TABLE transactions (
+  id TEXT PRIMARY KEY, date TEXT NOT NULL,
+  period_id TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('expense','income','transfer','refund','adjustment')),
+  amount_cents INTEGER NOT NULL CHECK (type='adjustment' OR amount_cents > 0),
+  account_id TEXT NOT NULL,
+  counter_account_id TEXT NOT NULL DEFAULT '',
+  category_id TEXT NOT NULL DEFAULT '',
+  merchant TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
+  is_shared INTEGER NOT NULL DEFAULT 0,
+  share_pct_override REAL,
+  paid_by TEXT NOT NULL DEFAULT 'me' CHECK (paid_by IN ('me','partner')),
+  settled INTEGER NOT NULL DEFAULT 0,
+  ref_id TEXT NOT NULL DEFAULT '', rule_id TEXT NOT NULL DEFAULT '',
+  external_id TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','reconciled')),
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0)`;

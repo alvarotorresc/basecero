@@ -30,13 +30,13 @@ function ins(db, over = {}) {
     date: "2026-08-20", period: "per-1", type: "expense", cents: 4520,
     account: "acc-n26", counterAccount: "", category: "cat-casa-alquiler",
     merchant: "", note: "", shared: 0, override: null, paidBy: "me", settled: 0,
-    ref: "", rule: "", external: "", status: "pending",
+    ref: "", rule: "", tag: "", external: "", status: "pending",
     ...over,
   };
   db.prepare(SQL.insertTransaction).run(
     v.id, v.date, v.period, v.type, v.cents, v.account, v.counterAccount,
     v.category, v.merchant, v.note, v.shared, v.override, v.paidBy, v.settled,
-    v.ref, v.rule, v.external, v.status, T, T,
+    v.ref, v.rule, v.tag, v.external, v.status, T, T,
   );
   return v.id;
 }
@@ -53,7 +53,7 @@ function settleShared(db, origId, accountId, now, openPeriodId = "per-1") {
   const refundId = "refund-" + origId;
   db.prepare(SQL.insertTransaction).run(
     refundId, "2026-08-24", openPeriodId, "refund", row.settle_cents, accountId, "",
-    row.category_id, row.merchant, t("liquidar.note"), 0, null, "me", 0, origId, "", "", "pending", now, now,
+    row.category_id, row.merchant, t("liquidar.note"), 0, null, "me", 0, origId, "", "", "", "pending", now, now,
   );
   db.prepare("UPDATE transactions SET settled=1, updated_at=? WHERE id=?").run(now, origId);
   return refundId;
@@ -275,7 +275,7 @@ function execManyRaw(db, stmts) {
  *  en Node (depende del Worker vía query/execMany, mismo motivo por el que la liquidación de una
  *  sola fila y openNextPeriod de este mismo fichero se reproducen en vez de importarse). El ARRAY de
  *  statements NO se reproduce a mano aquí: se delega en la settleAllSharedStmts REAL importada de
- *  repo.js (arriba) — así un bug en el bind de insertTransaction (orden de los 20 campos) lo
+ *  repo.js (arriba) — así un bug en el bind de insertTransaction (orden de los 21 campos) lo
  *  detectaría este test, cosa que una copia manual del bind no podría hacer. "Alex" es el
  *  partner_name que repo.settleAllShared saca de meta y pasa como sexto argumento. */
 function settleAllSharedReproduced(db, ids, accountId, now, periodId = "per-1") {
@@ -633,7 +633,7 @@ function updateTransactionReproduced(db, id, fields) {
     f.type, f.amountCents, fields.date ?? cur.date, fields.categoryId ?? cur.category_id,
     f.accountId, fields.counterAccountId ?? cur.counter_account_id,
     fields.merchant ?? cur.merchant, fields.note ?? cur.note, f.isShared ? 1 : 0, f.sharePctOverride, f.paidBy,
-    fields.refId ?? cur.ref_id, fields.ruleId ?? cur.rule_id, fields.status ?? cur.status, T2, id,
+    fields.refId ?? cur.ref_id, fields.ruleId ?? cur.rule_id, fields.tagId ?? cur.tag_id, fields.status ?? cur.status, T2, id,
   );
 }
 
@@ -685,6 +685,22 @@ test("updateTransaction (reproducido): editar categoría/nota del refund enlazad
   const refund = db.prepare("SELECT amount_cents, note FROM transactions WHERE id=?").get(refundId);
   assert.equal(refund.note, "Liquidación de agosto");
   assert.equal(refund.amount_cents, 2000, "el importe no debe tocarse por un cambio de nota");
+});
+
+test("updateTransaction (reproducido): tagId:'' quita la etiqueta; sin la clave tagId se conserva", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const gastoId = ins(db, { id: "gasto-etiquetado", date: "2026-08-12", period: "per-1", cents: 3000, tag: "tag-reforma" });
+
+  // "" no es undefined: fields.tagId ?? cur.tag_id toma la cadena vacía, no el valor previo.
+  updateTransactionReproduced(db, gastoId, { tagId: "" });
+  assert.equal(db.prepare("SELECT tag_id FROM transactions WHERE id=?").get(gastoId).tag_id, "");
+
+  // Sin la clave tagId en fields, el `??` cae al valor actual (ya vacío tras el paso anterior):
+  // se reetiqueta y se comprueba que un update SIN tagId no lo toca.
+  db.prepare("UPDATE transactions SET tag_id=? WHERE id=?").run("tag-reforma", gastoId);
+  updateTransactionReproduced(db, gastoId, { note: "Sin tocar la etiqueta" });
+  assert.equal(db.prepare("SELECT tag_id FROM transactions WHERE id=?").get(gastoId).tag_id, "tag-reforma");
 });
 
 test("updateTransaction (reproducido): pasar un gasto compartido a paidBy:'partner' vacía account_id", () => {
@@ -787,17 +803,17 @@ test("settleAllSharedStmts: una devolución entrante por lo que me deben y un aj
   const stmts = settleAllSharedStmts(rows, "acc-n26", "per-1", "2026-08-24", T2, "Alex");
   assert.equal(stmts.length, 4, "un insert + un settled=1 por cada una de las dos filas");
 
-  // El id es un ULID nuevo: se compara la cola del bind (los otros 19 valores).
+  // El id es un ULID nuevo: se compara la cola del bind (los otros 20 valores).
   assert.deepEqual(stmts[0].bind.slice(1), [
     "2026-08-24", "per-1", "refund", 4000, "acc-n26", "", "cat-casa-alquiler", "IKEA", t("liquidar.note"),
-    0, null, "me", 0, a, "", "", "pending", T2, T2,
-  ], "lo que pagué yo: devolución entrante por lo que me debe, con la categoría y el comercio del gasto");
+    0, null, "me", 0, a, "", "", "", "pending", T2, T2,
+  ], "lo que pagué yo: devolución entrante por lo que me debe, con la categoría y el comercio del gasto (tag_id='' siempre)");
   assert.deepEqual(stmts[1], { sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [T2, a] });
 
   assert.deepEqual(stmts[2].bind.slice(1), [
     "2026-08-24", "per-1", "adjustment", -6000, "acc-n26", "", "", "Liquidación con Alex", t("liquidar.note"),
-    0, null, "me", 0, b, "", "", "pending", T2, T2,
-  ], "lo que pagó ella: apunte de SALIDA negativo, sin categoría (no es gasto: mi parte ya contó)");
+    0, null, "me", 0, b, "", "", "", "pending", T2, T2,
+  ], "lo que pagó ella: apunte de SALIDA negativo, sin categoría (no es gasto: mi parte ya contó), tag_id='' siempre");
   assert.deepEqual(stmts[3], { sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [T2, b] });
 });
 

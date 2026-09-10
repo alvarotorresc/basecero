@@ -31,6 +31,54 @@ licencia procede de los metadatos del proyecto upstream. La Apache-2.0 no exige 
 íntegro cuando no hay un `NOTICE` que propagar, solo conservar los avisos de copyright — que es lo
 que hace este apartado.
 
+## pdf-lib (`pdf-lib.min.js`)
+
+- **Componente:** pdf-lib, versión **1.17.1**.
+- **Ruta:** `app/app/vendor/pdf-lib/pdf-lib.min.js`
+- **Licencia:** MIT — texto completo más abajo.
+- **Web del proyecto:** <https://pdf-lib.js.org/>
+
+Aviso de copyright:
+
+```
+Copyright (c) 2019 Andrew Dillon
+```
+
+### Texto de la licencia MIT
+
+```
+MIT License
+
+Copyright (c) 2019 Andrew Dillon
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+El bundle embebe además `pako` (MIT), `@pdf-lib/standard-fonts` (MIT) y `@pdf-lib/upng` (MIT), y
+**`tslib`** (Apache License 2.0), el único componente con licencia distinta a MIT — mismo
+tratamiento que se le dio a `js-codepage` dentro de SheetJS más abajo. Aviso de copyright de tslib,
+tal y como aparece en la cabecera embebida en el bundle:
+
+```
+Copyright (c) Microsoft Corporation. All rights reserved.
+```
+
 ## Schibsted Grotesk (fuente)
 
 - **Componente:** Schibsted Grotesk, fuente variable (eje `wght`), subset latin.

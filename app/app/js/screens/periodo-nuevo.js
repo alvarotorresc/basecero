@@ -1,13 +1,15 @@
 import {
   getOpenPeriod, spentOfPeriod, incomeOfPeriod, listAllByDay, spentByRootCategory, budgetsOfPeriod,
-  openNextPeriod, getMetaAll,
+  openNextPeriod, getMetaAll, goalsWithProgress, listAllAccounts, defaultAccountId, accountBalanceCents,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { eurToCents } from "../contract.js";
-import { fmtMoney, moneyPartsHtml, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol } from "../format.js";
+import { fmtMoney, moneyPartsHtml, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol, centsToRaw } from "../format.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, stepPct } from "../share-pct.js";
-import { inheritedBudgetsRaw } from "../category-spend.js";
+import { inheritedBudgetsRaw, budgetMap } from "../category-spend.js";
+import { remainderCents, sweepDestinations, sweepPlan } from "../barrido.js";
+import { renderInforme } from "./informe.js";
 import { userMessage } from "../errors.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -40,6 +42,9 @@ function renderAsistenteError(container, mode, onDone, message) {
 export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
   let closingPeriod = null, closingSpent = 0, closingIncome = 0, closingCount = 0, rootRows = [], meta = {};
   let closingBudgets = [];
+  // Barrido (N4): goals con progreso, cuentas vivas y la cuenta de origen por defecto — solo hace
+  // falta en modo 'next' (bloqueBarrido() más abajo).
+  let goalsProgress = [], allAccounts = [], sourceAccountId = "", sourceBalanceCents = 0;
   try {
     if (mode === "next") {
       closingPeriod = await getOpenPeriod();
@@ -47,16 +52,21 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
         renderAsistenteError(container, mode, onDone, t("periodo.error.noOpenToClose"));
         return;
       }
-      const [spent, income, all, roots, budgetRows, metaAll] = await Promise.all([
+      const [spent, income, all, roots, budgetRows, metaAll, goals, accounts, defaultAccId] = await Promise.all([
         spentOfPeriod(closingPeriod.id),
         incomeOfPeriod(closingPeriod.id),
         listAllByDay(closingPeriod.id),
         spentByRootCategory(closingPeriod.id),
         budgetsOfPeriod(closingPeriod.id),
         getMetaAll(),
+        goalsWithProgress(),
+        listAllAccounts(),
+        defaultAccountId(),
       ]);
       closingSpent = spent; closingIncome = income; closingCount = all.length; rootRows = roots;
       closingBudgets = budgetRows; meta = metaAll;
+      goalsProgress = goals; allAccounts = accounts; sourceAccountId = defaultAccId || "";
+      if (sourceAccountId) sourceBalanceCents = await accountBalanceCents(sourceAccountId, hoyISO());
     } else {
       [rootRows, meta] = await Promise.all([spentByRootCategory(""), getMetaAll()]);
     }
@@ -65,6 +75,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
     return;
   }
   const partnerName = (meta.partner_name || "").trim();
+  const accountsById = Object.fromEntries(allAccounts.map((a) => [a.id, a]));
 
   // byId "de mentira" solo con lo que colorForCategory/iconForCategory necesitan (rootOf sube
   // por parent_id hasta encontrar la raíz): como root_id YA es una raíz, basta con parent_id=''.
@@ -74,6 +85,30 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
   // campo vuelve a dejar esa categoría sin límite (el submit ya salta los vacíos). En modo 'first'
   // no hay periodo previo del que heredar nada.
   const inherited = mode === "next" ? inheritedBudgetsRaw(closingBudgets, rootRows) : {};
+
+  // Barrido (N4): el remanente del periodo que se cierra (mismo criterio que "Disponible del
+  // periodo" de Inicio) y los destinos elegibles a la cuenta de origen por defecto. No se pinta
+  // si el remanente es 0, si no hay ningún destino elegible, o si el saldo de origen es ≤ 0 (D10).
+  const closingBudgetTotalCents = Object.values(budgetMap(closingBudgets)).reduce((s, c) => s + c, 0);
+  const remainder = mode === "next"
+    ? remainderCents({ budgetTotalCents: closingBudgetTotalCents, incomeCents: closingIncome, spentCents: closingSpent })
+    : { cents: 0, basis: "income" };
+  // Funciones, no consts: el saldo de origen (state.sourceBalanceCents) cambia si el usuario mueve
+  // la fecha de inicio (#pn-fecha), así que los destinos elegibles hay que recalcularlos en cada
+  // render(), no fijarlos una vez con el saldo inicial.
+  function currentDestinations() {
+    return remainder.cents > 0 && state.sourceBalanceCents > 0
+      ? sweepDestinations(goalsProgress, accountsById, remainder.cents, state.sourceAccountId)
+      : [];
+  }
+  function currentShowBarrido() {
+    return mode === "next" && remainder.cents > 0 && state.sourceBalanceCents > 0 && currentDestinations().length > 0;
+  }
+  // Destinos con el saldo de origen INICIAL, solo para precargar sweepChoice antes de que exista
+  // `state` (currentDestinations() ya podría usarse después, una vez `state` está construido).
+  const initialDestinations = remainder.cents > 0 && sourceBalanceCents > 0
+    ? sweepDestinations(goalsProgress, accountsById, remainder.cents, sourceAccountId)
+    : [];
 
   const state = {
     startDate: hoyISO(),
@@ -90,6 +125,16 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
     ]),
     addOpen: false,
     saving: false,
+    // Barrido: preseleccionado el primero (más cerca de cumplirse, spec §9.4); precargado con el
+    // remanente entero. sourceAccountId/sourceBalanceCents viven en el state porque la fecha de
+    // inicio (#pn-fecha) puede cambiar el saldo de origen (la transferencia lleva esa fecha).
+    sweepChoice: initialDestinations[0]?.goalId ?? "keep",
+    // La anatomía de importe del sistema (SISTEMA §2.3) es SIEMPRE `type="text" inputmode="decimal"`
+    // + parseCentsRaw (registro.js:342), nunca `type="number"`: con coma decimal, un <input
+    // type="number"> rechaza el valor en silencio y el campo se ve vacío.
+    sweepAmountRaw: centsToRaw(remainder.cents),
+    sourceAccountId,
+    sourceBalanceCents,
   };
   let errorMsg = "";
 
@@ -125,6 +170,30 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
       if (barEl) barEl.style.width = pctBarra + "%";
       const notaEl = container.querySelector("#pn-nota");
       if (notaEl) notaEl.innerHTML = notaSinAsignarHtml(sinAsignar);
+    }
+  }
+
+  /** Actualiza SOLO el aviso de tope y el «quedaría en X» de cada destino tras teclear en
+   *  «Cantidad a barrer» — mismo criterio que patchTotal(): un render() completo por tecla
+   *  destruiría el input con el foco (comentario de referencia arriba, líneas 112-114). */
+  function patchSweepPreview() {
+    if (!currentShowBarrido()) return;
+    const plan = sweepPlan({ rawAmount: state.sweepAmountRaw, sourceBalanceCents: state.sourceBalanceCents });
+    const cappedEl = container.querySelector("#pn-sweep-capped");
+    if (cappedEl) {
+      if (plan.capped) {
+        cappedEl.style.display = "";
+        cappedEl.textContent = t("barrido.capped", {
+          amount: fmtMoney(plan.amountCents), account: accountsById[state.sourceAccountId]?.name ?? "",
+        });
+      } else {
+        cappedEl.style.display = "none";
+      }
+    }
+    const liveDestinations = sweepDestinations(goalsProgress, accountsById, plan.amountCents, state.sourceAccountId);
+    for (const d of liveDestinations) {
+      const line = container.querySelector(`[data-sweep-afterline="${d.goalId}"]`);
+      if (line) line.textContent = sweepAfterLineText(d);
     }
   }
 
@@ -175,6 +244,75 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
           <div style="font-size:11px; color:var(--text-3);">${t("periodo.closing.savingsRate")}</div>
           <div class="num" style="font-size:15px; font-weight:600;">${tasa}</div>
         </div>
+      </div>
+    </div>`;
+  }
+
+  /** Fila de un destino elegible (Bloque 2 de PeriodoNuevo.dc.html, N4): tarjeta de radio con
+   *  nombre, current/target, barra y «quedaría en {importe}». El `data-sweep-afterline` es lo que
+   *  patchSweepPreview() reescribe al teclear en el importe, sin re-renderizar toda la pantalla. */
+  function barridoDestinoHtml(d, withDivider) {
+    const checked = state.sweepChoice === d.goalId;
+    const pct = Math.min(100, Math.max(0, d.pct));
+    // Un fondo de emergencia del primer cierre no tiene periodos cerrados de los que sacar el
+    // promedio de gasto (repo.js#goalProgress): targetCents sale 0, así que no hay objetivo real
+    // con el que dar «X / 0,00 €» ni una barra que dibujar (0 % de un objetivo que no existe).
+    const hasTarget = d.targetCents > 0;
+    // Tarjeta con borde resaltado cuando está elegida (artboard PeriodoNuevo.dc.html): el margen
+    // negativo compensa el padding para que el borde no desplace el contenido de las demás filas.
+    return `
+    ${withDivider ? '<hr class="divider">' : ""}
+    <label style="display:flex; align-items:center; gap:12px; padding:12px; margin:2px -12px;
+      border-radius:12px; border:1.5px solid ${checked ? "var(--accent)" : "transparent"}; cursor:pointer; -webkit-tap-highlight-color:transparent;">
+      <input type="radio" name="pn-sweep-dest" value="${escAttr(d.goalId)}" data-sweep-radio ${checked ? "checked" : ""} style="width:20px; height:20px; flex-shrink:0;">
+      <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:5px;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px;">
+          <span style="font-size:14px; font-weight:600;">${t("barrido.toGoal", { name: escHtml(d.name) })}</span>
+          <span class="num" style="font-size:11px; color:var(--text-3); flex-shrink:0;">${escHtml(fmtMoney(d.currentCents))}${hasTarget ? ` / ${escHtml(fmtMoney(d.targetCents))}` : ""}</span>
+        </div>
+        ${hasTarget ? `<div class="bar" style="height:6px;"><i style="width:${pct}%;"></i></div>` : ""}
+        <div class="num" style="font-size:11px; color:var(--text-3);" data-sweep-afterline="${escAttr(d.goalId)}">${sweepAfterLineText(d)}</div>
+      </div>
+    </label>`;
+  }
+
+  function sweepAfterLineText(d) {
+    return t("barrido.wouldBe", { amount: escHtml(fmtMoney(d.afterCents)) }) + (d.completes ? " · " + t("barrido.completes") : "");
+  }
+
+  /** El paso «Barrido» del cierre (N4, spec §9.4): entre el resumen del periodo que se cierra y el
+   *  nombre del nuevo, y SOLO en modo 'next'. No se pinta si el remanente es 0, si no hay ningún
+   *  destino elegible, o si el saldo de la cuenta de origen es ≤ 0 (D10). */
+  function bloqueBarrido() {
+    if (!currentShowBarrido()) return "";
+    const destinations = currentDestinations();
+    const titleKey = remainder.basis === "budget" ? "barrido.title" : "barrido.titleIncome";
+    const plan = sweepPlan({ rawAmount: state.sweepAmountRaw, sourceBalanceCents: state.sourceBalanceCents });
+    const sourceAccountName = accountsById[state.sourceAccountId]?.name ?? "";
+    return `
+    <div class="card" style="display:flex; flex-direction:column; gap:14px; margin-bottom:16px;">
+      <div style="display:flex; flex-direction:column; gap:3px;">
+        <div style="font-size:15px; font-weight:700;">${t(titleKey, { amount: escHtml(fmtMoney(remainder.cents)) })}</div>
+        <div style="font-size:11px; color:var(--text-3);">${t("barrido.question")}</div>
+      </div>
+      <div style="display:flex; flex-direction:column;">
+        ${destinations.map((d, i) => barridoDestinoHtml(d, i > 0)).join("")}
+        <hr class="divider">
+        <label style="display:flex; align-items:center; gap:12px; padding:12px 0; cursor:pointer; -webkit-tap-highlight-color:transparent;">
+          <input type="radio" name="pn-sweep-dest" value="keep" data-sweep-radio ${state.sweepChoice === "keep" ? "checked" : ""} style="width:20px; height:20px; flex-shrink:0;">
+          <span style="font-size:14px; font-weight:600;">${t("barrido.leaveIt")}</span>
+        </label>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:6px; ${state.sweepChoice === "keep" ? "opacity:.5;" : ""}">
+        <div class="section-title">${t("barrido.amount")}</div>
+        <div class="amount-display" style="align-items:center;">
+          <input type="text" inputmode="decimal" id="pn-sweep-amount" value="${escAttr(state.sweepAmountRaw)}" placeholder="0" autocomplete="off"
+            ${state.sweepChoice === "keep" ? "disabled" : ""}
+            style="border:0; background:none; color:var(--text); font:600 32px var(--font-num); letter-spacing:-0.02em; width:100%; outline:none;">
+          <span class="amount-currency">${escHtml(currencySymbol())}</span>
+        </div>
+        <hr class="divider" style="margin-top:2px;">
+        <div id="pn-sweep-capped" class="num" style="font-size:11px; color:var(--amber, var(--text-3)); ${plan.capped ? "" : "display:none;"}">${plan.capped ? escHtml(t("barrido.capped", { amount: fmtMoney(plan.amountCents), account: sourceAccountName })) : ""}</div>
       </div>
     </div>`;
   }
@@ -349,6 +487,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
     container.innerHTML = `
       ${bloqueHeader()}
       ${bloqueCierre()}
+      ${bloqueBarrido()}
       ${bloqueNombre()}
       ${bloqueFecha()}
       ${bloqueReparto()}
@@ -363,11 +502,28 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
     const back = container.querySelector("#pn-back");
     if (back) back.onclick = () => (onBack ?? onDone)();
 
-    container.querySelector("#pn-fecha").onchange = (e) => {
+    container.querySelector("#pn-fecha").onchange = async (e) => {
       state.startDate = e.target.value || hoyISO();
+      // La transferencia del barrido lleva ESTA fecha (no "hoy"): al mover el inicio del periodo
+      // nuevo hay que releer el saldo de la cuenta de origen a esa fecha exacta.
+      if (state.sourceAccountId) {
+        try { state.sourceBalanceCents = await accountBalanceCents(state.sourceAccountId, state.startDate); }
+        catch { state.sourceBalanceCents = 0; }
+      }
       render();
     };
     container.querySelector("#pn-nombre").oninput = (e) => { state.name = e.target.value; };
+
+    container.querySelectorAll("[data-sweep-radio]").forEach((r) => {
+      r.onchange = () => { state.sweepChoice = r.value; render(); };
+    });
+    const sweepAmountInput = container.querySelector("#pn-sweep-amount");
+    if (sweepAmountInput) {
+      sweepAmountInput.oninput = (e) => {
+        state.sweepAmountRaw = e.target.value;
+        patchSweepPreview();
+      };
+    }
 
     const pctUp = container.querySelector("#pn-pct-up");
     if (pctUp) pctUp.onclick = () => { state.sharePct = stepPct(state.sharePct, PCT_STEP); render(); };
@@ -412,19 +568,51 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
           if (!Number.isFinite(n) || n <= 0) continue;
           budgets.push({ categoryId, amountCents: eurToCents(raw) });
         }
+        // El sweep solo viaja si hay un destino elegido (no «Dejarlo en la cuenta») Y la cantidad
+        // tecleada es válida (sweepPlan) — sin esto, dejar el campo a medias no debe escribir nada.
+        let sweep;
+        if (currentShowBarrido() && state.sweepChoice !== "keep") {
+          const plan = sweepPlan({ rawAmount: state.sweepAmountRaw, sourceBalanceCents: state.sourceBalanceCents });
+          const dest = currentDestinations().find((d) => d.goalId === state.sweepChoice);
+          if (dest && plan.valid) {
+            sweep = { amountCents: plan.amountCents, fromAccountId: state.sourceAccountId, toAccountId: dest.accountId, goalName: dest.name };
+          }
+        }
         await openNextPeriod({
           name: state.name.trim() || nombrePorDefecto(),
           startDate: state.startDate || hoyISO(),
           sharePct: partnerName ? Math.min(100, Math.max(0, state.sharePct)) : 100,
           budgets,
+          sweep,
         });
-        onDone();
+        // Bloque 6 del artboard: en modo 'next' hay un periodo recién cerrado del que enseñar el
+        // informe; en 'first' (onboarding) no existe ese periodo, así que se sigue como hasta
+        // ahora, sin panel.
+        if (mode === "next") renderClosedPanel();
+        else onDone();
       } catch (e) {
         state.saving = false;
         errorMsg = t("periodo.error.open", { error: userMessage(e) });
         render();
       }
     };
+  }
+
+  /** Panel final tras cerrar con éxito (Bloque 6 de PeriodoNuevo.dc.html): «Ver el informe» monta
+   *  renderInforme EN EL MISMO contenedor, con body.onboarding todavía puesto (el chrome sigue
+   *  oculto y nav() bloqueado, main.js:28) — volver desde ahí repinta este mismo panel, nunca sale
+   *  del asistente por sorpresa. «Hecho» es la única salida real. */
+  function renderClosedPanel() {
+    container.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:18px; align-items:center; text-align:center; padding-top:40px;">
+      <div style="font-size:20px; font-weight:800; letter-spacing:-0.02em;">${t("periodo.finish.autoReport", { name: escHtml(closingPeriod.name) })}</div>
+      <button type="button" class="btn-primary" id="pn-ver-informe" style="width:100%;">${t("periodo.finish.seeReport")}</button>
+      <button type="button" id="pn-hecho" style="${BTN_SECONDARY}">${t("periodo.finish.done")}</button>
+    </div>`;
+    container.querySelector("#pn-ver-informe").onclick = () => {
+      renderInforme(container, renderClosedPanel, { periodId: closingPeriod.id });
+    };
+    container.querySelector("#pn-hecho").onclick = () => onDone();
   }
 
   render();

@@ -11,13 +11,22 @@ const MY_AMOUNT = `CAST(ROUND(t.amount_cents * (CASE WHEN t.is_shared=1
 const REFUND_REDUCES_SPEND = `(t.ref_id='' OR NOT EXISTS (
   SELECT 1 FROM transactions e WHERE e.id=t.ref_id AND e.is_shared=1 AND e.deleted=0))`;
 
+// El gasto imputado a una etiqueta, con el MISMO criterio que spentByRootCategory: mi parte
+// prorrateada (MY_AMOUNT) y las devoluciones restadas salvo que liquiden un compartido
+// (REFUND_REDUCES_SPEND). Se escribe UNA vez: si el total de la pantalla Etiquetas y el de la
+// cabecera de Movimientos usaran criterios distintos, el mismo viaje valdría dos cifras.
+// Alias `tg` para tags: `t` y `p` los ocupan MY_AMOUNT y REFUND_REDUCES_SPEND.
+const TAG_SPENT = `COALESCE(SUM(CASE
+    WHEN t.type='expense' THEN ${MY_AMOUNT}
+    WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT} ELSE 0 END),0)`;
+
 export const SQL = {
   getOpenPeriod: `SELECT * FROM periods WHERE status='open' AND deleted=0 LIMIT 1`,
   insertPeriod: `INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
     VALUES (?,?,?,'','open',?,'',?,?,0)`,
   insertTransaction: `INSERT INTO transactions (id,date,period_id,type,amount_cents,account_id,counter_account_id,
-    category_id,merchant,note,is_shared,share_pct_override,paid_by,settled,ref_id,rule_id,external_id,status,created_at,updated_at,deleted)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
+    category_id,merchant,note,is_shared,share_pct_override,paid_by,settled,ref_id,rule_id,tag_id,external_id,status,created_at,updated_at,deleted)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
   spentOfPeriod: `SELECT COALESCE(SUM(CASE
       WHEN t.type='expense' THEN ${MY_AMOUNT}
       WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT}
@@ -99,7 +108,7 @@ export const SQL = {
   // necesita para mostrar el reparto real (mismo criterio que registro.js), no un 100% fijo.
   listPeriods: `SELECT id, name, start_date, end_date, status, my_share_pct FROM periods WHERE deleted=0 ORDER BY start_date DESC`,
   listAllByDay: `SELECT t.id, t.date, t.type, t.amount_cents, t.category_id, t.merchant, t.note, t.is_shared,
-      t.account_id, t.counter_account_id, t.share_pct_override, t.paid_by, t.ref_id, t.rule_id, t.status,
+      t.account_id, t.counter_account_id, t.share_pct_override, t.paid_by, t.ref_id, t.rule_id, t.tag_id, t.status,
       ${MY_AMOUNT} AS my_amount_cents
     FROM transactions t JOIN periods p ON p.id=t.period_id
     WHERE t.period_id=? AND t.deleted=0
@@ -116,7 +125,7 @@ export const SQL = {
     ORDER BY date DESC, id DESC LIMIT ?`,
   getTransaction: `SELECT * FROM transactions WHERE id=? AND deleted=0`,
   updateTransaction: `UPDATE transactions SET type=?, amount_cents=?, date=?, category_id=?, account_id=?,
-    counter_account_id=?, merchant=?, note=?, is_shared=?, share_pct_override=?, paid_by=?, ref_id=?, rule_id=?, status=?,
+    counter_account_id=?, merchant=?, note=?, is_shared=?, share_pct_override=?, paid_by=?, ref_id=?, rule_id=?, tag_id=?, status=?,
     updated_at=? WHERE id=?`,
   softDeleteTransaction: `UPDATE transactions SET deleted=1, updated_at=? WHERE id=?`,
   // Al borrar un apunte de liquidación enlazado (ref_id) —la devolución ENTRANTE de un gasto mío o
@@ -438,5 +447,32 @@ export const SQL = {
   // renombrada por el usuario ("Mi casa"), no matchean nada (0 filas, no-op). Bind:
   // [nombreNuevo, now, id, nombreSemillaDelOtroIdioma].
   retranslateCategory: `UPDATE categories SET name = ?, updated_at = ? WHERE id = ? AND name = ? AND deleted = 0`,
+
+  // ---- Etiquetas de proyecto (N11, Task 4: CRUD) -----------------------------
+
+  getTag: `SELECT * FROM tags WHERE id=? AND deleted=0`,
+  insertTag: `INSERT INTO tags (id,name,budget_cents,is_archived,created_at,updated_at,deleted)
+    VALUES (?,?,?,0,?,?,0)`,
+  updateTag: `UPDATE tags SET name=?, budget_cents=?, updated_at=? WHERE id=?`,
+  setTagArchived: `UPDATE tags SET is_archived=?, updated_at=? WHERE id=?`,
+  // Selector de Registro y del detalle: solo activas, barata.
+  listTags: `SELECT id, name, budget_cents FROM tags WHERE deleted=0 AND is_archived=0 ORDER BY created_at`,
+  // Pantalla Etiquetas y tarjeta de Movimientos: TODAS las vivas (archivadas al final), con su
+  // total de SIEMPRE — no el de un periodo (D7: una etiqueta cruza periodos).
+  tagTotals: `SELECT tg.id, tg.name, tg.budget_cents, tg.is_archived,
+      ${TAG_SPENT} AS spent_cents, COUNT(t.id) AS n
+    FROM tags tg
+    LEFT JOIN transactions t ON t.tag_id=tg.id AND t.deleted=0
+    LEFT JOIN periods p ON p.id=t.period_id
+    WHERE tg.deleted=0
+    GROUP BY tg.id ORDER BY tg.is_archived, spent_cents DESC, tg.name`,
+  // La segunda línea de la tarjeta de Movimientos y qué chips se pintan. NO filtra is_archived: un
+  // movimiento del periodo puede llevar una etiqueta archivada y su chip tiene que seguir estando.
+  tagTotalsOfPeriod: `SELECT tg.id, ${TAG_SPENT} AS spent_cents, COUNT(t.id) AS n
+    FROM tags tg
+    LEFT JOIN transactions t ON t.tag_id=tg.id AND t.deleted=0 AND t.period_id=?
+    LEFT JOIN periods p ON p.id=t.period_id
+    WHERE tg.deleted=0
+    GROUP BY tg.id`,
 };
-export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets"];
+export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets","tags"];

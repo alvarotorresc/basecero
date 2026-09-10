@@ -1,0 +1,388 @@
+// pdf-lib con fuentes estandar codifica en WinAnsi y LANZA ante cualquier caracter fuera de esa
+// tabla (verificado: `WinAnsi cannot encode "→" (0x2192)`). En esta app los nombres de
+// categoria admiten emoji por diseno (CURATED_ICONS, category-colors.js:63) y los comercios vienen
+// de CSV ajenos: sin este saneo, el PDF de un usuario normal revienta.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { winAnsiSafe, layoutReport, A4, buildPdfBytes, reportFilename } from "../../app/app/js/informe-pdf.js";
+import { barRowsGeometry } from "../../app/app/js/charts.js";
+import { t } from "../../app/app/js/i18n/index.js";
+import { createRequire } from "node:module";
+
+test("winAnsiSafe: conserva lo que WinAnsi si codifica", () => {
+  const ok = "Alimentación ñ áéíóú ü ç — · « » 1.480,15 €";
+  assert.equal(winAnsiSafe(ok), ok);
+});
+
+test("winAnsiSafe: normaliza el menos tipografico y los espacios finos", () => {
+  assert.equal(winAnsiSafe("−17,70 €"), "-17,70 €");
+  // fr-FR emite U+202F (narrow no-break space) en sus importes: verificado con Intl en Node 22.
+  const fr = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(-1234.5);
+  assert.ok(fr.includes(" "));
+  assert.ok(!winAnsiSafe(fr).includes(" "));
+  assert.ok(winAnsiSafe(fr).includes(" "));
+});
+
+test("winAnsiSafe: nunca lanza con emoji ni flechas, y no deja runs de interrogantes", () => {
+  assert.doesNotThrow(() => winAnsiSafe("🏠 Casa → 🎉"));
+  assert.ok(!/\?\?/.test(winAnsiSafe("🏠🏠🏠 Casa")));
+  assert.ok(winAnsiSafe("🏠 Casa").includes("Casa"));
+});
+
+test("winAnsiSafe: entradas raras no rompen", () => {
+  assert.equal(winAnsiSafe(null), "");
+  assert.equal(winAnsiSafe(undefined), "");
+  assert.equal(winAnsiSafe(42), "42");
+});
+
+// ---- Task 9: layoutReport — geometria sin libreria --------------------------------------------
+
+function smallReport() {
+  return {
+    meta: {
+      periodId: "per-1", name: "Septiembre 2026", startDate: "2026-09-01", endDate: "",
+      closeDate: "2026-09-09", isOpen: true, dayIndex: 9, expectedDays: 30, elapsedDays: 8,
+      generatedAtIso: "2026-09-09",
+    },
+    summary: {
+      incomeCents: 185000, spentCents: 84720, savedCents: 100280, availableCents: 35280,
+      budgetTotalCents: 120000, savingsRatePct: 54, prevSavingsRatePct: null,
+    },
+    accounts: {
+      rows: [
+        { id: "acc-1", name: "Cuenta corriente", startCents: 45965, endCents: 148015, deltaCents: 102050 },
+        { id: "acc-2", name: "Efectivo", startCents: 6000, endCents: 4230, deltaCents: -1770 },
+      ],
+      totalStartCents: 51965, totalEndCents: 152245, totalDeltaCents: 100280,
+    },
+    categories: {
+      rows: [
+        { rootId: "cat-casa", name: "Casa", color: "#5B9BFF", textColor: "#7FB3FF", icon: "🏠", spentCents: 24560, limitCents: 26000, pctOfLimit: 94, level: "warn", shareOfMax: 100, prevCents: 23800, deltaCents: 760, deltaPct: 3.19, direction: "up" },
+        { rootId: "cat-alimentacion", name: "Alimentación", color: "#6BCB3E", textColor: "#8FE05F", icon: "🛒", spentCents: 18740, limitCents: 25000, pctOfLimit: 75, level: "ok", shareOfMax: 76, prevCents: 21490, deltaCents: -2750, deltaPct: -12.8, direction: "down" },
+      ],
+      totalCents: 43300, prevTotalCents: 45290, totalDeltaPct: -4.4, hasPrev: true,
+    },
+    movements: {
+      count: 4,
+      groups: [
+        { rootId: "cat-casa", name: "Casa", color: "#5B9BFF", icon: "🏠", totalCents: 24560, count: 1,
+          items: [{ id: "t1", date: "2026-09-07", merchant: "Ferretería Ruiz", cents: 6790, type: "expense", isShared: false, paidBy: "me" }] },
+        { rootId: "cat-alimentacion", name: "Alimentación", color: "#6BCB3E", icon: "🛒", totalCents: 18740, count: 2,
+          items: [
+            { id: "t2", date: "2026-09-08", merchant: "Mercadona", cents: 2345, type: "expense", isShared: false, paidBy: "me" },
+            { id: "t3", date: "2026-09-02", merchant: "Mercadona", cents: 8430, type: "expense", isShared: true, paidBy: "me" },
+          ] },
+      ],
+      others: { count: 1, items: [{ id: "t4", date: "2026-09-01", merchant: "Nómina agosto", cents: 185000, type: "income", isShared: false, paidBy: "me" }] },
+    },
+    shared: { partnerName: "Marta", periodTotalCents: 19940, myPartCents: 9970, netCents: 2260, direction: "partner_owes", items: [{ id: "t3", date: "2026-09-02", merchant: "Mercadona", cents: 8430, myCents: 4215, paidBy: "me" }] },
+    subscriptions: { activeCount: 3, periodCents: 4998, monthlyCents: 4998, annualCents: 59976 },
+  };
+}
+
+/** Informe con `n` movimientos en un unico grupo (para hacer crecer el numero de paginas de
+ *  forma controlada) — `opts.categoryName`/`opts.merchant` permiten forzar un texto concreto en
+ *  la primera fila (Task 10: una categoria con emoji, un comercio con flecha). */
+function reportWith(n, opts = {}) {
+  const base = smallReport();
+  const catName = opts.categoryName ?? "Otros gastos";
+  const merchant = opts.merchant ?? "Comercio";
+  const items = Array.from({ length: n }, (_, i) => ({
+    id: "item-" + i,
+    date: "2026-09-" + String((i % 28) + 1).padStart(2, "0"),
+    merchant: i === 0 ? merchant : `${merchant} ${i}`,
+    cents: 1000 + i,
+    type: "expense",
+    isShared: false,
+    paidBy: "me",
+    // Etiquetas de proyecto (N11, Task 15): solo el item 0 lleva la etiqueta pedida (mismo
+    // criterio que categoryName/merchant arriba), el resto va sin ('').
+    tag: i === 0 ? (opts.tag ?? "") : "",
+  }));
+  const group = {
+    rootId: "cat-generado", name: catName, color: "#8A8794", icon: "▫️",
+    totalCents: items.reduce((s, it) => s + it.cents, 0), count: items.length, items,
+  };
+  return {
+    ...base,
+    movements: { count: n + base.movements.others.count, groups: [group], others: base.movements.others },
+  };
+}
+
+/** Informe con `n` grupos de UN movimiento cada uno — para probar de forma genérica (sin acoplarse
+ *  a las constantes internas de layout) que una cabecera de grupo nunca queda sola al final de una
+ *  página: con muchos grupos, alguna cabecera caerá justo en el límite de página tarde o temprano. */
+function reportWithManyGroups(n) {
+  const base = smallReport();
+  const groups = Array.from({ length: n }, (_, i) => ({
+    rootId: "cat-g" + i, name: "Grupo " + i, color: "#123456", icon: "•", totalCents: 1000, count: 1,
+    items: [{ id: "gi-" + i, date: "2026-09-01", merchant: "Comercio " + i, cents: 1000, type: "expense", isShared: false, paidBy: "me" }],
+  }));
+  return { ...base, movements: { count: n, groups, others: { count: 0, items: [] } } };
+}
+
+test("layoutReport: A4 y margenes, y ningun bloque por debajo del margen inferior", () => {
+  const { pageSize, margin, pages } = layoutReport(smallReport());
+  assert.deepEqual(pageSize, A4);
+  assert.deepEqual(pageSize, { w: 595.28, h: 841.89 });
+  for (const p of pages) for (const b of p.blocks) assert.ok(b.y >= margin);
+});
+
+test("layoutReport: las secciones salen en el orden del artboard", () => {
+  const kinds = layoutReport(smallReport()).pages[0].blocks.map((b) => b.section);
+  assert.deepEqual([...new Set(kinds)].slice(0, 4), ["header", "summary", "accounts", "categories"]);
+});
+
+// No se afirma un numero absoluto de paginas: se romperia al mover una constante de layout.
+test("layoutReport: mas movimientos, mas paginas", () => {
+  assert.ok(layoutReport(reportWith(60)).pages.length > layoutReport(reportWith(3)).pages.length);
+});
+
+test("layoutReport: una cabecera de grupo nunca se queda sola al final de pagina", () => {
+  const { pages } = layoutReport(reportWithManyGroups(40));
+  for (const p of pages) {
+    const last = p.blocks[p.blocks.length - 1];
+    assert.notEqual(last?.groupHeader, true, "una cabecera de grupo no puede ser el ultimo bloque de una pagina");
+  }
+});
+
+test("layoutReport: cada pagina lleva su pie numerado {n}/{total}", () => {
+  const { pages } = layoutReport(reportWith(60));
+  const total = pages.length;
+  pages.forEach((p, i) => {
+    const footer = p.blocks.find((b) => b.section === "footer");
+    assert.ok(footer, `la pagina ${i + 1} debe llevar pie`);
+    assert.equal(footer.text, `${i + 1}/${total}`);
+  });
+});
+
+// Con gastos por encima de ingresos, savingsRatePct sale negativo (p.ej. -146): "Tasa de ahorro
+// -146%" no dice nada util. La regla es la misma que Inicio (screens/informe.js, task 1): por
+// debajo de 0, un mensaje fijo en vez del numero.
+test("layoutReport: con tasa de ahorro negativa, imprime el mensaje fijo en vez del numero", () => {
+  const report = { ...smallReport(), summary: { ...smallReport().summary, savingsRatePct: -146, prevSavingsRatePct: null } };
+  const summaryLines = layoutReport(report).pages[0].blocks.filter((b) => b.section === "summary" && b.kind === "text").map((b) => b.text);
+  assert.ok(summaryLines.includes(t("informe.pdf.savingsRateNegative")));
+  assert.ok(!summaryLines.some((l) => l.includes("-146")), "nunca debe imprimir el porcentaje negativo en crudo");
+});
+
+test("layoutReport: con tasa de ahorro >= 0, imprime el numero como siempre", () => {
+  const summaryLines = layoutReport(smallReport()).pages[0].blocks.filter((b) => b.section === "summary" && b.kind === "text").map((b) => b.text);
+  assert.ok(summaryLines.includes(t("informe.pdf.savingsRate", { pct: 54 })));
+});
+
+// Sin ningun limite puesto, budgetTotalCents es 0: "Disponible" saldria en negativo (0 - gastado)
+// y no dice nada. Mismo criterio que la pantalla (screens/informe.js#summaryHtml).
+test("layoutReport: sin presupuesto puesto, omite la linea de Disponible", () => {
+  const report = { ...smallReport(), summary: { ...smallReport().summary, budgetTotalCents: 0 } };
+  const summaryLines = layoutReport(report).pages[0].blocks.filter((b) => b.section === "summary" && b.kind === "text").map((b) => b.text);
+  assert.ok(!summaryLines.some((l) => l.startsWith(t("informe.pdf.available"))));
+});
+
+test("layoutReport: con presupuesto puesto, imprime Disponible como siempre", () => {
+  const summaryLines = layoutReport(smallReport()).pages[0].blocks.filter((b) => b.section === "summary" && b.kind === "text").map((b) => b.text);
+  assert.ok(summaryLines.some((l) => l.startsWith(t("informe.pdf.available"))));
+});
+
+test("layoutReport: los rects de las barras salen de barRowsGeometry", () => {
+  const report = smallReport();
+  const { pageSize, margin, pages } = layoutReport(report);
+  const contentW = pageSize.w - margin * 2;
+  const casa = report.categories.rows.find((r) => r.rootId === "cat-casa");
+  const maxSpent = Math.max(...report.categories.rows.map((r) => r.spentCents));
+  const [expected] = barRowsGeometry(
+    [{ key: "row", value: casa.spentCents, max: maxSpent, color: casa.color }],
+    { width: contentW, rowH: 16, barH: 6 },
+  );
+  const rect = pages.flatMap((p) => p.blocks).find((b) => b.kind === "rect" && b.section === "categories" && b.color === casa.color);
+  assert.ok(rect, "debe haber un rect de barra para la categoria Casa");
+  assert.equal(rect.w, expected.w);
+  assert.equal(rect.h, expected.h);
+});
+
+// ---- Comparativa por categoria en el PDF (el pie del Informe la promete, el PDF no la llevaba) --
+
+/** `smallReport()` sin comparativa: mismo shape, `hasPrev` a false y cada fila sin prevCents. */
+function reportWithoutComparison() {
+  const base = smallReport();
+  return {
+    ...base,
+    categories: {
+      ...base.categories,
+      hasPrev: false,
+      rows: base.categories.rows.map((r) => ({ ...r, prevCents: null, deltaCents: null, deltaPct: null, direction: "new" })),
+    },
+  };
+}
+
+test("layoutReport: con comparativa hay mas rects por categoria que sin ella", () => {
+  const categoryRects = (report) => layoutReport(report).pages.flatMap((p) => p.blocks)
+    .filter((b) => b.kind === "rect" && b.section === "categories");
+  const rows = smallReport().categories.rows.length;
+  const sinComparativa = categoryRects(reportWithoutComparison());
+  const conComparativa = categoryRects(smallReport());
+  assert.equal(sinComparativa.length, rows, "sin comparativa, solo la barra principal por categoria");
+  assert.ok(conComparativa.length > sinComparativa.length, "con comparativa hay barra atenuada + insignia de mas");
+});
+
+test("layoutReport: la barra principal sigue siendo el primer rect de ese color (la insignia no le roba el puesto)", () => {
+  // Regresion del test de arriba ("los rects de las barras salen de barRowsGeometry"): la
+  // insignia comparte el color de la categoria, así que tiene que pintarse DESPUÉS de la barra
+  // real en el array de bloques, o `.find()` la encontraria a ella primero.
+  const report = smallReport();
+  const { pageSize, margin } = layoutReport(report);
+  const contentW = pageSize.w - margin * 2;
+  const casa = report.categories.rows.find((r) => r.rootId === "cat-casa");
+  const maxSpent = Math.max(...report.categories.rows.map((r) => r.spentCents));
+  const [expected] = barRowsGeometry(
+    [{ key: "row", value: casa.spentCents, max: maxSpent, color: casa.color }],
+    { width: contentW, rowH: 16, barH: 6 },
+  );
+  const rect = layoutReport(report).pages.flatMap((p) => p.blocks)
+    .find((b) => b.kind === "rect" && b.section === "categories" && b.color === casa.color);
+  assert.equal(rect.w, expected.w);
+  assert.equal(rect.h, expected.h);
+});
+
+test("layoutReport: el porcentaje de la comparativa lleva el signo (flecha ASCII)", () => {
+  const texts = layoutReport(smallReport()).pages.flatMap((p) => p.blocks)
+    .filter((b) => b.kind === "text" && b.section === "categories").map((b) => b.text);
+  assert.ok(texts.some((s) => s.startsWith("+") && s.includes("3,2")), "Casa sube un 3,2 %");
+  assert.ok(texts.some((s) => s.startsWith("-") && s.includes("12,8")), "Alimentacion baja un 12,8 %");
+});
+
+test("layoutReport: sin comparativa no hay ningun porcentaje con signo", () => {
+  const texts = layoutReport(reportWithoutComparison()).pages.flatMap((p) => p.blocks)
+    .filter((b) => b.kind === "text" && b.section === "categories").map((b) => b.text);
+  assert.ok(!texts.some((s) => /^[+-]/.test(s)));
+});
+
+// Regresion: `page()` siempre resuelve a la ULTIMA pagina. Si la insignia se empuja con `page()`
+// DESPUES de las barras/el texto del signo (que pueden disparar ensure() y saltar de pagina), una
+// fila que se parte justo ahi deja la insignia huerfana en la pagina SIGUIENTE con la `y` de la
+// fila ANTERIOR — silenciosa, porque `b.y >= margin` sigue siendo cierto. Con 2 categorias
+// (smallReport) nunca se observa: hace falta bastantes mas para forzar un salto DENTRO de la
+// seccion de categorias.
+function reportWithManyCategories(n) {
+  const base = smallReport();
+  // spentCents todos cercanos entre si (1000..1000+n): las barras salen casi a ancho completo,
+  // muy lejos de BADGE_SIZE (6pt) — así un rect de 6x6 solo puede ser la insignia, nunca una barra.
+  const rows = Array.from({ length: n }, (_, i) => ({
+    rootId: `cat-gen-${i}`, name: `Categoria ${i}`, color: "#123456", textColor: "#456789", icon: "•",
+    spentCents: 1000 + i, limitCents: 0, pctOfLimit: 0, level: null, shareOfMax: 90,
+    prevCents: 900 + i, deltaCents: 100, deltaPct: 11.1, direction: "up",
+  }));
+  return {
+    ...base,
+    categories: {
+      rows, totalCents: rows.reduce((s, r) => s + r.spentCents, 0),
+      prevTotalCents: rows.reduce((s, r) => s + r.prevCents, 0), totalDeltaPct: 5, hasPrev: true,
+    },
+  };
+}
+
+test("layoutReport: con un salto de pagina dentro de categorias, la insignia se queda en la pagina de su nombre", () => {
+  const { pages } = layoutReport(reportWithManyCategories(30));
+  assert.ok(pages.length > 1, "hacen falta bastantes categorias para forzar el salto dentro de la seccion");
+  for (const p of pages) {
+    const badges = p.blocks.filter((b) => b.kind === "rect" && b.section === "categories" && b.w === 6 && b.h === 6);
+    for (const badge of badges) {
+      const nameDeEstaFila = p.blocks.some((b) => b.kind === "text" && b.section === "categories" && b.y === badge.y);
+      assert.ok(nameDeEstaFila, `insignia en y=${badge.y} sin el texto de su fila en la misma pagina`);
+    }
+  }
+});
+
+test("layoutReport: con comparativa, las paginas del PDF siguen siendo las que dijo layoutReport", async () => {
+  const report = smallReport();
+  const bytes = await buildPdfBytes(PDFLib, report);
+  const doc = await PDFLib.PDFDocument.load(bytes);
+  assert.equal(doc.getPageCount(), layoutReport(report).pages.length);
+});
+
+// «Ahorras el 54 % de lo que ingresas. En agosto, el 43 %.» — el PDF no llevaba la segunda mitad.
+test("layoutReport: con tasa del periodo anterior (>= 0) y su nombre, imprime la segunda mitad", () => {
+  const report = { ...smallReport(), summary: { ...smallReport().summary, prevSavingsRatePct: 43, prevPeriodName: "Agosto 2026" } };
+  const summaryLines = layoutReport(report).pages[0].blocks.filter((b) => b.section === "summary" && b.kind === "text").map((b) => b.text);
+  assert.ok(summaryLines.includes(t("informe.pdf.savingsRateVsPrev", { name: "Agosto 2026", pct: 43 })));
+});
+
+test("layoutReport: sin nombre del periodo anterior (o con tasa previa negativa), omite la segunda mitad", () => {
+  const sinNombre = { ...smallReport(), summary: { ...smallReport().summary, prevSavingsRatePct: 43, prevPeriodName: null } };
+  const conTasaNegativa = { ...smallReport(), summary: { ...smallReport().summary, prevSavingsRatePct: -12, prevPeriodName: "Agosto 2026" } };
+  for (const report of [sinNombre, conTasaNegativa]) {
+    const summaryLines = layoutReport(report).pages[0].blocks.filter((b) => b.section === "summary" && b.kind === "text").map((b) => b.text);
+    assert.ok(!summaryLines.some((l) => l.startsWith("En ") || l.startsWith("In ")));
+  }
+});
+
+// ---- Task 10: buildPdfBytes y pdf-loader.js -----------------------------------------------------
+// pdf-lib se carga con createRequire, igual que tests/app/helpers.mjs:5-6 hace con xlsx (el UMD
+// expone module.exports).
+
+const require = createRequire(import.meta.url);
+const PDFLib = require("../../app/app/vendor/pdf-lib/pdf-lib.min.js");
+
+test("buildPdfBytes: los bytes son un PDF valido", async () => {
+  const bytes = await buildPdfBytes(PDFLib, smallReport());
+  assert.equal(Buffer.from(bytes.slice(0, 5)).toString(), "%PDF-");
+});
+
+test("buildPdfBytes: las paginas del PDF son las que dijo layoutReport", async () => {
+  const report = reportWith(60);
+  const bytes = await buildPdfBytes(PDFLib, report);
+  const doc = await PDFLib.PDFDocument.load(bytes);
+  assert.ok(doc.getPageCount() >= 2);
+  assert.equal(doc.getPageCount(), layoutReport(report).pages.length);
+});
+
+test("buildPdfBytes: un informe grande da estrictamente mas paginas que uno pequeno", async () => {
+  const [bigBytes, smallBytes] = await Promise.all([
+    buildPdfBytes(PDFLib, reportWith(60)),
+    buildPdfBytes(PDFLib, reportWith(3)),
+  ]);
+  const [bigDoc, smallDoc] = await Promise.all([PDFLib.PDFDocument.load(bigBytes), PDFLib.PDFDocument.load(smallBytes)]);
+  assert.ok(bigDoc.getPageCount() > smallDoc.getPageCount());
+});
+
+// El caso que revienta en producción si falta winAnsiSafe.
+test("buildPdfBytes: una categoria con emoji y un comercio con flecha no lanzan", async () => {
+  const report = reportWith(3, { categoryName: "🏠 Casa", merchant: "Bar → La Plaza" });
+  await assert.doesNotReject(() => buildPdfBytes(PDFLib, report));
+});
+
+test("buildPdfBytes: un importe de fr-FR (con U+202F) no lanza", async () => {
+  const frAmount = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(-1234.5);
+  const report = reportWith(3, { merchant: `Pedido ${frAmount}` });
+  await assert.doesNotReject(() => buildPdfBytes(PDFLib, report));
+});
+
+// ---- Task 15 (Etiquetas de proyecto, N11): la línea «Etiqueta: {name}» en el PDF -----------------
+
+test("layoutReport: un item con tag no cambia el numero de paginas del PDF (getPageCount sigue cuadrando)", async () => {
+  const report = reportWith(60, { tag: "Viaje Japón" });
+  const bytes = await buildPdfBytes(PDFLib, report);
+  const doc = await PDFLib.PDFDocument.load(bytes);
+  assert.equal(doc.getPageCount(), layoutReport(report).pages.length);
+});
+
+// El caso que revienta en producción si la línea de etiqueta no pasara por winAnsiSafe como el
+// resto de texto de usuario (mismo motivo que el test de categoria con emoji, de arriba).
+test("buildPdfBytes: un nombre de etiqueta con emoji no lanza", async () => {
+  const report = reportWith(3, { tag: "🏔️ Viaje Japón" });
+  await assert.doesNotReject(() => buildPdfBytes(PDFLib, report));
+});
+
+// Con tag, un bloque de texto MÁS por item etiquetado que sin ella (una línea aparte, D2: la
+// misma estructura de "Etiqueta: {name}" que pinta screens/informe.js) — sin acoplarse al copy
+// exacto de la clave i18n, que es cosa de screens/informe.js#movementGroupHtml, no de este módulo.
+test("layoutReport: un item CON tag pinta un bloque de texto mas que el mismo item SIN ella", () => {
+  const withTag = layoutReport(reportWith(1, { tag: "Viaje Japón" })).pages[0].blocks.filter((b) => b.section === "movements");
+  const withoutTag = layoutReport(reportWith(1)).pages[0].blocks.filter((b) => b.section === "movements");
+  assert.equal(withTag.length, withoutTag.length + 1);
+});
+
+test("reportFilename: determinista y sin caracteres de ruta", () => {
+  assert.equal(reportFilename(smallReport()), "basecero-informe-2026-09-01.pdf");
+  assert.ok(!/[/\\:]/.test(reportFilename(smallReport())));
+});

@@ -51,6 +51,15 @@ Versionado según [SemVer](https://semver.org/lang/es/).
   tengas que restar.
 - **«Liquidado» en el selector de devoluciones.** Un gasto compartido que ya liquidaste se marca
   como liquidado, no como devuelto: no son lo mismo.
+- **Informe del periodo, con PDF.** Resumen, saldos de cuentas al inicio y al final, gasto por
+  categoría con la comparativa frente al periodo anterior, movimientos por categoría, compartidos
+  y suscripciones — todo en una pantalla nueva (desde Inicio o desde Ajustes) y descargable en PDF,
+  generado en el propio móvil y con el mismo aspecto en cualquier dispositivo. Peso del shell:
+  +7 ficheros nuevos, 3,80 MB (≈1,34 MB comprimido) — la mayor parte es la librería de PDF, que se
+  carga sola y solo al pedir la descarga.
+- **El cierre de periodo propone en qué gastar lo que sobra.** Si queda presupuesto sin usar, el
+  asistente ofrece moverlo a un objetivo de ahorro (o dejarlo donde está); al terminar, enseña el
+  informe del periodo que se acaba de cerrar con la descarga del PDF a un toque.
 
 ### Arreglado
 

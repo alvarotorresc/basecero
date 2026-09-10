@@ -7,6 +7,7 @@ export const ES = {
     save: "Guardar",
     cancel: "Cancelar",
     delete: "Borrar",
+    edit: "Editar",
     saveFailed: "No se pudo guardar: {error}",
     saveChanges: "Guardar cambios",
     deleteFailed: "No se pudo borrar: {error}",
@@ -245,6 +246,17 @@ export const ES = {
     type: { transfer: "Transferencia" },
     detail: {
       lockedNote: "Tiene un apunte de liquidación enlazado (devolución o ajuste): para cambiar el importe o el reparto, bórralo antes.",
+      tagLabel: "Etiqueta",
+      noTag: "Sin etiqueta",
+      newTag: "Nueva etiqueta",
+    },
+    tagCard: {
+      movements: { one: "{n} movimiento", other: "{n} movimientos" },
+      ofLimit: "de {limit}",
+      periodLine: {
+        one: "{amount} en {period}, {n} movimiento",
+        other: "{amount} en {period}, {n} movimientos",
+      },
     },
     shared: {
       fallbackName: "la contraparte",
@@ -318,6 +330,12 @@ export const ES = {
       title: "Por categoría",
       hint: "Toca una categoría para ver el detalle o poner un límite",
       empty: "No tienes ninguna categoría de gasto activa.",
+    },
+    // N3 (Task 14): línea de comparativa con el periodo anterior, a la izquierda de la mini
+    // tendencia — mismo criterio de plantilla que el resto de gastoCategoria.row.*, para que un
+    // idioma con otro orden de palabras pueda mover {name}/{amount} sin tocar el JS.
+    compare: {
+      prev: "{name} {amount}",
     },
     row: {
       ofLimit: "{spent} de {limit}",
@@ -518,6 +536,36 @@ export const ES = {
       create: "Crear categoría",
     },
   },
+  etiquetas: {
+    title: "Etiquetas de proyecto",
+    intro: "Cruzan las categorías: agrupan lo que gastas en un viaje, una reforma o una boda, sin importar en qué categoría caiga cada gasto.",
+    footerNote: "Archivar una etiqueta la quita de los selectores, pero sus movimientos la siguen enseñando.",
+    new: "Nueva etiqueta",
+    row: {
+      movements: { one: "{n} movimiento", other: "{n} movimientos" },
+      open: "abierta",
+      archived: "archivada",
+      noLimit: "sin límite",
+      ofLimit: "{spent} de {limit}",
+      seeMovements: "Ver sus movimientos",
+    },
+    form: {
+      titleNew: "Nueva etiqueta",
+      titleEdit: "Editar etiqueta",
+      nameLabel: "Nombre",
+      namePlaceholder: "p. ej. Viaje Japón",
+      limitLabel: "Límite (opcional)",
+      limitPlaceholder: "Sin límite",
+      save: "Guardar",
+      archive: "Archivar",
+      unarchive: "Desarchivar",
+    },
+    error: {
+      load: "No se pudieron cargar las etiquetas: {error}",
+      save: "No se pudo guardar: {error}",
+      archive: "No se pudo archivar: {error}",
+    },
+  },
   periodo: {
     error: {
       noOpenToClose: "No hay ningún periodo abierto que cerrar.",
@@ -562,6 +610,13 @@ export const ES = {
     cta: {
       submit: "Abrir periodo",
       saving: "Abriendo…",
+    },
+    // El panel final del asistente de cierre (Task 15, plan 2026-09-10): tras abrir el periodo
+    // nuevo, en vez de salir directo, ofrece ver el informe del que se acaba de cerrar.
+    finish: {
+      autoReport: "Al cerrar se genera el informe de {name} automáticamente.",
+      seeReport: "Ver el informe y descargar el PDF",
+      done: "Hecho",
     },
   },
   ajustes: {
@@ -612,6 +667,10 @@ export const ES = {
       title: "Categorías",
       subtitleWithCount: "{n} categorías · colores e iconos",
       subtitleNoCount: "colores e iconos",
+    },
+    tags: {
+      title: "Etiquetas de proyecto",
+      sub: { one: "{n} activa", other: "{n} activas" },
     },
     bank: {
       title: "Banco",
@@ -861,6 +920,8 @@ export const ES = {
       categoryHasChildren: "Esta categoría tiene subcategorías: solo se permiten dos niveles, no puede convertirse en subcategoría de otra",
       colorUnavailable: "Ese color no está disponible",
       iconUnavailable: "Ese icono no está disponible",
+      tagNameEmpty: "El nombre de la etiqueta no puede estar vacío",
+      tagNotFound: "Etiqueta no encontrada",
     },
     // Compartida entre repo.js y n26.js (3 sitios, mismo mensaje EXACTO): distinta de
     // common.noOpenPeriod (esa lleva punto final, esta no — no son byte-idénticas).
@@ -949,6 +1010,107 @@ export const ES = {
     undo: "Deshacer",
     undone: "Movimiento deshecho",
     myPart: "Tu parte",
+    tagLabel: "Etiqueta",
     undoFailed: "No se pudo deshacer: {error}",
+  },
+  // Informe del periodo (F1). screens/informe.js.
+  informe: {
+    title: "Informe",
+    openPeriod: "Periodo en curso, día {n} de {m}",
+    closedPeriod: "Cerrado, del {start} al {end}",
+    generatedAt: "Generado hoy {time}",
+    download: "Descargar el PDF",
+    downloading: "Generando…",
+    downloadHint: "Se genera en tu móvil, con las mismas gráficas y sin salir de aquí.",
+    selector: { label: "Periodo" },
+    summary: {
+      title: "Resumen",
+      income: "Ingresos",
+      spent: "Gastado",
+      saved: "Ahorrado",
+      available: "Disponible",
+      savingsRate: "Ahorras el {pct} % de lo que ingresas.",
+      savingsRateVsPrev: " En {name}, el {pct} %.",
+    },
+    accounts: {
+      title: "Tus cuentas",
+      total: "Total operativo",
+    },
+    categories: {
+      title: "Gasto por categoría",
+      vsPrev: "frente a {name}",
+      total: "Total",
+      orientativo: "{prev} está cerrado y {current} va por el día {day} de {total}, así que la comparación es orientativa hasta el cierre.",
+      noPrev: "Sin periodo anterior con el que comparar.",
+    },
+    shared: {
+      title: "Con {name}",
+      periodTotal: "Gastos compartidos del periodo",
+      myPart: "Tu parte",
+      net: {
+        theyOwe: "{name} te debe",
+        youOwe: "Debes a {name}",
+        even: "Estáis en paz",
+      },
+    },
+    subscriptions: {
+      title: "Suscripciones",
+      active: "{n} activas, al mes",
+      yearly: "Lo que suman al año",
+      link: "El radar",
+    },
+    movements: {
+      title: "Movimientos por categoría",
+      count: "{n} en total",
+      groupCount: { one: "{n} movimiento", other: "{n} movimientos" },
+      andMore: "y {n} movimientos más",
+      others: "Otros",
+      tag: "Etiqueta: {name}",
+    },
+    footer: "El PDF lleva todo esto más la lista completa de los {n} movimientos, y se guarda igual en cualquier móvil.",
+    error: {
+      load: "No se pudo cargar el informe: {error}",
+      pdf: "No se pudo generar el PDF: {error}",
+    },
+    entry: {
+      fromHome: "Ver el informe de {name}",
+      fromSettings: "Informe del periodo",
+    },
+    pdf: {
+      summary: "Resumen",
+      income: "Ingresos",
+      spent: "Gastado",
+      saved: "Ahorrado",
+      available: "Disponible",
+      savingsRate: "Tasa de ahorro {pct}%",
+      savingsRateNegative: "Gastas más de lo que ingresas",
+      savingsRateVsPrev: "En {name}, el {pct} %",
+      accounts: "Tus cuentas",
+      accountsTotal: "Total operativo {amount}",
+      categories: "Gasto por categoría",
+      categoriesTotal: "Total {amount}",
+      shared: "Con {name}",
+      periodTotal: "Total del periodo {amount}",
+      myPart: "Mi parte {amount}",
+      net: "Neto {amount}",
+      subscriptions: "Suscripciones",
+      subscriptionsActive: "{n} activas · {amount} al mes",
+      subscriptionsYear: "{amount} al año",
+      movements: "Movimientos por categoría",
+      others: "Otros",
+    },
+  },
+  // El barrido (N4, plan 2026-09-10): paso del asistente de cierre.
+  barrido: {
+    title: "Te sobran {amount} del presupuesto",
+    titleIncome: "Te sobran {amount}",
+    question: "¿Qué hacemos con ellos?",
+    toGoal: "Al {name}",
+    wouldBe: "quedaría en {amount}",
+    completes: "¡Lo completa!",
+    leaveIt: "Dejarlo en la cuenta",
+    amount: "Cantidad a barrer",
+    capped: "Como mucho puedes barrer {amount}: es lo que hay en {account}",
+    note: "Barrido de fin de periodo",
   },
 };

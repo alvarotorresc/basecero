@@ -1,9 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import { SQL } from "../../app/app/js/sql.js";
 import { prevDayIso } from "../../app/app/js/format.js";
-import { periodStartTooEarly } from "../../app/app/js/repo.js";
+import { periodStartTooEarly, sweepTransferStmt } from "../../app/app/js/repo.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
+
+// repo.js#sweepTransferStmt llama a bcUlid/bcSanitizeCell como GLOBALES (vendor/pure.js), igual
+// que settleAllSharedStmts (compartidos.test.mjs:11-20) — se importa la función REAL, no una
+// reproducción, precisamente porque es la que el brief pide verificar "orden exacto, 20 campos".
+const require = createRequire(import.meta.url);
+const pure = require("../../app/app/vendor/pure.js");
+globalThis.bcUlid = pure.bcUlid;
+globalThis.bcSanitizeCell = pure.bcSanitizeCell;
 
 const T = "2026-08-24T18:00:00Z";
 const T2 = "2026-09-05T10:00:00Z";
@@ -16,13 +25,13 @@ function ins(db, over = {}) {
     date: "2026-08-20", period: "per-1", type: "expense", cents: 4520,
     account: "acc-n26", counterAccount: "", category: "cat-casa-alquiler",
     merchant: "", note: "", shared: 0, override: null, paidBy: "me", settled: 0,
-    ref: "", rule: "", external: "", status: "pending",
+    ref: "", rule: "", tag: "", external: "", status: "pending",
     ...over,
   };
   db.prepare(SQL.insertTransaction).run(
     v.id, v.date, v.period, v.type, v.cents, v.account, v.counterAccount,
     v.category, v.merchant, v.note, v.shared, v.override, v.paidBy, v.settled,
-    v.ref, v.rule, v.external, v.status, T, T,
+    v.ref, v.rule, v.tag, v.external, v.status, T, T,
   );
   return v.id;
 }
@@ -44,7 +53,10 @@ function execManyRaw(db, stmts) {
 /** Reproduce EXACTAMENTE la secuencia de repo.openNextPeriod: cierra el open (si existe)
  *  con end_date = día anterior a startDate, crea el nuevo periodo y sus budgets, todo en
  *  un único execMany. */
-function openNextPeriodReproduced(db, { name, startDate, sharePct, budgets = [] }, now = T2) {
+/** `sweep`, cuando se pasa: {amountCents, fromAccountId, toAccountId, goalName} — el statement se
+ *  construye con la función REAL sweepTransferStmt (repo.js), no una reproducción, exactamente
+ *  como repo.openNextPeriod hará: al FINAL del array, con `periodId: newId` y `date: startDate`. */
+function openNextPeriodReproduced(db, { name, startDate, sharePct, budgets = [], sweep }, now = T2) {
   const current = db.prepare(SQL.getOpenPeriod).get();
   const newId = "per-new-" + Math.floor(Math.random() * 1e9);
   const stmts = [];
@@ -52,6 +64,12 @@ function openNextPeriodReproduced(db, { name, startDate, sharePct, budgets = [] 
   stmts.push({ sql: SQL.insertPeriod, bind: [newId, name, startDate, sharePct, now, now] });
   for (const b of budgets) {
     stmts.push({ sql: SQL.insertBudget, bind: ["bud-" + Math.floor(Math.random() * 1e9), newId, b.categoryId, b.amountCents, now, now] });
+  }
+  if (sweep) {
+    stmts.push(sweepTransferStmt({
+      periodId: newId, date: startDate, amountCents: sweep.amountCents,
+      fromAccountId: sweep.fromAccountId, toAccountId: sweep.toAccountId, goalName: sweep.goalName, now,
+    }));
   }
   execManyRaw(db, stmts);
   return newId;
@@ -265,7 +283,7 @@ test("execMany: una violación de CHECK en el lote de openNextPeriod hace rollba
     // violación deliberada: amount_cents=0 con type='expense' incumple el CHECK de transactions
     {
       sql: SQL.insertTransaction,
-      bind: ["tx-bad", "2026-09-02", "per-2", "expense", 0, "acc-n26", "", "cat-casa-alquiler", "", "", 0, null, "me", 0, "", "", "", "pending", T2, T2],
+      bind: ["tx-bad", "2026-09-02", "per-2", "expense", 0, "acc-n26", "", "cat-casa-alquiler", "", "", 0, null, "me", 0, "", "", "", "", "pending", T2, T2],
     },
   ];
 
@@ -395,4 +413,149 @@ test("spentByChildCategory: una raíz SIN hijas devuelve exactamente una fila, l
 
   const raiz = db.prepare(SQL.spentByRootCategory).all("per-1").find((r) => r.root_id === "cat-ropa");
   assert.equal(rows[0].spent_cents, raiz.spent_cents, "y aun así la invariante se cumple");
+});
+
+// ---- Task 14 (Informe/barrido): sweepTransferStmt y openNextPeriod({ sweep }) ------------------
+
+const balance = (db, accountId, dateIso) => db.prepare(SQL.accountBalance).get(dateIso, accountId).balance_cents;
+const netWorth = (db, dateIso) => ["acc-n26", "acc-revolut", "acc-prestamo"]
+  .reduce((s, id) => s + balance(db, id, dateIso), 0);
+
+test("sweepTransferStmt: los 21 campos de insertTransaction en su orden exacto", () => {
+  const { sql, bind } = sweepTransferStmt({
+    periodId: "per-2", date: "2026-10-01", amountCents: 35280,
+    fromAccountId: "acc-corriente", toAccountId: "acc-fondo", goalName: "Fondo de emergencia", now: T,
+  });
+  assert.equal(sql, SQL.insertTransaction);
+  assert.equal(bind.length, 21);
+  assert.equal(bind[1], "2026-10-01"); // date
+  assert.equal(bind[2], "per-2");      // period_id: el NUEVO
+  assert.equal(bind[3], "transfer");
+  assert.equal(bind[4], 35280);
+  assert.equal(bind[5], "acc-corriente");
+  assert.equal(bind[6], "acc-fondo");
+  assert.equal(bind[7], "");           // category_id
+  assert.equal(bind[10], 0);           // is_shared
+  assert.equal(bind[11], null);        // share_pct_override
+  assert.equal(bind[12], "me");        // paid_by
+  assert.equal(bind[13], 0);           // settled
+  assert.equal(bind[14], "");          // ref_id
+  assert.equal(bind[15], "");          // rule_id
+  assert.equal(bind[16], "");          // tag_id
+  assert.equal(bind[17], "");          // external_id
+  assert.equal(bind[18], "pending");   // status
+  assert.equal(bind[19], T);           // created_at
+  assert.equal(bind[20], T);           // updated_at
+});
+
+test("sweepTransferStmt: el nombre del objetivo (comercio) pasa por bcSanitizeCell", () => {
+  const { bind } = sweepTransferStmt({
+    periodId: "per-2", date: "2026-10-01", amountCents: 1000,
+    fromAccountId: "a", toAccountId: "b", goalName: "=HACK()", now: T,
+  });
+  assert.equal(bind[8], "'=HACK()");
+});
+
+test("openNextPeriod con barrido: cierra, abre, presupuesta y transfiere en UNA transaccion", () => {
+  const db = openDb();
+  seedMinimal(db);
+
+  const newId = openNextPeriodReproduced(db, {
+    name: "Septiembre 2026", startDate: "2026-09-01", sharePct: 60,
+    budgets: [{ categoryId: "cat-casa", amountCents: 70000 }],
+    sweep: { amountCents: 35280, fromAccountId: "acc-n26", toAccountId: "acc-revolut", goalName: "Fondo de emergencia" },
+  });
+
+  const old = db.prepare("SELECT * FROM periods WHERE id='per-1'").get();
+  assert.equal(old.status, "closed");
+  assert.equal(old.end_date, "2026-08-31");
+
+  const nuevo = db.prepare("SELECT * FROM periods WHERE id=?").get(newId);
+  assert.equal(nuevo.status, "open");
+
+  const budgets = db.prepare(SQL.budgetsOfPeriod).all(newId);
+  assert.equal(budgets.length, 1);
+
+  const transfer = db.prepare("SELECT * FROM transactions WHERE type='transfer'").get();
+  assert.equal(transfer.period_id, newId, "el barrido vive en el periodo NUEVO");
+  assert.equal(transfer.amount_cents, 35280);
+  assert.equal(transfer.account_id, "acc-n26");
+  assert.equal(transfer.counter_account_id, "acc-revolut");
+  assert.equal(transfer.date, "2026-09-01");
+});
+
+// Es la razón de que el barrido vaya al periodo nuevo: el informe del que acabas de leer no se toca.
+test("el barrido no mueve spentOfPeriod ni incomeOfPeriod de ninguno de los dos periodos", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const spentAntes = db.prepare(SQL.spentOfPeriod).get("per-1").spent_cents;
+  const incomeAntes = db.prepare(SQL.incomeOfPeriod).get("per-1").income_cents;
+
+  const newId = openNextPeriodReproduced(db, {
+    name: "Septiembre 2026", startDate: "2026-09-01", sharePct: 60,
+    sweep: { amountCents: 20000, fromAccountId: "acc-n26", toAccountId: "acc-revolut", goalName: "Fondo" },
+  });
+
+  assert.equal(db.prepare(SQL.spentOfPeriod).get("per-1").spent_cents, spentAntes);
+  assert.equal(db.prepare(SQL.incomeOfPeriod).get("per-1").income_cents, incomeAntes);
+  assert.equal(db.prepare(SQL.spentOfPeriod).get(newId).spent_cents, 0);
+  assert.equal(db.prepare(SQL.incomeOfPeriod).get(newId).income_cents, 0);
+});
+
+test("el barrido baja el saldo de origen y sube el de destino por el mismo importe", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const antesOrigen = balance(db, "acc-n26", "2026-09-01");
+  const antesDestino = balance(db, "acc-revolut", "2026-09-01");
+
+  openNextPeriodReproduced(db, {
+    name: "Septiembre 2026", startDate: "2026-09-01", sharePct: 60,
+    sweep: { amountCents: 20000, fromAccountId: "acc-n26", toAccountId: "acc-revolut", goalName: "Fondo" },
+  });
+
+  assert.equal(balance(db, "acc-n26", "2026-09-01"), antesOrigen - 20000);
+  assert.equal(balance(db, "acc-revolut", "2026-09-01"), antesDestino + 20000);
+});
+
+test("el barrido no cambia el patrimonio neto total", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const antes = netWorth(db, "2026-09-01");
+
+  openNextPeriodReproduced(db, {
+    name: "Septiembre 2026", startDate: "2026-09-01", sharePct: 60,
+    sweep: { amountCents: 20000, fromAccountId: "acc-n26", toAccountId: "acc-revolut", goalName: "Fondo" },
+  });
+
+  assert.equal(netWorth(db, "2026-09-01"), antes, "mover dinero de un bolsillo propio a otro no cambia el patrimonio");
+});
+
+test("si un statement falla, no se escribe NADA (BEGIN/ROLLBACK del runner)", () => {
+  const db = openDb();
+  seedMinimal(db);
+
+  const stmts = [
+    { sql: SQL.closePeriod, bind: [prevDayIso("2026-09-01"), T2, "per-1"] },
+    { sql: SQL.insertPeriod, bind: ["per-nuevo", "Septiembre 2026", "2026-09-01", 60, T2, T2] },
+    // violación deliberada: amount_cents=0 con type='transfer' incumple el CHECK (type='adjustment' OR amount_cents>0)
+    sweepTransferStmt({ periodId: "per-nuevo", date: "2026-09-01", amountCents: 0, fromAccountId: "acc-n26", toAccountId: "acc-revolut", goalName: "Fondo", now: T2 }),
+  ];
+
+  assert.throws(() => execManyRaw(db, stmts));
+
+  const per1 = db.prepare("SELECT status FROM periods WHERE id='per-1'").get();
+  assert.equal(per1.status, "open", "rollback completo: el periodo viejo no queda cerrado");
+  assert.equal(db.prepare("SELECT * FROM periods WHERE id='per-nuevo'").get(), undefined);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM transactions WHERE type='transfer'").get().c, 0);
+});
+
+test("sin sweep, openNextPeriod se comporta exactamente como hoy", () => {
+  const db = openDb();
+  seedMinimal(db);
+
+  const newId = openNextPeriodReproduced(db, { name: "Septiembre 2026", startDate: "2026-09-01", sharePct: 60, budgets: [] });
+
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM transactions").get().c, 0, "sin sweep, ninguna transacción se escribe");
+  const nuevo = db.prepare("SELECT * FROM periods WHERE id=?").get(newId);
+  assert.equal(nuevo.status, "open");
 });

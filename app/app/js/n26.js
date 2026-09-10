@@ -131,9 +131,11 @@ async function runImportPipeline(rows) {
       if (categoryId) res.categorized++;
       stmts.push({
         sql: SQL.insertTransaction,
+        // tag_id='' SIEMPRE (el "" tras rule_id): el import nunca etiqueta — qué es de un proyecto
+        // lo decide una persona, no un CSV bancario (etiquetas-design §6).
         bind: [id, r.bookingDate, period.id, type, Math.abs(r.amountCents), accountId, "",
           categoryId, bcSanitizeCell(r.partnerName), bcSanitizeCell(r.paymentReference),
-          0, null, "me", 0, "", "", r.externalId, "reconciled", now, now],
+          0, null, "me", 0, "", "", "", r.externalId, "reconciled", now, now],
       });
       existing.push({ id, dateIso: r.bookingDate, type, amountCents: r.amountCents,
         externalId: r.externalId, status: "reconciled" });
