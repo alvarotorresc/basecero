@@ -168,6 +168,18 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
   // (crear una nueva en cada repintado filtraría memoria) y la revoca en cuanto state.photo
   // cambia de referencia (nueva foto elegida) o se vacía — ver photoPreviewUrl() más abajo.
   let photoObjectUrl = null;
+  // D-3/D-4 (revisión de código): vida de la pantalla. Sin esto, un callback async que resuelve
+  // DESPUÉS de que el usuario haya cerrado Registro (resultado de voz tardío, foto que tarda en
+  // comprimirse) podía repintar `container` encima de la pantalla que `nav()` ya había puesto
+  // detrás (main.js usa un único contenedor para todas las pantallas). `alive` se apaga en los dos
+  // puntos de salida de esta pantalla (✕ y guardado con éxito) y lo comprueban esos callbacks
+  // antes de tocar `state`/`render()`. `speech.stop()` no tenía NINGÚN llamante hasta este arreglo.
+  let alive = true;
+  const releasePhotoUrl = () => { if (photoObjectUrl) { URL.revokeObjectURL(photoObjectUrl); photoObjectUrl = null; } };
+  // D-5 (revisión de código): último texto ya interpretado por Enter/blur/voz — así un blur sobre
+  // un texto sin cambios desde la última interpretación no repinta (y no pisa lo que la memoria ya
+  // rellenó y el usuario pudo haber tocado a mano). Ver el onblur de #reg-nat-input en wire().
+  let lastInterpreted = null;
 
   const categoriesFor = () => {
     if (state.tipo === "income") return incomeCats;
@@ -260,7 +272,9 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     if (parsed?.merchant) {
       chips.push(`<button type="button" data-nat-chip="merchant" style="height:44px;border-radius:999px;border:1px solid var(--hairline-strong);background:var(--surface-2);color:var(--ink);font-size:13px;font-weight:500;padding:0 13px;cursor:pointer;">${escHtml(parsed.merchant)}</button>`);
     }
-    if (parsed?.shared) {
+    if (parsed?.shared && state.tipo === "expense") {
+      // M-5 (revisión de código): el guardado descarta isShared/sharePct para income
+      // (effectiveIsShared, más abajo) — el chip no debe prometer un reparto que no se guarda.
       chips.push(`<button type="button" data-nat-chip="shared" style="height:44px;border-radius:999px;border:1px solid var(--hairline-strong);background:var(--surface-2);color:var(--ink);font-size:13px;font-weight:500;padding:0 13px;cursor:pointer;">${escHtml(t("registro.natural.sharedChip", { name: partnerName, pct: parsed.sharePct ?? state.sharePct }))}</button>`);
     }
     return `
@@ -686,7 +700,12 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
   }
 
   function wire() {
-    container.querySelector("#reg-close").onclick = () => onDone();
+    container.querySelector("#reg-close").onclick = () => {
+      alive = false;
+      speech?.stop();
+      releasePhotoUrl();
+      onDone();
+    };
 
     // PB-1 · Lenguaje natural (Registro v2 §8.6): un único camino de interpretación para el texto,
     // Enter, blur y el resultado de voz. El oninput de la caja SOLO guarda el texto y NUNCA repinta
@@ -698,16 +717,26 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       natInput.onkeydown = (e) => {
         if (e.key !== "Enter") return;
         e.preventDefault();
+        lastInterpreted = natInput.value;
         applyNatural(natInput.value);
         focusInput(container.querySelector("#reg-raw"));
       };
-      // Simplificación deliberada respecto al plan («si el texto cambió desde la última
-      // interpretación»): volver a interpretar un texto ya interpretado es idempotente (mismo
-      // resultado, mismo render()), así que blur siempre interpreta si hay texto — evita tener que
-      // guardar un campo extra de "último texto interpretado" fuera de la forma exacta de estado
-      // que fija el plan ({text, parsed, listening, micOff}).
+      // D-5 (revisión de código): en el estado interpretado no hay `<input>` (naturalBoxHtml
+      // cambia de rama), así que un `applyNatural` síncrono en el blur reconstruye el `innerHTML`
+      // ANTES de que el click que provocó el blur llegue a su objetivo (importe/categoría/
+      // «Guardar») — el primer toque se perdía. Diferir con un `setTimeout(0)` deja que ese click
+      // termine de despachar sobre el DOM de ahora antes de repintar. `lastInterpreted` evita
+      // reinterpretar (y repintar) un texto que no ha cambiado desde la última vez — así un blur
+      // sin edición real no vuelve a mover nada bajo el dedo. `alive` cubre el caso de haber
+      // cerrado Registro entre el blur y el propio `setTimeout`.
       natInput.onblur = () => {
-        if (natInput.value.trim()) applyNatural(natInput.value);
+        const value = natInput.value;
+        if (!value.trim() || value === lastInterpreted) return;
+        setTimeout(() => {
+          if (!alive) return;
+          lastInterpreted = value;
+          applyNatural(value);
+        }, 0);
       };
     }
 
@@ -716,12 +745,17 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       state.natural.listening = true;
       render();
       speech.start(
+        // D-4: guard de vida — un resultado que llega después de cerrar Registro no debe repintar
+        // encima de la pantalla que haya quedado detrás.
         (resultText) => {
+          if (!alive) return;
           state.natural.listening = false;
+          lastInterpreted = resultText;
           applyNatural(resultText);
           focusInput(container.querySelector("#reg-raw"));
         },
         () => {
+          if (!alive) return;
           state.natural.listening = false;
           state.natural.micOff = true;
           render();
@@ -735,6 +769,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       // micOff NO se resetea: es de sesión de pantalla (spec §8.6), sobrevive a «Borrar». Tampoco
       // deshace lo que ya rellenó en el formulario — eso lo edita el usuario campo a campo.
       state.natural = { text: "", parsed: null, listening: false, micOff: state.natural.micOff };
+      lastInterpreted = null;
       render();
     };
 
@@ -778,6 +813,11 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         // Cierra el desplegable manual: typeSelectorHtml lo reabre solo si el tipo elegido es uno
         // de los tres que vive dentro de él.
         state.typeMoreOpen = false;
+        // M-4 (revisión de código): un chip de una interpretación anterior no debe sobrevivir al
+        // cambio de tipo — apuntaría a una categoryId que el guard de arriba acaba de poner a
+        // null. micOff SÍ sobrevive: es de sesión de pantalla, mismo criterio que #reg-nat-reset.
+        state.natural = { text: "", parsed: null, listening: false, micOff: state.natural.micOff };
+        lastInterpreted = null;
         errorMsg = "";
         render();
       };
@@ -927,6 +967,8 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       if (!file) return;
       try {
         const compressed = await compressImage(file);
+        // D-4: compressImage es async — si Registro se cerró mientras comprimía, no repintar.
+        if (!alive) return;
         // Reemplazar una foto ya elegida ("Otra foto"): la URL vieja apunta al Blob viejo y
         // render() no la recrearía sola (solo lo hace cuando photoObjectUrl está a null) — sin
         // esto la miniatura se queda enseñando la foto anterior mientras se guarda la nueva.
@@ -934,6 +976,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         state.photo = compressed;
         render();
       } catch (err) {
+        if (!alive) return;
         // El formulario NO pierde nada: state.photo se queda como estaba.
         showToast(t("errors.attachments.writeFailed", { error: userMessage(err) }));
       }
@@ -1067,6 +1110,11 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
             await setAttachmentFlag(newId, true);
           } catch { showToast(t("registro.photo.savedWithout")); }
         }
+        // D-3/D-4: guardar con éxito es el otro punto de salida de la pantalla (el primero es
+        // #reg-close, arriba) — se apaga la vida y se sueltan el reconocedor y la URL del Blob.
+        alive = false;
+        speech?.stop();
+        releasePhotoUrl();
         onDone();   // primero: el ticket cae sobre la pantalla ya repintada (ReciboGuardado.dc.html)
         const [y, m, d] = state.fecha.split("-");
         const now = new Date();
