@@ -6,6 +6,7 @@ import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 import { subHeaderHtml } from "../ui.js";
 import { icon } from "../icons.js";
+import { netOfSelected } from "../share-pct.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -109,14 +110,15 @@ export async function renderLiquidar(container, onBack) {
   let errorMsg = "";
 
   function render() {
-    // Neto derivado de las filas visibles (no de una query aparte) para que el hero no pueda
-    // desviarse de la lista: 'i_owe' resta, 'partner_owes' suma. SQL.pendingSettlementNet usa el
-    // mismo WHERE, así que ambos coinciden siempre.
-    const net = state.rows.reduce((s, r) => s + (r.direction === "i_owe" ? -r.settle_cents : r.settle_cents), 0);
+    // Neto de lo SELECCIONADO (share-pct.js#netOfSelected, Task 3.0), no de todo state.rows: es
+    // el único cambio de comportamiento de la PR. Con todo marcado (el estado por defecto) da
+    // exactamente la misma suma que antes: 'i_owe' resta, 'partner_owes' suma.
+    const net = netOfSelected(state.rows, state.selected);
     const name = partnerName || t("movimientos.shared.fallbackName");
     const theyOwe = state.rows.filter((r) => r.direction === "partner_owes");
     const iOwe = state.rows.filter((r) => r.direction === "i_owe");
     const netClass = net > 0 ? " text-green" : net < 0 ? " text-red" : "";
+    const netColor = net > 0 ? "var(--pos)" : net < 0 ? "var(--danger)" : "var(--ink-3)";
     const netLabel = net > 0
       ? t("common.settlement.theyOwe", { name: escHtml(name) })
       : net < 0
@@ -140,10 +142,10 @@ export async function renderLiquidar(container, onBack) {
     container.innerHTML = `
       ${subHeaderHtml({ id: "liq-back", title: partnerName ? t("liquidar.title.withPartner", { name: partnerName }) : t("common.settle") })}
 
-      <div class="card" style="display:flex;flex-direction:column;gap:4px;margin-bottom:18px;">
+      <div class="card" style="display:flex;flex-direction:column;gap:6px;margin-bottom:18px;">
         <div class="section-title">${t("liquidar.net.title")}</div>
-        <div class="amount-hero num${netClass}">${moneyPartsHtml(Math.abs(net))}</div>
-        <div style="font-size:11px;color:var(--text-3);">${netLabel}</div>
+        <div class="amount-hero lg${netClass}">${moneyPartsHtml(Math.abs(net))}</div>
+        <div style="font: var(--t-section); color: ${netColor};">${netLabel}</div>
       </div>
 
       ${accounts.length ? `
