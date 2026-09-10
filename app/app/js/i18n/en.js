@@ -516,9 +516,8 @@ export const EN = {
     intro: "They cross categories: they group what you spend on a trip, a renovation, or a wedding, no matter which category each expense falls under.",
     footerNote: "Archiving a tag removes it from the pickers, but its movements still show it.",
     new: "New tag",
-    empty: "You don’t have any tags yet.",
     row: {
-      movements: "{n} movements",
+      movements: { one: "{n} movement", other: "{n} movements" },
       open: "open",
       archived: "archived",
       noLimit: "no limit",
@@ -535,7 +534,6 @@ export const EN = {
       save: "Save",
       archive: "Archive",
       unarchive: "Unarchive",
-      removeLimit: "Remove limit",
     },
     error: {
       load: "Couldn’t load the tags: {error}",

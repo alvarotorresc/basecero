@@ -524,9 +524,8 @@ export const ES = {
     intro: "Cruzan las categorías: agrupan lo que gastas en un viaje, una reforma o una boda, sin importar en qué categoría caiga cada gasto.",
     footerNote: "Archivar una etiqueta la quita de los selectores, pero sus movimientos la siguen enseñando.",
     new: "Nueva etiqueta",
-    empty: "Aún no tienes ninguna etiqueta.",
     row: {
-      movements: "{n} movimientos",
+      movements: { one: "{n} movimiento", other: "{n} movimientos" },
       open: "abierta",
       archived: "archivada",
       noLimit: "sin límite",
@@ -543,7 +542,6 @@ export const ES = {
       save: "Guardar",
       archive: "Archivar",
       unarchive: "Desarchivar",
-      removeLimit: "Quitar límite",
     },
     error: {
       load: "No se pudieron cargar las etiquetas: {error}",

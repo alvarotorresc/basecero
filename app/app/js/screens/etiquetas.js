@@ -36,7 +36,7 @@ export async function renderEtiquetas(container, onBack) {
     try {
       rows = await tagTotals();
     } catch (e) {
-      loadError = userMessage(e);
+      loadError = t("etiquetas.error.load", { error: userMessage(e) });
     }
   }
 
@@ -149,7 +149,7 @@ export async function renderEtiquetas(container, onBack) {
       goBack();
     } catch (e) {
       btn.disabled = false;
-      state.formError = userMessage(e);
+      state.formError = t("etiquetas.error.save", { error: userMessage(e) });
       renderForm();
     }
   }
@@ -158,6 +158,15 @@ export async function renderEtiquetas(container, onBack) {
     const form = state.form;
     container.querySelector("#ef-close").onclick = () => goBack();
     container.querySelector("#ef-save").onclick = () => save();
+
+    // Igual que categorias.js#nameInput.oninput: si el guardado falla, renderForm() reconstruye
+    // el formulario desde `form` — sin este handler, lo que el usuario tecleó se perdería en
+    // cuanto apareciera el banner de error (el <input> vuelve a nacer con el valor viejo).
+    const nameInput = container.querySelector("#ef-name");
+    nameInput.oninput = (e) => {
+      form.name = e.target.value;
+      state.formError = "";
+    };
 
     const limitInput = container.querySelector("#ef-limit");
     limitInput.oninput = (e) => {
@@ -183,7 +192,7 @@ export async function renderEtiquetas(container, onBack) {
         goBack();
       } catch (e) {
         archiveBtn.disabled = false;
-        state.formError = userMessage(e);
+        state.formError = t("etiquetas.error.archive", { error: userMessage(e) });
         renderForm();
       }
     };
