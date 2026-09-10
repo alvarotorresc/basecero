@@ -494,6 +494,48 @@ export async function getSnoozedRenewals() {
   return parseSnoozed(meta.renewal_snoozed);
 }
 
+/** Construye los statements para aceptar una candidata detectada (subscription-detect.js#
+ *  detectSubscriptions): un insertRule YA marcado como suscripción + un linkTxsToRule por cada
+ *  cargo de la racha. `fallbackAccountId` llega YA resuelto (defaultAccountId() no es pura): así
+ *  la función es testeable en Node sin Worker (mismo criterio que replaceAllStmts/
+ *  settleAllSharedStmts). due_day/due_month se deducen del cargo MÁS RECIENTE de la racha
+ *  (candidate.lastDates[0]) — también en weekly, aunque el formulario no lo use para esa
+ *  frecuencia (recurrentes.js exige 1-31 igualmente). isShared es SIEMPRE false: marcar solo un
+ *  gasto como compartido cambiaría en silencio lo que la contraparte debe, y eso lo decide una
+ *  persona (mismo argumento textual que registro-v2-design.md §5.5).
+ *  bcUlid/bcSanitizeCell son globales (vendor/pure.js), igual que en createRule. */
+export function acceptSubscriptionCandidateStmts(candidate, fallbackAccountId) {
+  const now = nowIso();
+  const ruleId = bcUlid();
+  const anchor = candidate.lastDates?.[0] ?? "";
+  const dueDay = anchor ? Number(anchor.slice(8, 10)) : null;
+  const dueMonth = candidate.frequency === "yearly" && anchor ? Number(anchor.slice(5, 7)) : null;
+  const stmts = [{
+    sql: SQL.insertRule,
+    bind: [
+      ruleId, bcSanitizeCell(candidate.merchant), "expense", candidate.amountCents,
+      candidate.categoryId || "", candidate.accountId || fallbackAccountId, "",
+      candidate.frequency, dueDay, dueMonth,
+      0, 1, 1, "",
+      now, now,
+    ],
+  }];
+  for (const txId of candidate.txIds ?? []) stmts.push({ sql: SQL.linkTxsToRule, bind: [ruleId, now, txId] });
+  return stmts;
+}
+
+/** Acepta una candidata: crea la regla marcada como suscripción y ENLAZA sus cargos pasados por
+ *  rule_id, todo en un execMany. Atómico a propósito: una regla creada sin enlazar volvería a
+ *  proponerse en el siguiente render (los cargos siguen sin rule_id), y unos cargos enlazados a
+ *  una regla que no llegó a existir romperían la FK del contrato.
+ *  Efecto secundario BUSCADO: el cargo de este periodo pasa a marcar la regla como pagada en
+ *  Previsión (SQL.paidRuleIds), así que aceptar una suscripción que ya se cobró NO la suma como
+ *  pendiente (spec §12.5). */
+export async function acceptSubscriptionCandidate(candidate) {
+  const fallbackAccountId = candidate.accountId ? "" : await defaultAccountId();
+  await execMany(acceptSubscriptionCandidateStmts(candidate, fallbackAccountId));
+}
+
 export const accountBalanceCents = async (accountId, atDateIso) =>
   (await query(SQL.accountBalance, [atDateIso, accountId]))[0].balance_cents;
 
