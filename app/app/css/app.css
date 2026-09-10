@@ -1167,3 +1167,11 @@ body.onboarding .fab { display: none; }
 /* Semana (§9.2): el nombre de día sale de i18n.weekdaysLong en minúscula porque esa clave la usan
    también frases donde el día va en medio de una oración; aquí se capitaliza en el markup. */
 .week-day-name { text-transform: capitalize; }
+/* Etiqueta de proyecto elegida (SISTEMA.md §4.16bis, Registro): una etiqueta es transversal a las
+   categorías y no tiene color propio — chip neutro, nunca el lima de .chip.active. */
+.chip.is-tag {
+  background: var(--surface-2);
+  border: 1px solid var(--hairline-strong);
+  color: var(--ink);
+  font-weight: 500;
+}

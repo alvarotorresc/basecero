@@ -198,7 +198,7 @@ export const EN = {
     error: { load: "Couldn’t load the entry screen: {error}" },
     title: "Log transaction",
     close: "Close",
-    type: { transfer: "Transfer" },
+    type: { transfer: "Transfer", more: "More entry types" },
     save: {
       expense: "Save expense",
       income: "Save income",

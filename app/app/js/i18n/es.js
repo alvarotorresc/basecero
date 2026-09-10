@@ -204,7 +204,7 @@ export const ES = {
     error: { load: "No se pudo cargar la pantalla de registro: {error}" },
     title: "Registrar",
     close: "Cerrar",
-    type: { transfer: "Transfer." },
+    type: { transfer: "Transfer.", more: "Más tipos de apunte" },
     save: {
       expense: "Guardar gasto",
       income: "Guardar ingreso",
