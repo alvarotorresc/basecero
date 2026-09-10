@@ -394,7 +394,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
             <span class="field-label">${t("common.merchant")}</span>
             ${state.merchantRemembered ? `<span style="font-size:11px; font-weight:500; color:var(--accent);">${t("registro.merchant.remembered")}</span>` : ""}
           </span>
-          <input type="text" id="reg-merchant" list="reg-merchants" value="${escAttr(state.merchant)}" placeholder="${t("common.optional")}" aria-label="${t("registro.merchant.listLabel")}">
+          <input type="text" id="reg-merchant" list="reg-merchants" value="${escAttr(state.merchant)}" placeholder="${t("common.optional")}">
         </label>
         <label class="field field-stack" style="flex:1;">
           <span class="field-label">${t("common.date")}</span>
