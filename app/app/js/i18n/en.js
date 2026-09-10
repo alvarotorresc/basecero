@@ -27,8 +27,8 @@ export const EN = {
     to: "To",
     changeSign: "Change sign",
     linkedTo: "Linked to",
-    myShare: "Your share · {pct}%",
-    myPartSuffix: " · your share {amount}",
+    myShare: "Your share: {pct}%",
+    myPartSuffix: ", your share {amount}",
     sharedWith: "Shared with {name}",
     settlement: {
       theyOwe: "{name} owes you",
@@ -36,7 +36,7 @@ export const EN = {
       even: "You are square",
     },
     paidBy: { label: "Who paid", me: "I paid", partner: "{name} paid" },
-    paidFull: "{name} paid · total",
+    paidFull: "{name} paid the full amount",
     split: { label: "Split", hint: "{name} pays {pct}%", decreaseAria: "Decrease your share", increaseAria: "Increase your share" },
     merchant: "Merchant",
     date: "Date",
@@ -101,7 +101,7 @@ export const EN = {
       afternoon: "Good afternoon",
       evening: "Good evening",
     },
-    header: { dayOf: "{period} · day {day} of {total}" },
+    header: { dayOf: "{period}, day {day} of {total}" },
     streak: { one: "{n} day streak", other: "{n} day streak" },
     account: { switch: "Switch account" },
     spent: {
@@ -213,9 +213,9 @@ export const EN = {
       unlink: "Remove link",
       toggle: "Refunding an expense? {arrow}",
       empty: "No recent expenses.",
-      sharedSuffix: " · shared",
-      alreadyRefunded: "Already refunded · {amount}",
-      settledLabel: "Settled · {amount}",
+      sharedSuffix: " (shared)",
+      alreadyRefunded: "Already refunded, {amount}",
+      settledLabel: "Settled, {amount}",
     },
   },
   movimientos: {
@@ -229,7 +229,7 @@ export const EN = {
     periodLabel: "Period",
     uncategorized: "Uncategorized",
     tapToCategorize: "tap to categorize",
-    uncategorizedChip: "No category · {n}",
+    uncategorizedChip: "No category {n}",
     chipAll: "All",
     search: {
       toggle: "Search",
@@ -255,7 +255,7 @@ export const EN = {
       fallbackName: "the other party",
       fallbackLabel: "Other party",
     },
-    row: { partnerPaid: " · {name} paid · your share {amount}" },
+    row: { partnerPaid: ", {name} paid, your share {amount}" },
     delete: {
       button: "Delete",
       title: "Delete this transaction?",
@@ -277,15 +277,15 @@ export const EN = {
     account: { title: "Settlement account" },
     empty: "Nothing left to settle.",
     row: {
-      subTheirs: "{date} · {amount} · their {pct}%",
-      subMine: "{date} · {amount} · your {pct}%",
+      subTheirs: "{date}, {amount}, their {pct}%",
+      subMine: "{date}, {amount}, your {pct}%",
     },
     footer: {
       collect: "Collect {amount} from {name}",
       collectConfirm: "Yes, collect {amount}",
       pay: "Pay {amount} to {name}",
       payConfirm: "Yes, pay {amount}",
-      even: "Settle up · nothing changes hands",
+      even: "Settle up, nothing changes hands",
       evenConfirm: "Yes, settle up",
     },
     note: "Settle up",
@@ -301,13 +301,13 @@ export const EN = {
     },
     title: "Spending by category",
     header: {
-      dayOf: "{period} · day {day} of {total}",
+      dayOf: "{period}, day {day} of {total}",
     },
     total: {
       title: "Spent this period",
       withLimit: {
-        one: "{spent} of {limit} in the only category with a limit · {pct}",
-        other: "{spent} of {limit} in the {n} categories with a limit · {pct}",
+        one: "{spent} of {limit} in the only category with a limit ({pct})",
+        other: "{spent} of {limit} in the {n} categories with a limit ({pct})",
       },
       remaining: {
         one: "You have {amount} left in the only category with a limit",
@@ -329,8 +329,8 @@ export const EN = {
     },
     row: {
       ofLimit: "{spent} of {limit}",
-      ofLimitOver: "{spent} of {limit} · over by {over}",
-      noLimit: "{spent} · no limit",
+      ofLimitOver: "{spent} of {limit}, over by {over}",
+      noLimit: "{spent}, no limit",
       noPct: "—",
     },
     detail: {
@@ -355,7 +355,7 @@ export const EN = {
       openAccount: "Couldn’t open the account: {error}",
     },
     title: "Net worth",
-    subtitle: "Calculated from all your transactions · today",
+    subtitle: "Calculated from all your transactions",
     netWorth: {
       // La card va justo bajo el H1 «Net worth»: en inglés se llama «Total» para no apilar
       // la misma frase dos veces (en español Patrimonio / Patrimonio neto ya divergen solos).
@@ -370,7 +370,7 @@ export const EN = {
     },
     accountSubtitle: {
       checking: "Checking account",
-      checkingDefault: "Checking account · default",
+      checkingDefault: "Checking account, default",
       // Task 7 (6c): mirrors ES — see accountSubtitle there.
       savings: "Savings",
       liability: "Liability",
@@ -378,7 +378,7 @@ export const EN = {
     },
     accounts: {
       title: "Accounts",
-      countActive: { one: "{n} active · {currency} only", other: "{n} active · {currency} only" },
+      countActive: { one: "{n} active", other: "{n} active" },
       new: "New account",
       empty: "You don’t have any accounts yet.",
       today: "today",
@@ -399,7 +399,7 @@ export const EN = {
       countActive: { one: "{n} active", other: "{n} active" },
       new: "New goal",
       empty: "You don’t have any active goals yet.",
-      ringSub: "{current} of {target} · {subtitle}",
+      ringSub: "{current} of {target}, {subtitle}",
     },
     goalType: {
       emergency_fund: "Emergency fund",
@@ -484,8 +484,8 @@ export const EN = {
     addSubcategory: "+ Add subcategory",
     chevron: { collapse: "Collapse subcategories", expand: "Expand subcategories" },
     flow: {
-      expenseCount: "Expenses · {n}",
-      incomeCount: "Income · {n}",
+      expenseCount: "Expenses ({n})",
+      incomeCount: "Income ({n})",
     },
     empty: {
       expense: "No expense categories yet.",
@@ -562,10 +562,10 @@ export const EN = {
       open: "Couldn’t open the period: {error}",
     },
     header: {
-      closing: "Closing {name} · opening the next one",
+      closing: "Closing {name} and opening the next one",
       first: "First period",
       title: "New period",
-      subtitle: "One step · saves when opened",
+      subtitle: "One step, saves when opened",
     },
     closing: {
       title: "Closing {name}",
@@ -638,11 +638,11 @@ export const EN = {
     },
     period: {
       title: "Period",
-      subtitle: "Opened on {date}{days} · split {mine} / {theirs}",
-      days: { one: " · {n} day", other: " · {n} days" },
+      subtitle: "Opened on {date}{days}, split {mine} / {theirs}",
+      days: { one: ", {n} day", other: ", {n} days" },
       openLabel: "Open",
       shareLabel: "Default split",
-      shareHint: "For new expenses · {name} pays {pct}%",
+      shareHint: "For new expenses, {name} pays {pct}%",
       shareSaveFailed: "Could not save the split: {error}",
       closeBtn: "Close period and open the next one",
       closeNoteWithPartner: "Closing it sets the end date and lets you choose the split with {name} for the new period. Open it the day your paycheck arrives.",
@@ -652,7 +652,7 @@ export const EN = {
     subscriptions: { title: "Subscriptions", sub: "The yearly cost of what you pay each month" },
     categories: {
       title: "Categories",
-      subtitleWithCount: "{n} categories · colors and icons",
+      subtitleWithCount: "{n} categories, colors and icons",
       subtitleNoCount: "colors and icons",
     },
     tags: {
@@ -680,7 +680,7 @@ export const EN = {
     },
     backup: {
       title: "Emergency backup",
-      body: "🔒 Your data lives only on this device. No accounts, no cloud.",
+      body: "Your data lives only on this device. No accounts, no cloud.",
       exportBtn: "Export backup copy (JSON)",
     },
     about: {
@@ -692,9 +692,9 @@ export const EN = {
       feedbackNote: "The form opens in Tally, outside the app: only what you type there is sent.",
     },
     importResult: {
-      summary: "New: {created} · Reconciled: {reconciled} · Duplicates (skipped): {skipped}",
-      omitted: { one: " · 1 unreadable row skipped", other: " · {n} unreadable rows skipped" },
-      categorized: { one: " · 1 categorized from the merchant", other: " · {n} categorized from the merchant" },
+      summary: "New: {created}, reconciled: {reconciled}, duplicates (skipped): {skipped}",
+      omitted: { one: ", 1 unreadable row skipped", other: ", {n} unreadable rows skipped" },
+      categorized: { one: ", 1 categorized from the merchant", other: ", {n} categorized from the merchant" },
       tail: ". Check the “uncategorized” tray in Transactions.",
       bizumHint: " Settle up in Home before importing: an incoming Bizum reconciles itself; one you send comes in as a new transaction.",
     },
@@ -702,12 +702,12 @@ export const EN = {
       title: "Set up your bank",
       closeAria: "Close",
       rows: {
-        one: "{n} row · format not recognized — tell us what each column is, just this once",
-        other: "{n} rows · format not recognized — tell us what each column is, just this once",
+        one: "{n} row, format not recognized — tell us what each column is, just this once",
+        other: "{n} rows, format not recognized — tell us what each column is, just this once",
       },
       dateTitle: "Date",
       conceptTitle: "Description",
-      counterpartyTitle: "Counterparty · optional",
+      counterpartyTitle: "Counterparty (optional)",
       noColumn: "— no column",
       amountTitle: "Amount",
       amountSingleBtn: "One signed column",
@@ -716,21 +716,21 @@ export const EN = {
       creditTitle: "Credit",
       noConcept: "(no description)",
       previewTitle: "Here’s how your transactions will read",
-      counterOk: "✓ {readable} of {total} rows read fine",
-      counterWarn: "⚠ {readable} of {total} rows read fine · row {line}: {reason}",
+      counterOk: "{readable} of {total} rows read fine",
+      counterWarn: "{readable} of {total} rows read fine, row {line}: {reason}",
       saveBtn: "Save profile and import",
       footNote: "The profile is saved on your device: next time this bank imports directly. N26 CSVs are recognized on their own, with nothing to set up.",
       dateFormat: { iso: "year-month-day", dmy: "day/month/year" },
       date: {
         unrecognized: "This column’s date format isn’t recognized.",
-        detected: "✓ {raw} → {iso} · {fmt} format detected",
+        detected: "{raw} → {iso}, {fmt} format detected",
       },
       amount: {
         kindExpense: "expense",
         kindIncome: "income",
         decimalComma: "comma",
         decimalDot: "point",
-        detected: "✓ {raw} → {kind} of {money} · decimal {dec} detected",
+        detected: "{raw} → {kind} of {money}, decimal {dec} detected",
         noSampleSingle: "The sample has no amount in this column.",
         noSampleSplit: "The sample has no debit or credit amount.",
         unrecognized: "This column’s amount format isn’t recognized.",
@@ -746,7 +746,7 @@ export const EN = {
       feature1: { title: "Everything stays here", subtitle: "No server, no sign-up. Works even offline." },
       feature2: { title: "Your data is a spreadsheet", subtitle: "Export and import your data whenever you want: it’s never locked in." },
       feature3: { title: "Your month starts on payday", subtitle: "Periods run from payday to payday, not the 1st to the 30th." },
-      startBtn: "Start · 2 minutes",
+      startBtn: "Start (2 minutes)",
       importPrompt: "Coming from another backup?",
       importLink: "Import a spreadsheet or backup",
     },
@@ -755,12 +755,12 @@ export const EN = {
       subtitle: "The real ones: your everyday bank, your savings jar, your loan. One is enough to get started.",
       addAnotherTitle: "Add another",
       firstTitle: "Your first account",
-      namePlaceholder: "Name · e.g. Bank savings",
+      namePlaceholder: "e.g. Bank savings",
       balanceTitle: "Today’s balance",
       addBtn: "Add",
       liabilityNote: "A liability’s balance is what you owe: it’s stored as negative.",
       infoNote: "No bank connects here: you enter transactions yourself or import their CSV. You can add and rename accounts anytime in Net worth.",
-      importDefaultSuffix: " · will be your import account",
+      importDefaultSuffix: ", will be your import account",
       needOne: "Create at least one account to continue.",
       createFailed: "Couldn’t create the account: {error}",
       nameRequired: "Give the account a name.",
@@ -960,15 +960,15 @@ export const EN = {
   },
   goals: {
     emergencyFund: {
-      withAvg: "Savings in {account} · covers {months} months of spending",
-      noAvg: "Savings in {account} · no closed periods yet to calculate average spending",
+      withAvg: "Savings in {account}, covers {months} months of spending",
+      noAvg: "Savings in {account}, no closed periods yet to calculate average spending",
     },
     savingsTarget: {
       base: "Savings in {account}",
-      beforeDate: " · before {date}",
+      beforeDate: ", before {date}",
     },
     provision: {
-      subtitle: "Provision · {amount} per month",
+      subtitle: "Provision, {amount} per month",
     },
     spendingCap: {
       over: "Over by {amount}",
@@ -1068,7 +1068,7 @@ export const EN = {
       myPart: "My part {amount}",
       net: "Net {amount}",
       subscriptions: "Subscriptions",
-      subscriptionsActive: "{n} active · {amount} per month",
+      subscriptionsActive: "{n} active, {amount} per month",
       subscriptionsYear: "{amount} per year",
       movements: "Movements by category",
       others: "Other",

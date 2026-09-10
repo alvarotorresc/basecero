@@ -27,8 +27,8 @@ export const ES = {
     to: "Hacia",
     changeSign: "Cambiar signo",
     linkedTo: "Vinculado a",
-    myShare: "Tu parte · {pct}%",
-    myPartSuffix: " · tu parte {amount}",
+    myShare: "Tu parte: {pct} %",
+    myPartSuffix: ", tu parte {amount}",
     sharedWith: "Compartido con {name}",
     settlement: {
       theyOwe: "{name} te debe",
@@ -36,7 +36,7 @@ export const ES = {
       even: "Estáis en paz",
     },
     paidBy: { label: "Quién pagó", me: "Pagué yo", partner: "Pagó {name}" },
-    paidFull: "{name} pagó · total",
+    paidFull: "{name} pagó el total",
     split: { label: "Reparto", hint: "{name} paga el {pct} %", decreaseAria: "Bajar tu parte", increaseAria: "Subir tu parte" },
     merchant: "Comercio",
     date: "Fecha",
@@ -104,7 +104,7 @@ export const ES = {
       afternoon: "Buenas tardes",
       evening: "Buenas noches",
     },
-    header: { dayOf: "{period} · día {day} de {total}" },
+    header: { dayOf: "{period}, día {day} de {total}" },
     // Racha de días registrando seguidos (badge de la cabecera, Inicio v2) — no se pinta con
     // racha 0 (inicio.js), así que el singular/plural nunca ve n=0 en pantalla.
     streak: { one: "{n} día de racha", other: "{n} días de racha" },
@@ -218,11 +218,11 @@ export const ES = {
       unlink: "Quitar vínculo",
       toggle: "¿Devuelve un gasto? {arrow}",
       empty: "No hay gastos recientes.",
-      sharedSuffix: " · compartido",
-      alreadyRefunded: "Ya devuelto · {amount}",
+      sharedSuffix: " (compartido)",
+      alreadyRefunded: "Ya devuelto, {amount}",
       // Un gasto compartido ya liquidado: lo que volvió es la parte de la contraparte, no una
       // devolución. Se marca distinto de alreadyRefunded para que no se lean como lo mismo.
-      settledLabel: "Liquidado · {amount}",
+      settledLabel: "Liquidado, {amount}",
     },
   },
   movimientos: {
@@ -236,7 +236,7 @@ export const ES = {
     periodLabel: "Periodo",
     uncategorized: "Sin categorizar",
     tapToCategorize: "toca para categorizar",
-    uncategorizedChip: "Sin categoría · {n}",
+    uncategorizedChip: "Sin categoría {n}",
     chipAll: "Todos",
     search: {
       toggle: "Buscar",
@@ -262,7 +262,7 @@ export const ES = {
       fallbackName: "la contraparte",
       fallbackLabel: "Contraparte",
     },
-    row: { partnerPaid: " · pagó {name} · tu parte {amount}" },
+    row: { partnerPaid: ", pagó {name}, tu parte {amount}" },
     delete: {
       button: "Borrar",
       title: "¿Borrar este movimiento?",
@@ -284,15 +284,15 @@ export const ES = {
     account: { title: "Cuenta de la liquidación" },
     empty: "No queda nada pendiente de liquidar.",
     row: {
-      subTheirs: "{date} · {amount} · su {pct} %",
-      subMine: "{date} · {amount} · tu {pct} %",
+      subTheirs: "{date}, {amount}, su {pct} %",
+      subMine: "{date}, {amount}, tu {pct} %",
     },
     footer: {
       collect: "Cobrar {amount} de {name}",
       collectConfirm: "Sí, cobrar {amount}",
       pay: "Pagar {amount} a {name}",
       payConfirm: "Sí, pagar {amount}",
-      even: "Liquidar · queda a cero",
+      even: "Liquidar, queda a cero",
       evenConfirm: "Sí, liquidar",
     },
     note: "Liquidación",
@@ -308,13 +308,13 @@ export const ES = {
     },
     title: "Gasto por categoría",
     header: {
-      dayOf: "{period} · día {day} de {total}",
+      dayOf: "{period}, día {day} de {total}",
     },
     total: {
       title: "Gastado este periodo",
       withLimit: {
-        one: "{spent} de {limit} en la única categoría con límite · {pct}",
-        other: "{spent} de {limit} en las {n} categorías con límite · {pct}",
+        one: "{spent} de {limit} en la única categoría con límite ({pct})",
+        other: "{spent} de {limit} en las {n} categorías con límite ({pct})",
       },
       remaining: {
         one: "Te quedan {amount} en la única categoría con límite",
@@ -341,8 +341,8 @@ export const ES = {
       ofLimit: "{spent} de {limit}",
       // Solo cuando se ha pasado del límite: el exceso, ya calculado, para no tener que restar de
       // cabeza. Por debajo del límite se sigue usando ofLimit.
-      ofLimitOver: "{spent} de {limit} · superado por {over}",
-      noLimit: "{spent} · sin límite",
+      ofLimitOver: "{spent} de {limit}, superado por {over}",
+      noLimit: "{spent}, sin límite",
       noPct: "—",
     },
     detail: {
@@ -367,7 +367,7 @@ export const ES = {
       openAccount: "No se pudo abrir la cuenta: {error}",
     },
     title: "Patrimonio",
-    subtitle: "Calculado con todos tus movimientos · hoy",
+    subtitle: "Calculado con todos tus movimientos",
     netWorth: {
       title: "Patrimonio neto",
       deltaThisPeriod: "{amount} este periodo",
@@ -380,7 +380,7 @@ export const ES = {
     },
     accountSubtitle: {
       checking: "Cuenta corriente",
-      checkingDefault: "Cuenta corriente · por defecto",
+      checkingDefault: "Cuenta corriente, por defecto",
       // Task 7 (6c): antes accountSubtitle reutilizaba accountType.{savings,liability} (las
       // etiquetas del segmented control) — mismo texto, claves propias para no acoplar ambos usos.
       savings: "Ahorro",
@@ -389,7 +389,7 @@ export const ES = {
     },
     accounts: {
       title: "Cuentas",
-      countActive: { one: "{n} activa · solo {currency}", other: "{n} activas · solo {currency}" },
+      countActive: { one: "{n} activa", other: "{n} activas" },
       new: "Nueva cuenta",
       empty: "Todavía no tienes ninguna cuenta.",
       today: "hoy",
@@ -410,7 +410,7 @@ export const ES = {
       countActive: { one: "{n} activo", other: "{n} activos" },
       new: "Nuevo objetivo",
       empty: "Todavía no tienes ningún objetivo activo.",
-      ringSub: "{current} de {target} · {subtitle}",
+      ringSub: "{current} de {target}, {subtitle}",
     },
     goalType: {
       emergency_fund: "Fondo de emergencia",
@@ -495,8 +495,8 @@ export const ES = {
     addSubcategory: "+ Añadir subcategoría",
     chevron: { collapse: "Colapsar subcategorías", expand: "Expandir subcategorías" },
     flow: {
-      expenseCount: "Gastos · {n}",
-      incomeCount: "Ingresos · {n}",
+      expenseCount: "Gastos ({n})",
+      incomeCount: "Ingresos ({n})",
     },
     empty: {
       expense: "Todavía no hay categorías de gasto.",
@@ -573,10 +573,10 @@ export const ES = {
       open: "No se pudo abrir el periodo: {error}",
     },
     header: {
-      closing: "Cierra {name} · abre el siguiente",
+      closing: "Cierras {name} y abres el siguiente",
       first: "Primer periodo",
       title: "Nuevo periodo",
-      subtitle: "Paso único · se guarda al abrirlo",
+      subtitle: "Paso único, se guarda al abrirlo",
     },
     closing: {
       title: "Cierras {name}",
@@ -651,11 +651,11 @@ export const ES = {
     },
     period: {
       title: "Periodo",
-      subtitle: "Abierto el {date}{days} · reparto {mine} / {theirs}",
-      days: { one: " · {n} día", other: " · {n} días" },
+      subtitle: "Abierto el {date}{days}, reparto {mine} / {theirs}",
+      days: { one: ", {n} día", other: ", {n} días" },
       openLabel: "Abierto",
       shareLabel: "Reparto por defecto",
-      shareHint: "Para los gastos nuevos · {name} paga el {pct} %",
+      shareHint: "Para los gastos nuevos, {name} paga el {pct} %",
       shareSaveFailed: "No se pudo guardar el reparto: {error}",
       closeBtn: "Cerrar periodo y abrir el siguiente",
       closeNoteWithPartner: "Al cerrar fijarás la fecha final y elegirás el reparto con {name} del periodo nuevo. Ábrelo el día que entre la nómina.",
@@ -665,7 +665,7 @@ export const ES = {
     subscriptions: { title: "Suscripciones", sub: "El coste anual de lo que pagas cada mes" },
     categories: {
       title: "Categorías",
-      subtitleWithCount: "{n} categorías · colores e iconos",
+      subtitleWithCount: "{n} categorías, colores e iconos",
       subtitleNoCount: "colores e iconos",
     },
     tags: {
@@ -693,7 +693,7 @@ export const ES = {
     },
     backup: {
       title: "Copia de emergencia",
-      body: "🔒 Tus datos viven solo en este dispositivo. Sin cuentas, sin nube.",
+      body: "Tus datos viven solo en este dispositivo. Sin cuentas, sin nube.",
       exportBtn: "Exportar copia de seguridad (JSON)",
     },
     about: {
@@ -705,9 +705,9 @@ export const ES = {
       feedbackNote: "El formulario se abre en Tally, fuera de la app: solo viaja lo que escribas ahí.",
     },
     importResult: {
-      summary: "Nuevas: {created} · Conciliadas: {reconciled} · Duplicadas (saltadas): {skipped}",
-      omitted: { one: " · 1 fila ilegible omitida", other: " · {n} filas ilegibles omitidas" },
-      categorized: { one: " · 1 categorizado por el comercio", other: " · {n} categorizados por el comercio" },
+      summary: "Nuevas: {created}, conciliadas: {reconciled}, duplicadas (saltadas): {skipped}",
+      omitted: { one: ", 1 fila ilegible omitida", other: ", {n} filas ilegibles omitidas" },
+      categorized: { one: ", 1 categorizado por el comercio", other: ", {n} categorizados por el comercio" },
       tail: ". Revisa la bandeja «sin categorizar» en Movimientos.",
       bizumHint: " Liquida en Inicio antes de importar: el Bizum que recibes se concilia solo; el que envías entra como movimiento nuevo.",
     },
@@ -715,12 +715,12 @@ export const ES = {
       title: "Configura tu banco",
       closeAria: "Cerrar",
       rows: {
-        one: "{n} fila · formato no reconocido — dinos qué es cada columna, solo esta vez",
-        other: "{n} filas · formato no reconocido — dinos qué es cada columna, solo esta vez",
+        one: "{n} fila, formato no reconocido — dinos qué es cada columna, solo esta vez",
+        other: "{n} filas, formato no reconocido — dinos qué es cada columna, solo esta vez",
       },
       dateTitle: "Fecha",
       conceptTitle: "Concepto",
-      counterpartyTitle: "Contraparte · opcional",
+      counterpartyTitle: "Contraparte (opcional)",
       noColumn: "— sin columna",
       amountTitle: "Importe",
       amountSingleBtn: "Una columna con signo",
@@ -729,21 +729,21 @@ export const ES = {
       creditTitle: "Abono",
       noConcept: "(sin concepto)",
       previewTitle: "Así se leerán tus movimientos",
-      counterOk: "✓ {readable} de {total} filas se leen bien",
-      counterWarn: "⚠ {readable} de {total} filas se leen bien · fila {line}: {reason}",
+      counterOk: "{readable} de {total} filas se leen bien",
+      counterWarn: "{readable} de {total} filas se leen bien, fila {line}: {reason}",
       saveBtn: "Guardar perfil e importar",
       footNote: "El perfil se guarda en tu dispositivo: la próxima vez este banco se importa directo. Los CSV de N26 se reconocen solos, sin configurar nada.",
       dateFormat: { iso: "año-mes-día", dmy: "día/mes/año" },
       date: {
         unrecognized: "No se reconoce el formato de fecha en esta columna.",
-        detected: "✓ {raw} → {iso} · formato {fmt} detectado",
+        detected: "{raw} → {iso}, formato {fmt} detectado",
       },
       amount: {
         kindExpense: "gasto",
         kindIncome: "ingreso",
         decimalComma: "coma",
         decimalDot: "punto",
-        detected: "✓ {raw} → {kind} de {money} · decimal con {dec} detectado",
+        detected: "{raw} → {kind} de {money}, decimal con {dec} detectado",
         noSampleSingle: "La muestra no tiene ningún importe en esta columna.",
         noSampleSplit: "La muestra no tiene ningún importe de cargo o abono.",
         unrecognized: "No se reconoce el formato de importe en esta columna.",
@@ -759,7 +759,7 @@ export const ES = {
       feature1: { title: "Todo se queda aquí", subtitle: "Sin servidor y sin registro. Funciona hasta sin conexión." },
       feature2: { title: "Tu dato es una hoja de cálculo", subtitle: "Exporta e importa tus datos cuando quieras: nunca están atrapados." },
       feature3: { title: "Tu mes empieza cuando cobras", subtitle: "Los periodos van de nómina a nómina, no del 1 al 30." },
-      startBtn: "Empezar · 2 minutos",
+      startBtn: "Empezar (2 minutos)",
       importPrompt: "¿Vienes de otra copia?",
       importLink: "Importar una hoja o backup",
     },
@@ -768,12 +768,12 @@ export const ES = {
       subtitle: "Las de verdad: tu banco del día a día, tu hucha, tu préstamo. Con al menos una basta para empezar.",
       addAnotherTitle: "Añadir otra",
       firstTitle: "Tu primera cuenta",
-      namePlaceholder: "Nombre · p. ej. Hucha del banco",
+      namePlaceholder: "p. ej. Hucha del banco",
       balanceTitle: "Saldo de hoy",
       addBtn: "Añadir",
       liabilityNote: "El saldo de un pasivo es lo que debes: se guarda en negativo.",
       infoNote: "Aquí no se conecta ningún banco: tú apuntas o importas su CSV. Podrás añadir y renombrar cuentas cuando quieras en Patrimonio.",
-      importDefaultSuffix: " · será la cuenta de tus imports",
+      importDefaultSuffix: ", será la cuenta de tus imports",
       needOne: "Crea al menos una cuenta para seguir.",
       createFailed: "No se pudo crear la cuenta: {error}",
       nameRequired: "Ponle un nombre a la cuenta.",
@@ -986,15 +986,15 @@ export const ES = {
   // ES byte-exacto: patrimonio.test.mjs los comprueba con includes/match bajo el idioma por defecto.
   goals: {
     emergencyFund: {
-      withAvg: "Hucha en {account} · cubre {months} meses de gasto",
-      noAvg: "Hucha en {account} · todavía sin periodos cerrados para calcular el gasto medio",
+      withAvg: "Hucha en {account}, cubre {months} meses de gasto",
+      noAvg: "Hucha en {account}, todavía sin periodos cerrados para calcular el gasto medio",
     },
     savingsTarget: {
       base: "Hucha en {account}",
-      beforeDate: " · antes de {date}",
+      beforeDate: ", antes de {date}",
     },
     provision: {
-      subtitle: "Provisión · {amount} al mes",
+      subtitle: "Provisión, {amount} al mes",
     },
     spendingCap: {
       over: "Superado por {amount}",
@@ -1094,7 +1094,7 @@ export const ES = {
       myPart: "Mi parte {amount}",
       net: "Neto {amount}",
       subscriptions: "Suscripciones",
-      subscriptionsActive: "{n} activas · {amount} al mes",
+      subscriptionsActive: "{n} activas, {amount} al mes",
       subscriptionsYear: "{amount} al año",
       movements: "Movimientos por categoría",
       others: "Otros",

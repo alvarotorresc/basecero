@@ -166,7 +166,7 @@ function categoriesHtml(report, prevPeriodName) {
       : "";
     const trend = r.direction === "new" ? "" : `
       <span style="color:${r.direction === "down" ? "var(--pos)" : r.direction === "up" ? "var(--danger)" : "var(--ink-3)"};">
-        ${r.direction === "down" ? "↓" : r.direction === "up" ? "↑" : "·"} ${r.deltaPct != null ? escHtml(fmtPct(Math.abs(r.deltaPct) / 100)) : ""}
+        ${r.direction === "down" ? "↓" : r.direction === "up" ? "↑" : ""} ${r.deltaPct != null ? escHtml(fmtPct(Math.abs(r.deltaPct) / 100)) : ""}
       </span>`;
     return `
     <div style="display:flex;flex-direction:column;gap:6px;">

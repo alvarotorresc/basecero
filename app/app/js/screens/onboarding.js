@@ -429,7 +429,7 @@ export async function renderOnboarding(container, { onDone }) {
         t("onboarding.import.summaryAccounts", { n: data.accounts.length }),
         t("onboarding.import.summaryPeriods", { n: data.periods.length }),
         t("onboarding.import.summaryMovements", { n: data.transactions.length }),
-      ].join(" · ");
+      ].join(", ");
       render();
     } catch (e) { imp.errors = [t("onboarding.import.readFailed", { error: userMessage(e) })]; render(); }
   }
