@@ -13,6 +13,7 @@ import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { skeletonHtml } from "../skeleton.js";
 import { showConfirm } from "../modal.js";
+import { showToast } from "../toast.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -116,12 +117,23 @@ function movRowHtml(r, byId, accById, partnerName) {
 }
 
 /** Pantalla Movimientos: selector de periodo, bandeja de sin-categorizar y lista agrupada por día
- *  (los 5 tipos), con subvista de detalle para editar/borrar cada movimiento. */
-export async function renderMovimientos(container) {
+ *  (los 5 tipos), con subvista de detalle para editar/borrar cada movimiento.
+ *
+ *  Modo «solo detalle» (Inicio v2, I5): `{ detailTxId, onDetailClose }` deja que otra pantalla —
+ *  Inicio, Semana— reutilice ESTA vista de detalle, la única que existe, sin duplicar
+ *  renderDetail(). Sin comportamiento nuevo para la pestaña Movimientos: los dos parámetros son
+ *  opcionales y por defecto no cambian nada. Tres diferencias respecto al modo normal, las tres a
+ *  propósito:
+ *    · NO se escribe container.dataset.screen: ese testigo decide si Inicio repinta su silueta
+ *      gris (inicio.js), dejarlo en "movimientos" haría parpadear a Inicio al volver.
+ *    · NO se pinta el esqueleto de la lista: la lista no se va a ver nunca en este modo.
+ *    · openDetail NO apunta su propia entrada de historial: la apuntó el llamante (open-tx.js). */
+export async function renderMovimientos(container, { detailTxId = null, onDetailClose = null } = {}) {
+  const detailOnly = !!detailTxId;
   // Silueta gris mientras llega la primera consulta (mismo criterio que inicio.js): selector de
   // periodo, fila de chips y lista. Solo en el PRIMER pintado de esta pantalla — el testigo
   // container.dataset.screen lo escriben SOLO Inicio y Movimientos.
-  if (container.dataset.screen !== "movimientos") {
+  if (!detailOnly && container.dataset.screen !== "movimientos") {
     container.dataset.screen = "movimientos";
     container.innerHTML = skeletonHtml([72, 56, 320]);
   }
@@ -202,7 +214,7 @@ export async function renderMovimientos(container) {
     render();
   }
 
-  async function openDetail(id) {
+  async function openDetail(id, { push = true } = {}) {
     // Guard de apertura en curso: la lista sigue viva durante el await, y dos toques seguidos
     // apuntarían DOS entradas de historial para una sola vista abierta.
     if (state.opening) return;
@@ -211,12 +223,16 @@ export async function renderMovimientos(container) {
     try {
       row = await getTransaction(id);
     } catch (e) {
+      if (detailOnly) { showToast(t("movimientos.error.openDetail", { error: userMessage(e) })); onDetailClose?.(); return; }
       errorMsg = t("movimientos.error.openDetail", { error: userMessage(e) });
       state.opening = false;
       render();
       return;
     }
-    if (!row) { state.opening = false; return; }
+    // Fila inexistente (borrada en otra pestaña mientras esta pantalla estaba abierta): en modo
+    // solo detalle, un `return` a secas dejaría la pantalla EN BLANCO y la entrada de historial
+    // que apuntó el llamante (open-tx.js) colgando sin nada que la cierre.
+    if (!row) { state.opening = false; if (detailOnly) onDetailClose?.(); return; }
     state.detailId = id;
     state.detail = {
       type: row.type,
@@ -256,7 +272,9 @@ export async function renderMovimientos(container) {
     // gasto enlazado ya está settled, bajar aquí el importe del refund descuadra la deuda liquidada
     // en silencio (el guard de repo lo rechazaría en save, pero mejor prevenirlo en el input).
     state.detail.refundLocked = (row.type === "refund" || row.type === "adjustment") && !!state.linkedExpense?.settled;
-    pushBack(backToList);
+    // En modo solo detalle la entrada de historial ya la apuntó el llamante (open-tx.js): apuntar
+    // otra aquí obligaría a pulsar «atrás» dos veces para volver a la pantalla de origen.
+    if (push) pushBack(backToList);
     state.view = "detail";
     errorMsg = "";
     state.opening = false;
@@ -759,5 +777,8 @@ export async function renderMovimientos(container) {
     container.innerHTML = `<div class="banner-aviso red">${t("movimientos.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
+  // Modo solo detalle: la lista no llega a pintarse nunca — se abre directo en el detalle pedido,
+  // sin apuntar una segunda entrada de historial (push:false, ver openDetail más arriba).
+  if (detailOnly) { await openDetail(detailTxId, { push: false }); return; }
   render();
 }
