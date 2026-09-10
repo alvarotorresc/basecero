@@ -496,6 +496,15 @@ export const ES = {
       pending: "Pendiente este periodo",
       perMonth: "al mes",
     },
+    section: { all: "Todas" },
+    state: {
+      paid: "pagado",
+      pending: "pendiente",
+      transfer: "transferencia",
+    },
+    newRule: "Nueva regla recurrente",
+    toggle: { aria: "Activar {name}" },
+    footNote: "El toggle pausa la regla sin borrarla: no se generará el próximo cargo hasta que la vuelvas a activar.",
     type: { transfer: "Transfer." },
     freq: {
       weekly: "Semanal",
@@ -533,7 +542,7 @@ export const ES = {
       perYear: "al año",
       cancelSubscription: "Cancelar la suscripción",
     },
-    badge: { subscription: "suscripción" },
+    badge: { subscription: "suscripción", shared: "compartido" },
     radarLink: "Ver el radar de suscripciones",
   },
   categorias: {

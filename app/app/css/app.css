@@ -1135,3 +1135,19 @@ body.onboarding .fab { display: none; }
   display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
 }
 .check-box[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+/* ===================== P4 · Recurrentes ===================== */
+
+/* El importe de una fila de Recurrentes (screens/recurrentes.js#ruleRowHtml) tiñe las TRES partes
+   de moneyPartsHtml —entero, céntimos, símbolo—, no solo la principal: a diferencia de
+   .tx-amount.positive (app.css:440), que deja .money-cents/.money-cur en su gris por defecto,
+   Recurrentes.dc.html:141-143 (Nómina, +1.850,00 €) y :151 (transferencia, 200,00 €) pintan el
+   importe entero de un color, mismo remedio que .amount-hero.text-green (app.css:1044). Clase
+   propia (no se toca .tx-amount: no está en la lista de selectores que este paquete puede tocar). */
+.rec-amount-pos, .rec-amount-pos .money-cents, .rec-amount-pos .money-cur { color: var(--pos); }
+.rec-amount-muted, .rec-amount-muted .money-cents, .rec-amount-muted .money-cur { color: var(--ink-3); }
+
+/* El toggle real de la fila (D7) es un <button role="switch"> reutilizando .toggle/.toggle-track/
+   .toggle-knob (app.css:539-585), pero SIN el <input type="checkbox"> oculto del que depende el
+   anillo de foco de esas reglas (`input:focus-visible ~ .toggle-track`): sin esto, el botón no
+   muestra foco por teclado. Clase propia — .toggle no está en la lista de selectores de P4. */
+.rec-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

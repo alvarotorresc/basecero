@@ -483,6 +483,15 @@ export const EN = {
       pending: "Pending this period",
       perMonth: "per month",
     },
+    section: { all: "All" },
+    state: {
+      paid: "paid",
+      pending: "pending",
+      transfer: "transfer",
+    },
+    newRule: "New recurring rule",
+    toggle: { aria: "Enable {name}" },
+    footNote: "The toggle pauses the rule without deleting it: the next charge will not be generated until you turn it back on.",
     type: { transfer: "Transfer" },
     freq: {
       weekly: "Weekly",
@@ -520,7 +529,7 @@ export const EN = {
       perYear: "a year",
       cancelSubscription: "Cancel the subscription",
     },
-    badge: { subscription: "subscription" },
+    badge: { subscription: "subscription", shared: "shared" },
     radarLink: "View the subscription radar",
   },
   categorias: {
