@@ -286,6 +286,60 @@ export async function renderCategorias(container, onBack) {
           <input type="text" id="cf-name" value="${escAttr(form.name)}" placeholder="${t("categorias.form.namePlaceholder")}">
         </label>
 
+        ${isRoot ? `
+        <div>
+          <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.iconSectionTitle")}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;">
+            ${form.iconOrder.map((catIcon) => {
+              const active = form.icon === catIcon;
+              return `<button type="button" data-cf-icon="${escAttr(catIcon)}" aria-label="${t("categorias.form.pickIconAria")}" aria-pressed="${active}"
+                style="width:44px;height:44px;border-radius:var(--r-circle);box-sizing:border-box;
+                border:2px solid ${active ? "var(--accent)" : "transparent"};background:var(--card2);font-size:19px;
+                display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;
+                -webkit-tap-highlight-color:transparent;">${catIcon}</button>`;
+            }).join("")}
+          </div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:8px;">${t("categorias.form.iconHint")}</div>
+        </div>
+
+        <div>
+          <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.colorSectionTitle")}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;">
+            ${POOL.map((c) => {
+              const active = form.color === c;
+              return `<button type="button" data-cf-color="${c}" aria-label="${t("categorias.form.pickColorAria")}" aria-pressed="${active}"
+                style="width:44px;height:44px;border-radius:var(--r-circle);border:0;padding:0;background:${c};
+                display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;">${
+                  active ? icon("check", { size: 20, width: 2.25, stroke: "var(--accent-ink)" }) : ""
+                }</button>`;
+            }).join("")}
+          </div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:8px;">${t("categorias.form.colorHint")}</div>
+        </div>
+        ` : `
+        <div>
+          <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.colorIconSectionTitle")}</div>
+          <div style="font-size:11px;color:var(--text-3);">${t("categorias.form.inheritNote")}</div>
+        </div>
+        `}
+
+        <div>
+          <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.parentSectionTitle")}</div>
+          ${lockedParent ? `
+          <div style="${chipStyle(true)}width:fit-content;">${t("categorias.form.rootChip")}</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:6px;">${t("categorias.form.rootLockedNote")}</div>
+          ` : `
+          <div style="display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;">
+            <button type="button" data-cf-parent="" style="${chipStyle(!form.parentId)}">${t("categorias.form.newRootChip")}</button>
+            ${parents.map((r) => {
+              const parentIcon = iconForCategory(r.id, byId);
+              return `<button type="button" data-cf-parent="${escAttr(r.id)}" style="${chipStyle(form.parentId === r.id)}">${parentIcon} ${escHtml(r.name)}</button>`;
+            }).join("")}
+          </div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:6px;">${t("categorias.form.inheritNote")}</div>
+          `}
+        </div>
+
         <div>
           <div class="section-title" style="margin-bottom:8px;">${t("common.typeLabel")}</div>
           <div style="display:flex;gap:8px;${editing ? "opacity:0.6;" : ""}">
@@ -309,60 +363,6 @@ export async function renderCategorias(container, onBack) {
           </div>
           <div style="font-size:11px;color:var(--text-3);margin-top:6px;">${t("categorias.form.needHint")}</div>
         </div>` : ""}
-
-        <div>
-          <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.parentSectionTitle")}</div>
-          ${lockedParent ? `
-          <div style="${chipStyle(true)}width:fit-content;">${t("categorias.form.rootChip")}</div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:6px;">${t("categorias.form.rootLockedNote")}</div>
-          ` : `
-          <div style="display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;">
-            <button type="button" data-cf-parent="" style="${chipStyle(!form.parentId)}">${t("categorias.form.newRootChip")}</button>
-            ${parents.map((r) => {
-              const parentIcon = iconForCategory(r.id, byId);
-              return `<button type="button" data-cf-parent="${escAttr(r.id)}" style="${chipStyle(form.parentId === r.id)}">${parentIcon} ${escHtml(r.name)}</button>`;
-            }).join("")}
-          </div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:6px;">${t("categorias.form.inheritNote")}</div>
-          `}
-        </div>
-
-        ${isRoot ? `
-        <div>
-          <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.colorSectionTitle")}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:10px;">
-            ${POOL.map((c) => {
-              const active = form.color === c;
-              return `<button type="button" data-cf-color="${c}" aria-label="${t("categorias.form.pickColorAria")}" aria-pressed="${active}"
-                style="width:44px;height:44px;border-radius:var(--r-circle);border:0;padding:0;background:${c};
-                display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;">${
-                  active ? icon("check", { size: 20, width: 2.25, stroke: "var(--accent-ink)" }) : ""
-                }</button>`;
-            }).join("")}
-          </div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:8px;">${t("categorias.form.colorHint")}</div>
-        </div>
-
-        <div>
-          <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.iconSectionTitle")}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:10px;">
-            ${form.iconOrder.map((catIcon) => {
-              const active = form.icon === catIcon;
-              return `<button type="button" data-cf-icon="${escAttr(catIcon)}" aria-label="${t("categorias.form.pickIconAria")}" aria-pressed="${active}"
-                style="width:44px;height:44px;border-radius:var(--r-circle);box-sizing:border-box;
-                border:2px solid ${active ? "var(--accent)" : "transparent"};background:var(--card2);font-size:19px;
-                display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;
-                -webkit-tap-highlight-color:transparent;">${catIcon}</button>`;
-            }).join("")}
-          </div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:8px;">${t("categorias.form.iconHint")}</div>
-        </div>
-        ` : `
-        <div>
-          <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.colorIconSectionTitle")}</div>
-          <div style="font-size:11px;color:var(--text-3);">${t("categorias.form.inheritNote")}</div>
-        </div>
-        `}
 
         <div>
           <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.previewTitle")}</div>
