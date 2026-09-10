@@ -981,6 +981,7 @@ export const EN = {
     undo: "Undo",
     undone: "Movement undone",
     myPart: "Your share",
+    tagLabel: "Tag",
     undoFailed: "Could not undo: {error}",
   },
   // Period report (F1). screens/informe.js.

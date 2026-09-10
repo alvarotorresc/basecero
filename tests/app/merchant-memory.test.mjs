@@ -144,3 +144,15 @@ test("memoryPatch: no pisa paidBy ni sharePct si ya están en touched", () => {
   assert.equal(patch.accountId, "acc-1");
   assert.equal(patch.isShared, true);
 });
+
+// D11 (Etiquetas de proyecto, N11): una etiqueta NUNCA entra en la memoria de comercios. Un viaje
+// o una reforma no se repiten — que elegir "Mercadona" en Registro reetiquete un gasto tres meses
+// después con una etiqueta de un viaje ya cerrado sería peor que no rellenar nada. merchantMemory()
+// ni siquiera lee tag_id de las filas (ver su comentario), así que un `entry` de verdad nunca trae
+// `tagId`; este test cubre el caso en que SÍ lo trajera (una `entry` construida a mano, o un futuro
+// cambio en merchantMemory) — memoryPatch tiene que descartarlo siempre, `touched` o no.
+test("memoryPatch: NUNCA devuelve tagId, ni siquiera si entry lo trae (D11)", () => {
+  const entry = { categoryId: "cat-restauracion-bares", accountId: "acc-1", isShared: false, paidBy: "me", sharePct: null, tagId: "tag-viaje-japon" };
+  const patch = memoryPatch(entry, new Set());
+  assert.ok(!("tagId" in patch));
+});

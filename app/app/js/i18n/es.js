@@ -1004,6 +1004,7 @@ export const ES = {
     undo: "Deshacer",
     undone: "Movimiento deshecho",
     myPart: "Tu parte",
+    tagLabel: "Etiqueta",
     undoFailed: "No se pudo deshacer: {error}",
   },
   // Informe del periodo (F1). screens/informe.js.
