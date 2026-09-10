@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { SQL } from "../../app/app/js/sql.js";
 import { seedStatements } from "../../app/app/js/seeds.js";
+import { prevDayIso } from "../../app/app/js/format.js";
 
 const schema = readFileSync(new URL("../../app/app/js/schema.sql", import.meta.url), "utf8");
 const T = "2026-08-24T18:00:00Z";
@@ -184,4 +185,43 @@ test("merchantHistory: ORDER BY date DESC, id DESC y respeta el LIMIT", () => {
   tx(d, { date: "2026-08-19", merchant: "Intermedio" });
   const merchants = d.prepare(SQL.merchantHistory).all(2).map((r) => r.merchant);
   assert.deepEqual(merchants, ["Reciente", "Intermedio"]);
+});
+
+// ---- Task 6 (Informe): las consultas del informe funcionan igual sobre un periodo CERRADO -----
+// Hoy solo se ejercen sobre el periodo abierto (Inicio, Gasto por categoría); el Informe es el
+// primer consumidor que las llama también sobre un periodo ya cerrado.
+
+test("spentByRootCategory/budgetsOfPeriod/listAllByDay: funcionan igual sobre un periodo CERRADO", () => {
+  const d = db();
+  d.prepare("UPDATE periods SET status='closed', end_date='2026-08-26' WHERE id='p1'").run();
+  d.prepare(SQL.insertBudget).run("bud-1", "p1", "cat-alimentacion", 50000, T, T);
+  tx(d, { date: "2026-08-10", cents: 3000, category: "cat-alimentacion-supermercado" });
+
+  const spent = d.prepare(SQL.spentByRootCategory).all("p1").find((r) => r.root_id === "cat-alimentacion");
+  assert.equal(spent.spent_cents, 3000, "spentByRootCategory no filtra por status del periodo");
+
+  const budgets = d.prepare(SQL.budgetsOfPeriod).all("p1");
+  assert.equal(budgets.length, 1);
+  assert.equal(budgets[0].amount_cents, 50000);
+
+  const rows = d.prepare(SQL.listAllByDay).all("p1");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].amount_cents, 3000);
+});
+
+// REGRESIÓN del off-by-one: SQL.accountBalance filtra `t.date <= ?` (inclusivo), así que
+// balancesAt(start_date) incluiría un movimiento del PRIMER día del periodo en la "apertura".
+// repo.reportInputs debe pasar prevDayIso(start_date), no start_date a secas.
+test("SQL.accountBalance: prevDayIso(start_date) excluye un movimiento del primer día del periodo", () => {
+  const d = db();
+  d.prepare(`INSERT INTO accounts (id,name,type,opening_balance_cents,display_order,is_archived,created_at,updated_at,deleted)
+    VALUES ('acc-n26','N26','checking',100000,1,0,?,?,0)`).run(T, T);
+  // p1 empieza el 2026-07-27 (ver db()): un gasto EN ese día no debe contar en la apertura.
+  tx(d, { date: "2026-07-27", cents: 2000 });
+
+  const conFechaDeInicio = d.prepare(SQL.accountBalance).get("2026-07-27", "acc-n26").balance_cents;
+  const conDiaAnterior = d.prepare(SQL.accountBalance).get(prevDayIso("2026-07-27"), "acc-n26").balance_cents;
+
+  assert.equal(conFechaDeInicio, 98000, "balancesAt(start_date) YA descontaría el gasto del primer día — la trampa del off-by-one");
+  assert.equal(conDiaAnterior, 100000, "el día anterior no ve ningún movimiento del periodo: la apertura correcta");
 });

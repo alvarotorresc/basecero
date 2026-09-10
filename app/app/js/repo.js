@@ -12,6 +12,7 @@ import { UserError } from "./errors.js";
 import { MEMORY_WINDOW, merchantMemory } from "./merchant-memory.js";
 import { IGNORED_MAX, parseIgnored, parseSnoozed } from "./subscriptions.js";
 import { DETECT_WINDOW_DAYS } from "./subscription-detect.js";
+import { previousPeriodOf } from "./informe-logic.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -645,6 +646,47 @@ export async function avgSpentOfClosedPeriods() {
   if (closed.length === 0) return 0;
   const spents = await Promise.all(closed.map((p) => spentOfPeriod(p.id)));
   return Math.round(spents.reduce((s, c) => s + c, 0) / spents.length);
+}
+
+// ---- Informe del periodo (F1) -----------------------------------------------
+
+/** Todo lo que necesita buildReport (informe-logic.js) para UN periodo, abierto o cerrado. No
+ *  compone nada: devuelve filas tal cual (spec §5.1). Un solo `Promise.all`, para que la costura
+ *  `inputs -> buildReport` sea rápida tanto en el periodo abierto como en uno recalculado al vuelo.
+ *  Sin `periodId`, el periodo abierto; si no hay ninguno abierto ni existe el `periodId` pedido,
+ *  lanza `UserError`. **Sin `const t` local** (TDZ, repo-i18n-guards.test.mjs). */
+export async function reportInputs(periodId) {
+  const periods = await listPeriods();
+  const period = periodId ? periods.find((p) => p.id === periodId) : periods.find((p) => p.status === "open");
+  if (!period) throw new UserError(t("errors.common.noOpenPeriod"));
+  const prevPeriod = previousPeriodOf(periods, period.id);
+  // Apertura con el DÍA ANTERIOR a start_date: SQL.accountBalance filtra t.date<=?, así que
+  // balancesAt(start_date) ya incluiría el primer día del periodo en la "apertura" (§5.3).
+  const closeDateIso = period.status === "open" ? hoyISO() : period.end_date;
+  const [
+    accountsStart, accountsEnd, spentByRoot, prevSpentByRoot, budgets, transactions,
+    categoriesById, incomeCents, spentCents, partnerNetCents, subscriptionRules, meta,
+  ] = await Promise.all([
+    balancesAt(prevDayIso(period.start_date)),
+    balancesAt(closeDateIso),
+    spentByRootCategory(period.id),
+    prevPeriod ? spentByRootCategory(prevPeriod.id) : Promise.resolve([]),
+    budgetsOfPeriod(period.id),
+    listAllByDay(period.id),
+    allCategoriesById(),
+    incomeOfPeriod(period.id),
+    spentOfPeriod(period.id),
+    pendingSettlementNetCents(),
+    listRules(),
+    getMetaAll(),
+  ]);
+  return {
+    period, prevPeriod, accountsStart, accountsEnd, spentByRoot, prevSpentByRoot, budgets,
+    transactions, categoriesById, incomeCents, spentCents, partnerNetCents,
+    partnerName: (meta.partner_name || "").trim(),
+    subscriptionRules,
+    todayIso: hoyISO(),
+  };
 }
 
 // den<=0 -> 0 en vez de NaN/Infinity: mismo criterio que budgetStatus (category-spend.js), pero sin

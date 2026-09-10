@@ -11,6 +11,15 @@ import { budgetMap, budgetStatus, pctOf, relativeWidth, sortRootRows } from "./c
 import { colorForCategory, textColorForCategory, iconForCategory, rootOf } from "./category-colors.js";
 import { activeSubscriptions, monthlyTotalCents, annualTotalCents } from "./subscriptions.js";
 
+/** El periodo inmediatamente anterior por `start_date`. `listPeriods()` ya viene
+ *  `ORDER BY start_date DESC` (sql.js:100): el anterior es el SIGUIENTE elemento del array.
+ *  `null` si `periodId` es el primero de la vida del usuario o si no aparece en `periods`. */
+export function previousPeriodOf(periods, periodId) {
+  const idx = (periods ?? []).findIndex((p) => p.id === periodId);
+  if (idx === -1) return null;
+  return periods[idx + 1] ?? null;
+}
+
 function buildMeta({ period, todayIso }) {
   const isOpen = period.status === "open";
   return {

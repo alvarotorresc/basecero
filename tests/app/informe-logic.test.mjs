@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildReport } from "../../app/app/js/informe-logic.js";
+import { buildReport, previousPeriodOf } from "../../app/app/js/informe-logic.js";
 
 /** Fixture calcada de la hoja de datos del sistema (SISTEMA.md §5, periodo Septiembre 2026):
  *  periodo 2026-09-01, hoy 2026-09-09, ingresos 1.850,00 €, gastado 847,20 €, presupuesto
@@ -327,4 +327,19 @@ test("buildReport: una anual que no aplica este mes no suma al coste del periodo
 
 test("buildReport: sin suscripciones activas la seccion es null", () => {
   assert.equal(buildReport({ ...fixture(), subscriptionRules: [] }).subscriptions, null);
+});
+
+// ---- Task 6: previousPeriodOf ------------------------------------------------------------------
+
+test("previousPeriodOf: el anterior por start_date; el primero -> null; id desconocido -> null", () => {
+  const periods = [
+    { id: "p3", start_date: "2026-09-01" },
+    { id: "p2", start_date: "2026-08-01" },
+    { id: "p1", start_date: "2026-07-01" },
+  ];
+  assert.equal(previousPeriodOf(periods, "p3").id, "p2");
+  assert.equal(previousPeriodOf(periods, "p2").id, "p1");
+  assert.equal(previousPeriodOf(periods, "p1"), null, "el primero de la vida del usuario no tiene anterior");
+  assert.equal(previousPeriodOf(periods, "desconocido"), null);
+  assert.equal(previousPeriodOf([], "cualquiera"), null);
 });
