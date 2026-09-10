@@ -244,8 +244,8 @@ function huchaHtml(msg) {
     <div style="display:flex;flex-direction:column;gap:10px;flex:1;min-width:0;">
       <span style="font-size:14px;line-height:1.45;color:var(--ink);">${text}</span>
       <div style="display:flex;align-items:center;gap:18px;">
-        <button type="button" id="inicio-hucha-action" style="border:0;background:transparent;color:var(--accent);font-size:14px;font-weight:600;padding:0;height:24px;cursor:pointer;-webkit-tap-highlight-color:transparent;">${t(actionKey)}</button>
-        <button type="button" id="inicio-hucha-dismiss" style="border:0;background:transparent;color:var(--ink-3);font-size:14px;font-weight:500;padding:0;height:24px;cursor:pointer;-webkit-tap-highlight-color:transparent;">${t("inicio.hucha.dismiss")}</button>
+        <button type="button" id="inicio-hucha-action" style="border:0;background:transparent;color:var(--accent);font-size:14px;font-weight:600;padding:12px 0;margin:-12px 0;cursor:pointer;-webkit-tap-highlight-color:transparent;">${t(actionKey)}</button>
+        <button type="button" id="inicio-hucha-dismiss" style="border:0;background:transparent;color:var(--ink-3);font-size:14px;font-weight:500;padding:12px 0;margin:-12px 0;cursor:pointer;-webkit-tap-highlight-color:transparent;">${t("inicio.hucha.dismiss")}</button>
       </div>
     </div>
   </div>`;
@@ -259,12 +259,15 @@ function huchaHtml(msg) {
  *  como para uno con meses de historial que acaba de abrir un periodo nuevo. hasHistory (derivado
  *  de recentTxDates(), sin filtro de periodo) distingue los dos casos para no invitar a "registra
  *  tu primer gasto" a quien ya tiene datos — bug heredado de v1, donde pasaba menos porque el
- *  bloque no era el primer contenido bajo la cabecera. */
+ *  bloque no era el primer contenido bajo la cabecera.
+ *  «Ver todos» lleva el mismo `padding:12px 0;margin:-12px 0` de objetivo táctil que el resto de
+ *  la pantalla (ver pendingHtml): su área ampliada invade unos px del primer `.tx-row` de debajo,
+ *  misma limitación conocida, aceptada por ser el mismo truco ya en uso. */
 function movimientosPlegadosHtml(rows, hoy, byId, partnerName, hasHistory) {
   const headerHtml = `
   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;">
     <span style="font-size:15px;font-weight:600;color:var(--ink);">${t("common.movements")}</span>
-    <button type="button" id="inicio-movimientos-ver" class="link-btn" style="display:flex;align-items:center;gap:5px;">${t("inicio.movements.viewAll")}${CHEVRON_RIGHT_SVG}</button>
+    <button type="button" id="inicio-movimientos-ver" class="link-btn" style="display:flex;align-items:center;gap:5px;padding:12px 0;margin:-12px 0;">${t("inicio.movements.viewAll")}${CHEVRON_RIGHT_SVG}</button>
   </div>`;
   if (rows.length === 0) {
     const msg = hasHistory ? t("inicio.movements.emptyPeriod") : t("inicio.movements.empty");
@@ -437,12 +440,17 @@ function savingsLineHtml(income, spent) {
  *  que no sea ingreso — siguen siendo `<button data-prevision-rule>` que abren Registro
  *  precargado (se conserva íntegro, ver el wiring en renderInicio). Cierra con «Te quedarán» =
  *  remainingAfterRecurringCents(disponible, comprometido); sin límites definidos (`remaining`
- *  null) esa última fila no se pinta. */
+ *  null) esa última fila no se pinta.
+ *  Objetivo táctil (revisión de código): `padding:12px 0;margin:-12px 0` en cada fila para llegar
+ *  a 44px sin mover un píxel el layout — LIMITACIÓN CONOCIDA: con gap:12px entre filas el área
+ *  ampliada de una fila invade la de su vecina; el navegador se lo lleva la que esté más abajo en
+ *  el DOM, así que un toque justo en el hueco puede abrir la regla de debajo en vez de la de
+ *  encima. Aceptado (mismo margen que ya usan #inicio-cuenta/#inicio-periodo-header). */
 function pendingHtml(prevision, remaining) {
   const pending = prevision.items.filter((it) => !it.paid && it.rule.type !== "income");
   if (pending.length === 0 && remaining == null) return "";
   const rowsHtml = pending.map((it) => `
-    <button type="button" data-prevision-rule="${escAttr(it.rule.id)}" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:0;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+    <button type="button" data-prevision-rule="${escAttr(it.rule.id)}" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:12px 0;margin:-12px 0;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
       <span style="font-size:14px;font-weight:500;color:var(--ink-2);flex:1;min-width:0;">${escHtml(it.rule.name)}</span>
       <span class="num" style="font-size:13px;font-weight:500;color:var(--warn);">${escHtml(fmtMoney(it.myCents))}</span>
     </button>`).join("");
@@ -455,7 +463,7 @@ function pendingHtml(prevision, remaining) {
   <div style="margin-top:var(--gap-section);">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">
       <span style="font-size:15px;font-weight:600;color:var(--ink);">${t("inicio.pending.title")}</span>
-      <button type="button" id="prevision-gestionar" class="link-btn" style="display:flex;align-items:center;gap:5px;">${t("inicio.prevision.manage")}${CHEVRON_RIGHT_SVG}</button>
+      <button type="button" id="prevision-gestionar" class="link-btn" style="display:flex;align-items:center;gap:5px;padding:12px 0;margin:-12px 0;">${t("inicio.prevision.manage")}${CHEVRON_RIGHT_SVG}</button>
     </div>
     <div style="display:flex;flex-direction:column;gap:12px;">
       ${rowsHtml}${remainingHtml}
