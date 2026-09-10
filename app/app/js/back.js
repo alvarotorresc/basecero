@@ -53,12 +53,19 @@ export function createBackStack(win) {
   // distingue con un flag por entrada: las de resetTo() llevan `root: true`, las de push() no
   // (por defecto `root: false`), así que hay subpantalla abierta si hay más de una entrada, o si
   // la única que hay no es la raíz.
+  // Un segundo caso, distinto del anterior: el modal de confirmación (modal.js) también apunta una
+  // entrada aquí para que «atrás» lo cierre, pero NO es ni una subpantalla ni una pestaña raíz —
+  // es un velo por ENCIMA de lo que ya hubiera, y no debe cambiar el chrome en ningún sentido (ver
+  // fix/chrome-subpantallas: abrirlo escondía la tab bar y desplazaba `main#screen`, y al cerrarlo
+  // volvía a saltar). Esas entradas llevan `chrome: false` y se descartan del todo antes de
+  // calcular `subscreen`, como si no estuvieran en la pila.
   // `win.document?.body?.classList?.toggle` con los `?.` a propósito, mismo motivo que
   // `win.document?.getElementById?.("screen")` en viewport.js: el `win` falso de los tests no
   // lleva `document` salvo que quiera probar justo esto, y el módulo tiene que seguir siendo
   // importable en Node.
   const syncChrome = () => {
-    const subscreen = stack.length > 1 || (stack.length === 1 && !stack[0].root);
+    const relevant = stack.filter((e) => e.chrome !== false);
+    const subscreen = relevant.length > 1 || (relevant.length === 1 && !relevant[0].root);
     win.document?.body?.classList?.toggle("subscreen", subscreen);
   };
   return {
@@ -67,10 +74,13 @@ export function createBackStack(win) {
      *  Safari), la pila no debe registrar una entrada que el historial nunca tuvo.
      *  { scroll: false } es para quien empuja una entrada que NO es un cambio de pantalla (el
      *  modal de confirmación, ver modal.js): abrir o cerrar el modal no debe mover la pantalla de
-     *  detrás. Por defecto true: las 15 pantallas que llaman a pushBack() siguen reseteando. */
-    push(onBack, { scroll = true } = {}) {
+     *  detrás. Por defecto true: las 15 pantallas que llaman a pushBack() siguen reseteando.
+     *  { chrome: false } es para esa misma entrada del modal: no cuenta para `subscreen` (ver
+     *  syncChrome más arriba), así que abrir o cerrar el modal no toca la tab bar/FAB ni el
+     *  padding de `main#screen`. Por defecto true: toda subpantalla real sí cuenta. */
+    push(onBack, { scroll = true, chrome = true } = {}) {
       win.history.pushState({ bc: stack.length + 1 }, "");
-      stack.push({ onBack, scroll, root: false });
+      stack.push({ onBack, scroll, root: false, chrome });
       syncChrome();
       if (scroll) scrollTop();
     },

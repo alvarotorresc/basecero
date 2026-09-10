@@ -395,3 +395,33 @@ test("subscreen no toca una clase onboarding ya puesta en <body>", () => {
   assert.equal(win.document.body.classList.contains("subscreen"), true);
   assert.equal(win.document.body.classList.contains("onboarding"), true);
 });
+
+// push(cb, { chrome: false }) — el modal de confirmación (modal.js) apunta una entrada de
+// historial para que «atrás» lo cierre, pero NO es un cambio de pantalla: no debe alterar si se ve
+// la tab bar. syncChrome() tiene que ignorar por completo esa entrada, como si no estuviera.
+
+test("push con chrome:false sobre Inicio (pila vacía): NO pone subscreen", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  back.push(() => {}, { scroll: false, chrome: false });
+  assert.equal(win.document.body.classList.contains("subscreen"), false);
+});
+
+test("push con chrome:false sobre una pestaña raíz (resetTo): NO pone subscreen", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  back.resetTo(() => {});                                   // pestaña Movimientos: solo la raíz
+  back.push(() => {}, { scroll: false, chrome: false });     // modal de confirmación encima
+  assert.equal(win.document.body.classList.contains("subscreen"), false);
+});
+
+test("push con chrome:false sobre una subpantalla: la mantiene con subscreen puesto", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  back.push(() => {});                                       // abre una subpantalla real
+  assert.equal(win.document.body.classList.contains("subscreen"), true);
+  back.push(() => {}, { scroll: false, chrome: false });      // modal de confirmación encima
+  assert.equal(win.document.body.classList.contains("subscreen"), true);
+  win.listeners.popstate({ state: { bc: 1 } });               // se cierra el modal
+  assert.equal(win.document.body.classList.contains("subscreen"), true, "la subpantalla de debajo sigue abierta");
+});
