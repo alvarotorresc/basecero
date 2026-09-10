@@ -76,12 +76,16 @@ export async function renderGastoPorCategoria(container, onBack) {
     byId = cats;
     // history: del más antiguo al más reciente, el actual siempre al final (repo.rootSpendHistory).
     // El anterior es el penúltimo elemento; con un único periodo (sin historia previa) no hay
-    // penúltimo y la comparativa entera se omite (Step 3: compareRoots con prevRows=[] da
-    // direction "new"/deltaPct null en todas las filas, y comparisonLineHtml no pinta nada).
+    // penúltimo y la comparativa entera se omite (Step 3: comparisonLineHtml mira `prevPeriod`, que
+    // queda null, no `prevRows`).
+    // hasPrevPeriod explícito en compareRoots: un periodo anterior REAL sin gasto en ninguna raíz
+    // también llega con prevRows=[], y ahí SÍ hay con qué comparar (0 gastado), así que direction
+    // debe salir "flat" con delta 0,0 % en vez de "new" sin delta (mismo bug que category-spend.js
+    // documenta en su cabecera).
     const hasPrevPeriod = history.length >= 2;
     prevPeriod = hasPrevPeriod ? history[history.length - 2].period : null;
     const prevRows = hasPrevPeriod ? history[history.length - 2].rows : [];
-    cmpByRoot = Object.fromEntries(compareRoots(rows, prevRows).map((c) => [c.rootId, c]));
+    cmpByRoot = Object.fromEntries(compareRoots(rows, prevRows, hasPrevPeriod).map((c) => [c.rootId, c]));
     seriesByRoot = spentSeriesByRoot(history);
     return true;
   }
