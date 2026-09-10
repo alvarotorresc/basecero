@@ -330,8 +330,6 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
     const saved = state.rules.find((r) => r.id === state.editId);
     const canCancelSubscription = !!(saved?.is_subscription && saved?.is_active);
 
-    const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
-
     container.innerHTML = `
       ${subHeaderHtml({ id: "rec-form-back", title: state.editId ? t("recurrentes.form.title.edit") : t("recurrentes.form.title.new") })}
 
@@ -348,8 +346,8 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
         <div class="section-title">${t("common.amount")}</div>
         <div class="amount-display" style="align-items:center;">
           <input type="text" inputmode="decimal" id="rec-raw" value="${escAttr(f.raw)}" placeholder="0"
-            style="border:0;background:none;color:var(--text);font:600 56px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
-          <span class="amount-currency">${currencySymbol()}</span>
+            style="border:0;background:none;color:var(--text);font:var(--t-figure-xl);letter-spacing:-.015em;width:100%;outline:none;">
+          <span class="amount-currency" style="font-size:17px;">${currencySymbol()}</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
       </div>
@@ -357,13 +355,13 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
       ${cats.length ? `
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
         <div class="section-title">${t("common.category")}</div>
-        <div class="chips-scroll">
+        <div class="chips-grid">
           ${cats.map((c) => {
             const color = colorForCategory(c.id, byId);
-            const icon = iconForCategory(c.id, byId);
+            const catIcon = iconForCategory(c.id, byId);
             const active = f.categoryId === c.id;
             return `<button type="button" class="chip-v${active ? " active" : ""}" data-cat="${c.id}" style="--cat:${color};">
-              <span class="chip-icon">${icon}</span><span>${escHtml(c.name)}</span>
+              <span class="chip-icon">${catIcon}</span><span>${escHtml(c.name)}</span>
             </button>`;
           }).join("")}
         </div>
@@ -441,17 +439,10 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
         ${t("recurrentes.form.cancelSubscription")}
       </button>` : ""}
       ${state.editId ? `
-      <button type="button" id="rec-delete"
-        style="width:100%;background:transparent;color:var(--red);
-          border:1px solid var(--red);border-radius:var(--radius-sm);padding:16px;font:600 16px var(--font-ui);cursor:pointer;">
+      <button type="button" class="btn-danger" id="rec-delete">
         ${t("recurrentes.form.delete")}
       </button>` : ""}
     `;
-
-    if (prevChipsScroll != null) {
-      const chipsEl = container.querySelector(".chips-scroll");
-      if (chipsEl) chipsEl.scrollLeft = prevChipsScroll;
-    }
 
     wireForm();
   }
