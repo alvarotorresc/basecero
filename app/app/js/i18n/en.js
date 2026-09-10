@@ -956,8 +956,6 @@ export const EN = {
     },
     accounts: {
       title: "Your accounts",
-      opening: "Opening",
-      closing: "Closing",
       total: "Operating total",
     },
     categories: {
@@ -1035,6 +1033,5 @@ export const EN = {
     amount: "Amount to sweep",
     capped: "You can sweep at most {amount}: that's what's in {account}",
     note: "End-of-period sweep",
-    done: "Sweep confirmed",
   },
 };

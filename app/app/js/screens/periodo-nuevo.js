@@ -308,7 +308,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
           <span class="amount-currency">${escHtml(currencySymbol())}</span>
         </div>
         <hr class="divider" style="margin-top:2px;">
-        <div id="pn-sweep-capped" class="num" style="font-size:11px; color:var(--amber, var(--text-3)); ${plan.capped ? "" : "display:none;"}">${plan.capped ? escHtml(t("barrido.capped", { amount: fmtMoney(plan.amountCents), account: escHtml(sourceAccountName) })) : ""}</div>
+        <div id="pn-sweep-capped" class="num" style="font-size:11px; color:var(--amber, var(--text-3)); ${plan.capped ? "" : "display:none;"}">${plan.capped ? escHtml(t("barrido.capped", { amount: fmtMoney(plan.amountCents), account: sourceAccountName })) : ""}</div>
       </div>
     </div>`;
   }

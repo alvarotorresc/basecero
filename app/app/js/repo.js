@@ -681,11 +681,13 @@ export async function avgSpentOfClosedPeriods() {
 /** Todo lo que necesita buildReport (informe-logic.js) para UN periodo, abierto o cerrado. No
  *  compone nada: devuelve filas tal cual (spec §5.1). Un solo `Promise.all`, para que la costura
  *  `inputs -> buildReport` sea rápida tanto en el periodo abierto como en uno recalculado al vuelo.
- *  Sin `periodId`, el periodo abierto; si no hay ninguno abierto ni existe el `periodId` pedido,
- *  lanza `UserError`. **Sin `const t` local** (TDZ, repo-i18n-guards.test.mjs). */
+ *  Sin `periodId`, el periodo abierto — o el más reciente (`periods[0]`, ya viene ORDER BY
+ *  start_date DESC) si no hay ninguno abierto — mismo criterio que promete renderInforme
+ *  (screens/informe.js). Lanza `UserError` solo si no hay NINGÚN periodo en absoluto, o si se
+ *  pide un `periodId` que no existe. **Sin `const t` local** (TDZ, repo-i18n-guards.test.mjs). */
 export async function reportInputs(periodId) {
   const periods = await listPeriods();
-  const period = periodId ? periods.find((p) => p.id === periodId) : periods.find((p) => p.status === "open");
+  const period = periodId ? periods.find((p) => p.id === periodId) : (periods.find((p) => p.status === "open") ?? periods[0]);
   if (!period) throw new UserError(t("errors.common.noOpenPeriod"));
   const prevPeriod = previousPeriodOf(periods, period.id);
   // Apertura con el DÍA ANTERIOR a start_date: SQL.accountBalance filtra t.date<=?, así que

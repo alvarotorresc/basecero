@@ -979,8 +979,6 @@ export const ES = {
     },
     accounts: {
       title: "Tus cuentas",
-      opening: "Apertura",
-      closing: "Cierre",
       total: "Total operativo",
     },
     categories: {
@@ -1058,6 +1056,5 @@ export const ES = {
     amount: "Cantidad a barrer",
     capped: "Como mucho puedes barrer {amount}: es lo que hay en {account}",
     note: "Barrido de fin de periodo",
-    done: "Barrido confirmado",
   },
 };
