@@ -196,6 +196,16 @@ export const EN = {
     title: "Log transaction",
     close: "Close",
     type: { transfer: "Transfer", more: "More entry types" },
+    natural: {
+      placeholder: "Say it or type it: 12.50 at the bar",
+      mic: "Dictate the expense",
+      micListening: "Listening…",
+      micDenied: "Couldn’t use the microphone. Type it instead.",
+      notUnderstood: "I didn’t understand that sentence.",
+      reset: "Clear",
+      sharedChip: "{name} {pct}%",
+      micNotice: "Dictation uses the browser’s speech recognition, which sends what you say to its server. Typing never leaves your phone.",
+    },
     save: {
       expense: "Save expense",
       income: "Save income",

@@ -9,7 +9,7 @@ import { limitWarning } from "../limit-warning.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { icon } from "../icons.js";
-import { t } from "../i18n/index.js";
+import { t, activeLang } from "../i18n/index.js";
 import { metaHtml, subHeaderHtml } from "../ui.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { userMessage } from "../errors.js";
@@ -18,6 +18,8 @@ import { showReceipt } from "../recibo.js";
 import { showToast } from "../toast.js";
 import { quickRegisterEnabled, detailsOpen, foldedSummaryParts, visibleCategories } from "../registro-mode.js";
 import { normalizeMerchant, memoryPatch } from "../merchant-memory.js";
+import { parseNaturalExpense } from "../natural.js";
+import { speech } from "../speech.js";
 
 // labelKey/SAVE_KEY en vez de texto resuelto: son consts de módulo, evaluadas al importar el
 // fichero (antes de que boot() llame a initI18n con el idioma real) — si guardaran el string ya
@@ -132,6 +134,11 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     newTagDraft: null,
     adjustmentSign: "+",
     refundPickerOpen: false,
+    // Registro v2 §8.6: caja de lenguaje natural. `text` es lo tecleado o dictado (NO se
+    // interpreta en el oninput: eso mataría el cursor, igual que #reg-raw/#reg-merchant); `parsed`
+    // es el último resultado de parseNaturalExpense, y es lo que pinta los chips; `micOff` se
+    // enciende para el resto de la sesión de pantalla si el usuario deniega el permiso.
+    natural: { text: "", parsed: null, listening: false, micOff: false },
     // Registro v2 §4: quick gobierna qué se pinta (registro-mode.js#detailsOpen); expanded es el
     // «Más» tocado a mano en ESTE formulario (nunca persiste entre aperturas de Registro).
     // allCats: se pasó de las CATS_GRID_LIMIT primeras categorías a la lista entera («Ver las N
@@ -191,6 +198,101 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
 
   function clearRefundLink() {
     state.refId = "";
+    render();
+  }
+
+  /** Caja de lenguaje natural (Registro v2 §8.6). Vacía: fila de reposo de 44px con el micro (solo
+   *  si `speech.supported` y el usuario no lo ha apagado esta sesión) y el ejemplo. Con texto: el
+   *  bloque interpretado sobre --accent-tint con la frase entre comillas, el enlace «Borrar» y
+   *  hasta cuatro chips — importe/categoría/comercio/compartido, uno por cada campo que el parser
+   *  SÍ entendió (spec: "lo que el parser no entendió simplemente no produce chip"). Solo para
+   *  gasto e ingreso: una frase no puede describir una transferencia, devolución ni ajuste.
+   *  Estilos inline (nunca app.css, spec §8.6/§8.7: el fichero queda fuera de los dos paquetes de
+   *  esta PR para que el único cherry-pick delicado —dos paquetes tocando registro.js— no tenga
+   *  que fundir también una hoja de estilos). */
+  function naturalBoxHtml() {
+    if (state.tipo !== "expense" && state.tipo !== "income") return "";
+    const { text } = state.natural;
+    const micAvailable = !!speech?.supported && !state.natural.micOff;
+    // §13.10 de la spec (a validar por Álvaro, recomendación adoptada): el reconocimiento de voz
+    // del navegador NO es local — el audio sale a un servidor del fabricante. Se dice bajo la caja,
+    // solo cuando el micro está disponible (si no hay soporte, o el usuario ya lo apagó esta
+    // sesión, no hay nada que avisar).
+    const micNotice = micAvailable
+      ? `<span style="font-size:11px; color:var(--ink-3);">${t("registro.natural.micNotice")}</span>` : "";
+    if (!text.trim()) {
+      // Mientras el reconocedor está abierto no hay input editable que mostrar: la fila se
+      // sustituye por «Escuchando…» (registro.natural.micListening) hasta que llegue el resultado
+      // o el error — ver el handler de #reg-nat-mic en wire().
+      const rowInner = state.natural.listening
+        ? `${icon("mic", { size: 20, stroke: "var(--accent)" })}<span style="font-size:14px; color:var(--ink-3);">${t("registro.natural.micListening")}</span>`
+        : `${micAvailable ? `<button type="button" id="reg-nat-mic" aria-label="${escAttr(t("registro.natural.mic"))}" style="border:0; background:transparent; padding:0; display:flex; align-items:center; flex-shrink:0; cursor:pointer;">${icon("mic", { size: 20, stroke: "var(--accent)" })}</button>` : ""}
+           <input type="text" id="reg-nat-input" value="${escAttr(text)}" placeholder="${escAttr(t("registro.natural.placeholder"))}" autocomplete="off"
+             style="flex:1; min-width:0; border:0; background:none; color:var(--ink); font-size:14px; outline:none;">`;
+      return `
+      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
+        <div style="display:flex; align-items:center; gap:11px; height:44px; background:var(--surface-2); border:1px solid var(--hairline); padding:0 14px; box-sizing:border-box;">
+          ${rowInner}
+        </div>
+        ${micNotice}
+      </div>`;
+    }
+    const parsed = state.natural.parsed;
+    const chips = [];
+    if (parsed?.cents != null) {
+      chips.push(`<button type="button" data-nat-chip="amount" style="height:44px;border-radius:999px;border:1px solid var(--hairline-strong);background:var(--surface-2);color:var(--ink);font:600 13px var(--font-num);padding:0 13px;cursor:pointer;">${escHtml(fmtMoney(parsed.cents))}</button>`);
+    }
+    if (parsed?.categoryId && byId[parsed.categoryId]) {
+      const color = colorForCategory(parsed.categoryId, byId);
+      const textColor = textColorForCategory(parsed.categoryId, byId);
+      const catEmoji = iconForCategory(parsed.categoryId, byId);
+      chips.push(`<button type="button" data-nat-chip="category" style="height:44px;border-radius:999px;border:1px solid color-mix(in srgb, ${color} 42%, transparent);background:color-mix(in srgb, ${color} 16%, transparent);color:${textColor};font-size:13px;font-weight:500;padding:0 12px;display:flex;align-items:center;gap:6px;cursor:pointer;"><span style="font-size:13px;" aria-hidden="true">${catEmoji}</span>${escHtml(byId[parsed.categoryId].name)}</button>`);
+    }
+    if (parsed?.merchant) {
+      chips.push(`<button type="button" data-nat-chip="merchant" style="height:44px;border-radius:999px;border:1px solid var(--hairline-strong);background:var(--surface-2);color:var(--ink);font-size:13px;font-weight:500;padding:0 13px;cursor:pointer;">${escHtml(parsed.merchant)}</button>`);
+    }
+    if (parsed?.shared) {
+      chips.push(`<button type="button" data-nat-chip="shared" style="height:44px;border-radius:999px;border:1px solid var(--hairline-strong);background:var(--surface-2);color:var(--ink);font-size:13px;font-weight:500;padding:0 13px;cursor:pointer;">${escHtml(t("registro.natural.sharedChip", { name: partnerName, pct: parsed.sharePct ?? state.sharePct }))}</button>`);
+    }
+    return `
+    <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
+      <div style="display:flex; flex-direction:column; gap:11px; padding:16px; background:var(--accent-tint);">
+        <div style="display:flex; align-items:flex-start; gap:11px;">
+          ${icon("mic", { size: 20, stroke: "var(--accent)", style: "flex-shrink:0;margin-top:1px;" })}
+          <span style="font-size:15px; line-height:1.4; color:var(--ink); flex:1; min-width:0;">${chips.length ? `«${escHtml(text)}»` : escHtml(t("registro.natural.notUnderstood"))}</span>
+          <button type="button" id="reg-nat-reset" style="border:0; background:transparent; color:var(--ink-3); font-size:13px; font-weight:500; padding:0; height:24px; flex-shrink:0; cursor:pointer;">${t("registro.natural.reset")}</button>
+        </div>
+        ${chips.length ? `<div style="display:flex; flex-wrap:wrap; gap:7px;">${chips.join("")}</div>` : ""}
+      </div>
+      ${micNotice}
+    </div>`;
+  }
+
+  /** Interpreta `text` (tecleado o dictado) y aplica al formulario lo que el parser entendió
+   *  (Registro v2 §8.6). LA FRASE GANA SOBRE `touched`: es el acto explícito más reciente del
+   *  usuario, así que cada campo que toca aquí entra también en `state.touched` para que el
+   *  `oninput` del comercio (memoryPatch, más abajo) no lo vuelva a pisar después con lo que diga
+   *  la memoria — la memoria sigue cediendo, igual que hoy. `sharePct` pasa por `normalizePct`,
+   *  igual que el parche de la memoria. No pide foco: el foco al importe lo pide SIEMPRE quien
+   *  llama, después de esta función (invariante de foco, `:862-871` — nunca desde aquí ni desde
+   *  render()). */
+  function applyNatural(text) {
+    state.natural.text = text;
+    const parsed = parseNaturalExpense(text, {
+      categories: categoriesFor(), accounts, merchants: merchantMemoryMap,
+      counterpartName: partnerName, today: hoyISO(), lang: activeLang(),
+    });
+    state.natural.parsed = parsed;
+    if (parsed.cents != null) { state.cents = parsed.cents; state.raw = centsToRaw(parsed.cents); }
+    if (parsed.merchant != null) state.merchant = parsed.merchant;
+    if (parsed.categoryId != null) { state.categoryId = parsed.categoryId; state.touched.add("categoryId"); }
+    if (parsed.accountId != null) { state.accountId = parsed.accountId; state.touched.add("accountId"); }
+    if (parsed.date != null) state.fecha = parsed.date;
+    if (parsed.shared) {
+      state.isShared = true;
+      state.touched.add("isShared");
+      if (parsed.sharePct != null) { state.sharePct = normalizePct(parsed.sharePct, state.sharePct); state.touched.add("sharePct"); }
+    }
     render();
   }
 
@@ -407,6 +509,8 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     container.innerHTML = `
       ${subHeaderHtml({ id: null, title: t("registro.title"), action: { id: "reg-close", icon: "close", label: t("registro.close") } })}
 
+      ${naturalBoxHtml()}
+
       ${typeSelectorHtml(formOpen)}
 
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px; padding-bottom:10px; border-bottom:2px solid var(--accent);">
@@ -546,6 +650,80 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
 
   function wire() {
     container.querySelector("#reg-close").onclick = () => onDone();
+
+    // PB-1 · Lenguaje natural (Registro v2 §8.6): un único camino de interpretación para el texto,
+    // Enter, blur y el resultado de voz. El oninput de la caja SOLO guarda el texto y NUNCA repinta
+    // ni interpreta — repintar en cada tecla mataría el cursor, mismo criterio que #reg-raw/
+    // #reg-merchant/#reg-tag-new-input.
+    const natInput = container.querySelector("#reg-nat-input");
+    if (natInput) {
+      natInput.oninput = (e) => { state.natural.text = e.target.value; };
+      natInput.onkeydown = (e) => {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        applyNatural(natInput.value);
+        focusInput(container.querySelector("#reg-raw"));
+      };
+      // Simplificación deliberada respecto al plan («si el texto cambió desde la última
+      // interpretación»): volver a interpretar un texto ya interpretado es idempotente (mismo
+      // resultado, mismo render()), así que blur siempre interpreta si hay texto — evita tener que
+      // guardar un campo extra de "último texto interpretado" fuera de la forma exacta de estado
+      // que fija el plan ({text, parsed, listening, micOff}).
+      natInput.onblur = () => {
+        if (natInput.value.trim()) applyNatural(natInput.value);
+      };
+    }
+
+    const natMicBtn = container.querySelector("#reg-nat-mic");
+    if (natMicBtn) natMicBtn.onclick = () => {
+      state.natural.listening = true;
+      render();
+      speech.start(
+        (resultText) => {
+          state.natural.listening = false;
+          applyNatural(resultText);
+          focusInput(container.querySelector("#reg-raw"));
+        },
+        () => {
+          state.natural.listening = false;
+          state.natural.micOff = true;
+          render();
+          showToast(t("registro.natural.micDenied"));
+        },
+      );
+    };
+
+    const natReset = container.querySelector("#reg-nat-reset");
+    if (natReset) natReset.onclick = () => {
+      // micOff NO se resetea: es de sesión de pantalla (spec §8.6), sobrevive a «Borrar». Tampoco
+      // deshace lo que ya rellenó en el formulario — eso lo edita el usuario campo a campo.
+      state.natural = { text: "", parsed: null, listening: false, micOff: state.natural.micOff };
+      render();
+    };
+
+    container.querySelectorAll("[data-nat-chip]").forEach((b) => {
+      b.onclick = () => {
+        const field = b.dataset.natChip;
+        // Solo comercio y compartido viven dentro del bloque plegable de "Más" (registro.js real:
+        // la rejilla de categorías y el importe están SIEMPRE visibles, nunca detrás de "Más" —
+        // desviación de la redacción literal de la spec §8.6 respecto al código real, que pide
+        // "despliega Más si hace falta" también para el chip de categoría; se resuelve a favor del
+        // código, que ya garantiza la categoría elegida visible vía visibleCategories, :429).
+        const needsExpand = (field === "merchant" || field === "shared")
+          && !detailsOpen({ quick: state.quick, expanded: state.expanded, tipo: state.tipo });
+        if (needsExpand) state.expanded = true;
+        render();
+        if (field === "amount") {
+          focusInput(container.querySelector("#reg-raw"));
+        } else if (field === "category" && state.categoryId) {
+          container.querySelector(`[data-cat="${state.categoryId}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+        } else if (field === "merchant") {
+          focusInput(container.querySelector("#reg-merchant"));
+        } else if (field === "shared") {
+          container.querySelector("#reg-shared")?.scrollIntoView({ block: "nearest" });
+        }
+      };
+    });
 
     container.querySelectorAll("[data-tipo]").forEach((b) => {
       b.onclick = () => {
