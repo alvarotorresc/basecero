@@ -25,8 +25,8 @@ export const SQL = {
   insertPeriod: `INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
     VALUES (?,?,?,'','open',?,'',?,?,0)`,
   insertTransaction: `INSERT INTO transactions (id,date,period_id,type,amount_cents,account_id,counter_account_id,
-    category_id,merchant,note,is_shared,share_pct_override,paid_by,settled,ref_id,rule_id,tag_id,external_id,status,created_at,updated_at,deleted)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
+    category_id,merchant,note,is_shared,share_pct_override,paid_by,settled,ref_id,rule_id,tag_id,external_id,has_attachment,status,created_at,updated_at,deleted)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
   spentOfPeriod: `SELECT COALESCE(SUM(CASE
       WHEN t.type='expense' THEN ${MY_AMOUNT}
       WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT}

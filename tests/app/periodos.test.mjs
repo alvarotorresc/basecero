@@ -25,13 +25,13 @@ function ins(db, over = {}) {
     date: "2026-08-20", period: "per-1", type: "expense", cents: 4520,
     account: "acc-n26", counterAccount: "", category: "cat-casa-alquiler",
     merchant: "", note: "", shared: 0, override: null, paidBy: "me", settled: 0,
-    ref: "", rule: "", tag: "", external: "", status: "pending",
+    ref: "", rule: "", tag: "", external: "", hasAttachment: 0, status: "pending",
     ...over,
   };
   db.prepare(SQL.insertTransaction).run(
     v.id, v.date, v.period, v.type, v.cents, v.account, v.counterAccount,
     v.category, v.merchant, v.note, v.shared, v.override, v.paidBy, v.settled,
-    v.ref, v.rule, v.tag, v.external, v.status, T, T,
+    v.ref, v.rule, v.tag, v.external, v.hasAttachment, v.status, T, T,
   );
   return v.id;
 }
@@ -421,13 +421,13 @@ const balance = (db, accountId, dateIso) => db.prepare(SQL.accountBalance).get(d
 const netWorth = (db, dateIso) => ["acc-n26", "acc-revolut", "acc-prestamo"]
   .reduce((s, id) => s + balance(db, id, dateIso), 0);
 
-test("sweepTransferStmt: los 21 campos de insertTransaction en su orden exacto", () => {
+test("sweepTransferStmt: los 22 campos de insertTransaction en su orden exacto", () => {
   const { sql, bind } = sweepTransferStmt({
     periodId: "per-2", date: "2026-10-01", amountCents: 35280,
     fromAccountId: "acc-corriente", toAccountId: "acc-fondo", goalName: "Fondo de emergencia", now: T,
   });
   assert.equal(sql, SQL.insertTransaction);
-  assert.equal(bind.length, 21);
+  assert.equal(bind.length, 22);
   assert.equal(bind[1], "2026-10-01"); // date
   assert.equal(bind[2], "per-2");      // period_id: el NUEVO
   assert.equal(bind[3], "transfer");
@@ -443,9 +443,10 @@ test("sweepTransferStmt: los 21 campos de insertTransaction en su orden exacto",
   assert.equal(bind[15], "");          // rule_id
   assert.equal(bind[16], "");          // tag_id
   assert.equal(bind[17], "");          // external_id
-  assert.equal(bind[18], "pending");   // status
-  assert.equal(bind[19], T);           // created_at
-  assert.equal(bind[20], T);           // updated_at
+  assert.equal(bind[18], 0);           // has_attachment
+  assert.equal(bind[19], "pending");   // status
+  assert.equal(bind[20], T);           // created_at
+  assert.equal(bind[21], T);           // updated_at
 });
 
 test("sweepTransferStmt: el nombre del objetivo (comercio) pasa por bcSanitizeCell", () => {

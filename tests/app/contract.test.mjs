@@ -6,7 +6,7 @@ test("columnas canónicas de transactions (orden del schema)", () => {
   assert.deepEqual(CONTRACT.transactions.cols, [
     "id","date","period_id","type","amount_cents","account_id","counter_account_id",
     "category_id","merchant","note","is_shared","share_pct_override","paid_by","settled",
-    "ref_id","rule_id","tag_id","external_id","status","created_at","updated_at","deleted"]);
+    "ref_id","rule_id","tag_id","external_id","has_attachment","status","created_at","updated_at","deleted"]);
 });
 test("las 9 tablas del contrato, con tags al final", () => {
   assert.deepEqual(Object.keys(CONTRACT),
@@ -73,12 +73,13 @@ test("enums del contrato", () => {
   assert.deepEqual(ENUMS.recurring_rules.frequency, ["weekly","monthly","quarterly","yearly"]);
 });
 
-test("insertSql(transactions): 22 columnas y 22 placeholders", () => {
+test("insertSql(transactions): 23 columnas y 23 placeholders", () => {
   const sql = insertSql("transactions");
-  assert.equal(CONTRACT.transactions.cols.length, 22);
-  assert.equal(sql.match(/\?/g).length, 22);
+  assert.equal(CONTRACT.transactions.cols.length, 23);
+  assert.equal(sql.match(/\?/g).length, 23);
   assert.match(sql, /share_pct_override,paid_by,settled/, "paid_by va entre el reparto y settled");
   assert.match(sql, /rule_id,tag_id,external_id/, "tag_id va entre rule_id y external_id");
+  assert.match(sql, /external_id,has_attachment,status/, "has_attachment va entre external_id y status");
 });
 
 test("ENUMS.transactions.paid_by es exactamente me/partner (sin cadena vacía)", () => {

@@ -94,3 +94,27 @@ export const V3_TRANSACTIONS_DDL = `CREATE TABLE transactions (
   external_id TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','reconciled')),
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0)`;
+
+/** DDL de `transactions` tal como lo deja `feat/etiquetas-y-comparativa` (v4): CON `paid_by` y
+ *  `tag_id` pero SIN `has_attachment` — el estado real de una BD ya migrada a v4 que todavía no
+ *  ha visto esta PR (Registro v2, foto del ticket). Mismo motivo que los tres DDL de arriba:
+ *  escrito entero a mano, no recortado de schema.sql con un `.replace()` (que se vuelve un no-op
+ *  silencioso en cuanto alguien reindenta el fichero). */
+export const V4_TRANSACTIONS_DDL = `CREATE TABLE transactions (
+  id TEXT PRIMARY KEY, date TEXT NOT NULL,
+  period_id TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('expense','income','transfer','refund','adjustment')),
+  amount_cents INTEGER NOT NULL CHECK (type='adjustment' OR amount_cents > 0),
+  account_id TEXT NOT NULL,
+  counter_account_id TEXT NOT NULL DEFAULT '',
+  category_id TEXT NOT NULL DEFAULT '',
+  merchant TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
+  is_shared INTEGER NOT NULL DEFAULT 0,
+  share_pct_override REAL,
+  paid_by TEXT NOT NULL DEFAULT 'me' CHECK (paid_by IN ('me','partner')),
+  settled INTEGER NOT NULL DEFAULT 0,
+  ref_id TEXT NOT NULL DEFAULT '', rule_id TEXT NOT NULL DEFAULT '',
+  tag_id TEXT NOT NULL DEFAULT '',
+  external_id TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','reconciled')),
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0)`;

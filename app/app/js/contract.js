@@ -5,7 +5,9 @@ export const CONTRACT = {
   accounts: { cols: ["id","name","type","opening_balance_cents","display_order","is_archived","created_at","updated_at","deleted"] },
   categories: { cols: ["id","name","parent_id","flow","need_type","display_order","is_archived","created_at","updated_at","deleted"] },
   periods: { cols: ["id","name","start_date","end_date","status","my_share_pct","notes","created_at","updated_at","deleted"] },
-  transactions: { cols: ["id","date","period_id","type","amount_cents","account_id","counter_account_id","category_id","merchant","note","is_shared","share_pct_override","paid_by","settled","ref_id","rule_id","tag_id","external_id","status","created_at","updated_at","deleted"] },
+  // has_attachment (Registro v2 §9.1) entre external_id y status: el FICHERO (OPFS, attachments.js)
+  // es la fuente de verdad, esta columna es solo una pista de "esta fila tiene foto".
+  transactions: { cols: ["id","date","period_id","type","amount_cents","account_id","counter_account_id","category_id","merchant","note","is_shared","share_pct_override","paid_by","settled","ref_id","rule_id","tag_id","external_id","has_attachment","status","created_at","updated_at","deleted"] },
   // is_subscription/cancelled_at (Suscripciones, N6) entre is_active y created_at — mismo criterio
   // de colocación semántica que paid_by en transactions. cancelled_at es una FECHA (YYYY-MM-DD),
   // NO un timestamp pese al sufijo _at: es el día de la baja, comparable con hoyISO() (ver xlsx.js
@@ -47,7 +49,7 @@ export const ENUMS = {
 
 export const BOOL_COLS = {
   accounts: ["is_archived","deleted"], categories: ["is_archived","deleted"],
-  periods: ["deleted"], transactions: ["is_shared","settled","deleted"],
+  periods: ["deleted"], transactions: ["is_shared","settled","has_attachment","deleted"],
   recurring_rules: ["is_shared","is_active","is_subscription","deleted"], goals: ["is_active","deleted"],
   budgets: ["deleted"], meta: [], tags: ["is_archived","deleted"],
 };

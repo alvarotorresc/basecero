@@ -6,23 +6,19 @@
  *  y devuelve los statements, sin ejecutarlos. */
 
 /** Versión que deja este código en meta.schema_version. Subirla es parte de añadir una migración. */
-export const SCHEMA_VERSION = "4";
+export const SCHEMA_VERSION = "5";
 
 /** Versiones de schema_version que una hoja importada puede traer y aceptamos (xlsx.js las valida
  *  contra esta lista, no contra un literal repetido). Incluye SCHEMA_VERSION y todas las versiones
  *  anteriores que workbookToRows sabe rellenar con TEXT_DEFAULTS (hoy solo "1" → paid_by='me'). */
-export const ACCEPTED_SCHEMA_VERSIONS = ["1", "2", "3", "4"];
+export const ACCEPTED_SCHEMA_VERSIONS = ["1", "2", "3", "4", "5"];
 
 /** Lista ORDENADA. `needed(cols)` mira el ESTADO REAL de la tabla, nunca el número guardado en
  *  meta: la verdad de si falta una columna la tiene PRAGMA table_info, no una fila de texto. El
  *  upsert de meta.schema_version se ejecuta en cada arranque. Una hoja v1 podía sobrescribir
  *  meta.schema_version en versiones anteriores al filtro de replaceAllStmts (ver
  *  repo.replaceAllStmts), así que ese mismo upsert también repara esas bases de datos. Añadir la
- *  siguiente migración = una entrada más aquí + subir SCHEMA_VERSION.
- *  NOTA de rama (spec §4.2): si `feat/registro-v2-extras` (has_attachment, v3) se mergea antes que
- *  esta PR, esta entrada pasa a v4 y se coloca DESPUÉS de la suya — cambio mecánico de un literal.
- *  El test de versiones ÚNICAS (migraciones.test.mjs) convierte una colisión de esa contingencia
- *  en rojo en vez de dejarla colarse en silencio. */
+ *  siguiente migración = una entrada más aquí + subir SCHEMA_VERSION. */
 export const MIGRATIONS = [
   {
     version: "2",
@@ -61,6 +57,15 @@ export const MIGRATIONS = [
          created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0)`,
       `ALTER TABLE transactions ADD COLUMN tag_id TEXT NOT NULL DEFAULT ''`,
     ],
+  },
+  {
+    // Foto del ticket (N5): el FICHERO vive en OPFS (attachments.js), nunca en SQLite. Esta
+    // columna es solo la pista de "esta fila tiene foto" para no sondear OPFS por cada fila de
+    // una lista. Ver §9.2: la verdad de si la foto existe la tiene el fichero, no este flag.
+    version: "5",
+    table: "transactions",
+    needed: (cols) => !cols.includes("has_attachment"),
+    sql: [`ALTER TABLE transactions ADD COLUMN has_attachment INTEGER NOT NULL DEFAULT 0`],
   },
 ];
 

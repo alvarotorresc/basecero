@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 -- subscription_ignored/renewal_snoozed (Suscripciones, N6): CONFIG-IN-META igual que
 -- account_loans/category_style — sin migración de esquema, repo.js:697. subscription_ignored es
 -- un array JSON de comercios normalizados ignorados; renewal_snoozed es un objeto {ruleId: fecha}.
-INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version','4'),('currency','EUR'),('created_with','basecero-pwa'),('locale','es-ES'),('import_account_id',''),('default_account_id',''),('partner_name',''),('category_style','{}'),('csv_profile',''),('lang',''),('account_loans','{}'),('quick_register','1'),('subscription_ignored','[]'),('renewal_snoozed','{}');
+INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version','5'),('currency','EUR'),('created_with','basecero-pwa'),('locale','es-ES'),('import_account_id',''),('default_account_id',''),('partner_name',''),('category_style','{}'),('csv_profile',''),('lang',''),('account_loans','{}'),('quick_register','1'),('subscription_ignored','[]'),('renewal_snoozed','{}');
 
 CREATE TABLE IF NOT EXISTS accounts (
   id TEXT PRIMARY KEY, name TEXT NOT NULL,
@@ -50,6 +50,10 @@ CREATE TABLE IF NOT EXISTS transactions (
   ref_id TEXT NOT NULL DEFAULT '', rule_id TEXT NOT NULL DEFAULT '',
   tag_id TEXT NOT NULL DEFAULT '',             -- '' = sin etiqueta (Etiquetas, N11)
   external_id TEXT NOT NULL DEFAULT '',
+  -- Foto del ticket (N5, Registro v2 §9.1): 1 = hay foto en OPFS (attachments.js). El FICHERO es
+  -- la fuente de verdad, esta columna es solo una pista para no sondear OPFS por cada fila de una
+  -- lista — ver el comentario de la migración v5 en migrations.js y la spec §9.2.
+  has_attachment INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','reconciled')),
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted INTEGER NOT NULL DEFAULT 0);
 CREATE INDEX IF NOT EXISTS tx_period ON transactions (period_id, deleted);

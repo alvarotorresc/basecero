@@ -19,7 +19,18 @@ test("esquema aplica y las 9 tablas existen", () => {
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name);
   for (const t of ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets","tags"])
     assert.ok(tables.includes(t), t);
-  assert.equal(db.prepare("SELECT value FROM meta WHERE key='schema_version'").get().value, "4");
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='schema_version'").get().value, "5");
+});
+
+// Foto del ticket (N5, Registro v2 §9.1): la columna es solo una pista de "esta fila tiene foto"
+// (el fichero en OPFS es la fuente de verdad, ver attachments.js) — NOT NULL DEFAULT 0 para que un
+// INSERT que no la nombre (import de un CSV, barrido, liquidación) no reviente.
+test("transactions.has_attachment: existe en una BD nueva con su NOT NULL y su default 0", () => {
+  const db = freshDb();
+  const col = db.prepare("PRAGMA table_info(transactions)").all().find((c) => c.name === "has_attachment");
+  assert.ok(col, "la columna existe en una BD nueva");
+  assert.equal(col.notnull, 1);
+  assert.equal(col.dflt_value, "0");
 });
 
 // D4 (etiquetas-design §5.1): budget_cents es NULLABLE — NULL significa «sin límite». Con
