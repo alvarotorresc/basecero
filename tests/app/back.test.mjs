@@ -8,9 +8,13 @@ import { createBackStack } from "../../app/app/js/back.js";
 // `state` y `length` simulan lo que el navegador conserva tras una recarga: el state de la entrada
 // actual (con su {bc:n}) y cuántas entradas hay en la sesión. Por defecto, pestaña recién abierta:
 // sin state y con una sola entrada.
+// `document.body.classList` falso (mismo motivo que en toast.test.mjs/modal.test.mjs): un Set de
+// nombres de clase con add/remove/contains/toggle, para poder comprobar la clase `subscreen` que
+// pone createBackStack sin un DOM de verdad.
 function fakeWin({ state = null, length = 1 } = {}) {
   const calls = [];
   const listeners = {};
+  const classes = new Set();
   return {
     calls,
     listeners,
@@ -24,6 +28,20 @@ function fakeWin({ state = null, length = 1 } = {}) {
     },
     addEventListener: (type, fn) => { listeners[type] = fn; },
     scrollTo: (x, y) => calls.push(["scrollTo", x, y]),
+    document: {
+      body: {
+        classList: {
+          add: (c) => classes.add(c),
+          remove: (c) => classes.delete(c),
+          contains: (c) => classes.has(c),
+          toggle: (c, force) => {
+            const on = force === undefined ? !classes.has(c) : !!force;
+            if (on) classes.add(c); else classes.delete(c);
+            return on;
+          },
+        },
+      },
+    },
   };
 }
 
@@ -311,4 +329,69 @@ test("popstate que descarta una entrada {scroll:false} junto con una de pantalla
   // Solo corre el callback de la más baja descartada (back.js:34): la de pantalla, no la del modal.
   assert.deepEqual(vistas, ["pantalla"]);
   assert.ok(win.calls.some((c) => c[0] === "scrollTo"));
+});
+
+// ------------------------------------------- clase `subscreen` en <body> (fix/chrome-subpantallas)
+//
+// SISTEMA.md §4.14: solo las cuatro pestañas raíz llevan tab bar y FAB. resetTo() (cambio de
+// pestaña, main.js#nav) deja UNA entrada en la pila que no es una subpantalla — es la raíz de la
+// pestaña — así que no debe encender la clase; cualquier entrada de push() sí.
+
+test("push: pone la clase subscreen en <body>", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  back.push(() => {});
+  assert.equal(win.document.body.classList.contains("subscreen"), true);
+});
+
+test("popstate: quita la clase subscreen al vaciar la pila", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  back.push(() => {});
+  win.listeners.popstate({ state: { bc: 0 } });
+  assert.equal(win.document.body.classList.contains("subscreen"), false);
+});
+
+test("resetTo desde Inicio: NO pone subscreen — es la raíz de la pestaña, no una subpantalla", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  back.resetTo(() => {});
+  assert.equal(back.depth(), 1);
+  assert.equal(win.document.body.classList.contains("subscreen"), false);
+});
+
+test("resetTo con la pestaña ya a profundidad 1: sigue sin subscreen tras cambiar el callback", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  back.resetTo(() => {});
+  back.resetTo(() => {});
+  assert.equal(win.document.body.classList.contains("subscreen"), false);
+});
+
+test("resetTo con subpantallas abiertas encima: subscreen se mantiene hasta llegar a la raíz de la pestaña", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  back.resetTo(() => {});                        // pestaña Movimientos: solo la raíz
+  assert.equal(win.document.body.classList.contains("subscreen"), false);
+  back.push(() => {});                            // abre una subpantalla encima
+  assert.equal(win.document.body.classList.contains("subscreen"), true);
+  win.listeners.popstate({ state: { bc: 1 } });    // cierra la subpantalla, queda solo la raíz
+  assert.equal(win.document.body.classList.contains("subscreen"), false);
+});
+
+test("clear(): quita la clase subscreen de <body>", () => {
+  const win = fakeWin();
+  const back = createBackStack(win);
+  back.push(() => {});
+  back.clear();
+  assert.equal(win.document.body.classList.contains("subscreen"), false);
+});
+
+test("subscreen no toca una clase onboarding ya puesta en <body>", () => {
+  const win = fakeWin();
+  win.document.body.classList.add("onboarding");
+  const back = createBackStack(win);
+  back.push(() => {});
+  assert.equal(win.document.body.classList.contains("subscreen"), true);
+  assert.equal(win.document.body.classList.contains("onboarding"), true);
 });

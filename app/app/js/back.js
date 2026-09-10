@@ -30,6 +30,7 @@ export function createBackStack(win) {
     // entrada ajena o corrupta (recarga, o un {bc} negativo/NaN): nada que deshacer.
     if (!Number.isInteger(target) || target < 0 || target >= stack.length) return;
     const dropped = stack.splice(target);
+    syncChrome();  // antes del callback: la pantalla que va a pintar ya encuentra el chrome resuelto
     // dropped[0] (la más baja descartada) es quien pinta la pantalla que queda debajo — es SU
     // scroll el que importa, no el de las entradas por encima que también se descartan (p. ej. el
     // modal de confirmación, que no es un cambio de pantalla). No lo simplifiques a un flag global:
@@ -42,6 +43,24 @@ export function createBackStack(win) {
   // Después de registrar el listener: el popstate que provoque este salto tiene que encontrarlo
   // puesto (la pila ya está vacía, así que será inocuo, pero el guard debe correr).
   if (Number.isInteger(restored) && restored > 0 && restored < win.history.length) win.history.go(-restored);
+  // Clase `subscreen` en <body> — SISTEMA.md §4.14: solo las cuatro pestañas raíz (Inicio,
+  // Movimientos, Patrimonio, Ajustes) llevan tab bar y FAB; cualquier otra pantalla los oculta
+  // (ver app.css, junto a `body.onboarding`, que resuelve el mismo problema para el asistente de
+  // periodo — no se toca aquí).
+  // La dificultad: resetTo() (cambio de pestaña, main.js#nav) TAMBIÉN deja una entrada en esta
+  // pila («pestaña no-Inicio → atrás vuelve a Inicio»), pero esa entrada ES una pestaña raíz, no
+  // una subpantalla — así que `stack.length > 0` la marcaría con `subscreen` por error. Se
+  // distingue con un flag por entrada: las de resetTo() llevan `root: true`, las de push() no
+  // (por defecto `root: false`), así que hay subpantalla abierta si hay más de una entrada, o si
+  // la única que hay no es la raíz.
+  // `win.document?.body?.classList?.toggle` con los `?.` a propósito, mismo motivo que
+  // `win.document?.getElementById?.("screen")` en viewport.js: el `win` falso de los tests no
+  // lleva `document` salvo que quiera probar justo esto, y el módulo tiene que seguir siendo
+  // importable en Node.
+  const syncChrome = () => {
+    const subscreen = stack.length > 1 || (stack.length === 1 && !stack[0].root);
+    win.document?.body?.classList?.toggle("subscreen", subscreen);
+  };
   return {
     /** Abre una subpantalla: apunta su callback de vuelta y una entrada de historial.
      *  pushState va ANTES del stack.push: si el navegador lo rechaza (p. ej. límite de
@@ -51,7 +70,8 @@ export function createBackStack(win) {
      *  detrás. Por defecto true: las 15 pantallas que llaman a pushBack() siguen reseteando. */
     push(onBack, { scroll = true } = {}) {
       win.history.pushState({ bc: stack.length + 1 }, "");
-      stack.push({ onBack, scroll });
+      stack.push({ onBack, scroll, root: false });
+      syncChrome();
       if (scroll) scrollTop();
     },
     /** Cierra la subpantalla superior por el historial (no-op sin subpantallas abiertas). */
@@ -64,6 +84,7 @@ export function createBackStack(win) {
       if (n === 0) return;
       stack.length = 0;
       win.history.go(-n);
+      syncChrome();
     },
     /** Deja la pila con EXACTAMENTE una entrada, cuyo callback de vuelta es `onBack`: es lo que
      *  hace falta al entrar en una pestaña principal que no es Inicio (Movimientos, Patrimonio,
@@ -78,12 +99,15 @@ export function createBackStack(win) {
       const n = stack.length;
       if (n === 0) {
         win.history.pushState({ bc: 1 }, "");
-        stack.push({ onBack });
+        stack.push({ onBack, root: true });
+        syncChrome();
         return;
       }
       stack.length = 1;
       stack[0].onBack = onBack;
+      stack[0].root = true;  // se reutilice o no la entrada de abajo, pasa a ser la raíz de la pestaña
       if (n > 1) win.history.go(-(n - 1));
+      syncChrome();
     },
     /** Profundidad de la pila — solo para tests. */
     depth: () => stack.length,

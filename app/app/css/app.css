@@ -674,6 +674,18 @@ body:has(> .banner-aviso) main#screen { margin-top: 46px; }
 body.onboarding .tabbar,
 body.onboarding .fab { display: none; }
 
+/* chrome oculto en cualquier subpantalla (SISTEMA.md §4.14: solo Inicio/Movimientos/Patrimonio/
+   Ajustes llevan tab bar). La clase la pone/quita back.js (createBackStack#syncChrome) exactamente
+   mientras la pila de subpantallas tenga alguna entrada — ver el comentario ahí. Con el FAB fuera,
+   main#screen ya no necesita reservarle sitio abajo: el hueco del padding original (tabbar + FAB +
+   holgura) se cambia por uno mucho menor, solo para que los botones «Guardar»/«Borrar» del final de
+   los formularios no queden pegados al borde de la pantalla, respetando el notch inferior. */
+body.subscreen .tabbar,
+body.subscreen .fab { display: none; }
+body.subscreen main#screen {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--s-6));
+}
+
 /* ===== componentes nuevos del sistema (consumidos por las tareas 5-8) ===== */
 
 /* Círculo TINTADO al 16 % con el emoji encima (antes: círculo de color sólido). Es lo que hace
