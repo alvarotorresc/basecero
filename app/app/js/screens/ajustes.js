@@ -316,11 +316,11 @@ export async function renderAjustes(container) {
     container.innerHTML = `
       <header class="screen-header"><h1>${t("ajustes.title")}</h1></header>
 
-      <div class="card" style="margin-bottom:12px">
-        <p style="font-weight:600;margin-bottom:4px">${t("ajustes.sheet.title")}</p>
+      <section style="margin-bottom:var(--gap-section)">
+        <div class="section-title" style="margin-bottom:4px">${t("ajustes.sheet.title")}</div>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
           ${t("ajustes.sheet.body")}</p>
-        <button type="button" class="btn-primary" id="btn-xlsx-export" ${state.busy ? "disabled" : ""}>${t("ajustes.sheet.exportBtn")}</button>
+        <button type="button" class="btn-secondary" id="btn-xlsx-export" style="${BTN_FULL_WIDTH}" ${state.busy ? "disabled" : ""}>${t("ajustes.sheet.exportBtn")}</button>
         <button type="button" class="btn-secondary" id="btn-xlsx-import" style="${BTN_FULL_WIDTH}margin-top:10px" ${state.busy ? "disabled" : ""}>${t("ajustes.sheet.importBtn")}</button>
         <input type="file" id="xlsx-file-input" accept=".xlsx,.bce" style="display:none">
 
@@ -363,11 +363,11 @@ export async function renderAjustes(container) {
           <button type="button" class="btn-secondary" id="btn-import-cancel" style="flex:1" ${state.busy ? "disabled" : ""}>${t("common.cancel")}</button>
           <button type="button" class="btn-primary" id="btn-import-confirm" style="flex:1" ${state.busy ? "disabled" : ""}>${t("ajustes.sheet.replaceBtn")}</button>
         </div>` : ""}
-      </div>
+      </section>
 
       ${periodoCardHtml(openPeriod, partnerName, state.periodError)}
 
-      <div class="card" style="margin-bottom:12px">
+      <section style="margin-bottom:var(--gap-section)">
         <button type="button" id="btn-recurrentes" class="list-row"
           style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
           <div class="list-row-icon">
@@ -380,9 +380,9 @@ export async function renderAjustes(container) {
           </div>
           <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
         </button>
-      </div>
+      </section>
 
-      <div class="card" style="margin-bottom:12px">
+      <section style="margin-bottom:var(--gap-section)">
         <button type="button" id="btn-suscripciones" class="list-row"
           style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
           <div class="list-row-icon">
@@ -396,9 +396,9 @@ export async function renderAjustes(container) {
           </div>
           <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
         </button>
-      </div>
+      </section>
 
-      <div class="card" style="margin-bottom:12px">
+      <section style="margin-bottom:var(--gap-section)">
         <button type="button" id="btn-categorias" class="list-row"
           style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
           <div class="list-row-icon">
@@ -412,9 +412,9 @@ export async function renderAjustes(container) {
           </div>
           <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
         </button>
-      </div>
+      </section>
 
-      <div class="card" style="margin-bottom:12px">
+      <section style="margin-bottom:var(--gap-section)">
         <button type="button" id="btn-etiquetas" class="list-row"
           style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
           <div class="list-row-icon">
@@ -428,10 +428,10 @@ export async function renderAjustes(container) {
           </div>
           <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
         </button>
-      </div>
+      </section>
 
-      <div class="card" style="margin-bottom:12px">
-        <p style="font-weight:600;margin-bottom:4px">${t("ajustes.bank.title")}</p>
+      <section style="margin-bottom:var(--gap-section)">
+        <div class="section-title" style="margin-bottom:4px">${t("ajustes.bank.title")}</div>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
           ${t("ajustes.bank.body")}</p>
         <button type="button" class="btn-secondary" id="btn-n26-import" style="${BTN_FULL_WIDTH}" ${state.busy ? "disabled" : ""}>${t("ajustes.bank.importBtn")}</button>
@@ -441,10 +441,10 @@ export async function renderAjustes(container) {
         <div class="banner-aviso" style="margin-top:12px;display:block"><p>${escHtml(state.n26Result)}</p></div>` : ""}
         ${state.n26Error ? `
         <div class="banner-aviso red" style="margin-top:12px;display:block"><p>${escHtml(state.n26Error)}</p></div>` : ""}
-      </div>
+      </section>
 
-      <div class="card" style="margin-bottom:12px">
-        <p style="font-weight:600;margin-bottom:4px">${t("ajustes.prefs.title")}</p>
+      <section style="margin-bottom:var(--gap-section)">
+        <div class="section-title" style="margin-bottom:4px">${t("ajustes.prefs.title")}</div>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
           ${t("ajustes.prefs.body")}</p>
         <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;cursor:pointer;margin-bottom:4px;">
@@ -477,17 +477,17 @@ export async function renderAjustes(container) {
         </label>
         <div style="font-size:11px;color:var(--text-3);">${t("ajustes.prefs.partnerNote")}</div>
         <button type="button" class="btn-secondary" id="btn-prefs-save" style="${BTN_FULL_WIDTH}margin-top:12px" ${state.busy ? "disabled" : ""}>${t("ajustes.prefs.saveBtn")}</button>
-      </div>
+      </section>
 
-      <div class="card" style="margin-bottom:12px">
-        <p style="font-weight:600;margin-bottom:4px">${t("ajustes.backup.title")}</p>
+      <section style="margin-bottom:var(--gap-section)">
+        <div class="section-title" style="margin-bottom:4px">${t("ajustes.backup.title")}</div>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
           ${t("ajustes.backup.body")}</p>
         <button type="button" class="btn-secondary" id="btn-json-export" style="${BTN_FULL_WIDTH}">${t("ajustes.backup.exportBtn")}</button>
-      </div>
+      </section>
 
-      <div class="card">
-        <p style="font-weight:600;margin-bottom:12px">${t("ajustes.about.title")}</p>
+      <section>
+        <div class="section-title" style="margin-bottom:12px">${t("ajustes.about.title")}</div>
         <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
           <a href="${FEEDBACK_URL}" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.feedback")}</a>
           <a href="${escAttr(activeLang() === "en" ? "/en/privacy.html" : "/privacidad.html")}" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.privacy")}</a>
@@ -495,7 +495,7 @@ export async function renderAjustes(container) {
           <a href="https://github.com/alvarotorresc/basecero/blob/main/LICENSE" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.license")}</a>
         </div>
         <p style="color:var(--text-2);font-size:11.5px;margin-top:12px">${t("ajustes.about.feedbackNote")}</p>
-      </div>
+      </section>
     `;
     wireMain();
   }
