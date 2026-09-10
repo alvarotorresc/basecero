@@ -696,8 +696,8 @@ export const EN = {
     },
     period: {
       title: "Period",
-      subtitle: "Opened on {date}{days}, split {mine} / {theirs}",
-      days: { one: ", {n} day", other: ", {n} days" },
+      openedOn: "Opened on {date}",
+      days: { one: "{n} day", other: "{n} days" },
       openLabel: "Open",
       shareLabel: "Default split",
       shareHint: "For new expenses, {name} pays {pct}%",
@@ -707,7 +707,10 @@ export const EN = {
       closeNote: "Closing it sets the end date. Open it the day your paycheck arrives.",
     },
     recurring: { title: "Recurring expenses and income" },
-    subscriptions: { title: "Subscriptions", sub: "The yearly cost of what you pay each month" },
+    subscriptions: {
+      title: "Subscriptions",
+      subtitleLive: { one: "{n} active, {amount} per month", other: "{n} active, {amount} per month" },
+    },
     categories: {
       title: "Categories",
       subtitleWithCount: "{n} categories, colors and icons",
@@ -719,7 +722,6 @@ export const EN = {
     },
     bank: {
       title: "Bank",
-      body: "Import your bank’s CSV statement: it creates the transactions you’re missing and reconciles the ones you already logged by hand (same amount and direction, ±3 days). Duplicates are skipped automatically. N26 CSVs are recognized on their own; other banks need a one-time setup.",
       importBtn: "Import CSV",
     },
     prefs: {

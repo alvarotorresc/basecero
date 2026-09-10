@@ -1,4 +1,5 @@
-import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta, setMetaMany, allCategoriesById, retranslateSeedNames, updatePeriodSharePct, listTags } from "../repo.js";
+import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta, setMetaMany, allCategoriesById, retranslateSeedNames, updatePeriodSharePct, listTags, listRules } from "../repo.js";
+import { activeSubscriptions, monthlyTotalCents } from "../subscriptions.js";
 import { PCT_STEP, normalizePct, stepPct } from "../share-pct.js";
 import { quickRegisterEnabled } from "../registro-mode.js";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
@@ -18,7 +19,8 @@ import { loadXlsx } from "../xlsx-loader.js";
 import { userMessage } from "../errors.js";
 import { showToast } from "../toast.js";
 import { download } from "../download.js";
-import { subHeaderHtml } from "../ui.js";
+import { subHeaderHtml, metaHtml } from "../ui.js";
+import { icon } from "../icons.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -187,6 +189,25 @@ function importResultText(res, partnerName) {
   return text;
 }
 
+// Fila-enlace de Ajustes (spec §7.1 bloque 6): 60px, SIN insignia de icono (a diferencia de
+// .list-row, que sí la lleva) — nombre + subtítulo opcional + icon("chevronRight"). `first`
+// añade el filete superior que abre el grupo; cada fila pone su propio filete inferior, así que
+// el grupo entero queda encajonado con un solo filete arriba y uno abajo (Ajustes.dc.html:98-140).
+// `subtitleHtml` llega YA seguro (t() de una clave del diccionario, o ya escapado por el llamante):
+// este helper no vuelve a escaparlo, igual que metaHtml exige de sus segmentos.
+function linkRowHtml({ id, title, subtitleHtml = "", first = false, disabled = false }) {
+  return `<button type="button" id="${id}" ${disabled ? "disabled" : ""}
+    style="display:flex;align-items:center;gap:14px;padding:10px 0;min-height:60px;width:100%;text-align:left;
+    background:none;border:0;${first ? "border-top:1px solid var(--hairline);" : ""}border-bottom:1px solid var(--hairline);
+    cursor:pointer;-webkit-tap-highlight-color:transparent;">
+    <div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;">
+      <span style="font-size:15px;font-weight:500;color:var(--ink);">${escHtml(title)}</span>
+      ${subtitleHtml ? `<span style="font-size:12px;font-weight:500;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${subtitleHtml}</span>` : ""}
+    </div>
+    ${icon("chevronRight", { stroke: "var(--ink-3)" })}
+  </button>`;
+}
+
 function periodoCardHtml(period, partnerName, periodError) {
   if (!period) return "";
   // start_date puede quedar en el futuro (se puede abrir el periodo unos días antes de que
@@ -195,31 +216,28 @@ function periodoCardHtml(period, partnerName, periodError) {
   const dias = Math.floor((new Date(hoyISO() + "T12:00:00") - new Date(period.start_date + "T12:00:00")) / 86400000) + 1;
   const diasTxt = dias >= 1 ? t("ajustes.period.days", { n: dias }) : "";
   const pct = normalizePct(period.my_share_pct, 100);
+  // Sin "reparto {mine}/{theirs}" en la fila de metadatos (Ajustes.dc.html:35-39 solo pone
+  // "Abierto el… / N días"): el reparto ya lo dice shareHint debajo, y en solo (sin partnerName)
+  // ese bloque entero desaparece, así que repetirlo aquí no aportaba nada en ningún caso.
+  const metaRow = metaHtml([t("ajustes.period.openedOn", { date: fmtDiaCorto(period.start_date) }), diasTxt]);
   return `
-  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
-    <div class="section-title">${t("ajustes.period.title")}</div>
-    <div class="card" style="display:flex;flex-direction:column;gap:14px">
+  <section style="margin-bottom:var(--gap-section)">
+    <div class="section-title" style="padding-bottom:16px">${t("ajustes.period.title")}</div>
+    <div style="display:flex;flex-direction:column;gap:18px;padding:18px 0;border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline)">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-        <div style="display:flex;flex-direction:column;gap:3px">
-          <div style="font-size:15px;font-weight:700">${escHtml(period.name)}</div>
-          <div style="font-size:11px;color:var(--text-3)">
-            ${t("ajustes.period.subtitle", { date: fmtDiaCorto(period.start_date), days: diasTxt, mine: period.my_share_pct, theirs: 100 - period.my_share_pct })}
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;background:var(--card2);border-radius:10px;padding:6px 9px;flex-shrink:0">
-          <div style="width:7px;height:7px;border-radius:4px;background:var(--green)"></div>
-          <div style="font-size:11px;font-weight:600;color:var(--text-2)">${t("ajustes.period.openLabel")}</div>
-        </div>
+        <span style="font-size:16px;font-weight:600;color:var(--ink)">${escHtml(period.name)}</span>
+        <span class="state-pill">${t("ajustes.period.openLabel")}</span>
       </div>
+      ${metaRow}
       ${partnerName ? `
       <div style="display:flex; align-items:center; gap:10px;">
         <div style="flex:1; min-width:0;">
           <div style="font-size:14px; font-weight:600;">${t("ajustes.period.shareLabel")}</div>
-          <div style="font-size:11px; color:var(--text-3);">${t("ajustes.period.shareHint", { name: escHtml(partnerName), pct: 100 - pct })}</div>
+          <div style="font-size:12px; font-weight:500; color:var(--ink-3); line-height:1.35;">${t("ajustes.period.shareHint", { name: escHtml(partnerName), pct: 100 - pct })}</div>
         </div>
-        <button type="button" id="aj-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
-        <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${pct} %</div>
-        <button type="button" id="aj-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+        <button type="button" id="aj-pct-down" class="stepper-btn lg" aria-label="${escAttr(t("common.split.decreaseAria"))}">${icon("minus")}</button>
+        <div class="num" style="font-size:17px; font-weight:600; width:50px; text-align:center; flex-shrink:0;">${pct} %</div>
+        <button type="button" id="aj-pct-up" class="stepper-btn lg" aria-label="${escAttr(t("common.split.increaseAria"))}">${icon("plus")}</button>
       </div>
       ${periodError ? `<div class="banner-aviso red">${escHtml(periodError)}</div>` : ""}` : ""}
       <button type="button" id="btn-informe" class="list-row"
@@ -235,13 +253,13 @@ function periodoCardHtml(period, partnerName, periodError) {
         <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
       </button>
       <button type="button" class="btn-secondary" id="btn-cerrar-periodo" style="width:100%">${t("ajustes.period.closeBtn")}</button>
-      <div style="font-size:11px;color:var(--text-3);line-height:1.5">
+      <div style="font-size:12px;color:var(--ink-3);line-height:1.5">
         ${partnerName
           ? t("ajustes.period.closeNoteWithPartner", { name: escHtml(partnerName) })
           : t("ajustes.period.closeNote")}
       </div>
     </div>
-  </div>`;
+  </section>`;
 }
 
 /** Pantalla de Ajustes: export/import de la hoja .xlsx (motor de fase 2), cierre del periodo
@@ -270,6 +288,19 @@ export async function renderAjustes(container) {
   // aislado que categoryCount: un fallo aquí no debe dejar Ajustes en blanco.
   let tagCount = 0;
   try { tagCount = (await listTags()).length; } catch { tagCount = 0; }
+
+  // Subtítulo vivo de la fila "Suscripciones" (Task 6.2, spec §7.1 bloque 6): activeSubscriptions
+  // y monthlyTotalCents ya los expone subscriptions.js (P4) sobre las reglas que ya carga
+  // Recurrentes/Suscripciones — mismo try/catch aislado que categoryCount/tagCount de arriba.
+  let subsCount = 0, subsMonthlyCents = 0;
+  try {
+    const rules = await listRules();
+    subsCount = activeSubscriptions(rules).length;
+    subsMonthlyCents = monthlyTotalCents(rules);
+  } catch { subsCount = 0; subsMonthlyCents = 0; }
+  const subsSubtitle = t("ajustes.subscriptions.subtitleLive", {
+    n: subsCount, amount: `<span class="num">${escHtml(fmtMoney(subsMonthlyCents))}</span>`,
+  });
 
   const state = {
     errors: null, pending: null, busy: false, n26Result: null, n26Error: null,
@@ -368,73 +399,11 @@ export async function renderAjustes(container) {
       ${periodoCardHtml(openPeriod, partnerName, state.periodError)}
 
       <section style="margin-bottom:var(--gap-section)">
-        <button type="button" id="btn-recurrentes" class="list-row"
-          style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-          <div class="list-row-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 12a9 9 0 019-9 9 9 0 018 4.6M21 12a9 9 0 01-9 9 9 9 0 01-8-4.6"></path><path d="M20 3v5h-5M4 21v-5h5"></path>
-            </svg>
-          </div>
-          <div class="list-row-body">
-            <div class="list-row-title">${t("ajustes.recurring.title")}</div>
-          </div>
-          <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
-        </button>
-      </section>
-
-      <section style="margin-bottom:var(--gap-section)">
-        <button type="button" id="btn-suscripciones" class="list-row"
-          style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-          <div class="list-row-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3.5" y="5" width="17" height="15.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path>
-            </svg>
-          </div>
-          <div class="list-row-body">
-            <div class="list-row-title">${t("ajustes.subscriptions.title")}</div>
-            <div class="list-row-sub">${t("ajustes.subscriptions.sub")}</div>
-          </div>
-          <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
-        </button>
-      </section>
-
-      <section style="margin-bottom:var(--gap-section)">
-        <button type="button" id="btn-categorias" class="list-row"
-          style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-          <div class="list-row-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="3"></circle><circle cx="5" cy="6" r="2"></circle><circle cx="19" cy="6" r="2"></circle><circle cx="5" cy="18" r="2"></circle><circle cx="19" cy="18" r="2"></circle>
-            </svg>
-          </div>
-          <div class="list-row-body">
-            <div class="list-row-title">${t("ajustes.categories.title")}</div>
-            <div class="list-row-sub">${escHtml(catSubtitle)}</div>
-          </div>
-          <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
-        </button>
-      </section>
-
-      <section style="margin-bottom:var(--gap-section)">
-        <button type="button" id="btn-etiquetas" class="list-row"
-          style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-          <div class="list-row-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 11V4h7l9 9-7 7z"></path><circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none"></circle>
-            </svg>
-          </div>
-          <div class="list-row-body">
-            <div class="list-row-title">${t("ajustes.tags.title")}</div>
-            <div class="list-row-sub">${t("ajustes.tags.sub", { n: tagCount })}</div>
-          </div>
-          <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
-        </button>
-      </section>
-
-      <section style="margin-bottom:var(--gap-section)">
-        <div class="section-title" style="margin-bottom:4px">${t("ajustes.bank.title")}</div>
-        <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
-          ${t("ajustes.bank.body")}</p>
-        <button type="button" class="btn-secondary" id="btn-n26-import" style="${BTN_FULL_WIDTH}" ${state.busy ? "disabled" : ""}>${t("ajustes.bank.importBtn")}</button>
+        ${linkRowHtml({ id: "btn-recurrentes", title: t("ajustes.recurring.title"), first: true })}
+        ${linkRowHtml({ id: "btn-suscripciones", title: t("ajustes.subscriptions.title"), subtitleHtml: subsSubtitle })}
+        ${linkRowHtml({ id: "btn-categorias", title: t("ajustes.categories.title"), subtitleHtml: escHtml(catSubtitle) })}
+        ${linkRowHtml({ id: "btn-etiquetas", title: t("ajustes.tags.title"), subtitleHtml: escHtml(t("ajustes.tags.sub", { n: tagCount })) })}
+        ${linkRowHtml({ id: "btn-n26-import", title: t("ajustes.bank.title"), subtitleHtml: escHtml(t("ajustes.bank.importBtn")), disabled: state.busy })}
         <input type="file" id="n26-file-input" accept=".csv" style="display:none">
 
         ${state.n26Result ? `

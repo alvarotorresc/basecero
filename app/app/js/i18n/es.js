@@ -711,8 +711,10 @@ export const ES = {
     },
     period: {
       title: "Periodo",
-      subtitle: "Abierto el {date}{days}, reparto {mine} / {theirs}",
-      days: { one: ", {n} día", other: ", {n} días" },
+      // openedOn/days: segmentos de metaHtml (SISTEMA.md §4.18/§1) — la fila de metadatos de
+      // Periodo, sin el reparto (Ajustes.dc.html:35-39 no lo repite: ya lo dice shareHint debajo).
+      openedOn: "Abierto el {date}",
+      days: { one: "{n} día", other: "{n} días" },
       openLabel: "Abierto",
       shareLabel: "Reparto por defecto",
       shareHint: "Para los gastos nuevos, {name} paga el {pct} %",
@@ -722,7 +724,12 @@ export const ES = {
       closeNote: "Al cerrar fijarás la fecha final. Ábrelo el día que entre la nómina.",
     },
     recurring: { title: "Gastos e ingresos recurrentes" },
-    subscriptions: { title: "Suscripciones", sub: "El coste anual de lo que pagas cada mes" },
+    subscriptions: {
+      title: "Suscripciones",
+      // subtitleLive: dato vivo (activeSubscriptions + monthlyTotalCents de subscriptions.js),
+      // sustituye al texto fijo de antes (Ajustes.dc.html:89).
+      subtitleLive: { one: "{n} activa, {amount} al mes", other: "{n} activas, {amount} al mes" },
+    },
     categories: {
       title: "Categorías",
       subtitleWithCount: "{n} categorías, colores e iconos",
@@ -732,9 +739,10 @@ export const ES = {
       title: "Etiquetas de proyecto",
       sub: { one: "{n} activa", other: "{n} activas" },
     },
+    // body (con la explicación larga del import CSV) se borra: la fila-enlace de Banco (Task 6.2,
+    // spec §7.1 bloque 6) ya no lleva párrafo de descripción, solo título + subtítulo "Importar CSV".
     bank: {
       title: "Banco",
-      body: "Importa el extracto CSV de tu banco: crea los movimientos que faltan y concilia los que ya registraste a mano (mismo importe y sentido, ±3 días). Las duplicadas se saltan solas. Los CSV de N26 se reconocen solos; los de otros bancos te los pedimos configurar una vez.",
       importBtn: "Importar CSV",
     },
     prefs: {
