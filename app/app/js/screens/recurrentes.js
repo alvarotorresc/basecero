@@ -338,10 +338,6 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
         <input type="text" id="rec-name" value="${escAttr(f.name)}" placeholder="${t("common.egPlaceholder", { example: t("recurrentes.form.namePlaceholderExample") })}">
       </label>
 
-      <div class="segmented" style="margin-bottom:18px;">
-        ${TIPOS_RULE.map((tr) => `<button type="button" data-tipo="${tr.id}" class="${f.type === tr.id ? "active" : ""}">${t(tr.labelKey)}</button>`).join("")}
-      </div>
-
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
         <div class="section-title">${t("common.amount")}</div>
         <div class="amount-display" style="align-items:center;">
@@ -350,6 +346,10 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
           <span class="amount-currency" style="font-size:17px;">${currencySymbol()}</span>
         </div>
         <hr class="divider" style="margin-top:6px;">
+      </div>
+
+      <div class="segmented" style="margin-bottom:18px;">
+        ${TIPOS_RULE.map((tr) => `<button type="button" data-tipo="${tr.id}" class="${f.type === tr.id ? "active" : ""}">${t(tr.labelKey)}</button>`).join("")}
       </div>
 
       ${cats.length ? `
