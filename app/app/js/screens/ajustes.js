@@ -12,7 +12,7 @@ import { renderEtiquetas } from "./etiquetas.js";
 import { renderInforme } from "./informe.js";
 import { pushBack, goBack } from "../back.js";
 import { importCsv, importWithProfile } from "../n26.js";
-import { buildProfile, applyProfile, detectDateFormat, detectDecimal, parseDateIso, parseAmountCents } from "../csv-generic.js";
+import { buildProfile, applyProfile, detectDateFormat, detectDecimal, parseDateIso, parseAmountCents, summarizeReasons } from "../csv-generic.js";
 import { encryptBackup, decryptBackup, isEncryptedBackup, WrongPassphraseError, MIN_PASSPHRASE } from "../backup-crypto.js";
 import { t, LANGS, activeLang } from "../i18n/index.js";
 import { loadXlsx } from "../xlsx-loader.js";
@@ -742,10 +742,18 @@ export async function renderAjustes(container) {
     };
   }
 
-  // Fondo de las 3 cajas "de tarjeta suelta" del asistente (fichero / preview / nota del pie):
-  // 16px/12-16, no la .card de app.css (22px/16 — pensada para las secciones de nivel de
-  // pantalla) — mismo criterio que la caja de vista previa de nombre en categorias.js:renderForm.
-  const ASSIST_BOX_STYLE = "background:var(--card);border-radius:0;padding:12px 16px;";
+  /** Nota de detección (fecha/importe), ya con el icono fuera del copy (spec §7.2 bloque 3, D14):
+   *  la de éxito lleva icon("check") + metaHtml (un solo segmento — el helper no exige más de
+   *  uno); la de error se queda como texto plano en --danger, sin icono (no hay «check» que
+   *  poner delante de un fallo). */
+  function detectionNoteHtml(note) {
+    if (!note) return "";
+    if (note.ok) {
+      return `<div style="display:flex;align-items:flex-start;gap:6px;margin-top:5px;">`
+        + icon("check", { size: 16, stroke: "var(--pos)" }) + metaHtml([note.text], { cls: "pos" }) + `</div>`;
+    }
+    return `<div style="font-size:11px;color:var(--red);margin-top:5px;">${escHtml(note.text)}</div>`;
+  }
 
   /** Subvista "asistente de mapeo" (Task 6, PR E): se abre cuando importCsv() devuelve
    *  needsMapping. Recalcula notas/preview/contador/CTA en cada render a partir de
@@ -790,36 +798,42 @@ export async function renderAjustes(container) {
       readableCount = rows.length;
       const total = rows.length + errors.length;
       const previewRows = rows.slice(0, 3);
-      const counterOk = errors.length === 0;
-      // Tres estados: verde = todo legible, rojo = nada legible (0 filas importarían), ámbar =
-      // parcial — el CTA de abajo ya bloquea el caso rojo, pero el color tiene que reflejarlo.
-      const counterColor = counterOk ? "var(--green)" : (rows.length === 0 ? "var(--red)" : "var(--amber)");
-      const counterText = counterOk
-        ? t("ajustes.assist.counterOk", { readable: rows.length, total })
-        : t("ajustes.assist.counterWarn", { readable: rows.length, total, line: errors[0].line, reason: errors[0].reason });
+      // La primera línea es --pos salvo el caso extremo de "nada legible" (rows.length === 0):
+      // el CTA ya lo bloquea, pero el color lo remarca — decisión tomada al migrar, el artboard
+      // solo dibuja el caso feliz. La segunda línea (--warn, con los motivos de summarizeReasons)
+      // solo aparece cuando hay algún error (spec §7.2 bloque 5).
+      const line1Color = rows.length > 0 ? "var(--green)" : "var(--red)";
+      const line1 = t("ajustes.assist.counterOk", { readable: rows.length, total });
+      const line2 = errors.length > 0
+        ? `${t("ajustes.assist.counterWarnLine", { n: errors.length })}: `
+          + t("ajustes.assist.counterReasons", { reasons: summarizeReasons(errors).join(", ") })
+        : "";
 
       previewHtml = `
-      <div style="${ASSIST_BOX_STYLE}">
-        <div class="section-title" style="margin-bottom:6px;">${t("ajustes.assist.previewTitle")}</div>
-        ${previewRows.map((r, i) => {
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <div class="section-title" style="margin-bottom:8px;">${t("ajustes.assist.previewTitle")}</div>
+        ${previewRows.map((r) => {
           // merchant||note, mismo criterio que movimientos.js (líneas 53/65/76): la contraparte
           // manda como etiqueta reconocible; si no hay columna de contraparte asignada, cae al
           // concepto — ningún campo mapeado queda sin sitio donde mostrarse.
           const label = r.partnerName || r.paymentReference || t("ajustes.assist.noConcept");
           const income = r.amountCents >= 0;
-          const rowStyle = `display:flex;align-items:center;gap:10px;padding:8px 0;`
-            + (i < previewRows.length - 1 ? "border-bottom:1px solid var(--rule);" : "");
           return `
-          <div style="${rowStyle}">
-            <span style="color:var(--green);font-weight:700;flex-shrink:0;">✓</span>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(label)}</div>
-              <div class="num" style="font-size:10.5px;color:var(--text-3);">${escHtml(r.bookingDate)}</div>
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule);">
+            <div style="width:20px;height:20px;border-radius:var(--r-circle);background:var(--pos-tint);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              ${icon("check", { size: 14, stroke: "var(--pos)" })}
             </div>
-            <div class="num" style="font-size:13px;font-weight:700;${income ? "color:var(--green);" : ""}">${escHtml(fmtMoney(r.amountCents))}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(label)}</div>
+              <div class="num" style="font-size:11px;color:var(--ink-3);">${escHtml(r.bookingDate)}</div>
+            </div>
+            <div class="num" style="font-size:15px;font-weight:600;${income ? "color:var(--green);" : ""}">${escHtml(fmtMoney(r.amountCents))}</div>
           </div>`;
         }).join("")}
-        <div class="num" style="font-size:11px;color:${counterColor};padding-top:8px;">${escHtml(counterText)}</div>
+        <div style="display:flex;flex-direction:column;gap:4px;padding-top:10px;">
+          <span style="font-size:12px;font-weight:600;color:${line1Color};">${escHtml(line1)}</span>
+          ${line2 ? `<span style="font-size:12px;font-weight:500;color:var(--warn);line-height:1.5;">${escHtml(line2)}</span>` : ""}
+        </div>
       </div>`;
     }
 
@@ -831,36 +845,39 @@ export async function renderAjustes(container) {
     container.innerHTML = `
       ${subHeaderHtml({ id: "assist-close", title: t("ajustes.assist.title") })}
 
-      <div style="display:flex;flex-direction:column;gap:16px;">
+      <div style="display:flex;flex-direction:column;gap:26px;">
 
-        <div style="${ASSIST_BOX_STYLE}display:flex;align-items:center;gap:12px;">
-          <div style="width:36px;height:36px;border-radius:0;background:var(--card2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3H6.5A1.5 1.5 0 005 4.5v15A1.5 1.5 0 006.5 21h11a1.5 1.5 0 001.5-1.5V9z"></path><path d="M13 3v6h6M8.5 13h7M8.5 16.5h7"></path></svg>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:44px;height:44px;border-radius:var(--r-0);background:var(--surface-2);border:1px solid var(--hairline-strong);box-sizing:border-box;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            ${icon("file", { stroke: "var(--ink-2)" })}
           </div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(a.fileName)}</div>
-            <div style="font-size:11.5px;color:var(--text-2);">${t("ajustes.assist.rows", { n: a.totalRows })}</div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;">
+            <span style="font-size:15px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(a.fileName)}</span>
+            ${metaHtml([t("ajustes.assist.rowCount", { n: a.totalRows }), t("ajustes.assist.unknownFormat")])}
           </div>
         </div>
 
         <div>
-          <div class="section-title" style="margin-bottom:7px;">${t("ajustes.assist.dateTitle")}</div>
+          <span class="field-label" style="display:block;margin-bottom:7px;">${t("ajustes.assist.dateTitle")}</span>
           ${chipsRowHtml("date", headerOptions, a.date)}
-          ${dateNote ? `<div class="num" style="font-size:11px;color:${dateNote.ok ? "var(--green)" : "var(--red)"};margin-top:5px;">${escHtml(dateNote.text)}</div>` : ""}
+          ${detectionNoteHtml(dateNote)}
         </div>
 
         <div>
-          <div class="section-title" style="margin-bottom:7px;">${t("ajustes.assist.conceptTitle")}</div>
+          <span class="field-label" style="display:block;margin-bottom:7px;">${t("ajustes.assist.conceptTitle")}</span>
           ${chipsRowHtml("concept", headerOptions, a.concept)}
         </div>
 
         <div>
-          <div class="section-title" style="margin-bottom:7px;">${t("ajustes.assist.counterpartyTitle")}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
+            <span class="field-label">${t("ajustes.assist.counterpartyTitle")}</span>
+            <span class="state-pill">${t("common.optional")}</span>
+          </div>
           ${chipsRowHtml("counterparty", [...headerOptions, { value: null, label: t("ajustes.assist.noColumn") }], a.counterparty)}
         </div>
 
         <div>
-          <div class="section-title" style="margin-bottom:7px;">${t("ajustes.assist.amountTitle")}</div>
+          <span class="field-label" style="display:block;margin-bottom:7px;">${t("ajustes.assist.amountTitle")}</span>
           <div class="segmented" style="border-radius:999px;margin-bottom:8px;">
             <button type="button" data-assist-kind="single" class="${a.amountKind === "single" ? "active" : ""}"
               style="border-radius:999px;${a.amountKind === "single" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("ajustes.assist.amountSingleBtn")}</button>
@@ -868,11 +885,11 @@ export async function renderAjustes(container) {
               style="border-radius:999px;${a.amountKind === "split" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("ajustes.assist.amountSplitBtn")}</button>
           </div>
           ${a.amountKind === "single" ? chipsRowHtml("amountCol", headerOptions, a.amountCol) : `
-          <div class="section-title" style="margin:0 0 6px;">${t("ajustes.assist.debitTitle")}</div>
+          <span class="field-label" style="display:block;margin:0 0 6px;">${t("ajustes.assist.debitTitle")}</span>
           ${chipsRowHtml("debitCol", headerOptions, a.debitCol)}
-          <div class="section-title" style="margin:10px 0 6px;">${t("ajustes.assist.creditTitle")}</div>
+          <span class="field-label" style="display:block;margin:10px 0 6px;">${t("ajustes.assist.creditTitle")}</span>
           ${chipsRowHtml("creditCol", headerOptions, a.creditCol)}`}
-          ${amountNote ? `<div class="num" style="font-size:11px;color:${amountNote.ok ? "var(--green)" : "var(--red)"};margin-top:5px;">${escHtml(amountNote.text)}</div>` : ""}
+          ${detectionNoteHtml(amountNote)}
         </div>
 
         ${previewHtml}
@@ -881,10 +898,7 @@ export async function renderAjustes(container) {
 
         <button type="button" class="btn-primary" id="assist-save" style="width:100%;${ctaDisabled ? "opacity:0.45;" : ""}" ${ctaDisabled ? "disabled" : ""}>${t("ajustes.assist.saveBtn")}</button>
 
-        <div style="${ASSIST_BOX_STYLE}display:flex;align-items:center;gap:10px;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.01"></path></svg>
-          <div style="font-size:11.5px;color:var(--text-2);">${t("ajustes.assist.footNote")}</div>
-        </div>
+        <p style="font-size:12px;color:var(--ink-3);line-height:1.5;margin:0;">${t("ajustes.assist.footNote")}</p>
       </div>
     `;
     wireAssistant(profile, profileValid);

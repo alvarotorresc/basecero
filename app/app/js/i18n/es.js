@@ -781,13 +781,14 @@ export const ES = {
     },
     assist: {
       title: "Configura tu banco",
-      rows: {
-        one: "{n} fila, formato no reconocido — dinos qué es cada columna, solo esta vez",
-        other: "{n} filas, formato no reconocido — dinos qué es cada columna, solo esta vez",
-      },
+      // rowCount/unknownFormat: segmentos de metaHtml (spec §7.2 bloque 2) para la fila de
+      // fichero — sustituyen a la vieja "rows" (una sola cadena con el aviso "dinos qué es cada
+      // columna" ya cubierto por footNote, así que no se traslada).
+      rowCount: { one: "{n} fila", other: "{n} filas" },
+      unknownFormat: "formato no reconocido",
       dateTitle: "Fecha",
       conceptTitle: "Concepto",
-      counterpartyTitle: "Contraparte (opcional)",
+      counterpartyTitle: "Contraparte",
       noColumn: "— sin columna",
       amountTitle: "Importe",
       amountSingleBtn: "Una columna con signo",
@@ -797,7 +798,11 @@ export const ES = {
       noConcept: "(sin concepto)",
       previewTitle: "Así se leerán tus movimientos",
       counterOk: "{readable} de {total} filas se leen bien",
-      counterWarn: "{readable} de {total} filas se leen bien, fila {line}: {reason}",
+      // counterWarnLine + counterReasons: la segunda línea del pie (spec §7.2 bloque 5), con los
+      // motivos que junta summarizeReasons(errors) — sustituyen a la vieja "counterWarn", que
+      // citaba solo el PRIMER error (errors[0]) en una sola línea.
+      counterWarnLine: { one: "1 fila no se lee", other: "{n} filas no se leen" },
+      counterReasons: "{reasons}",
       saveBtn: "Guardar perfil e importar",
       footNote: "El perfil se guarda en tu dispositivo: la próxima vez este banco se importa directo. Los CSV de N26 se reconocen solos, sin configurar nada.",
       dateFormat: { iso: "año-mes-día", dmy: "día/mes/año" },

@@ -1151,3 +1151,10 @@ body.onboarding .fab { display: none; }
    anillo de foco de esas reglas (`input:focus-visible ~ .toggle-track`): sin esto, el botón no
    muestra foco por teclado. Clase propia — .toggle no está en la lista de selectores de P4. */
 .rec-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* ===================== P6 · Ajustes ===================== */
+
+/* .meta-row ya fija --ink-3 (app.css P0): las notas de detección del asistente de import
+   (ImportAsistente.dc.html, spec §7.2 bloque 3) van en --pos con un icon("check") delante en
+   vez del glifo de texto que llevaban — este modificador es lo único que falta para que
+   metaHtml() pueda pintarlas en ese color sin tocar la regla compartida de P0. */
+.meta-row.pos { color: var(--pos); }
