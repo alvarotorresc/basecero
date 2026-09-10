@@ -296,7 +296,11 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     if (parsed.merchant != null) state.merchant = parsed.merchant;
     if (parsed.categoryId != null) { state.categoryId = parsed.categoryId; state.touched.add("categoryId"); }
     if (parsed.accountId != null) { state.accountId = parsed.accountId; state.touched.add("accountId"); }
-    if (parsed.date != null) state.fecha = parsed.date;
+    // D-1 (revisión de código): findDate SIEMPRE devuelve una fecha (today cuando no encuentra
+    // nada, natural.js#findDate), así que `parsed.date != null` nunca es falso — una frase sin
+    // fecha pisaba la que el usuario ya había elegido a mano. `spans.date` sí distingue "la frase
+    // decía una fecha" de "no decía nada".
+    if (parsed.spans?.date) state.fecha = parsed.date;
     if (parsed.shared) {
       state.isShared = true;
       state.touched.add("isShared");
