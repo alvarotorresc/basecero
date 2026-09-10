@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CONTRACT, ENUMS, TEXT_DEFAULTS, eurToCents, centsToEur, toIsoDate, xlsxHeader, insertSql } from "../../app/app/js/contract.js";
+import { CONTRACT, ENUMS, BOOL_COLS, TEXT_DEFAULTS, eurToCents, centsToEur, toIsoDate, xlsxHeader, insertSql } from "../../app/app/js/contract.js";
 
 test("columnas canónicas de transactions (orden del schema)", () => {
   assert.deepEqual(CONTRACT.transactions.cols, [
@@ -48,4 +48,17 @@ test("ENUMS.transactions.paid_by es exactamente me/partner (sin cadena vacía)",
 
 test("TEXT_DEFAULTS: paid_by de transactions cae a me", () => {
   assert.equal(TEXT_DEFAULTS.transactions.paid_by, "me");
+});
+
+// Suscripciones (v3): is_subscription y cancelled_at entre is_active y created_at — mismo criterio
+// de colocación semántica que paid_by en transactions.
+test("columnas canónicas de recurring_rules: is_subscription y cancelled_at entre is_active y created_at", () => {
+  assert.deepEqual(CONTRACT.recurring_rules.cols, [
+    "id", "name", "type", "amount_cents", "category_id", "account_id", "counter_account_id",
+    "frequency", "due_day", "due_month", "is_shared", "is_active", "is_subscription", "cancelled_at",
+    "created_at", "updated_at", "deleted"]);
+});
+
+test("BOOL_COLS.recurring_rules incluye is_subscription", () => {
+  assert.deepEqual(BOOL_COLS.recurring_rules, ["is_shared", "is_active", "is_subscription", "deleted"]);
 });

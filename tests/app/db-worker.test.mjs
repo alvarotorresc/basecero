@@ -9,6 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
+import { MIGRATIONS } from "../../app/app/js/migrations.js";
 
 /** Reproduce el guard añadido al principio de self.onmessage en db-worker.js:
  *    if (op !== "init" && db === null) { postMessage({ id, error: "not_initialized" }); return; }
@@ -97,4 +98,34 @@ test("B5 (fix): el camino feliz no cambia — un execMany sin errores sigue comm
   execManyGuarded(db, [{ sql: "INSERT INTO t VALUES (?)", bind: [1] }, { sql: "INSERT INTO t VALUES (?)", bind: [2] }]);
   const rows = db.prepare("SELECT x FROM t ORDER BY x").all();
   assert.deepEqual(rows.map((r) => r.x), [1, 2]);
+});
+
+/** Reproduce LÍNEA A LÍNEA el bucle de db-worker.js:27-33 (colsByTable), que hasta esta PR nunca
+ *  se había ejercido con más de una tabla (MIGRATIONS solo tenía entradas de "transactions").
+ *  Suscripciones (v3) añade una entrada de "recurring_rules", así que este test fija: se consulta
+ *  UNA vez cada tabla DISTINTA de MIGRATIONS, y ninguna que MIGRATIONS no declare (goals, aquí,
+ *  representa cualquier tabla ajena a las migraciones — no debe consultarse). */
+test("init: el bucle del PRAGMA consulta una vez cada tabla que MIGRATIONS declara, ninguna más", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT)");
+  db.exec("CREATE TABLE transactions (id TEXT, paid_by TEXT)");
+  db.exec("CREATE TABLE recurring_rules (id TEXT, is_subscription INTEGER)");
+  db.exec("CREATE TABLE goals (id TEXT)"); // tabla real, pero NINGUNA migración la declara
+
+  const queried = [];
+  const colsByTable = {};
+  for (const table of [...new Set(MIGRATIONS.map((m) => m.table))]) {
+    queried.push(table);
+    const cols = [];
+    // rowMode:"object" no existe en node:sqlite: se reproduce con .all() + .map(), equivalente
+    // a resultRows del sqlite3 wasm real para lo que este test comprueba (qué tablas se consultan).
+    for (const c of db.prepare(`PRAGMA table_info(${table})`).all()) cols.push(c.name);
+    colsByTable[table] = cols;
+  }
+
+  assert.deepEqual([...new Set(queried)].sort(), ["recurring_rules", "transactions"]);
+  assert.equal(queried.length, new Set(queried).size, "cada tabla se consulta EXACTAMENTE una vez");
+  assert.ok(colsByTable.transactions.includes("paid_by"));
+  assert.ok(colsByTable.recurring_rules.includes("is_subscription"));
+  assert.ok(!("goals" in colsByTable), "una tabla que MIGRATIONS no declara nunca se consulta");
 });

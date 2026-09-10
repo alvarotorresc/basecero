@@ -827,6 +827,7 @@ export const EN = {
       paidByAccount: "sheet “transactions” row {row}: an expense paid by your partner cannot have an account",
       refundOfPartnerPaid: "sheet “transactions” row {row}: a refund cannot link an expense paid by the partner",
       budgetDuplicate: "sheet “budgets” row {row}: another live limit already exists for the same period/category pair (row {first})",
+      cancelledActive: "sheet “recurring_rules” row {row}: cancelled_at can't have a value with is_active=1",
     },
     csvGeneric: {
       invalidHeaders: "invalid headers",
