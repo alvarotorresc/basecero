@@ -669,6 +669,7 @@ export const EN = {
     sheet: {
       title: "Your spreadsheet",
       body: "Export all your data to an editable .xlsx (LibreOffice/Sheets), or import a spreadsheet to replace your current data. The encrypted backup (.bce) is also imported from here.",
+      attachmentsNote: "The encrypted backup (.bce) includes the photos; the spreadsheet (.xlsx) doesn’t",
       exportBtn: "Export spreadsheet (.xlsx)",
       importBtn: "Import spreadsheet (.xlsx)",
       encWarn: {

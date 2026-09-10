@@ -697,6 +697,9 @@ export const ES = {
     sheet: {
       title: "Tu hoja de cálculo",
       body: "Exporta todos tus datos a un .xlsx editable en LibreOffice/Sheets, o importa una hoja para sustituir los datos actuales. La copia cifrada (.bce) también se importa desde aquí.",
+      // Foto del ticket (N5, §9.6/§9.7): la foto es un adjunto, no un dato del contrato — solo
+      // viaja en la copia cifrada.
+      attachmentsNote: "La copia cifrada (.bce) incluye las fotos; la hoja (.xlsx) no",
       exportBtn: "Exportar hoja (.xlsx)",
       importBtn: "Importar hoja (.xlsx)",
       encWarn: {

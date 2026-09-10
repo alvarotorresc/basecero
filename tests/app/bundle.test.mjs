@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { X } from "./helpers.mjs";
-import { isBundle, packBundle, unpackBundle } from "../../app/app/js/bundle.js";
+import { isBundle, packBundle, unpackBundle, unpackRestore } from "../../app/app/js/bundle.js";
 import { UserError } from "../../app/app/js/errors.js";
 
 // ---- isBundle: pura, sin CFB, sobre el magic crudo -------------------------
@@ -14,6 +14,12 @@ test("isBundle: el magic CFB (D0 CF 11 E0 A1 B1 1A E1) es un paquete", () => {
 test("isBundle: un .bce antiguo (el ZIP del .xlsx, PK\\x03\\x04) NO es un paquete", () => {
   const bytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4]);
   assert.equal(isBundle(bytes), false);
+});
+
+test("isBundle: reconoce el magic también sobre un ArrayBuffer suelto, no solo Uint8Array", () => {
+  const bytes = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+  const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  assert.equal(isBundle(arrayBuffer), true);
 });
 
 test("isBundle: 2 bytes de basura no lanza y devuelve false", () => {
@@ -80,6 +86,34 @@ test("unpackBundle: descarta lo que no es un stream de fichero (Root Entry y el 
   assert.deepEqual(entries.map((e) => e.name), ["data.xlsx"]);
 });
 
+// XLSX.write(wb, {type:"array"}) devuelve un ArrayBuffer CRUDO, no un Uint8Array (comprobado a
+// mano contra el fichero vendorizado) — y ese es exactamente el valor que ajustes.js mete como
+// `data` de "data.xlsx" al llamar a packBundle. Sin normalizar antes de cfb_add, ese entry queda
+// VACIO sin avisar: no hay excepción, ni test que lo detecte salvo comprobar el tamaño real.
+test("round-trip: un ArrayBuffer crudo (lo que devuelve XLSX.write) no se queda vacío", () => {
+  const wb = X.utils.book_new();
+  X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet([["a", "b"], [1, 2]]), "S");
+  const arr = X.write(wb, { type: "array", bookType: "xlsx" });
+  assert.ok(arr instanceof ArrayBuffer, "sentinela: si SheetJS cambia esto de tipo, este test debe fallar en rojo aquí");
+  const bytes = packBundle(X.CFB, [{ name: "data.xlsx", data: arr }]);
+  const entries = unpackBundle(X.CFB, bytes);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].data.length, arr.byteLength, "el entry no debe llegar vacío");
+});
+
+test("unpackRestore: acepta un ArrayBuffer suelto (no solo Uint8Array) sin perder las fotos", () => {
+  const xlsx = new Uint8Array([80, 75, 3, 4, 9, 9]);
+  const bytes = packBundle(X.CFB, [
+    { name: "data.xlsx", data: xlsx },
+    { name: "attachments/01ARZ3NDEKTSV4RRFFQ69G5FAV.jpg", data: new Uint8Array([7, 8]) },
+  ]);
+  const asArrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  assert.ok(asArrayBuffer instanceof ArrayBuffer);
+  const { xlsx: outXlsx, attachments } = unpackRestore(X.CFB, asArrayBuffer);
+  assert.deepEqual(new Uint8Array(outXlsx), xlsx);
+  assert.equal(attachments.length, 1);
+});
+
 test("unpackBundle: bytes truncados -> UserError, nunca el error crudo de la librería", () => {
   const full = packBundle(X.CFB, [{ name: "data.xlsx", data: new Uint8Array(50).fill(7) }]);
   const truncated = full.slice(0, 20);
@@ -87,4 +121,27 @@ test("unpackBundle: bytes truncados -> UserError, nunca el error crudo de la lib
     assert.ok(e instanceof UserError, `esperaba UserError, fue ${e.constructor.name}: ${e.message}`);
     return true;
   });
+});
+
+// ---- unpackRestore: el punto de entrada único de los DOS caminos de restauración -------------
+
+test("unpackRestore: unos bytes de paquete devuelven { xlsx, attachments: [{id, data}] }", () => {
+  const xlsx = new Uint8Array([80, 75, 3, 4, 9, 9]); // el ZIP simulado del xlsx
+  const photo = new Uint8Array([1, 2, 3]);
+  const bytes = packBundle(X.CFB, [
+    { name: "data.xlsx", data: xlsx },
+    { name: "attachments/01ARZ3NDEKTSV4RRFFQ69G5FAV.jpg", data: photo },
+  ]);
+  const { xlsx: outXlsx, attachments } = unpackRestore(X.CFB, bytes);
+  assert.deepEqual(new Uint8Array(outXlsx), xlsx);
+  assert.equal(attachments.length, 1);
+  assert.equal(attachments[0].id, "01ARZ3NDEKTSV4RRFFQ69G5FAV");
+  assert.deepEqual(new Uint8Array(attachments[0].data), photo);
+});
+
+test("unpackRestore: unos bytes que empiezan por PK (copia antigua, sin paquete) devuelven el xlsx y attachments: []", () => {
+  const xlsx = new Uint8Array([80, 75, 3, 4, 5, 5, 5]);
+  const { xlsx: outXlsx, attachments } = unpackRestore(X.CFB, xlsx);
+  assert.equal(outXlsx, xlsx, "los mismos bytes, sin tocar");
+  assert.deepEqual(attachments, []);
 });

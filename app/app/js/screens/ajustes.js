@@ -18,6 +18,8 @@ import { t, LANGS, activeLang } from "../i18n/index.js";
 import { loadXlsx } from "../xlsx-loader.js";
 import { userMessage } from "../errors.js";
 import { showToast } from "../toast.js";
+import { attachments } from "../attachments.js";
+import { packBundle, unpackRestore } from "../bundle.js";
 import { download } from "../download.js";
 import { subHeaderHtml, metaHtml } from "../ui.js";
 import { icon } from "../icons.js";
@@ -309,9 +311,13 @@ export async function renderAjustes(container) {
   };
 
   async function processImportBuffer(buf) {
-    // buf: ArrayBuffer|Uint8Array con un .xlsx EN CLARO (ya descifrado si venía cifrado)
+    // buf: ArrayBuffer|Uint8Array EN CLARO (ya descifrado si venía cifrado) — un .xlsx pelado, o
+    // un paquete CFB con el .xlsx + fotos (Registro v2 §9.6). unpackRestore distingue los dos
+    // SIN tirar de red ni de caso especial aquí: una copia antigua (isBundle a false) devuelve
+    // los mismos bytes con attachments: [].
     const XLSX = await loadXlsx();
-    const wb = XLSX.read(buf, { type: "array" });
+    const { xlsx, attachments: fotos } = unpackRestore(XLSX.CFB, buf);
+    const wb = XLSX.read(xlsx, { type: "array" });
     const { data, errors: parseErrors } = workbookToRows(XLSX, wb);
     const errors = [...parseErrors, ...validateImport(data)];
     if (errors.length) {
@@ -324,7 +330,10 @@ export async function renderAjustes(container) {
     // backup JSON completo) — el aviso de "movimientos actuales" antes de un reemplazo
     // destructivo debe contar solo las visibles, si no infla la cifra con lo ya borrado.
     const activeCount = currentDump.transactions.filter((tx) => !tx.deleted).length;
-    state.pending = { data, currentDump, currentCount: activeCount };
+    // Foto del ticket: las fotos desempaquetadas se guardan JUNTO A los datos en el objeto de
+    // confirmación — se descartan con él si el usuario cancela (#btn-import-cancel). Nada toca
+    // OPFS antes de confirmar.
+    state.pending = { data, attachments: fotos, currentDump, currentCount: activeCount };
   }
 
   // Task 6: render() es el despachador de subvista (mismo patrón que categorias.js state.view /
@@ -351,6 +360,8 @@ export async function renderAjustes(container) {
         <div class="section-title" style="margin-bottom:4px">${t("ajustes.sheet.title")}</div>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
           ${t("ajustes.sheet.body")}</p>
+        ${attachments?.available() ? `
+        <p style="color:var(--text-3);font-size:12px;margin-bottom:14px">${t("ajustes.sheet.attachmentsNote")}</p>` : ""}
         <button type="button" class="btn-secondary" id="btn-xlsx-export" style="${BTN_FULL_WIDTH}" ${state.busy ? "disabled" : ""}>${t("ajustes.sheet.exportBtn")}</button>
         <button type="button" class="btn-secondary" id="btn-xlsx-import" style="${BTN_FULL_WIDTH}margin-top:10px" ${state.busy ? "disabled" : ""}>${t("ajustes.sheet.importBtn")}</button>
         <input type="file" id="xlsx-file-input" accept=".xlsx,.bce" style="display:none">
@@ -560,9 +571,25 @@ export async function renderAjustes(container) {
       state.busy = true; render();
       try {
         const XLSX = await loadXlsx();
-        const wb = rowsToWorkbook(XLSX, await dumpAllTables());
+        const dump = await dumpAllTables();
+        const wb = rowsToWorkbook(XLSX, dump);
         const arr = XLSX.write(wb, { type: "array", bookType: "xlsx" });
-        const enc = await encryptBackup(arr, p1);
+        // Foto del ticket (N5, §9.6): SOLO se envuelve en un paquete CFB si hay al menos una
+        // foto — sin fotos, el texto en claro sigue siendo el .xlsx pelado, byte a byte como
+        // hoy, y una versión anterior de la app lo sigue leyendo.
+        const photoIds = dump.transactions.filter((tx) => tx.has_attachment).map((tx) => tx.id);
+        const photos = photoIds.length && attachments
+          ? (await Promise.all(photoIds.map(async (id) => {
+              const blob = await attachments.blob(id);
+              // dumpAllTables trae también las filas BORRADAS (comentario más arriba): el borrado
+              // lógico no limpia has_attachment y §9.5 SÍ borra el fichero, así que cualquiera que
+              // haya borrado un movimiento con foto tiene filas cuyo blob(id) es null. Se
+              // descartan aquí — meterlas sería pasarle null a cfb_add.
+              return blob ? { name: `attachments/${id}.jpg`, data: new Uint8Array(await blob.arrayBuffer()) } : null;
+            }))).filter(Boolean)
+          : [];
+        const plain = photos.length ? packBundle(XLSX.CFB, [{ name: "data.xlsx", data: arr }, ...photos]) : arr;
+        const enc = await encryptBackup(plain, p1);
         download(new Blob([enc], { type: "application/octet-stream" }), `basecero-cifrado-${hoyISO()}.bce`);
         state.encExport = false;
       } catch (e) {
@@ -680,6 +707,16 @@ export async function renderAjustes(container) {
         try {
           await downloadXlsx(state.pending.currentDump, `basecero-backup-${hoyISO()}.xlsx`);
           await replaceAll(state.pending.data);
+          // Foto del ticket (N5, §9.6): las fotos van DESPUÉS del reemplazo y SOLO si fue bien —
+          // replaceAllStmts conserva los id que trae la hoja, así que attachments/<id>.jpg sigue
+          // casando. sweep() usa los ids de la BD YA IMPORTADA (state.pending.data), nunca los de
+          // currentDump (la copia de ANTES de importar) — si no, borraría los ficheros que
+          // acaba de escribir. Todos los `await` van ANTES de location.reload(): en un móvil
+          // lento, "en paralelo" a la recarga las perdería a medias.
+          if (attachments) {
+            for (const f of state.pending.attachments) await attachments.put(f.id, f.data);
+            await attachments.sweep(state.pending.data.transactions.map((r) => r.id));
+          }
           location.reload();
         } catch (err) {
           state.busy = false;
