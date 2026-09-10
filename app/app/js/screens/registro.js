@@ -285,7 +285,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     const summaryHtml = parts.map((p, i) => (i === 0 ? "" : `<span style="width:1px;height:11px;background:var(--hairline-strong);flex-shrink:0;"></span>`)
       + `<span style="font-size:12px;font-weight:500;color:var(--text-3);">${escHtml(p)}</span>`).join("");
     return `
-    <button type="button" id="reg-more-toggle" style="display:flex; align-items:center; gap:12px; width:100%; min-height:60px; padding:10px 0; margin-top:12px; border:0; border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline); background:transparent; color:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent;">
+    <button type="button" id="reg-more-toggle" aria-expanded="false" style="display:flex; align-items:center; gap:12px; width:100%; min-height:60px; padding:10px 0; margin-top:12px; border:0; border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline); background:transparent; color:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent;">
       <div style="display:flex; flex-direction:column; gap:4px; flex:1; min-width:0;">
         <span style="font-size:14px; font-weight:600;">${t("registro.more.toggle")}</span>
         <div style="display:flex; align-items:center; gap:9px; flex-wrap:wrap;">${summaryHtml}</div>
@@ -370,7 +370,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
           }).join("")}
         </div>
         ${hidden > 0 ? `
-        <button type="button" id="reg-cats-more" style="border:0;background:transparent;color:var(--text-3);font-size:13px;font-weight:500;padding:0;height:32px;display:flex;align-items:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+        <button type="button" id="reg-cats-more" aria-expanded="false" style="border:0;background:transparent;color:var(--text-3);font-size:13px;font-weight:500;padding:0;height:44px;display:flex;align-items:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
           ${t("registro.categories.showAll", { n: cats.length })}
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9.5 12 16l7-6.5"></path></svg>
         </button>` : ""}
@@ -378,7 +378,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       })() : ""}
 
       ${warning ? `
-      <div class="limit-band ${warning.level}" id="reg-limit-band">
+      <div class="limit-band ${warning.level}" id="reg-limit-band" role="status" aria-live="polite">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5 21 19.5H3z"></path><path d="M12 10v4"></path><path d="M12 17h.01"></path></svg>
         <span id="reg-limit-text">${escHtml(limitBandText(warning))}</span>
       </div>` : ""}
