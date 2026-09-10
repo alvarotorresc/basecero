@@ -193,8 +193,15 @@ function findAmount(folded, reserved, rules) {
 
 // ---------------------------------------------------------------------- 2. compartido
 
-function findShared(folded, rules) {
-  const conMatch = folded.match(rules.sharedTrigger);
+// B-1 (revisión de código, bloqueante): `sharedTrigger` casa CUALQUIER palabra tras «con»/«with» —
+// el grupo capturado solo cuenta si es la contraparte real (spec §8.3: "solo si counterpartName no
+// está vacío", y aquí además solo si el nombre casa). Sin esto, «un café con leche» marcaba
+// compartido. «a medias»/equivalente sigue activando el reparto sin nombrar a nadie (no pasa por
+// esta comparación).
+function findShared(folded, rules, counterpartName) {
+  const raw = folded.match(rules.sharedTrigger);
+  const firstName = normalizeMerchant(counterpartName).split(" ")[0];
+  const conMatch = raw && normalizeMerchant(raw[1]) === firstName ? raw : null;
   const mediasMatch = rules.sharedAltTrigger ? folded.match(rules.sharedAltTrigger) : null;
   const pctMatch = rules.pctTrigger ? folded.match(rules.pctTrigger) : null;
   if (!conMatch && !mediasMatch && !pctMatch) return null;
@@ -326,7 +333,7 @@ export function parseNaturalExpense(text, opts = {}) {
     // 2. compartido — solo si hay contraparte (spec §8.3): sin ella, «con Marta» no consume nada
     // y «Marta» no puede colarse luego como comercio.
     if (counterpartName) {
-      const shared = findShared(folded, rules);
+      const shared = findShared(folded, rules, counterpartName);
       if (shared) {
         result.shared = true;
         if (shared.sharePct != null) result.sharePct = shared.sharePct;

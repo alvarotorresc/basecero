@@ -134,6 +134,40 @@ test("compartido: «a medias» activa shared sin nombrar a nadie", () => {
   assert.equal(r.shared, true);
 });
 
+// B-1 (revisión de código, bloqueante): «con <cualquier palabra>» NO debe activar compartido —
+// solo si la palabra que sigue a «con» es la contraparte real (counterpartName), o «a medias» /
+// equivalente (spec §8.1 paso 2 / §8.3). counterpartName por defecto en `parse()` es "Marta".
+
+test("B-1: «un café con leche» NO activa compartido (leche no es la contraparte)", () => {
+  const r = parse("un café con leche");
+  assert.equal(r.shared, false);
+});
+
+test("B-1: «pan con tomate 4,50» NO activa compartido, importe correcto", () => {
+  const r = parse("pan con tomate 4,50");
+  assert.equal(r.shared, false);
+  assert.equal(r.cents, 450);
+});
+
+test("B-1: «cita con el dentista 40» NO activa compartido, importe correcto", () => {
+  const r = parse("cita con el dentista 40");
+  assert.equal(r.shared, false);
+  assert.equal(r.cents, 4000);
+});
+
+test("B-1: «20 en el bar con tarjeta» NO activa compartido, importe y comercio correctos", () => {
+  const r = parse("20 en el bar con tarjeta");
+  assert.equal(r.shared, false);
+  assert.equal(r.cents, 2000);
+  assert.equal(r.merchant, "bar");
+});
+
+test("B-1: «12,50 en el bar con Marta» SÍ activa compartido (nombra a la contraparte real)", () => {
+  const r = parse("12,50 en el bar con Marta");
+  assert.equal(r.shared, true);
+  assert.equal(r.cents, 1250);
+});
+
 // ------------------------------------------------------------------ fecha (today fijo, miércoles 2026-09-09)
 
 test("fecha: sin fecha en la frase -> today", () => {
@@ -248,6 +282,17 @@ test("en: «12.50 in the bar» -> 1250, merchant bar", () => {
 
 test("en: «with Marta» -> shared true", () => {
   assert.equal(parseEn("with Marta").shared, true);
+});
+
+// B-1 equivalente en inglés: «with <word>» solo activa compartido si esa palabra es la contraparte.
+test("en B-1: «coffee with milk» does NOT trigger shared (milk is not the counterpart)", () => {
+  assert.equal(parseEn("coffee with milk").shared, false);
+});
+
+test("en B-1: «12.50 at the bar with Marta» triggers shared (names the real counterpart)", () => {
+  const r = parseEn("12.50 at the bar with Marta");
+  assert.equal(r.shared, true);
+  assert.equal(r.cents, 1250);
 });
 
 test("en: «yesterday» -> today - 1 day", () => {
