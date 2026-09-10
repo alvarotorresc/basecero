@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   budgetStatus, pctOf, relativeWidth, limitTotals, sortRootRows, budgetMap, inheritedBudgetsRaw,
+  compareRoots,
 } from "../../app/app/js/category-spend.js";
 
 test("budgetStatus: 82% del límite -> ok", () => {
@@ -155,4 +156,83 @@ test("inheritedBudgetsRaw: fuera las categorías que la pantalla no pinta y los 
     { id: "b5", category_id: "cat-casa", amount_cents: 30000 },
     { id: "b6", category_id: "cat-casa", amount_cents: 99900 },
   ], rootRows), { "cat-casa": "300" });
+});
+
+// ---- compareRoots (N3, extraída de informe-logic.js — Task 6) --------------------------------
+
+// Misma hoja de datos del sistema que informe-logic.test.mjs (SISTEMA.md §5, Septiembre 2026).
+const CURRENT_ROWS = [
+  { root_id: "cat-casa", name: "Casa", spent_cents: 24560 },
+  { root_id: "cat-alimentacion", name: "Alimentacion", spent_cents: 18740 },
+  { root_id: "cat-coche", name: "Coche", spent_cents: 12180 },
+  { root_id: "cat-restauracion", name: "Restauracion", spent_cents: 9630 },
+  { root_id: "cat-ocio", name: "Ocio", spent_cents: 8995 },
+  { root_id: "cat-transporte", name: "Transporte", spent_cents: 6400 },
+  { root_id: "cat-salud", name: "Salud", spent_cents: 4215 },
+];
+const PREV_ROWS = [
+  { root_id: "cat-casa", name: "Casa", spent_cents: 23800 },
+  { root_id: "cat-alimentacion", name: "Alimentacion", spent_cents: 21490 },
+  { root_id: "cat-coche", name: "Coche", spent_cents: 7640 },
+  { root_id: "cat-restauracion", name: "Restauracion", spent_cents: 14210 },
+  { root_id: "cat-ocio", name: "Ocio", spent_cents: 6130 },
+  { root_id: "cat-transporte", name: "Transporte", spent_cents: 5820 },
+  { root_id: "cat-salud", name: "Salud", spent_cents: 3350 },
+];
+// deltaPct a un decimal y direction, verificados contra SISTEMA §5 / etiquetas-design §7.1.
+const EXPECTED = {
+  "cat-casa": [3.2, "up"],
+  "cat-alimentacion": [-12.8, "down"],
+  "cat-coche": [59.4, "up"],
+  "cat-restauracion": [-32.2, "down"],
+  "cat-ocio": [46.7, "up"],
+  "cat-transporte": [10.0, "up"],
+  "cat-salud": [25.8, "up"],
+};
+
+test("compareRoots: las siete filas de SISTEMA §5, con su deltaPct a un decimal y su direction", () => {
+  const rows = compareRoots(CURRENT_ROWS, PREV_ROWS);
+  assert.equal(rows.length, 7);
+  for (const row of rows) {
+    const [pct, direction] = EXPECTED[row.rootId];
+    assert.equal(Number(row.deltaPct.toFixed(1)), pct, row.rootId);
+    assert.equal(row.direction, direction, row.rootId);
+  }
+});
+
+test("compareRoots: prevRows vacío (sin periodo anterior) -> todas 'new', deltaPct null, sin dividir por cero", () => {
+  const rows = compareRoots(CURRENT_ROWS, []);
+  for (const row of rows) {
+    assert.equal(row.prevCents, null);
+    assert.equal(row.deltaCents, null);
+    assert.equal(row.deltaPct, null);
+    assert.equal(row.direction, "new");
+  }
+});
+
+test("compareRoots: deltaCents === 0 -> 'flat' (mismo gasto que el periodo anterior)", () => {
+  const [row] = compareRoots(
+    [{ root_id: "cat-igual", name: "Igual", spent_cents: 3000 }],
+    [{ root_id: "cat-igual", name: "Igual", spent_cents: 3000 }],
+  );
+  assert.equal(row.direction, "flat");
+  assert.equal(row.deltaPct, 0);
+  assert.equal(row.deltaCents, 0);
+});
+
+test("compareRoots: una raíz nueva (sin fila previa) -> 'new', prevCents 0, deltaPct null", () => {
+  const [row] = compareRoots(
+    [{ root_id: "cat-nueva", name: "Nueva", spent_cents: 5000 }],
+    PREV_ROWS,
+  );
+  assert.equal(row.prevCents, 0);
+  assert.equal(row.direction, "new");
+  assert.equal(row.deltaPct, null, "no se divide por cero: sin gasto previo no hay porcentaje");
+});
+
+test("compareRoots: una raíz con spent_cents negativo (más devoluciones que gasto) no lanza", () => {
+  assert.doesNotThrow(() => compareRoots(
+    [{ root_id: "cat-negativa", name: "Negativa", spent_cents: -500 }],
+    [{ root_id: "cat-negativa", name: "Negativa", spent_cents: 1000 }],
+  ));
 });

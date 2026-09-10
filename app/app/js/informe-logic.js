@@ -7,7 +7,7 @@
  *  números, strings y arrays, nunca HTML ni nodos ni funciones. La pantalla y el PDF son dos
  *  presentadores de este mismo objeto (spec §5.2, D2). */
 import { dayIndexOfPeriod, expectedPeriodDays, ruleApplies, myAmountOfRule, periodMonth } from "./prevision.js";
-import { budgetMap, budgetStatus, pctOf, relativeWidth, sortRootRows } from "./category-spend.js";
+import { budgetMap, budgetStatus, pctOf, relativeWidth, sortRootRows, compareRoots } from "./category-spend.js";
 import { colorForCategory, textColorForCategory, iconForCategory, rootOf } from "./category-colors.js";
 import { activeSubscriptions, monthlyTotalCents, annualTotalCents } from "./subscriptions.js";
 
@@ -80,27 +80,20 @@ function buildAccounts({ accountsStart, accountsEnd }) {
 function buildCategories({ spentByRoot, prevSpentByRoot, budgets, categoriesById, prevPeriod }) {
   const hasPrev = !!prevPeriod;
   const budgetByCategory = budgetMap(budgets ?? []);
-  const prevByRoot = Object.fromEntries((prevSpentByRoot ?? []).map((r) => [r.root_id, r.spent_cents]));
   const byId = categoriesById ?? {};
   const sorted = sortRootRows(spentByRoot ?? [], budgetByCategory);
   const maxSpent = Math.max(0, ...sorted.map((r) => r.spent_cents), 0);
+  // compareRoots (category-spend.js) es la extracción de lo que vivía aquí (Task 6,
+  // etiquetas-design §7.1): un índice por rootId porque `sorted` ya reordenó las filas y
+  // compareRoots devuelve su propio array en el orden de entrada, no el de pintado.
+  const cmpByRoot = Object.fromEntries(
+    compareRoots(spentByRoot ?? [], prevSpentByRoot ?? []).map((c) => [c.rootId, c]),
+  );
 
   const rows = sorted.map((r) => {
     const limitCents = budgetByCategory[r.root_id] ?? 0;
     const status = budgetStatus(r.spent_cents, limitCents);
-    let prevCents = null, deltaCents = null, deltaPct = null, direction = "new";
-    if (hasPrev) {
-      prevCents = prevByRoot[r.root_id] ?? 0;
-      deltaCents = r.spent_cents - prevCents;
-      if (prevCents > 0) {
-        deltaPct = ((r.spent_cents - prevCents) / prevCents) * 100;
-        direction = deltaCents === 0 ? "flat" : deltaCents > 0 ? "up" : "down";
-      } else {
-        // sin gasto previo: "new" si ahora sí se gastó algo, "flat" si sigue sin haber nada —
-        // en ninguno de los dos casos hay un porcentaje que calcular sin dividir por cero.
-        direction = r.spent_cents > 0 ? "new" : "flat";
-      }
-    }
+    const cmp = cmpByRoot[r.root_id];
     return {
       rootId: r.root_id,
       name: r.name,
@@ -112,10 +105,10 @@ function buildCategories({ spentByRoot, prevSpentByRoot, budgets, categoriesById
       pctOfLimit: pctOf(r.spent_cents, limitCents),
       level: status?.level ?? null,
       shareOfMax: relativeWidth(r.spent_cents, maxSpent),
-      prevCents,
-      deltaCents,
-      deltaPct,
-      direction,
+      prevCents: cmp.prevCents,
+      deltaCents: cmp.deltaCents,
+      deltaPct: cmp.deltaPct,
+      direction: cmp.direction,
     };
   });
 

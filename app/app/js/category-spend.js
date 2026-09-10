@@ -98,3 +98,38 @@ export function inheritedBudgetsRaw(budgetRows, rootRows) {
   }
   return out;
 }
+
+/** Comparativa de gasto por raíz entre este periodo y el anterior (N3). PURA.
+ *  Una fila por cada raíz del periodo ACTUAL, en el mismo orden en que llegan (el de
+ *  SQL.spentByRootCategory); quien pinta reordena con sortRootRows si quiere.
+ *  Extraída de informe-logic.js (Task 6, etiquetas-design §7.1 y §8.4 de informe-design): esta
+ *  función es la extracción de lo que ya vivía dentro de buildReport, no una regla nueva —
+ *    prevCents  = gasto de esa raíz el periodo anterior, 0 si la raíz no estaba
+ *    deltaCents = spent - prev
+ *    deltaPct   = prev > 0 ? ((spent - prev) / prev) * 100 : null   <- NUNCA se divide por cero
+ *    direction  = "flat" si deltaCents === 0
+ *                 "new"  si prev <= 0 (no había con qué comparar)
+ *                 "up"   si se gastó más   -> se pinta en --danger
+ *                 "down" si se gastó menos -> se pinta en --pos   (gastar menos es bueno, SISTEMA §4.19)
+ *  Con prevRows vacío (no hay periodo anterior) todas salen "new" con deltaPct null, y la pantalla
+ *  omite la comparativa entera. */
+export function compareRoots(currentRows, prevRows) {
+  const hasPrev = (prevRows ?? []).length > 0;
+  const prevByRoot = Object.fromEntries((prevRows ?? []).map((r) => [r.root_id, r.spent_cents]));
+  return (currentRows ?? []).map((r) => {
+    let prevCents = null, deltaCents = null, deltaPct = null, direction = "new";
+    if (hasPrev) {
+      prevCents = prevByRoot[r.root_id] ?? 0;
+      deltaCents = r.spent_cents - prevCents;
+      if (prevCents > 0) {
+        deltaPct = ((r.spent_cents - prevCents) / prevCents) * 100;
+        direction = deltaCents === 0 ? "flat" : deltaCents > 0 ? "up" : "down";
+      } else {
+        // sin gasto previo: "new" si ahora sí se gastó algo, "flat" si sigue sin haber nada — en
+        // ninguno de los dos casos hay un porcentaje que calcular sin dividir por cero.
+        direction = r.spent_cents > 0 ? "new" : "flat";
+      }
+    }
+    return { rootId: r.root_id, prevCents, deltaCents, deltaPct, direction };
+  });
+}
