@@ -449,21 +449,24 @@ export async function renderAjustes(container) {
       </section>
 
       <section style="margin-bottom:var(--gap-section)">
-        <div class="section-title" style="margin-bottom:4px">${t("ajustes.backup.title")}</div>
-        <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
-          ${t("ajustes.backup.body")}</p>
+        <div class="section-title" style="margin-bottom:14px">${t("ajustes.backup.title")}</div>
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;">
+          ${icon("lock", { size: 18, stroke: "var(--ink-3)" })}
+          <p style="color:var(--text-2);font-size:13px;line-height:1.45;margin:0">
+            ${t("ajustes.backup.body")}</p>
+        </div>
         <button type="button" class="btn-secondary" id="btn-json-export" style="${BTN_FULL_WIDTH}">${t("ajustes.backup.exportBtn")}</button>
       </section>
 
       <section>
-        <div class="section-title" style="margin-bottom:12px">${t("ajustes.about.title")}</div>
-        <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
-          <a href="${FEEDBACK_URL}" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.feedback")}</a>
-          <a href="${escAttr(activeLang() === "en" ? "/en/privacy.html" : "/privacidad.html")}" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.privacy")}</a>
-          <a href="https://github.com/alvarotorresc/basecero" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.source")}</a>
-          <a href="https://github.com/alvarotorresc/basecero/blob/main/LICENSE" target="_blank" rel="noopener" style="color:var(--text-2);text-decoration:underline;">${t("ajustes.about.license")}</a>
+        <div class="section-title" style="margin-bottom:6px">${t("ajustes.about.title")}</div>
+        <div style="display:flex;flex-direction:column;">
+          <a href="${FEEDBACK_URL}" target="_blank" rel="noopener" style="display:flex;align-items:center;height:44px;font-size:14px;font-weight:500;color:var(--accent);text-decoration:none;border-bottom:1px solid var(--hairline);">${t("ajustes.about.feedback")}</a>
+          <a href="${escAttr(activeLang() === "en" ? "/en/privacy.html" : "/privacidad.html")}" target="_blank" rel="noopener" style="display:flex;align-items:center;height:44px;font-size:14px;font-weight:500;color:var(--accent);text-decoration:none;border-bottom:1px solid var(--hairline);">${t("ajustes.about.privacy")}</a>
+          <a href="https://github.com/alvarotorresc/basecero" target="_blank" rel="noopener" style="display:flex;align-items:center;height:44px;font-size:14px;font-weight:500;color:var(--accent);text-decoration:none;border-bottom:1px solid var(--hairline);">${t("ajustes.about.source")}</a>
+          <a href="https://github.com/alvarotorresc/basecero/blob/main/LICENSE" target="_blank" rel="noopener" style="display:flex;align-items:center;height:44px;font-size:14px;font-weight:500;color:var(--accent);text-decoration:none;">${t("ajustes.about.license")}</a>
         </div>
-        <p style="color:var(--text-2);font-size:11.5px;margin-top:12px">${t("ajustes.about.feedbackNote")}</p>
+        <p style="color:var(--text-2);font-size:12px;line-height:1.5;margin-top:12px">${t("ajustes.about.feedbackNote")}</p>
       </section>
     `;
     wireMain();
