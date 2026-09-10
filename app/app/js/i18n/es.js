@@ -266,6 +266,10 @@ export const ES = {
     detail: {
       lockedNote: "Tiene un apunte de liquidación enlazado (devolución o ajuste): para cambiar el importe o el reparto, bórralo antes.",
       typeLabel: "Tipo",
+      // Sin consumidor EN ESTE FICHERO desde la Task 1.5 (la etiqueta del bloque Fecha+Etiqueta
+      // desaparece: el artboard no la lleva), pero registro.js:461 (P8) sigue llamando a esta
+      // misma clave para el mismo control — borrarla habría roto Registro. No se toca.
+      tagLabel: "Etiqueta",
       noTag: "Sin etiqueta",
       newTag: "Nueva etiqueta",
     },

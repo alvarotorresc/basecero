@@ -258,6 +258,10 @@ export const EN = {
     detail: {
       lockedNote: "It has a linked settlement entry (refund or adjustment): delete it first to change the amount or the split.",
       typeLabel: "Type",
+      // No consumer IN THIS FILE since Task 1.5 (the Date+Tag block's label goes away: the
+      // artboard doesn't carry it), but registro.js:461 (P8) still calls this same key for the
+      // same control — deleting it would have broken Registro. Left as is.
+      tagLabel: "Tag",
       noTag: "No tag",
       newTag: "New tag",
     },
