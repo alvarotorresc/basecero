@@ -25,6 +25,12 @@ test("detailsOpen: transfer y adjustment siempre abiertos, aunque quick esté pu
   assert.equal(detailsOpen({ quick: true, expanded: false, tipo: "adjustment" }), true);
 });
 
+test("detailsOpen: refund siempre abierto en modo rápido — sin esto no hay selector de enlace", () => {
+  assert.equal(detailsOpen({ quick: true, expanded: false, tipo: "refund" }), true);
+  assert.equal(detailsOpen({ quick: true, expanded: true, tipo: "refund" }), true);
+  assert.equal(detailsOpen({ quick: false, expanded: false, tipo: "refund" }), true);
+});
+
 test("foldedSummaryParts devuelve un array, nunca un string con separador ·", () => {
   const tr = (key) => key;
   const parts = foldedSummaryParts({ accountName: "Cuenta corriente", dateLabel: "hoy", hasNote: false, hasPhoto: false, sharedLabel: "" }, tr);

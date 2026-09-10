@@ -12,9 +12,11 @@ export const quickRegisterEnabled = (raw) => String(raw ?? "") !== "0";
 /** ¿Se pinta el bloque de "todo lo demás" (cuenta, fecha, comercio, nota, compartido, foto)?
  *  En modo completo, SIEMPRE. En modo rápido, solo si el usuario ha tocado «Más».
  *  `tipo` manda por encima de las dos cosas: transferencia y ajuste NO tienen modo rápido — sin
- *  las dos cuentas o sin el signo el formulario no se puede ni validar. */
+ *  las dos cuentas o sin el signo el formulario no se puede ni validar; devolución tampoco — el
+ *  selector de enlace (registro.js#renderRefundPicker) vive en este mismo bloque plegable y sin
+ *  él no hay forma de decir a qué gasto corresponde la devolución. */
 export function detailsOpen({ quick, expanded, tipo }) {
-  if (tipo === "transfer" || tipo === "adjustment") return true;
+  if (tipo === "transfer" || tipo === "adjustment" || tipo === "refund") return true;
   return !quick || !!expanded;
 }
 
