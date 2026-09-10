@@ -15,6 +15,7 @@ import { t, LANGS, activeLang } from "../i18n/index.js";
 import { loadXlsx } from "../xlsx-loader.js";
 import { userMessage } from "../errors.js";
 import { showToast } from "../toast.js";
+import { download } from "../download.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -47,11 +48,6 @@ export const localeOptionsHtml = (loc) => {
   const known = LOCALES.some(([v]) => v === loc) ? LOCALES : [[loc, loc], ...LOCALES];
   return known.map(([v, label]) => `<option value="${escAttr(v)}" ${v === loc ? "selected" : ""}>${escHtml(label)}</option>`).join("");
 };
-
-function download(blob, filename) {
-  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: filename });
-  a.click(); URL.revokeObjectURL(a.href);
-}
 
 async function downloadXlsx(dump, filename) {
   const XLSX = await loadXlsx();
