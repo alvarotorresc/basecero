@@ -6,6 +6,7 @@ const { bcParseCsvLine } = require("../../app/app/vendor/pure.js");
 import {
   sniffCsv, isN26Headers, detectDateFormat, detectDecimal, parseAmountCents,
   parseDateIso, buildProfile, applyProfile, parseCsvProfile, profileMatches, detectDelimiter,
+  summarizeReasons,
 } from "../../app/app/js/csv-generic.js";
 
 // Cabeceras EXACTAS del CSV de N26 (tests/app/fixtures/n26_sample.csv línea 1).
@@ -409,4 +410,26 @@ test("applyProfile: un perfil guardado sigue casando cuando el export trae BOM",
   assert.equal(rows.length, 1);
   assert.equal(rows[0].bookingDate, "2026-09-12");
   assert.equal(rows[0].amountCents, -4520);
+});
+
+// ------------------------------------------------------------ summarizeReasons
+
+test("summarizeReasons: dedupe por reason, conservando el orden de aparición", () => {
+  const errors = [
+    { line: 2, reason: "fecha inválida" },
+    { line: 5, reason: "importe inválido" },
+    { line: 7, reason: "fecha inválida" },
+    { line: 9, reason: "importe inválido" },
+    { line: 11, reason: "cargo y abono vacíos" },
+  ];
+  assert.deepEqual(summarizeReasons(errors), ["fecha inválida", "importe inválido", "cargo y abono vacíos"]);
+});
+
+test("summarizeReasons: con una lista vacía devuelve []", () => {
+  assert.deepEqual(summarizeReasons([]), []);
+});
+
+test("summarizeReasons: sin duplicados, el orden de salida es el de entrada", () => {
+  const errors = [{ line: 2, reason: "b" }, { line: 3, reason: "a" }, { line: 4, reason: "c" }];
+  assert.deepEqual(summarizeReasons(errors), ["b", "a", "c"]);
 });
