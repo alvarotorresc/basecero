@@ -13,7 +13,7 @@ const byId = {
 const ALL = { query: "", rootCatId: null, uncat: false };
 
 function row(over = {}) {
-  return { type: "expense", category_id: "cat-alimentacion-super", merchant: "", note: "", ...over };
+  return { type: "expense", category_id: "cat-alimentacion-super", merchant: "", note: "", tag_id: "", ...over };
 }
 
 test("matchesFilter: «Todos» (filtro neutro) hace match con cualquier fila", () => {
@@ -72,6 +72,39 @@ test("matchesFilter: query + rootCatId se combinan con AND", () => {
 test("matchesFilter: sin filtro (undefined/null) hace match con cualquier fila", () => {
   assert.equal(matchesFilter(row(), undefined, byId), true);
   assert.equal(matchesFilter(row(), null, byId), true);
+});
+
+// ---- tagId (Task 9: filtro por etiqueta de proyecto, N11) --------------------------------
+
+test("matchesFilter: tagId casa por id", () => {
+  const r = row({ tag_id: "tag-japon" });
+  assert.equal(matchesFilter(r, { ...ALL, tagId: "tag-japon" }, byId), true);
+});
+
+test("matchesFilter: tagId no casa con otro id", () => {
+  const r = row({ tag_id: "tag-japon" });
+  assert.equal(matchesFilter(r, { ...ALL, tagId: "tag-reforma" }, byId), false);
+});
+
+test("matchesFilter: tagId + query se combinan con AND", () => {
+  const r = row({ tag_id: "tag-japon", merchant: "Mercadona" });
+  assert.equal(matchesFilter(r, { ...ALL, tagId: "tag-japon", query: "merca" }, byId), true);
+  assert.equal(matchesFilter(r, { ...ALL, tagId: "tag-japon", query: "carrefour" }, byId), false);
+  assert.equal(matchesFilter(r, { ...ALL, tagId: "tag-reforma", query: "merca" }, byId), false);
+});
+
+test("matchesFilter: tagId + rootCatId se combinan con AND", () => {
+  const r = row({ tag_id: "tag-japon", category_id: "cat-alimentacion-super" });
+  assert.equal(matchesFilter(r, { ...ALL, tagId: "tag-japon", rootCatId: "cat-alimentacion" }, byId), true);
+  assert.equal(matchesFilter(r, { ...ALL, tagId: "tag-japon", rootCatId: "cat-restauracion" }, byId), false);
+  assert.equal(matchesFilter(r, { ...ALL, tagId: "tag-reforma", rootCatId: "cat-alimentacion" }, byId), false);
+});
+
+// La guarda de que ningún test existente cambia: el filtro neutro de HOY (sin la clave tagId)
+// sigue haciendo match con todo — ALL, arriba, nunca lleva tagId.
+test("matchesFilter: el filtro neutro de hoy (sin la clave tagId) sigue haciendo match con todo", () => {
+  assert.equal(matchesFilter(row({ tag_id: "tag-japon" }), ALL, byId), true);
+  assert.equal(matchesFilter(row({ tag_id: "" }), ALL, byId), true);
 });
 
 test("isUncategorized: expense/income/refund sin categoría, no transfer/adjustment", () => {
