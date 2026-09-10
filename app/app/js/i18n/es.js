@@ -1035,4 +1035,8 @@ export const ES = {
       others: "Otros",
     },
   },
+  // El barrido (N4, plan 2026-09-10): la nota que queda en la transferencia del remanente.
+  barrido: {
+    note: "Barrido de fin de periodo",
+  },
 };

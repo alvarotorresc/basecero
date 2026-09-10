@@ -1014,4 +1014,8 @@ export const EN = {
       others: "Other",
     },
   },
+  // The sweep (N4, plan 2026-09-10): the note left on the leftover's transfer.
+  barrido: {
+    note: "End-of-period sweep",
+  },
 };

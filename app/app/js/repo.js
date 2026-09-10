@@ -29,7 +29,29 @@ export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[
  *  execMany. Sin periodo abierto (modo 'first') no hay nada que comparar: siempre false. */
 export const periodStartTooEarly = (open, startDate) => !!open && startDate <= open.start_date;
 
-export async function openNextPeriod({ name, startDate, sharePct, budgets = [] }) {
+/** Statement de la transferencia del barrido (N4). PURO (mismo criterio que settleAllSharedStmts,
+ *  arriba): recibe todo resuelto y devuelve {sql, bind}, para que el test pueda verificar el
+ *  ORDEN EXACTO de los 20 campos de SQL.insertTransaction llamando a la función REAL.
+ *  bcUlid/bcSanitizeCell son globales (vendor/pure.js), igual que en addTransaction.
+ *  `type='transfer'`, `category_id=''`, `merchant` = nombre del objetivo (saneado), `is_shared=0`,
+ *  `paid_by='me'`. OJO TDZ: aquí NO puede declararse ningún `const t` local. */
+export function sweepTransferStmt({ periodId, date, amountCents, fromAccountId, toAccountId, goalName, now }) {
+  return {
+    sql: SQL.insertTransaction,
+    bind: [
+      bcUlid(), date, periodId, "transfer", amountCents, fromAccountId, toAccountId,
+      "", bcSanitizeCell(goalName ?? ""), t("barrido.note"),
+      0, null, "me", 0, "", "", "", "pending", now, now,
+    ],
+  };
+}
+
+/** `sweep`, cuando se pasa: {amountCents, fromAccountId, toAccountId, goalName} — la transferencia
+ *  del remanente (N4), al FINAL de `stmts` con `periodId: newId` y `date: startDate`, en el MISMO
+ *  execMany que cierra/abre/presupuesta: o queda el periodo abierto CON su barrido, o no queda
+ *  nada (D8 de la spec: es lo que hace inmutable el informe del periodo recién cerrado). Sin
+ *  `sweep`, cero cambios de comportamiento. */
+export async function openNextPeriod({ name, startDate, sharePct, budgets = [], sweep }) {
   const current = await getOpenPeriod();
   if (periodStartTooEarly(current, startDate))
     throw new UserError(t("errors.repo.periodStartTooEarly"));
@@ -40,6 +62,12 @@ export async function openNextPeriod({ name, startDate, sharePct, budgets = [] }
   stmts.push({ sql: SQL.insertPeriod, bind: [newId, name, startDate, sharePct, now, now] });
   for (const b of budgets) {
     stmts.push({ sql: SQL.insertBudget, bind: [bcUlid(), newId, b.categoryId, b.amountCents, now, now] });
+  }
+  if (sweep) {
+    stmts.push(sweepTransferStmt({
+      periodId: newId, date: startDate, amountCents: sweep.amountCents,
+      fromAccountId: sweep.fromAccountId, toAccountId: sweep.toAccountId, goalName: sweep.goalName, now,
+    }));
   }
   await execMany(stmts);
   return newId;
