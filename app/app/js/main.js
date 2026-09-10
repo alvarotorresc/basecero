@@ -13,6 +13,7 @@ import { renderAjustes } from "./screens/ajustes.js";
 import { pushBack, goBack, clearBack, resetBack } from "./back.js";
 import { userMessage } from "./errors.js";
 import { scrollScreenTop } from "./viewport.js";
+import { setTabNavigator } from "./tabs.js";
 
 const screen = document.getElementById("screen");
 const RUTAS = {
@@ -43,12 +44,15 @@ export function nav(tab) {
   scrollScreenTop();
   RUTAS[tab]();
 }
+setTabNavigator(nav);   // deja que una pantalla pida un cambio de pestaña sin importar main.js
 
 // Se llama en boot y de nuevo tras el onboarding, donde el usuario puede haber cambiado el idioma:
 // el tabbar y el FAB están ocultos durante el asistente, así que sin este segundo rotulado
 // quedarían con el idioma del arranque durante toda la sesión.
 function relabelChrome() {
-  document.querySelectorAll(".tab").forEach((b) => { b.lastChild.textContent = " " + t("main.tabs." + b.dataset.tab); });
+  document.querySelectorAll(".tab").forEach((b) => {
+    b.querySelector(".tab-label").textContent = t("main.tabs." + b.dataset.tab);
+  });
   document.getElementById("btn-registro").setAttribute("aria-label", t("main.fab"));
   document.querySelector(".tabbar").setAttribute("aria-label", t("main.tabsNav"));
 }
@@ -103,6 +107,6 @@ async function boot() {
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => nav(b.dataset.tab)));
 document.getElementById("btn-registro").onclick = () => {
   pushBack(() => nav("inicio"));
-  renderRegistro(screen, goBack);
+  renderRegistro(screen, goBack, undefined, () => nav("inicio"));
 };
 boot();

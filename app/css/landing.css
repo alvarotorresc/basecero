@@ -20,6 +20,33 @@
    se toca aquí: no cambiar sus selectores. Todo lo nuevo va con prefijo .bc-.
    ========================================================================== */
 
+/* La landing conserva la piel v1 A PROPÓSITO, aunque /app/css/tokens.css ya trae la v2 (reskin):
+   las capturas publicadas de la app (README, App Store/Play, redes) siguen siendo v1, y cambiar
+   aquí los colores de golpe dejaría la landing enseñando un producto que no es el de las capturas.
+   tokens.css sigue cargándose antes que este fichero (lo usan los controles de las páginas legales,
+   ver la nota de arriba), así que se redeclaran aquí, DESPUÉS y con el mismo :root, los alias v1
+   que la landing consume de verdad (--bg/--card/--card2/--text/--text-2/--text-3/--rule/--accent/
+   --red/--green/--amber/--radius/--radius-sm/--font-ui/--font-num) — misma especificidad, pero
+   este fichero se carga después, así que gana. Migrar la landing a la v2 es harina de otro costal
+   (otra PR, con sus propias capturas nuevas). */
+:root {
+  --bg: #121214;
+  --card: #1C1C21;
+  --card2: #26262D;
+  --text: #F0EFF4;
+  --text-2: #9A99A6;
+  --text-3: #9A99A6;
+  --rule: rgba(154, 153, 166, .16);
+  --accent: #F0EFF4;
+  --red: #FF7A70;
+  --green: #4FD99A;
+  --amber: #FFBE4D;
+  --radius: 22px;
+  --radius-sm: 16px;
+  --font-ui: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-num: var(--font-ui);
+}
+
 :root {
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --hair: rgba(154, 153, 166, 0.16);
@@ -49,6 +76,10 @@ html {
 }
 
 body {
+  /* tokens.css pone font-family: var(--font-sans) directamente (no vía --font-ui), así que
+     redeclarar --font-ui arriba no le llega solo: hay que pisarlo aquí para que el body no
+     herede la v2 (Schibsted Grotesk). */
+  font-family: var(--font-ui);
   -webkit-font-smoothing: antialiased;
 }
 

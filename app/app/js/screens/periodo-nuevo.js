@@ -4,7 +4,7 @@ import {
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
 import { eurToCents } from "../contract.js";
-import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol } from "../format.js";
+import { fmtMoney, moneyPartsHtml, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol } from "../format.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, stepPct } from "../share-pct.js";
 import { inheritedBudgetsRaw } from "../category-spend.js";
@@ -14,14 +14,6 @@ const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const BTN_SECONDARY = "background:var(--card2);color:var(--text);border:0;"
   + "border-radius:999px;padding:16px;flex:1;font:600 16px var(--font-ui);cursor:pointer;";
-
-// Compone un importe con los céntimos reducidos en <small> (patrón .amount-hero del design
-// system, ver DesignSystem.dc.html / inicio.js#moneyPartsHtml): main + <small>céntimos</small> +
-// sufijo, sin reimplementar el locale — fmtMoneyParts (format.js) ya hace el split posicional.
-const moneyPartsHtml = (cents) => {
-  const { main, cents: c, suffix } = fmtMoneyParts(cents);
-  return `${escHtml(main)}<small>${escHtml(c)}</small>${escHtml(suffix)}`;
-};
 
 /** Pantalla de error con recuperación: quien llama ya puso `body.onboarding` (chrome oculto,
  *  nav() bloqueado — ver main.js), así que un simple banner sin salida deja a quien lo use
@@ -196,7 +188,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
     <div class="card" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
       <div class="section-title">${t("common.name")}</div>
       <input type="text" id="pn-nombre" value="${escAttr(state.name)}"
-        style="height:44px; padding:0 14px; background:var(--card2); border:0; border-radius:16px; color:var(--text);
+        style="height:44px; padding:0 14px; background:var(--card2); border:0; border-radius:0; color:var(--text);
         font:700 15px var(--font-ui); width:100%; outline:none;">
     </div>`;
   }
@@ -210,9 +202,9 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
       <div class="section-title">${t("periodo.date.title")}</div>
       <div style="display:flex; align-items:center; gap:10px;">
         <input type="date" id="pn-fecha" value="${state.startDate}"
-          style="flex:1; height:44px; padding:0 14px; background:var(--card2); border:0; border-radius:14px;
+          style="flex:1; height:44px; padding:0 14px; background:var(--card2); border:0; border-radius:0;
           color:var(--text); font:600 14px var(--font-num); min-width:0;">
-        <div style="width:44px; height:44px; border-radius:14px; background:var(--card2); flex-shrink:0;
+        <div style="width:44px; height:44px; border-radius:0; background:var(--card2); flex-shrink:0;
           display:flex; align-items:center; justify-content:center;" aria-hidden="true">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="stroke:var(--text);" stroke-width="1.6"
             stroke-linecap="round" stroke-linejoin="round">
@@ -238,10 +230,10 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
           <div style="font-size:11px; color:var(--text-3);">${t("periodo.share.partnerPays", { name: escHtml(partnerName), pct: restante })}</div>
         </div>
         <button type="button" id="pn-pct-down" class="stepper-btn lg"
-          aria-label="${t("periodo.share.decreaseAria")}">−</button>
+          aria-label="${t("periodo.share.decreaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
         <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${state.sharePct} %</div>
         <button type="button" id="pn-pct-up" class="stepper-btn lg"
-          aria-label="${t("periodo.share.increaseAria")}">+</button>
+          aria-label="${t("periodo.share.increaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
       </div>
     </div>`;
   }

@@ -1,33 +1,29 @@
+// Paleta v2 resaturada para el fondo oscuro #0B0B0C (reskin, SISTEMA.md §2.2). El ORDEN de las
+// claves no importa aquí (a diferencia de POOL más abajo): cada categoría raíz seedeada tiene su
+// propio hex fijo, no depende de una ranura.
 const ROOT_COLORS = {
-  "cat-casa": "#4F94E9", "cat-alimentacion": "#629D3B", "cat-restauracion": "#B45018",
-  "cat-transporte": "#00A1CB", "cat-coche": "#986603", "cat-ocio": "#6B61C2",
-  "cat-salud": "#12A7A7", "cat-suscripciones": "#9153AB",
-  "cat-ropa": "#B64656", "cat-regalos": "#AA4985", "cat-impuestos": "#A09600",
-  "cat-nomina": "#15AC7D", "cat-puntuales": "#15AC7D", "cat-intereses": "#15AC7D",
+  "cat-casa": "#5B9BFF", "cat-alimentacion": "#6BCB3E", "cat-restauracion": "#FF7A45",
+  "cat-transporte": "#2FC4E0", "cat-coche": "#E8A93B", "cat-ocio": "#8B7CF6",
+  "cat-salud": "#2BD9C9", "cat-suscripciones": "#C264D9",
+  "cat-ropa": "#E85F72", "cat-regalos": "#DE5FA8", "cat-impuestos": "#C4B72F",
+  "cat-nomina": "#22C58B", "cat-puntuales": "#22C58B", "cat-intereses": "#22C58B",
 };
-const DEFAULT_COLOR = "#9A99A6";
-// Contraste texto/tinte (Task 2 P2, WCAG 1.4.3 AA ≥4.5:1), verificado sobre las dos superficies
-// reales donde se usa TEXT_COLORS: en registro.js chipStyle el texto va sobre su propio tinte al
-// 18% (color-mix(in srgb, <color> 18%, transparent)) compuesto sobre --bg #121214; en
-// gasto-por-categoria.js rootRowHtml el texto va sólido (sin tinte) sobre --card #1C1C21 igualmente
-// sólido, dando ≥5.33:1 para las 12 — la superficie exigente es el tinte sobre --bg. 5 de las 12
-// entradas fallaban 4.5:1 ahí con el hex original (aunque ya pasaban de sobra sobre --card
-// sólido); se subió su lightness en OKLCH manteniendo hue/chroma hasta despejar 4.5:1 con margen
-// sobre el tinte (script ad-hoc, no versionado — ver report de Task 2). Ratios sobre tinte 18% /
-// --bg, antes → después:
-//   cat-coche          #B2802A → #BB8934  (4.261 → 4.711)
-//   cat-ocio           #8A82D6 → #9088DD  (4.390 → 4.683)
-//   cat-suscripciones  #AB74C4 → #B37CCD  (4.250 → 4.650)
-//   cat-ropa           #CD6472 → #DA707D  (4.072 → 4.623)
-//   cat-regalos        #C4699F → #CF73A9  (4.185 → 4.678)
-// Las otras 7 (incl. restauracion, 4.676, el "casi" más próximo) ya pasaban 4.5:1 en esa misma
-// superficie y no se tocan.
+export const DEFAULT_COLOR = "#8A8794";
+// Tinta legible de los neutros (cat-otros, ""): antes compartía DEFAULT_COLOR con el propio color
+// de fondo del neutro; en v2 son valores distintos, como en el resto de la paleta (--cat-x vs
+// --cat-x-ink, SISTEMA.md §2.2).
+export const DEFAULT_TEXT_COLOR = "#B4B1BC";
+// Contraste texto/insignia (WCAG 1.4.3 AA ≥4.5:1), verificado sobre la insignia tintada al 16%
+// de --cat sobre --bg #0B0B0C (SISTEMA.md §2.2, columna "ink / insignia tintada 16%"): Casa 7.45 ·
+// Alimentación 9.38 · Restauración 7.64 · Transporte 8.95 · Coche 9.32 · Ocio 6.90 (el peor) ·
+// Salud 9.72 · Suscripciones 7.00 · Ropa 6.91 · Regalos 7.08 · Impuestos 9.02 · Ingresos 8.85 ·
+// Otras/neutro 7.79. Las 13 pasan de sobra el mínimo 4.5:1.
 const TEXT_COLORS = {
-  "cat-casa": "#6FA8F0", "cat-alimentacion": "#7FB554", "cat-restauracion": "#D97742",
-  "cat-transporte": "#3FB7DC", "cat-coche": "#BB8934", "cat-ocio": "#9088DD",
-  "cat-salud": "#3FBDBD", "cat-suscripciones": "#B37CCD",
-  "cat-ropa": "#DA707D", "cat-regalos": "#CF73A9", "cat-impuestos": "#BDB32A",
-  "cat-nomina": "#3DC299", "cat-puntuales": "#3DC299", "cat-intereses": "#3DC299",
+  "cat-casa": "#7FB3FF", "cat-alimentacion": "#8FE05F", "cat-restauracion": "#FF9A6E",
+  "cat-transporte": "#63D6EC", "cat-coche": "#F2C463", "cat-ocio": "#A99CFA",
+  "cat-salud": "#5CE6D8", "cat-suscripciones": "#D98CE8",
+  "cat-ropa": "#F08997", "cat-regalos": "#EA8BC4", "cat-impuestos": "#D6CB5E",
+  "cat-nomina": "#4FDBA6", "cat-puntuales": "#4FDBA6", "cat-intereses": "#4FDBA6",
 };
 export const CATEGORY_ICONS = {
   "cat-casa": "🏠", "cat-alimentacion": "🛒", "cat-restauracion": "🍽️", "cat-transporte": "🚌",
@@ -47,17 +43,29 @@ export const CATEGORY_ICONS = {
 const NEUTRAL_IDS = new Set(["cat-otros", ""]);
 
 // Pool de 12 colores validados (contraste + distinción) para categorías sin seed ni override.
+// ORDEN preservado del pool v1: hashIndex mapea id → RANURA, así que una categoría de usuario ya
+// hasheada mantiene su ranura (y por tanto su identidad de color) y solo cambia de tono con el
+// reskin — no salta de "el azul" a "el rosa" para nadie.
 export const POOL = [
-  "#629D3B", "#6B61C2", "#A09600", "#9153AB", "#15AC7D", "#986603",
-  "#12A7A7", "#B45018", "#00A1CB", "#AA4985", "#4F94E9", "#B64656",
+  "#6BCB3E", "#8B7CF6", "#C4B72F", "#C264D9", "#22C58B", "#E8A93B",
+  "#2BD9C9", "#FF7A45", "#2FC4E0", "#DE5FA8", "#5B9BFF", "#E85F72",
 ];
-// Mismos 5 hexes aclarados que TEXT_COLORS (misma justificación arriba): POOL_TEXT es la fuente
-// para overrides de usuario y categorías hasheadas, así que debe llevar los mismos valores o esos
-// caminos volverían a renderizar el hex sin aclarar sobre el mismo tinte al 18%.
+// Mismos hexes que TEXT_COLORS (misma justificación arriba): POOL_TEXT es la fuente para overrides
+// de usuario y categorías hasheadas, así que debe llevar los mismos valores o esos caminos
+// volverían a renderizar el hex sin aclarar sobre la insignia tintada.
 const POOL_TEXT = {
-  "#629D3B": "#7FB554", "#6B61C2": "#9088DD", "#A09600": "#BDB32A", "#9153AB": "#B37CCD",
-  "#15AC7D": "#3DC299", "#986603": "#BB8934", "#12A7A7": "#3FBDBD", "#B45018": "#D97742",
-  "#00A1CB": "#3FB7DC", "#AA4985": "#CF73A9", "#4F94E9": "#6FA8F0", "#B64656": "#DA707D",
+  "#6BCB3E": "#8FE05F", "#8B7CF6": "#A99CFA", "#C4B72F": "#D6CB5E", "#C264D9": "#D98CE8",
+  "#22C58B": "#4FDBA6", "#E8A93B": "#F2C463", "#2BD9C9": "#5CE6D8", "#FF7A45": "#FF9A6E",
+  "#2FC4E0": "#63D6EC", "#DE5FA8": "#EA8BC4", "#5B9BFF": "#7FB3FF", "#E85F72": "#F08997",
+};
+// meta.category_style guarda el hex que el usuario eligió. Al resaturar la paleta (reskin v2) esos
+// hexes dejarían de estar en POOL y sanitizeStyleMap los descartaría EN SILENCIO: el usuario
+// perdería el color que eligió sin ver ni un aviso. Este mapa los sube a su equivalente v2 (misma
+// ranura de POOL, mismo tono). Idempotente: un hex nuevo (ya en POOL) no matchea y pasa de largo.
+const LEGACY_COLORS = {
+  "#629D3B": "#6BCB3E", "#6B61C2": "#8B7CF6", "#A09600": "#C4B72F", "#9153AB": "#C264D9",
+  "#15AC7D": "#22C58B", "#986603": "#E8A93B", "#12A7A7": "#2BD9C9", "#B45018": "#FF7A45",
+  "#00A1CB": "#2FC4E0", "#AA4985": "#DE5FA8", "#4F94E9": "#5B9BFF", "#B64656": "#E85F72",
 };
 // 8 iconos curados ofrecidos en el selector de icono de categoría (pantalla de edición).
 export const CURATED_ICONS = ["🐾", "🎓", "✈️", "👶", "💻", "🎮", "🌱", "📦"];
@@ -87,7 +95,10 @@ function sanitizeStyleMap(map) {
     if (k === "__proto__") continue;
     if (!v || typeof v !== "object") continue;
     const entry = {};
-    if (typeof v.color === "string" && POOL.includes(v.color)) entry.color = v.color;
+    // Migrar ANTES del filtro: un hex de la paleta v1 no está en el POOL v2 y se descartaría en
+    // silencio (ver LEGACY_COLORS arriba) si no se sube primero a su sucesor.
+    const color = typeof v.color === "string" ? (LEGACY_COLORS[v.color] ?? v.color) : v.color;
+    if (typeof color === "string" && POOL.includes(color)) entry.color = color;
     if (typeof v.icon === "string" && allowedIcons.has(v.icon)) entry.icon = v.icon;
     if (Object.keys(entry).length > 0) out[k] = entry;
   }
@@ -139,14 +150,14 @@ export const colorForCategory = (catId, byId) => {
 };
 
 // Mismo orden que colorForCategory. Con override de usuario el tinte SIEMPRE sale del pool
-// (el color elegido en el selector es del pool): POOL_TEXT[color], o DEFAULT_COLOR si datos
+// (el color elegido en el selector es del pool): POOL_TEXT[color], o DEFAULT_TEXT_COLOR si datos
 // corruptos lo dejaran fuera del pool.
 export const textColorForCategory = (catId, byId) => {
   const root = rootOf(catId, byId);
   const override = style[root];
-  if (override?.color) return POOL_TEXT[override.color] ?? DEFAULT_COLOR;
+  if (override?.color) return POOL_TEXT[override.color] ?? DEFAULT_TEXT_COLOR;
   if (TEXT_COLORS[root]) return TEXT_COLORS[root];
-  if (NEUTRAL_IDS.has(root)) return DEFAULT_COLOR;
+  if (NEUTRAL_IDS.has(root)) return DEFAULT_TEXT_COLOR;
   return POOL_TEXT[POOL[hashIndex(root)]];
 };
 

@@ -9,19 +9,19 @@ import {
   hashIndex,
   rootOf,
   POOL,
+  DEFAULT_COLOR,
   CURATED_ICONS,
 } from "../../app/app/js/category-colors.js";
 
-const DEFAULT_COLOR = "#9A99A6";
+const DEFAULT_TEXT_COLOR = "#B4B1BC";
 
-// Pool de texto tras Task 2 (P2): 5 de los 12 aclarados para pasar 4.5:1 (WCAG AA) en las
-// superficies reales donde se usan — tinte al 18% sobre --bg en registro.js chipStyle
-// (4.62–4.71:1) y texto sólido sobre --card en gasto-por-categoria.js rootRowHtml (≥5.33:1); ver
-// category-colors.js TEXT_COLORS/POOL_TEXT y el report de Task 2 para la tabla de ratios.
+// Pool de texto v2 (reskin, SISTEMA.md §2.2): resaturado para #0B0B0C. Mismo criterio que antes
+// (POOL_TEXT es la fuente para overrides de usuario y categorías hasheadas) — ver
+// category-colors.js TEXT_COLORS/POOL_TEXT para la tabla de ratios (peor caso Ocio, 6,90:1).
 const POOL_TEXT = {
-  "#629D3B": "#7FB554", "#6B61C2": "#9088DD", "#A09600": "#BDB32A", "#9153AB": "#B37CCD",
-  "#15AC7D": "#3DC299", "#986603": "#BB8934", "#12A7A7": "#3FBDBD", "#B45018": "#D97742",
-  "#00A1CB": "#3FB7DC", "#AA4985": "#CF73A9", "#4F94E9": "#6FA8F0", "#B64656": "#DA707D",
+  "#6BCB3E": "#8FE05F", "#8B7CF6": "#A99CFA", "#C4B72F": "#D6CB5E", "#C264D9": "#D98CE8",
+  "#22C58B": "#4FDBA6", "#E8A93B": "#F2C463", "#2BD9C9": "#5CE6D8", "#FF7A45": "#FF9A6E",
+  "#2FC4E0": "#63D6EC", "#DE5FA8": "#EA8BC4", "#5B9BFF": "#7FB3FF", "#E85F72": "#F08997",
 };
 
 // Reset del estado module-level entre tests para que no se filtren overrides.
@@ -66,7 +66,7 @@ test("category-colors: rootOf termina sobre un ciclo A↔B (a.parent_id=b, b.par
   assert.ok(result === "a" || result === "b", "debe devolver uno de los dos ids del ciclo, no colgarse");
 });
 
-test("category-colors: paridad de seeds — sin overrides, las 14 raíces + iconos rinden los valores actuales", () => {
+test("category-colors: paridad de seeds — sin overrides, las 14 raíces + iconos rinden los valores de la paleta v2", () => {
   const byId = {
     "cat-casa": { id: "cat-casa", parent_id: "" },
     "cat-alimentacion": { id: "cat-alimentacion", parent_id: "" },
@@ -87,37 +87,37 @@ test("category-colors: paridad de seeds — sin overrides, las 14 raíces + icon
   };
 
   const expectedColors = {
-    "cat-casa": "#4F94E9",
-    "cat-alimentacion": "#629D3B",
-    "cat-restauracion": "#B45018",
-    "cat-transporte": "#00A1CB",
-    "cat-coche": "#986603",
-    "cat-salud": "#12A7A7",
-    "cat-suscripciones": "#9153AB",
-    "cat-ocio": "#6B61C2",
-    "cat-ropa": "#B64656",
-    "cat-regalos": "#AA4985",
-    "cat-impuestos": "#A09600",
-    "cat-nomina": "#15AC7D",
-    "cat-puntuales": "#15AC7D",
-    "cat-intereses": "#15AC7D",
+    "cat-casa": "#5B9BFF",
+    "cat-alimentacion": "#6BCB3E",
+    "cat-restauracion": "#FF7A45",
+    "cat-transporte": "#2FC4E0",
+    "cat-coche": "#E8A93B",
+    "cat-salud": "#2BD9C9",
+    "cat-suscripciones": "#C264D9",
+    "cat-ocio": "#8B7CF6",
+    "cat-ropa": "#E85F72",
+    "cat-regalos": "#DE5FA8",
+    "cat-impuestos": "#C4B72F",
+    "cat-nomina": "#22C58B",
+    "cat-puntuales": "#22C58B",
+    "cat-intereses": "#22C58B",
   };
 
   const expectedTextColors = {
-    "cat-casa": "#6FA8F0",
-    "cat-alimentacion": "#7FB554",
-    "cat-restauracion": "#D97742",
-    "cat-transporte": "#3FB7DC",
-    "cat-coche": "#BB8934",
-    "cat-salud": "#3FBDBD",
-    "cat-suscripciones": "#B37CCD",
-    "cat-ocio": "#9088DD",
-    "cat-ropa": "#DA707D",
-    "cat-regalos": "#CF73A9",
-    "cat-impuestos": "#BDB32A",
-    "cat-nomina": "#3DC299",
-    "cat-puntuales": "#3DC299",
-    "cat-intereses": "#3DC299",
+    "cat-casa": "#7FB3FF",
+    "cat-alimentacion": "#8FE05F",
+    "cat-restauracion": "#FF9A6E",
+    "cat-transporte": "#63D6EC",
+    "cat-coche": "#F2C463",
+    "cat-salud": "#5CE6D8",
+    "cat-suscripciones": "#D98CE8",
+    "cat-ocio": "#A99CFA",
+    "cat-ropa": "#F08997",
+    "cat-regalos": "#EA8BC4",
+    "cat-impuestos": "#D6CB5E",
+    "cat-nomina": "#4FDBA6",
+    "cat-puntuales": "#4FDBA6",
+    "cat-intereses": "#4FDBA6",
   };
 
   const expectedIcons = {
@@ -139,13 +139,13 @@ test("category-colors: paridad de seeds — sin overrides, las 14 raíces + icon
   }
 
   // Una hija hereda color/tinte/icono de su raíz
-  assert.equal(colorForCategory("cat-casa-luz", byId), "#4F94E9", "cat-casa-luz debe heredar el color de cat-casa");
-  assert.equal(textColorForCategory("cat-casa-luz", byId), "#6FA8F0", "cat-casa-luz debe heredar el tinte de texto de cat-casa");
+  assert.equal(colorForCategory("cat-casa-luz", byId), "#5B9BFF", "cat-casa-luz debe heredar el color de cat-casa");
+  assert.equal(textColorForCategory("cat-casa-luz", byId), "#7FB3FF", "cat-casa-luz debe heredar el tinte de texto de cat-casa");
   assert.equal(iconForCategory("cat-casa-luz", byId), "🏠", "cat-casa-luz debe heredar el icono de cat-casa");
 
-  // cat-otros cae a DEFAULT_COLOR (no está en ROOT_COLORS ni en el hash: NEUTRAL_IDS lo intercepta)
+  // cat-otros cae a DEFAULT_COLOR/DEFAULT_TEXT_COLOR (no está en ROOT_COLORS ni en el hash: NEUTRAL_IDS lo intercepta)
   assert.equal(colorForCategory("cat-otros", byId), DEFAULT_COLOR, "cat-otros debe devolver DEFAULT_COLOR");
-  assert.equal(textColorForCategory("cat-otros", byId), DEFAULT_COLOR, "cat-otros debe devolver DEFAULT_COLOR para textColorForCategory");
+  assert.equal(textColorForCategory("cat-otros", byId), DEFAULT_TEXT_COLOR, "cat-otros debe devolver DEFAULT_TEXT_COLOR para textColorForCategory");
 
   // CURATED_ICONS: los 8 iconos ofrecidos en el selector de icono
   assert.equal(CURATED_ICONS.length, 8, "CURATED_ICONS debe tener 8 entradas");
@@ -165,26 +165,26 @@ test("category-colors: category_id='' (sin categorizar / transferencias) se qued
   // del hash, no un color aleatorio del pool.
   const byId = {};
   assert.equal(colorForCategory("", byId), DEFAULT_COLOR, "category_id vacío debe seguir en DEFAULT_COLOR");
-  assert.equal(textColorForCategory("", byId), DEFAULT_COLOR, "category_id vacío debe seguir en DEFAULT_COLOR para el texto");
+  assert.equal(textColorForCategory("", byId), DEFAULT_TEXT_COLOR, "category_id vacío debe seguir en DEFAULT_TEXT_COLOR para el texto");
 });
 
 test("category-colors: override de usuario tiene precedencia sobre seeds y aplica a las hijas", () => {
-  initCategoryStyle({ "cat-casa": { color: "#B45018", icon: "🐾" } });
+  initCategoryStyle({ "cat-casa": { color: "#FF7A45", icon: "🐾" } });
 
   const byId = {
     "cat-casa": { id: "cat-casa", parent_id: "" },
     "cat-casa-luz": { id: "cat-casa-luz", parent_id: "cat-casa" },
   };
 
-  assert.equal(colorForCategory("cat-casa", byId), "#B45018", "cat-casa debe usar el color del override");
+  assert.equal(colorForCategory("cat-casa", byId), "#FF7A45", "cat-casa debe usar el color del override");
   assert.equal(iconForCategory("cat-casa", byId), "🐾", "cat-casa debe usar el icono del override");
   // El tinte de texto SIEMPRE sale del pool: POOL_TEXT del color elegido (que pertenece al pool)
-  assert.equal(textColorForCategory("cat-casa", byId), "#D97742", "cat-casa debe tener el tinte de texto del color del pool elegido");
+  assert.equal(textColorForCategory("cat-casa", byId), "#FF9A6E", "cat-casa debe tener el tinte de texto del color del pool elegido");
 
   // Las hijas heredan el override vía rootOf
-  assert.equal(colorForCategory("cat-casa-luz", byId), "#B45018", "cat-casa-luz debe heredar el override de cat-casa");
+  assert.equal(colorForCategory("cat-casa-luz", byId), "#FF7A45", "cat-casa-luz debe heredar el override de cat-casa");
   assert.equal(iconForCategory("cat-casa-luz", byId), "🐾", "cat-casa-luz debe heredar el icono del override de cat-casa");
-  assert.equal(textColorForCategory("cat-casa-luz", byId), "#D97742", "cat-casa-luz debe heredar el tinte de texto del override de cat-casa");
+  assert.equal(textColorForCategory("cat-casa-luz", byId), "#FF9A6E", "cat-casa-luz debe heredar el tinte de texto del override de cat-casa");
 });
 
 // Item 1 (CRITICAL, review final): invertido — antes del saneo, un override con color corrupto
@@ -195,8 +195,8 @@ test("category-colors: override de usuario tiene precedencia sobre seeds y aplic
 test("category-colors: override con color corrupto (fuera del pool) se descarta — resuelve al seed de la categoría", () => {
   initCategoryStyle({ "cat-casa": { color: "#123456" } });
   const byId = { "cat-casa": { id: "cat-casa", parent_id: "" } };
-  assert.equal(colorForCategory("cat-casa", byId), "#4F94E9", "la entrada corrupta se descarta: cae al seed de cat-casa");
-  assert.equal(textColorForCategory("cat-casa", byId), "#6FA8F0", "ídem para el tinte de texto del seed");
+  assert.equal(colorForCategory("cat-casa", byId), "#5B9BFF", "la entrada corrupta se descarta: cae al seed de cat-casa");
+  assert.equal(textColorForCategory("cat-casa", byId), "#7FB3FF", "ídem para el tinte de texto del seed");
 });
 
 test("category-colors: color fuera del pool se descarta, pero el icono válido de la MISMA entrada se conserva", () => {
@@ -213,7 +213,7 @@ test("category-colors: un array en el nivel superior de meta.category_style se d
   assert.deepEqual(parseStyle(JSON.stringify([{ color: POOL[0] }])), {});
   initCategoryStyle([{ color: POOL[0] }]);
   const byId = { "cat-casa": { id: "cat-casa", parent_id: "" } };
-  assert.equal(colorForCategory("cat-casa", byId), "#4F94E9", "un array no aporta overrides: cat-casa sigue en su seed");
+  assert.equal(colorForCategory("cat-casa", byId), "#5B9BFF", "un array no aporta overrides: cat-casa sigue en su seed");
 });
 
 test("category-colors: una entrada válida (color del pool + icono permitido) queda intacta tras el saneo", () => {
@@ -232,10 +232,11 @@ test("category-colors: la clave __proto__ del JSON se ignora sin contaminar Obje
 
 test("category-colors: categoría nueva sin override (cat-mascotas) resuelve por hash — índice y color fijados, no recalculados", () => {
   const byId = { "cat-mascotas": { id: "cat-mascotas", parent_id: "" } };
-  // hashIndex("cat-mascotas") calculado al implementar el algoritmo: 3 → POOL[3] = "#9153AB".
+  // hashIndex("cat-mascotas") calculado al implementar el algoritmo: 3 → POOL[3] = "#C264D9" (v2:
+  // el algoritmo de hash y el ORDEN de POOL no cambian con el reskin, solo el hex de cada ranura).
   // Ambos literales a propósito (no se llama a hashIndex ni se indexa POOL aquí) para que un
   // cambio de algoritmo O un reordenamiento de POOL ("orden fijo") rompan este test.
-  assert.equal(colorForCategory("cat-mascotas", byId), "#9153AB", "cat-mascotas debe resolver a POOL[3] = #9153AB");
+  assert.equal(colorForCategory("cat-mascotas", byId), "#C264D9", "cat-mascotas debe resolver a POOL[3] = #C264D9");
 });
 
 test("category-colors: hashIndex es estable para un conjunto fijo de ids", () => {
@@ -245,10 +246,10 @@ test("category-colors: hashIndex es estable para un conjunto fijo de ids", () =>
 });
 
 test("category-colors: initCategoryStyle(undefined) no rompe — vuelve a {}", () => {
-  initCategoryStyle({ "cat-casa": { color: "#B45018" } });
+  initCategoryStyle({ "cat-casa": { color: "#FF7A45" } });
   initCategoryStyle(undefined);
   const byId = { "cat-casa": { id: "cat-casa", parent_id: "" } };
-  assert.equal(colorForCategory("cat-casa", byId), "#4F94E9", "sin overrides, cat-casa debe volver a su color de seed");
+  assert.equal(colorForCategory("cat-casa", byId), "#5B9BFF", "sin overrides, cat-casa debe volver a su color de seed");
 });
 
 test("category-colors: parseStyle hace try/catch seguro de JSON.parse", () => {
@@ -257,5 +258,14 @@ test("category-colors: parseStyle hace try/catch seguro de JSON.parse", () => {
   assert.deepEqual(parseStyle(""), {});
   assert.deepEqual(parseStyle("no es json"), {});
   assert.deepEqual(parseStyle("{}"), {});
-  assert.deepEqual(parseStyle('{"cat-casa":{"color":"#B45018"}}'), { "cat-casa": { color: "#B45018" } });
+  assert.deepEqual(parseStyle('{"cat-casa":{"color":"#FF7A45"}}'), { "cat-casa": { color: "#FF7A45" } });
+});
+
+// Protege datos del usuario: un override guardado ANTES del reskin con un hex de la paleta v1
+// (p.ej. el verde viejo de Alimentación) ya no está en el POOL v2 y sanitizeStyleMap lo
+// descartaría en silencio si no se migrase primero. LEGACY_COLORS lo sube a su sucesor v2 en la
+// MISMA ranura de POOL (mismo criterio de color, solo cambia el tono).
+test("category-colors: un override guardado con la paleta vieja se migra, no se descarta", () => {
+  initCategoryStyle(parseStyle('{"cat-x":{"color":"#629D3B"}}'));   // verde v1 (alimentación)
+  assert.equal(colorForCategory("cat-x", { "cat-x": { id: "cat-x", parent_id: "" } }), "#6BCB3E");
 });

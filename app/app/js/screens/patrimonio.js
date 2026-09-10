@@ -3,8 +3,8 @@ import {
   getAccount, createAccount, updateAccount, listExpenseRootCategories, allCategoriesById,
   createGoal, updateGoal, softDeleteGoal, getAccountLoans, setAccountLoan,
 } from "../repo.js";
-import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtMoneyParts, hoyISO, fmtDec1, currencySymbol, currencyCode, parseCentsRaw, centsToRaw } from "../format.js";
+import { colorForCategory, iconForCategory, POOL } from "../category-colors.js";
+import { fmtMoney, moneyPartsHtml, hoyISO, fmtDec1, currencySymbol, currencyCode, parseCentsRaw, centsToRaw } from "../format.js";
 import { netWorthBarsHtml } from "../charts.js";
 import { t } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
@@ -23,14 +23,6 @@ const ICON_ARROW = (up) => `<svg width="13" height="13" viewBox="0 0 24 24" fill
     style="stroke:${up ? "var(--green)" : "var(--red)"};" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
     ${up ? '<path d="M12 19V5M12 5l-6 6M12 5l6 6"></path>' : '<path d="M12 5v14M12 19l-6-6M12 19l6-6"></path>'}
   </svg>`;
-
-// Compone un importe con los céntimos reducidos en <small> (patrón .amount-hero del design
-// system, ver DesignSystem.dc.html / inicio.js#moneyPartsHtml): main + <small>céntimos</small> +
-// sufijo, sin reimplementar el locale — fmtMoneyParts (format.js) ya hace el split posicional.
-const moneyPartsHtml = (cents) => {
-  const { main, cents: c, suffix } = fmtMoneyParts(cents);
-  return `${escHtml(main)}<small>${escHtml(c)}</small>${escHtml(suffix)}`;
-};
 
 /** Tarjeta "Patrimonio neto": importe héroe (.amount-hero, 34/700) + badge de variación ABSOLUTA
  *  vs el último periodo CERRADO + evolución en barras (netWorthBarsHtml, charts.js) — réplica de
@@ -83,15 +75,13 @@ function netWorthCardHtml(netWorthCents, series) {
 // ---- tarjeta "Cuentas" -----------------------------------------------------
 
 // Trazos de los iconos SVG de docs/design/material-expresivo/Patrimonio.dc.html:71-118 (uno por tipo de cuenta, no por
-// cuenta concreta: aquí solo hay 3 tipos). El color entra como --cat en .list-row-icon (mismo
-// mecanismo de tinte que .tx-icon con las categorías, ver app.css). Paleta propia de tipo de
-// cuenta, independiente de category-colors.js (checking/liability no están en la lista de hex
-// viejos de categoría, así que se dejan tal cual; el morado de savings SÍ coincidía por accidente
-// con el hex viejo retirado de cat-suscripciones — migrado al mismo sucesor morado, tarea 9).
+// cuenta concreta: aquí solo hay 3 tipos). SISTEMA.md §2.2 es explícito: una cuenta no tiene ni
+// icono ni color propios — se identifica por su nombre y su tipo escritos — así que los tres
+// entran en --ink-2, no en un hex de tipo (reskin v2, tarea 9).
 const ACCOUNT_ICON = {
-  checking: { color: "#7aa2ff", paths: '<rect x="3" y="5.5" width="18" height="13" rx="3.5"></rect><path d="M3 10.5h18"></path>' },
-  savings: { color: "#9153AB", paths: '<path d="M5 8.5h14a1.6 1.6 0 011.6 1.6v7.3A1.6 1.6 0 0119 19H5a1.6 1.6 0 01-1.6-1.6V6.6A1.6 1.6 0 015 5h10"></path><circle cx="16.5" cy="13.8" r="1.2"></circle>' },
-  liability: { color: "#f87171", paths: '<path d="M4.2 16.2h15.6v-3.8l-1.7-4.1a1.6 1.6 0 00-1.5-1H7.4a1.6 1.6 0 00-1.5 1l-1.7 4.1z"></path><path d="M6 16.2v2.4h2.6v-2.4M15.4 16.2v2.4H18v-2.4"></path>' },
+  checking: { color: "var(--ink-2)", paths: '<rect x="3" y="5.5" width="18" height="13" rx="3.5"></rect><path d="M3 10.5h18"></path>' },
+  savings: { color: "var(--ink-2)", paths: '<path d="M5 8.5h14a1.6 1.6 0 011.6 1.6v7.3A1.6 1.6 0 0119 19H5a1.6 1.6 0 01-1.6-1.6V6.6A1.6 1.6 0 015 5h10"></path><circle cx="16.5" cy="13.8" r="1.2"></circle>' },
+  liability: { color: "var(--ink-2)", paths: '<path d="M4.2 16.2h15.6v-3.8l-1.7-4.1a1.6 1.6 0 00-1.5-1H7.4a1.6 1.6 0 00-1.5 1l-1.7 4.1z"></path><path d="M6 16.2v2.4h2.6v-2.4M15.4 16.2v2.4H18v-2.4"></path>' },
 };
 
 const ACCOUNT_TYPES = [
@@ -129,7 +119,7 @@ function cuentaRowHtml(a, isDefault, accountLoans) {
     <button type="button" class="list-row" data-acc="${a.id}"
       style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
       <div class="list-row-icon" style="--cat:${icon.color};">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${icon.color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icon.paths}</svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="stroke:${icon.color};" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icon.paths}</svg>
       </div>
       <div class="list-row-body">
         <div class="list-row-title">${escHtml(a.name)}</div>
@@ -200,13 +190,10 @@ const GOAL_TYPE_KEY = Object.fromEntries(GOAL_TYPES.map((gt) => [gt.id, gt.label
 // "Tope de Restauración" — spending_cap, sin hucha — lleva barra).
 const HUCHA_GOAL_TYPES = new Set(["emergency_fund", "savings_target", "provision"]);
 
-// Paleta de anillos de Objetivos (brief Task 6): color = paleta[i % 12] sobre el índice del goal
+// Paleta de anillos de Objetivos (brief Task 6): color = POOL[i % 12] sobre el índice del goal
 // en el orden de listado (SQL.listGoals ORDER BY created_at, ya determinista) — no se persiste
-// nada, se deriva en cada render.
-const GOAL_RING_PALETTE = [
-  "#629D3B", "#6B61C2", "#A09600", "#9153AB", "#15AC7D", "#986603",
-  "#12A7A7", "#B45018", "#00A1CB", "#AA4985", "#4F94E9", "#B64656",
-];
+// nada, se deriva en cada render. Reusa el POOL de category-colors.js en vez de una copia propia
+// (cerraba el punto "paleta triplicada" del BACKLOG; reskin v2, tarea 10).
 
 /** savings_rate guarda puntos porcentuales en currentCents/targetCents (ver repo.goalProgress):
  *  se muestran como "%", el resto de tipos como € (fmtMoney). */
@@ -299,7 +286,7 @@ function objetivosCardHtml(goals) {
       ${header}
       <div class="card" style="display:flex;flex-direction:column;gap:18px;">
         ${goals.map((g, i) => HUCHA_GOAL_TYPES.has(g.goal.type)
-          ? goalRingRowHtml(g, GOAL_RING_PALETTE[i % GOAL_RING_PALETTE.length])
+          ? goalRingRowHtml(g, POOL[i % POOL.length])
           : goalBarRowHtml(g)).join("")}
       </div>
     </div>`;

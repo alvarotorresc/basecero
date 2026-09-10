@@ -1,77 +1,77 @@
 import {
   getOpenPeriod, spentOfPeriod, incomeOfPeriod, listByDay, allCategoriesById,
   pendingSettlements, pendingSettlementNetCents, budgetsOfPeriod, previsionOfPeriod,
-  spentByRootCategory, spentLast7Days, getMetaAll, setMeta, hasSharedData,
+  spentByRootCategory, balancesAt, spentByDayAndRootCategory, recentTxDates,
+  getMetaAll, setMeta, hasSharedData,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtMoneyParts, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtNum2, fmtPct, currencyCode } from "../format.js";
-import { dayIndexOfPeriod, expectedPeriodDays, paceDeltaCents } from "../prevision.js";
+import { fmtMoney, moneyPartsHtml, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtPct0 } from "../format.js";
+import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
+import {
+  nextAccountId, daysLeftOfPeriod, dailyAllowanceCents, nextDueDateIso, streakDays,
+  daysSinceLastEntry, huchaMessage, foldedMovements, groupByDay, savingsSentence,
+  remainingAfterRecurringCents,
+} from "../inicio-logic.js";
+import { weekRange, daysWithCategories, maxDayTotal, weekTotals } from "../semana-logic.js";
+import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
-import { budgetStatus, budgetMap } from "../category-spend.js";
-import { barChartSvg, donutSvg } from "../charts.js";
+import { budgetMap, pctOf, relativeWidth } from "../category-spend.js";
 import { renderLiquidar } from "./liquidar.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 import { renderGastoPorCategoria } from "./gasto-por-categoria.js";
 import { renderRecurrentes } from "./recurrentes.js";
 import { renderRegistro } from "./registro.js";
+import { renderSemana } from "./semana.js";
 import { pushBack, goBack } from "../back.js";
+import { openTxDetail } from "../open-tx.js";
+import { goToTab } from "../tabs.js";
 import { userMessage } from "../errors.js";
 import { showToast } from "../toast.js";
 import { skeletonHtml } from "../skeleton.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-const centsToStr = (cents) => fmtNum2((cents ?? 0) / 100);
+// Porcentaje entero con espacio duro antes del «%» — mismo patrón que gasto-por-categoria.js
+// (fmtPctInt): sin el U+00A0 el «%» se parte en su propia línea al estrecharse el contenedor.
+// `format.js#fmtPct0` (Task 10) hará esto mismo vía Intl; hasta entonces el porcentaje de la
+// hucha ya llega redondeado desde inicio-logic.js#huchaMessage, así que basta con el sufijo.
+const fmtPctInt = (pct) => `${pct} %`;
 
-// Compone un importe con los céntimos reducidos en <small> (patrón .amount-hero del design
-// system, ver DesignSystem.dc.html): main + <small>céntimos</small> + sufijo, sin reimplementar
-// el locale — fmtMoneyParts (format.js) ya hace el split posicional sobre formatToParts.
-const moneyPartsHtml = (cents) => {
-  const { main, cents: c, suffix } = fmtMoneyParts(cents);
-  return `${escHtml(main)}<small>${escHtml(c)}</small>${escHtml(suffix)}`;
-};
+// Cuántas categorías raíz se listan en el bloque «Gasto por categoría» de Inicio (I3): 5 en el
+// artboard, sin rueda y sin fila «Otras N» (a diferencia del v1, que agrupaba el resto en una).
+const INICIO_TOP_CATEGORIES = 5;
 
-// Cuántas categorías raíz se listan individualmente en el donut antes de agrupar el resto en
-// "Otras N" — mismo criterio visual que docs/design/material-expresivo/Resumen.dc.html:139-213 (6 + "Otras 3").
-const DONUT_TOP_N = 6;
-// Mismo gris que DEFAULT_COLOR en category-colors.js — no se importa porque este módulo no
-// tiene ninguna categoría real que resolver a "sin color", solo el grupo "Otras N".
-const DONUT_OTHERS_COLOR = "#9A99A6";
+// Cuenta elegida por el selector del héroe (decisión 3 de la spec): vive a nivel de MÓDULO, no del
+// closure de renderInicio, porque esa función se re-ejecuta en cada vuelta de subpantalla y un
+// `let` local perdería la cuenta elegida en cuanto se repintara. Se valida contra la lista de
+// cuentas VIVAS en cada render (una cuenta borrada/archivada entre medias cae al valor por defecto).
+let selectedAccountId = null;
 
-/** Agrupa las filas de listByDay (ya vienen ordenadas por date DESC) en bloques por día,
- *  preservando el orden de llegada. */
-function groupByDay(rows) {
-  const groups = [];
-  let current = null;
-  for (const r of rows) {
-    if (!current || current.date !== r.date) {
-      current = { date: r.date, rows: [] };
-      groups.push(current);
-    }
-    current.rows.push(r);
-  }
-  return groups;
-}
+// «Ahora no» de la hucha dura la sesión (decisión 16): mismo criterio de módulo que
+// selectedAccountId — renderInicio se re-ejecuta en cada vuelta de subpantalla y un Set del
+// closure perdería el descarte.
+const huchaDismissed = new Set();
 
+// SVG «chevron abajo»/«chevron derecha» del repertorio (SISTEMA §3).
+const CHEVRON_DOWN_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9.5 12 16l7-6.5"></path></svg>`;
+const CHEVRON_RIGHT_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 5 16 12l-6.5 7"></path></svg>`;
+
+/** Fila de movimiento plegado (I4/I5, Main.dc.html:90-102): SIEMPRE un <button> de 64px que abre
+ *  el detalle real vía open-tx.js — antes era un <div> estático. Se conserva ENTERA la rama de
+ *  `type === "adjustment"` y el sufijo de compartidos (decisión 13: este bloque no es un
+ *  contenedor tocable, cada fila navega por sí sola). */
 function txRowHtml(r, byId, partnerName) {
-  // Una liquidación deja DOS apuntes (repo.js#settleAllSharedStmts): la devolución ENTRANTE de un
-  // gasto que pagué yo y el ajuste SALIENTE —negativo, sin categoría— de uno que pagó ella. Antes
-  // listByDay escondía los ajustes y aquí solo se veía la mitad del movimiento de dinero.
-  // Se pinta igual que en Movimientos (movimientos.js:70-81): balanza sobre el gris de tarjeta,
-  // «Ajuste» de título y el comercio debajo («Liquidación con {nombre}» cuando lo es). El signo
-  // sale del importe, que en un adjustment PUEDE ser negativo — sin este caso, la rama genérica de
-  // abajo pintaría «+-45,20 €» en verde, porque da por hecho que solo los gastos restan.
   if (r.type === "adjustment") {
     const isNeg = r.amount_cents < 0;
     return `
-    <div class="tx-row">
-      <div class="dotico" style="--cat:var(--card2);">⚖️</div>
+    <button type="button" class="tx-row" data-tx="${escAttr(r.id)}" style="width:100%;text-align:left;background:none;border:0;padding:10px 0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+      <div class="dotico" style="--cat:var(--surface-2);">⚖️</div>
       <div class="tx-body">
         <div class="tx-title">${t("common.type.adjustment")}</div>
         <div class="tx-sub">${escHtml(r.merchant || r.note || "")}</div>
       </div>
-      <div class="tx-amount num ${isNeg ? "negative" : "positive"}">${isNeg ? "-" : "+"}${fmtMoney(Math.abs(r.amount_cents))}</div>
-    </div>`;
+      <div class="tx-amount num ${isNeg ? "negative" : "positive"}">${isNeg ? "-" : "+"}${moneyPartsHtml(Math.abs(r.amount_cents))}</div>
+    </button>`;
   }
   const cat = byId[r.category_id];
   const catName = cat?.name ?? "";
@@ -91,51 +91,32 @@ function txRowHtml(r, byId, partnerName) {
   const sign = isExpense ? "-" : "+";
 
   return `
-    <div class="tx-row">
+    <button type="button" class="tx-row" data-tx="${escAttr(r.id)}" style="width:100%;text-align:left;background:none;border:0;padding:10px 0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
       <div class="dotico" style="--cat:${color};">${icon}</div>
       <div class="tx-body">
         <div class="tx-title">${escHtml(title)}</div>
         <div class="tx-sub">${escHtml(sub)}</div>
       </div>
-      <div class="tx-amount num ${amountClass}">${sign}${fmtMoney(r.amount_cents)}</div>
-    </div>`;
+      <div class="tx-amount num ${amountClass}">${sign}${moneyPartsHtml(r.amount_cents)}</div>
+    </button>`;
 }
 
-/** Bloque de compartidos: neto pendiente con la contraparte, de TODOS los periodos
- *  (pendingSettlements/-Net cubren cualquier gasto compartido sin liquidar en las dos
- *  direcciones, no solo los del periodo abierto). Se oculta entero si no hay partnerName
- *  configurado (PR C, Task 5: sin nombre no hay a quién liquidar — ver partnerBannerHtml para el
- *  caso "hay compartidos pero falta el nombre") o si no hay nada pendiente. */
-function sharedBlockHtml(period, sharedRows, netCents, partnerName) {
+/** Bloque de compartidos (Main.dc.html:311-321): neto pendiente con la contraparte, de TODOS los
+ *  periodos, + «Liquidar». Pierde el badge de reparto y la línea del más antiguo que llevaba el
+ *  v1 (Task 9: la pantalla ya no reparte protagonismo, es neto + acción). Se oculta entero sin
+ *  partnerName configurado o sin nada pendiente — igual que antes. */
+function sharedBlockHtml(sharedRows, netCents, partnerName) {
   if (!partnerName || (sharedRows.length === 0 && netCents === 0)) return "";
-  const miPct = period.my_share_pct;
-  const n = sharedRows.length;
-  const masAntiguo = sharedRows[0]?.date;
+  const labelKey = netCents > 0 ? "common.settlement.theyOwe" : netCents < 0 ? "common.settlement.youOwe" : "common.settlement.even";
+  const amountColor = netCents > 0 ? "var(--pos)" : netCents < 0 ? "var(--danger)" : "var(--ink)";
   return `
-    <div class="card" style="display:flex;flex-direction:column;gap:14px;margin-bottom:16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="font-size:15px;font-weight:700;">${t("inicio.shared.withPartner", { name: escHtml(partnerName) })}</div>
-        <div style="font-size:11px;font-weight:600;color:var(--text-2);background:var(--card2);border-radius:999px;padding:5px 10px;">
-          ${t("inicio.shared.periodSplit", { mine: miPct, theirs: 100 - miPct })}
-        </div>
-      </div>
-      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;">
-        <div style="display:flex;flex-direction:column;gap:5px;">
-          <div style="font-size:11px;color:var(--text-3);">${netCents > 0
-            ? t("common.settlement.theyOwe", { name: escHtml(partnerName) })
-            : netCents < 0
-              ? t("common.settlement.youOwe", { name: escHtml(partnerName) })
-              : t("common.settlement.even")}</div>
-          <div class="num${netCents > 0 ? " text-green" : netCents < 0 ? " text-red" : ""}" style="font-size:30px;font-weight:600;letter-spacing:-0.02em;">${fmtMoney(Math.abs(netCents))}</div>
-        </div>
-        <button type="button" id="shared-liquidar" style="height:44px;padding:0 18px;border-radius:999px;
-          background:var(--card2);color:var(--text);border:0;font-size:12px;font-weight:700;cursor:pointer;
-          -webkit-tap-highlight-color:transparent;">${t("common.settle")}</button>
-      </div>
-      ${n > 0 ? `<div style="font-size:11px;color:var(--text-3);">
-        ${t("inicio.shared.oldest", { n, date: fmtDiaCorto(masAntiguo) })}
-      </div>` : ""}
-    </div>`;
+  <div style="display:flex;align-items:center;gap:14px;margin-top:var(--gap-section);">
+    <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;">
+      <span style="font-size:13px;font-weight:500;color:var(--ink-3);">${t(labelKey, { name: escHtml(partnerName) })}</span>
+      <div class="num" style="font:var(--t-figure-l);color:${amountColor};">${moneyPartsHtml(Math.abs(netCents))}</div>
+    </div>
+    <button type="button" id="shared-liquidar" class="btn-secondary" style="width:auto;flex-shrink:0;">${t("common.settle")}</button>
+  </div>`;
 }
 
 /** Banner de migración de una sola vez (PR C, Task 5): se pinta sobre el resumen cuando la BD
@@ -156,258 +137,366 @@ function partnerBannerHtml() {
   </div>`;
 }
 
-function previsionRowHtml(item, byId) {
-  const { rule, myCents, paid } = item;
-  const color = rule.type === "transfer" ? "#9A99A6" : colorForCategory(rule.category_id, byId);
-  const icon = rule.type === "transfer" ? "⇄" : iconForCategory(rule.category_id, byId);
-  const amountStyle = paid
-    ? "font-size:14px;font-weight:700;flex-shrink:0;color:var(--text-2);text-decoration:line-through;"
-    : "font-size:14px;font-weight:700;flex-shrink:0;";
-  const inner = `
-      <div class="dotico" style="--cat:${color};">${icon}</div>
-      <div class="tx-body">
-        <div class="tx-title">${escHtml(rule.name)}</div>
-        <div class="tx-sub">${paid ? t("inicio.prevision.paid") : t("inicio.prevision.pending")}</div>
-      </div>
-      <div class="num" style="${amountStyle}">${fmtMoney(myCents)}</div>`;
-  // Pagada: fila estática (nada que hacer). Pendiente: <button> real (no un <div> con onclick),
-  // igual criterio que recurrentes.js ruleRowHtml — accesible por teclado/lector de pantalla.
-  return paid
-    ? `<div class="tx-row">${inner}</div>`
-    : `<button type="button" class="tx-row" data-prevision-rule="${escAttr(rule.id)}"
-        style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">${inner}</button>`;
-}
-
-/** Bloque "Previsión": reglas recurrentes que aplican este mes (pagadas o pendientes), con
- *  el "comprometido restante" y el "disponible real" destacado. Se oculta entero si no hay
- *  ninguna regla aplicable este mes (aunque estén todas ya pagadas, el bloque se muestra). */
-function previsionHtml(prevision, byId) {
-  if (prevision.items.length === 0) return "";
+/** Cabecera de Inicio (Main.dc.html:19-28): saludo arriba en --t-body/--ink-2, «{periodo} · día N
+ *  de M» debajo en --t-label/--ink-3 (hoy están al revés) + badge de racha a la derecha. El botón
+ *  entero sigue abriendo «Periodo nuevo» — es SOLO chrome de layout, el onclick lo pone el
+ *  llamante sobre #inicio-periodo-header. */
+function cabeceraHtml(period, hoy, saludo, racha) {
+  const rachaHtml = racha > 0
+    ? `<div style="display:flex;align-items:center;gap:6px;height:30px;border-radius:var(--r-pill);background:var(--surface-2);padding:0 12px;flex-shrink:0;">
+        <span style="font-size:13px;font-weight:500;color:var(--ink-2);">${t("inicio.streak", { n: racha })}</span>
+      </div>`
+    : "";
   return `
-    <div class="card" style="display:flex;flex-direction:column;gap:14px;margin-bottom:16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div class="section-title">${t("inicio.prevision.title")}</div>
-        <button type="button" id="prevision-gestionar" class="link-btn" style="white-space:nowrap;">${t("inicio.prevision.manage")}</button>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        ${prevision.items.map((it) => previsionRowHtml(it, byId)).join("")}
-      </div>
-      <hr class="divider">
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
-          <div style="font-size:12px;color:var(--text-2);">${t("inicio.prevision.committed")}</div>
-          <div class="num" style="font-size:14px;font-weight:600;">${fmtMoney(prevision.comprometidoCents)}</div>
-        </div>
-        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
-          <div style="font-size:13px;font-weight:700;">${t("inicio.prevision.available")}</div>
-          <div class="num ${prevision.disponibleCents >= 0 ? "text-green" : "text-red"}"
-            style="font-size:20px;font-weight:700;letter-spacing:-0.02em;">${fmtMoney(prevision.disponibleCents)}</div>
-        </div>
-      </div>
-    </div>`;
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:26px;">
+    <button type="button" id="inicio-periodo-header" class="link-btn" style="color:inherit;display:flex;flex-direction:column;gap:3px;text-align:left;padding:7px 0;margin:-7px 0;">
+      <span style="font:var(--t-body);color:var(--ink-2);">${escHtml(saludo)}</span>
+      <span style="font:var(--t-label);color:var(--ink-3);">${t("inicio.header.dayOf", { period: escHtml(period.name), day: dayIndexOfPeriod(period.start_date, hoy), total: expectedPeriodDays(period.start_date) })}</span>
+    </button>
+    ${rachaHtml}
+  </div>`;
 }
 
-/** Tarjeta "Flujo de gasto": barChartSvg de los últimos 7 días naturales (hoy incluido y
- *  marcado como activo) — réplica de docs/design/material-expresivo/Resumen.dc.html:67-107. days7 viene de
- *  repo.spentLast7Days: 7 entradas {date, cents} ya rellenas con 0 en los días sin movimiento. */
-function flujoDeGastoHtml(days7) {
-  const hoy = hoyISO();
-  const total7 = days7.reduce((s, d) => s + d.cents, 0);
-  const days = days7.map((d) => ({ label: fmtDiaIni(d.date), cents: d.cents, active: d.date === hoy }));
+/** Héroe con selector de cuenta (Main.dc.html:30-40, decisiones 1-3 de la spec). `cuentas` es
+ *  `balancesAt(hoy)`: TODAS las activas (ahorro y pasivo incluidos) en display_order, ya con
+ *  `type` (para resolveAccountId) y `balance_cents`. Con una sola cuenta no hay chevron ni
+ *  onclick: un botón que no hace nada es peor que un texto. El onclick real (parcheo en sitio,
+ *  SIN renderInicio) lo pone wire() más abajo. */
+function heroCuentaHtml(cuenta, cuentas) {
+  const negativo = cuenta.balance_cents < 0;
+  const nombreHtml = `<span id="inicio-cuenta-nombre" style="font-size:13px;font-weight:500;">${escHtml(cuenta.name)}</span>`;
+  // Con una sola cuenta no hay a qué ciclar: un <button> que no hace nada es peor que un texto
+  // (decisión de la spec), así que ni chevron ni elemento interactivo.
+  const selectorHtml = cuentas.length > 1
+    ? `<button type="button" id="inicio-cuenta" class="link-btn" aria-label="${escAttr(t("inicio.account.switch"))}"
+        style="display:flex;align-items:center;gap:7px;color:var(--ink-3);padding:10px 0;margin:-10px 0;align-self:flex-start;">
+        ${nombreHtml}${CHEVRON_DOWN_SVG}
+      </button>`
+    : `<div style="display:flex;align-items:center;gap:7px;color:var(--ink-3);">${nombreHtml}</div>`;
   return `
-    <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
-        <div style="font-size:15px;font-weight:700;">${t("inicio.flow.title")}</div>
-        <div style="font-size:11px;color:var(--text-3);">${t("inicio.flow.last7", { total: fmtMoney(total7) })}</div>
+  <div class="hero-account" style="margin-bottom:26px;">
+    ${selectorHtml}
+    <div class="balance num${negativo ? " is-negative" : ""}" id="inicio-saldo">${moneyPartsHtml(cuenta.balance_cents)}</div>
+  </div>`;
+}
+
+/** «Disponible del periodo» + «Hoy puedes gastar» (Main.dc.html:42-62, N7 §5.2). `budgetTotal` ya
+ *  viene calculado del llamante (lo reutiliza también «Te quedarán»): con 0 esta función no se
+ *  invoca. La barra se rellena con lo GASTADO, no con lo que queda (decisión 6). */
+function disponibleHtml(budgetTotal, spent, period, comprometidoCents, hoy) {
+  const disponible = budgetTotal - spent;
+  const diasLabel = Math.max(0, daysLeftOfPeriod(period.start_date, hoy));
+  const allowance = dailyAllowanceCents(disponible, comprometidoCents, period.start_date, hoy);
+  const allowanceOk = allowance > 0;
+  return `
+  <div style="display:flex;flex-direction:column;gap:11px;margin-bottom:26px;">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;">
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <span style="font-size:13px;font-weight:500;color:var(--ink-3);">${t("inicio.available.title")}</span>
+        <div class="num" style="font:var(--t-figure-xl);letter-spacing:-.015em;">${moneyPartsHtml(disponible)}</div>
       </div>
-      ${barChartSvg(days)}
-    </div>`;
+      <span class="num" style="font-size:13px;font-weight:500;color:var(--ink-3);padding-bottom:3px;">${t("inicio.available.days", { n: diasLabel })}</span>
+    </div>
+    <div class="bar"><i style="width:${relativeWidth(spent, budgetTotal)}%;"></i></div>
+    <span style="font-size:13px;font-weight:500;color:var(--ink-3);">${t("inicio.available.spentOf", { spent: escHtml(fmtMoney(spent)), budget: escHtml(fmtMoney(budgetTotal)) })}</span>
+    <div style="display:flex;align-items:center;gap:8px;padding-top:3px;">
+      <span style="font-size:14px;font-weight:500;color:var(--ink-2);">${t("inicio.available.today")}</span>
+      <span class="num" style="font-size:15px;font-weight:600;color:${allowanceOk ? "var(--accent)" : "var(--danger)"};">${escHtml(fmtMoney(allowanceOk ? allowance : 0))}</span>
+    </div>
+  </div>`;
 }
 
-/** Color de la barra de estado de una fila del donut: igual criterio que
- *  gasto-por-categoria.js#rootRowHtml (ok -> color propio de la categoría, warn/over -> ámbar/rojo). No
- *  se reutiliza directamente porque esa pantalla no la exporta (es de detalle interno de esa
- *  pantalla) — aquí además el texto NO se colorea en warn (solo la barra), a diferencia de
- *  gasto-por-categoria.js (rootRowHtml colorea el % en ámbar en warn; esta tarjeta no). */
-function donutBarColor(level, catColor) {
-  if (level === "warn") return "var(--amber)";
-  if (level === "over") return "var(--red)";
-  return catColor;
-}
+// Icono de la hucha (SISTEMA §4.15), repintado con el acento del sistema: rx="112" es la única
+// excepción de radio de todo el sistema (SISTEMA §2.4, es la marca, no una superficie de UI).
+const HUCHA_SVG = `
+  <svg viewBox="0 0 512 512" width="34" height="34" style="flex-shrink:0;border-radius:9px;" aria-hidden="true">
+    <rect width="512" height="512" rx="112" fill="var(--accent)"></rect>
+    <path d="M193.43 112.79A41 42 0 1 0 166 186A41 42 0 1 1 138.57 259.21" fill="none" stroke="var(--accent-ink)" stroke-width="40" stroke-linecap="round"></path>
+    <rect x="149" y="78" width="34" height="216" rx="17" fill="var(--accent-ink)"></rect>
+    <path d="M373.43 112.79A41 42 0 1 0 346 186A41 42 0 1 1 318.57 259.21" fill="none" stroke="var(--accent-ink)" stroke-width="40" stroke-linecap="round"></path>
+    <rect x="329" y="78" width="34" height="216" rx="17" fill="var(--accent-ink)"></rect>
+    <rect x="138" y="349" width="236" height="50" rx="25" fill="var(--accent-ink)"></rect>
+  </svg>`;
 
-/** Una fila de la lista de categorías del donut: punto de color + nombre + "X € de Y €" con
- *  mini-barra (categorías CON límite este periodo) o "X € sin límite" sin barra (el resto y el
- *  grupo "Otras N") — réplica de docs/design/material-expresivo/Resumen.dc.html:140-213. */
-function categoriaDonutRowHtml(name, color, spentCents, limitCents) {
-  if (limitCents > 0) {
-    const st = budgetStatus(spentCents, limitCents);
-    const barColor = donutBarColor(st.level, color);
-    const numColor = st.level === "over" ? "var(--red)" : "var(--text)";
-    const barPct = Math.min(100, Math.max(0, st.pct));
-    return `
-      <div style="display:flex;flex-direction:column;gap:6px;">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <div style="width:9px;height:9px;border-radius:3px;background:${color};flex-shrink:0;"></div>
-            <div style="font-size:12.5px;font-weight:600;color:var(--text-2);">${escHtml(name)}</div>
-          </div>
-          <div class="num" style="font-size:12.5px;font-weight:700;color:${numColor};white-space:nowrap;">${fmtMoney(spentCents)} <span style="font-weight:500;color:var(--text-3);">${t("inicio.categorySpend.of", { limit: fmtMoney(limitCents) })}</span></div>
-        </div>
-        <div style="height:5px;background:var(--card2);border-radius:999px;overflow:hidden;">
-          <div style="width:${barPct}%;height:5px;background:${barColor};border-radius:999px;"></div>
-        </div>
-      </div>`;
+/** La hucha (Main.dc.html:64-80, SISTEMA §4.15): una frase calculada en local (huchaMessage,
+ *  inicio-logic.js), como mucho dos acciones de texto, nunca un botón primario. Sin nada que
+ *  decir, `msg` es null y no se pinta nada — no existe el estado «hola, todo bien». */
+function huchaHtml(msg) {
+  if (!msg) return "";
+  let text, actionKey;
+  if (msg.kind === "renewal") {
+    text = t("inicio.hucha.renewal", { name: escHtml(msg.params.name), date: fmtDiaCorto(msg.params.date), amount: escHtml(fmtMoney(msg.params.amount)) });
+    actionKey = "inicio.hucha.action.renewal";
+  } else if (msg.kind === "limit") {
+    text = t("inicio.hucha.limit", { name: escHtml(msg.params.name), pct: fmtPctInt(msg.params.pct) });
+    actionKey = "inicio.hucha.action.limit";
+  } else if (msg.kind === "idle") {
+    text = t("inicio.hucha.idle", { n: msg.params.n });
+    actionKey = "inicio.hucha.action.idle";
+  } else {
+    // periodEnd: n===0 es la variante «se cierra hoy» (periodo pasado de largo incluido).
+    text = msg.params.n === 0 ? t("inicio.hucha.periodEndToday") : t("inicio.hucha.periodEnd", { n: msg.params.n });
+    actionKey = "inicio.hucha.action.periodEnd";
   }
   return `
-    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div style="width:9px;height:9px;border-radius:3px;background:${color};flex-shrink:0;"></div>
-        <div style="font-size:12.5px;font-weight:600;color:var(--text-2);">${escHtml(name)}</div>
+  <div class="hucha">
+    ${HUCHA_SVG}
+    <div style="display:flex;flex-direction:column;gap:10px;flex:1;min-width:0;">
+      <span style="font-size:14px;line-height:1.45;color:var(--ink);">${text}</span>
+      <div style="display:flex;align-items:center;gap:18px;">
+        <button type="button" id="inicio-hucha-action" style="border:0;background:transparent;color:var(--accent);font-size:14px;font-weight:600;padding:12px 0;margin:-12px 0;cursor:pointer;-webkit-tap-highlight-color:transparent;">${t(actionKey)}</button>
+        <button type="button" id="inicio-hucha-dismiss" style="border:0;background:transparent;color:var(--ink-3);font-size:14px;font-weight:500;padding:12px 0;margin:-12px 0;cursor:pointer;-webkit-tap-highlight-color:transparent;">${t("inicio.hucha.dismiss")}</button>
       </div>
-      <div class="num" style="font-size:12.5px;font-weight:700;white-space:nowrap;">${fmtMoney(spentCents)} <span style="font-weight:500;color:var(--text-3);">${t("inicio.categorySpend.noLimit")}</span></div>
-    </div>`;
+    </div>
+  </div>`;
 }
 
-/** Tarjeta "Gasto por categoría": donut + lista de categorías raíz con gasto, agrupando las que
- *  sobran más allá de DONUT_TOP_N en "Otras N" — réplica de
- *  docs/design/gasto-por-categoria/Inicio.dc.html.
- *
- *  El centro del donut muestra la SUMA DE LAS RAÍCES (= suma de los arcos), NO spentOfPeriod():
- *  un movimiento sin categorizar (category_id='') no cae bajo ninguna raíz (spentByRootCategory
- *  no lo agrupa) y por tanto no aparece en el anillo — si el centro mostrara el total del
- *  periodo, podría ser mayor que la suma de los arcos dibujados, dando la falsa impresión de que
- *  "falta" un trozo. Mostrando la suma de lo categorizado, el número del centro SIEMPRE coincide
- *  con el 100% del anillo.
- *
- *  La tarjeta ENTERA es el punto de entrada a la pantalla «Gasto por categoría» y se muestra
- *  SIEMPRE: antes solo había un enlace, y encima detrás de un gate (había que tener presupuestos
- *  este periodo) que dejaba la pantalla inalcanzable justo para quien todavía no ha puesto ningún
- *  límite — es decir, para quien más falta le hace entrar a ponerlos. Sin gasto categorizado se
- *  pinta la versión reducida: cabecera + texto vacío + pie.
- *
- *  Nada de role ARIA de botón ni tabindex en el contenedor: ese role marca sus hijos como
- *  Children Presentational en ARIA, así que Chrome/WebKit los sacan del árbol de accesibilidad —
- *  el total del centro del donut y el "X € de Y €" de cada fila desaparecerían para lectores de
- *  pantalla. En vez de eso, el .card entero se queda con onclick + cursor:pointer (tap en
- *  cualquier punto sigue navegando para ratón/dedo) y el pie "Ver por categoría →" es un
- *  <button> real: su click (de puntero o sintetizado por teclado) burbujea al onclick del
- *  contenedor, así que un solo listener basta y el foco de teclado/lector de pantalla aterriza en
- *  un control con nombre correcto. */
-function gastoPorCategoriaHtml(rootRows, byId, budgetByCategory) {
+/** Movimientos plegados (I4/I5, Main.dc.html:82-131): sección + «Ver todos» → pestaña Movimientos
+ *  (tabs.js, sin importar main.js). Cuerpo: groupByDay(foldedMovements(rows, hoy)), con «Hoy» para
+ *  el día de hoy y la fecha larga para el resto. El bloque NO es un contenedor tocable entero
+ *  (decisión 13): solo «Ver todos» navega, cada fila abre su propio detalle.
+ *  `rows` viene de listByDay(period.id): vacío tanto para un usuario sin ningún movimiento nunca
+ *  como para uno con meses de historial que acaba de abrir un periodo nuevo. hasHistory (derivado
+ *  de recentTxDates(), sin filtro de periodo) distingue los dos casos para no invitar a "registra
+ *  tu primer gasto" a quien ya tiene datos — bug heredado de v1, donde pasaba menos porque el
+ *  bloque no era el primer contenido bajo la cabecera.
+ *  «Ver todos» lleva el mismo `padding:12px 0;margin:-12px 0` de objetivo táctil que el resto de
+ *  la pantalla (ver pendingHtml): su área ampliada invade unos px del primer `.tx-row` de debajo,
+ *  misma limitación conocida, aceptada por ser el mismo truco ya en uso. */
+function movimientosPlegadosHtml(rows, hoy, byId, partnerName, hasHistory) {
   const headerHtml = `
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
-      <div style="display:flex;flex-direction:column;gap:3px;">
-        <div style="font-size:15px;font-weight:700;">${t("inicio.categorySpend.title")}</div>
-        <div style="font-size:11px;color:var(--text-3);">${t("inicio.categorySpend.subtitle")}</div>
-      </div>
-      <div style="width:24px;height:24px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--text-2);">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg>
-      </div>
-    </div>`;
-  const footerHtml = `
-    <hr class="divider">
-    <div style="height:44px;display:flex;align-items:center;justify-content:center;">
-      <button type="button" id="inicio-categoria-ver" class="link-btn" style="white-space:nowrap;">${t("inicio.categorySpend.viewAll")}</button>
-    </div>`;
-  const cardAttrs = `class="card" id="inicio-categoria-card"`;
-
-  const withSpend = rootRows.filter((r) => r.spent_cents > 0);
-  if (withSpend.length === 0) {
-    return `
-      <div ${cardAttrs} style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px;padding:16px 16px 8px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-        ${headerHtml}
-        <div style="font-size:12px;color:var(--text-3);">${t("inicio.categorySpend.empty")}</div>
-        ${footerHtml}
-      </div>`;
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;">
+    <span style="font-size:15px;font-weight:600;color:var(--ink);">${t("common.movements")}</span>
+    <button type="button" id="inicio-movimientos-ver" class="link-btn" style="display:flex;align-items:center;gap:5px;padding:12px 0;margin:-12px 0;">${t("inicio.movements.viewAll")}${CHEVRON_RIGHT_SVG}</button>
+  </div>`;
+  if (rows.length === 0) {
+    const msg = hasHistory ? t("inicio.movements.emptyPeriod") : t("inicio.movements.empty");
+    return `${headerHtml}<div style="font-size:12px;color:var(--ink-3);">${msg}</div>`;
   }
-
-  const top = withSpend.slice(0, DONUT_TOP_N);
-  const rest = withSpend.slice(DONUT_TOP_N);
-  const restTotal = rest.reduce((s, r) => s + r.spent_cents, 0);
-  // El número del centro es el NETO de TODAS las raíces, incluidas las que quedan en negativo (una
-  // devolución mayor que el gasto de su categoría): es exactamente la misma suma que el héroe de
-  // «Gasto por categoría» (gasto-por-categoria.js#render), la pantalla que abre esta tarjeta.
-  // Antes aquí se sumaban solo las positivas y las dos cifras no cuadraban.
-  // Las PORCIONES del anillo siguen saliendo solo de las raíces con gasto > 0 (`withSpend`): una
-  // porción de ángulo negativo no existe.
-  const netTotal = rootRows.reduce((s, r) => s + r.spent_cents, 0);
-
-  const slices = top.map((r) => ({ color: colorForCategory(r.root_id, byId), cents: r.spent_cents }));
-  if (rest.length > 0) slices.push({ color: DONUT_OTHERS_COLOR, cents: restTotal });
-
-  const rowsHtml = top
-    .map((r) => categoriaDonutRowHtml(r.name, colorForCategory(r.root_id, byId), r.spent_cents, budgetByCategory[r.root_id] ?? 0))
-    .join("");
-  const otrasRowHtml = rest.length > 0 ? categoriaDonutRowHtml(t("inicio.categorySpend.others", { n: rest.length }), DONUT_OTHERS_COLOR, restTotal, 0) : "";
-
+  const groups = groupByDay(foldedMovements(rows, hoy));
   return `
-    <div ${cardAttrs} style="display:flex;flex-direction:column;gap:16px;margin-bottom:16px;padding:16px 16px 8px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-      ${headerHtml}
-      <div style="display:flex;justify-content:center;">
-        ${donutSvg(slices, centsToStr(netTotal), t("inicio.categorySpend.spent", { currency: currencyCode() }))}
+  ${headerHtml}
+  <div>
+    ${groups.map((g) => `
+      <div class="day-label" style="padding:8px 0 4px 0;">${g.date === hoy ? t("common.today") : fmtDiaLargo(g.date)}</div>
+      ${g.rows.map((r) => txRowHtml(r, byId, partnerName)).join("")}
+    `).join("")}
+  </div>`;
+}
+
+/** Fila compacta de la espina de Inicio (I2, Main.dc.html:143-218, 34px): comparte constructor
+ *  (daysWithCategories) con la pantalla Semana — solo cambia la densidad, nunca los datos. */
+function spineRowCompactHtml(day, isLast, max, byId) {
+  const hoy = day.date === hoyISO();
+  const hasBar = day.segments.length > 0;
+  const nodeStyle = hoy
+    ? "width:12px;height:12px;background:var(--accent);box-shadow:0 0 0 4px var(--accent-tint);"
+    : hasBar
+      ? `width:10px;height:10px;background:${colorForCategory(day.dominantRootId || "", byId)};`
+      : "width:8px;height:8px;background:var(--bg);border:1px solid var(--hairline-strong);box-sizing:border-box;";
+  // flex:1 inline: esta espina es horizontal (día · barra · importe), a diferencia de la de
+  // Semana y de la barra de categoría de Inicio (ambas en columna) — ver el comentario de
+  // .day-bar en app.css sobre por qué el flex:1 no puede vivir en la clase.
+  const barHtml = hasBar
+    ? `<div class="day-bar" style="flex:1;min-width:0;">${day.segments.map((seg) => `<div class="day-seg" style="width:${relativeWidth(seg.cents, max)}%;--cat:${colorForCategory(seg.rootId || "", byId)};"></div>`).join("")}</div>`
+    : `<div class="day-bar" style="flex:1;min-width:0;"></div>`;
+  const dayNum = new Date(day.date + "T12:00:00").getDate();
+  // El rail es hijo directo de .spine-row (que hace stretch por defecto) para que la línea de 2px
+  // siga continua entre filas; el contenido va en un flex interno aparte para poder centrarlo
+  // verticalmente SIN encoger el rail (align-items:center en la fila entera lo habría hecho).
+  return `
+  <div class="spine-row" style="min-height:34px;">
+    <div class="spine-rail">
+      <div class="spine-line"${isLast ? ' style="height:50%;"' : ""}></div>
+      <div class="spine-node" style="${nodeStyle}"></div>
+    </div>
+    <div style="flex:1;min-width:0;display:flex;align-items:center;gap:12px;">
+      <span class="num" style="width:40px;flex-shrink:0;font-size:12px;font-weight:${hoy ? "600" : "500"};color:${hoy ? "var(--accent)" : "var(--ink-3)"};">${escHtml(fmtDiaIni(day.date))} ${dayNum}</span>
+      ${barHtml}
+      <span class="num" style="font-size:13px;font-weight:${hoy ? "600" : "500"};color:var(--ink);min-width:62px;text-align:right;">${escHtml(fmtMoney(day.totalCents))}</span>
+    </div>
+  </div>`;
+}
+
+/** «Esta semana» (I2, Main.dc.html:133-219): cabecera con el total + «Ver la semana» y la espina
+ *  compacta. Contenedor tocable ENTERO (mismo patrón que #inicio-categoria-card, decisión 13):
+ *  abre la pantalla Semana. */
+function estaSemanaHtml(days, total, byId) {
+  const max = maxDayTotal(days);
+  return `
+  <div id="inicio-semana-card" style="margin-top:var(--gap-section);cursor:pointer;-webkit-tap-highlight-color:transparent;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:15px;font-weight:600;color:var(--ink);">${t("inicio.week.title")}</span>
+        <span style="width:1px;height:13px;background:var(--hairline-strong);"></span>
+        <span class="num" style="font-size:13px;font-weight:500;color:var(--ink-3);">${escHtml(fmtMoney(total.totalCents))}</span>
       </div>
-      <div style="display:flex;flex-direction:column;gap:12px;">
-        ${rowsHtml}${otrasRowHtml}
+      <button type="button" id="inicio-semana-ver" class="link-btn" style="display:flex;align-items:center;gap:5px;">${t("inicio.week.viewAll")}${CHEVRON_RIGHT_SVG}</button>
+    </div>
+    <div class="spine">
+      ${days.map((d, i) => spineRowCompactHtml(d, i === days.length - 1, max, byId)).join("")}
+    </div>
+  </div>`;
+}
+
+/** Una fila de «Gasto por categoría» en Inicio (I3, Main.dc.html:227-291): insignia de 36px,
+ *  nombre, importe, barra de 6px relativa a la raíz que más gasta. Con límite superado, el tramo
+ *  hasta el límite en el color de la categoría y el exceso en --danger — reutiliza .day-bar/
+ *  .day-seg (pista+tramos a hueso): pese al nombre no son «días», son la misma pieza genérica. */
+function categoriaRowHtml(row, byId, budgetByCategory, maxSpent) {
+  const color = colorForCategory(row.root_id, byId);
+  const icon = iconForCategory(row.root_id, byId);
+  const limit = budgetByCategory[row.root_id] ?? 0;
+  const spent = row.spent_cents;
+  const over = limit > 0 && spent > limit;
+  const limitPct = relativeWidth(limit, maxSpent);
+  const totalPct = relativeWidth(spent, maxSpent);
+  const barHtml = over
+    ? `<div class="day-bar" style="height:6px;">
+        <div class="day-seg" style="width:${limitPct}%;--cat:${color};"></div>
+        <div class="day-seg" style="width:${Math.max(0, totalPct - limitPct)}%;--cat:var(--danger);"></div>
+      </div>`
+    : `<div class="bar" style="height:6px;"><i style="width:${totalPct}%;--cat:${color};"></i></div>`;
+  const overLabel = over
+    ? `<span style="font-size:12px;font-weight:500;color:var(--danger);">${t("inicio.categorySpend.over", { amount: escHtml(fmtMoney(spent - limit)) })}</span>`
+    : "";
+  return `
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div class="dotico" style="width:36px;height:36px;font-size:16px;--cat:${color};">${icon}</div>
+    <div style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:0;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
+        <div style="display:flex;align-items:baseline;gap:8px;min-width:0;">
+          <span style="font-size:14px;font-weight:500;color:var(--ink);">${escHtml(row.name)}</span>
+          ${overLabel}
+        </div>
+        <span class="num" style="font-size:13px;font-weight:500;color:${over ? "var(--danger)" : "var(--ink)"};flex-shrink:0;">${escHtml(fmtMoney(spent))}</span>
       </div>
-      ${footerHtml}
+      ${barHtml}
+    </div>
+  </div>`;
+}
+
+/** «Gasto por categoría» en Inicio (I3): las 5 raíces con más gasto, sin rueda y sin «Otras N» (a
+ *  diferencia del v1). Contenedor tocable ENTERO (decisión 13, mismo patrón de siempre): un solo
+ *  onclick + el botón «Ver todas» del pie burbujea hasta él — nada de role de botón (borraría los
+ *  importes del árbol de accesibilidad). Sin gasto categorizado, versión reducida. */
+function categoriaPorCategoriaHtml(rootRows, byId, budgetByCategory) {
+  const withSpend = rootRows.filter((r) => r.spent_cents > 0).slice(0, INICIO_TOP_CATEGORIES);
+  const headerHtml = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <span style="font-size:15px;font-weight:600;color:var(--ink);">${t("inicio.categorySpend.title")}</span>
+      <button type="button" id="inicio-categoria-ver" class="link-btn" style="display:flex;align-items:center;gap:5px;">${t("inicio.categorySpend.viewAll")}${CHEVRON_RIGHT_SVG}</button>
     </div>`;
-}
-
-/** Tarjeta "Disponible del periodo" (PR polish): presupuesto total del periodo menos lo
- *  gastado, con el ritmo del plan (paceDeltaCents, prevision.js: cuánto por encima o por debajo
- *  del gasto prorrateado a hoy). Se oculta entera si no hay presupuestos definidos este periodo
- *  (budgetTotal === 0).
- *
- *  Task 7 (6f): esta tarjeta llevaba TAMBIÉN su propio botón «Liquidar» (#disp-liquidar), con
- *  el mismo gate (partnerName && netCents distinto de 0) y el mismo handler que #shared-liquidar en
- *  sharedBlockHtml — un usuario con presupuestos definidos Y compartidos pendientes veía DOS
- *  botones «Liquidar» a la vez. Consolidado en uno solo: se queda en sharedBlockHtml (la tarjeta
- *  dedicada a compartidos, con nombre de la contraparte/reparto/importe pendiente ya de
- *  contexto — el botón encaja ahí de forma natural) y se retira de aquí, que es sobre el
- *  presupuesto, no sobre compartidos. */
-// budgetByCategory (el mapa), no las filas en crudo: budgetsOfPeriod ya deja fuera los límites de
-// categorías archivadas o borradas —sumarlos descontaba del disponible un presupuesto que el
-// usuario no veía en ninguna lista— y budgetMap colapsa las parejas duplicadas que solo puede dejar
-// una hoja editada a mano, que con reduce sobre las filas se contarían dos veces.
-function disponibleCardHtml(budgetByCategory, spent, period) {
-  const budgetTotal = Object.values(budgetByCategory).reduce((s, c) => s + c, 0);
-  if (!budgetTotal) return "";
-  const disp = budgetTotal - spent;
-  const delta = paceDeltaCents(budgetTotal, spent, period.start_date, hoyISO());
-  const over = delta > 0;
-  const badge = `<span class="num" style="font-size:11px;font-weight:700;border-radius:999px;padding:4px 10px;color:${over ? "var(--amber)" : "var(--green)"};background:${over ? "rgba(255,190,77,0.14)" : "rgba(79,217,154,0.14)"};">${t(over ? "inicio.available.paceOver" : "inicio.available.paceUnder", { amount: escHtml(fmtMoney(Math.abs(delta))) })}</span>`;
+  let bodyHtml;
+  if (withSpend.length === 0) {
+    bodyHtml = `<div style="font-size:12px;color:var(--ink-3);margin-top:12px;">${t("inicio.categorySpend.empty")}</div>`;
+  } else {
+    const maxSpent = Math.max(...withSpend.map((r) => r.spent_cents));
+    bodyHtml = `<div style="display:flex;flex-direction:column;gap:14px;margin-top:14px;">
+      ${withSpend.map((r) => categoriaRowHtml(r, byId, budgetByCategory, maxSpent)).join("")}
+    </div>`;
+  }
   return `
-  <section class="card" style="margin-bottom:16px;">
-    <div class="section-title">${t("inicio.available.title")}</div>
-    <div class="amount-hero num">${moneyPartsHtml(disp)}</div>
-    <div class="num" style="font-size:12px;color:var(--text-2);">${t("inicio.available.ofBudgeted", { amount: escHtml(fmtMoney(budgetTotal)) })}</div>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;">${badge}</div>
-  </section>`;
+  <div id="inicio-categoria-card" style="margin-top:var(--gap-section);cursor:pointer;-webkit-tap-highlight-color:transparent;">
+    ${headerHtml}
+    ${bodyHtml}
+  </div>`;
 }
 
-/** Pantalla Inicio: cabecera del periodo abierto (gastado, ingresos, ahorrado, tasa),
- *  tarjetas "Flujo de gasto" y "Gasto por categoría", bloque de compartidos (pendiente/liquidar),
- *  bloque "Previsión" (reglas recurrentes del mes) y sus movimientos agrupados por día. */
+/** Gastado / Ingresos / Ahorrado (I1, Main.dc.html:293-306): grid de 3 columnas separadas por un
+ *  filete de 1px. Ingresos en --pos, Ahorrado en --danger si es negativo. */
+function statGridHtml(spent, income, ahorrado) {
+  return `
+  <div class="stat-grid">
+    <div>
+      <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("inicio.spent.title")}</span>
+      <span class="num" style="font:600 15px var(--font-mono);letter-spacing:-.02em;color:var(--ink);">${escHtml(fmtMoney(spent))}</span>
+    </div>
+    <div>
+      <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("inicio.spent.income")}</span>
+      <span class="num" style="font:600 15px var(--font-mono);letter-spacing:-.02em;color:var(--pos);">${escHtml(fmtMoney(income))}</span>
+    </div>
+    <div>
+      <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("inicio.spent.saved")}</span>
+      <span class="num" style="font:600 15px var(--font-mono);letter-spacing:-.02em;color:${ahorrado < 0 ? "var(--danger)" : "var(--ink)"};">${escHtml(fmtMoney(ahorrado))}</span>
+    </div>
+  </div>`;
+}
+
+/** «Ahorras el X % de lo que ingresas» (I1, Main.dc.html:307-309): savingsSentence decide el
+ *  kind; sin ingresos, null → no se pinta nada. fmtPct0 (Task 10, sin decimales: «54 %») en vez
+ *  de fmtPct (que mete un decimal, «54,2 %») — coherente con el resto de cifras de la pantalla,
+ *  que van a un vistazo, no a precisión contable. */
+function savingsLineHtml(income, spent) {
+  const s = savingsSentence(income, spent);
+  if (!s) return "";
+  const text = s.kind === "saves"
+    ? t("inicio.savings.rate", { pct: fmtPct0(s.ratio) })
+    : t("inicio.savings.negative");
+  return `<div style="padding-top:10px;"><span style="font-size:13px;font-weight:500;color:var(--ink-3);">${text}</span></div>`;
+}
+
+/** «Queda por pagar» + «Te quedarán» (Main.dc.html:323-344): una fila por recurrente PENDIENTE
+ *  que no sea ingreso — siguen siendo `<button data-prevision-rule>` que abren Registro
+ *  precargado (se conserva íntegro, ver el wiring en renderInicio). Cierra con «Te quedarán» =
+ *  remainingAfterRecurringCents(disponible, comprometido); sin límites definidos (`remaining`
+ *  null) esa última fila no se pinta.
+ *  Objetivo táctil (revisión de código): `padding:12px 0;margin:-12px 0` en cada fila para llegar
+ *  a 44px sin mover un píxel el layout — LIMITACIÓN CONOCIDA: con gap:12px entre filas el área
+ *  ampliada de una fila invade la de su vecina; el navegador se lo lleva la que esté más abajo en
+ *  el DOM, así que un toque justo en el hueco puede abrir la regla de debajo en vez de la de
+ *  encima. Aceptado (mismo margen que ya usan #inicio-cuenta/#inicio-periodo-header). */
+function pendingHtml(prevision, remaining) {
+  const pending = prevision.items.filter((it) => !it.paid && it.rule.type !== "income");
+  if (pending.length === 0 && remaining == null) return "";
+  const rowsHtml = pending.map((it) => `
+    <button type="button" data-prevision-rule="${escAttr(it.rule.id)}" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:12px 0;margin:-12px 0;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+      <span style="font-size:14px;font-weight:500;color:var(--ink-2);flex:1;min-width:0;">${escHtml(it.rule.name)}</span>
+      <span class="num" style="font-size:13px;font-weight:500;color:var(--warn);">${escHtml(fmtMoney(it.myCents))}</span>
+    </button>`).join("");
+  const remainingHtml = remaining == null ? "" : `
+    <div style="display:flex;align-items:center;gap:10px;padding-top:10px;border-top:1px solid var(--hairline);">
+      <span style="font-size:14px;font-weight:500;color:var(--ink);flex:1;min-width:0;">${t("inicio.pending.left")}</span>
+      <span class="num" style="font-size:15px;font-weight:600;color:var(--ink);">${escHtml(fmtMoney(remaining))}</span>
+    </div>`;
+  return `
+  <div style="margin-top:var(--gap-section);">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">
+      <span style="font-size:15px;font-weight:600;color:var(--ink);">${t("inicio.pending.title")}</span>
+      <button type="button" id="prevision-gestionar" class="link-btn" style="display:flex;align-items:center;gap:5px;padding:12px 0;margin:-12px 0;">${t("inicio.prevision.manage")}${CHEVRON_RIGHT_SVG}</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      ${rowsHtml}${remainingHtml}
+    </div>
+  </div>`;
+}
+
+/** Pantalla Inicio v2 («saldo primero», spec docs/superpowers/specs/2026-09-10-inicio-v2-design.md):
+ *  saldo de la cuenta principal, disponible del periodo + «hoy puedes gastar», la hucha,
+ *  movimientos plegados, la semana en espina, gasto por categoría en barras, compartidos,
+ *  recurrentes pendientes y «Te quedarán». */
 export async function renderInicio(container) {
   // Silueta gris mientras llega la primera consulta: antes la pantalla se quedaba EN BLANCO desde
-  // que se tocaba la pestaña hasta que volvía el Worker.
-  // Solo en el PRIMER pintado: un re-render (guardar el nombre de la contraparte, volver de una
-  // subpantalla) tiene que repintar directo, sin un parpadeo gris de por medio. El testigo es
-  // container.dataset.screen, que escriben SOLO esta pantalla y Movimientos — ninguna otra lo toca
-  // (si alguna lo escribiera, las dos empezarían a parpadear cuando no toca).
+  // que se tocaba la pestaña hasta que volvía el Worker. Solo en el PRIMER pintado — ver el
+  // testigo container.dataset.screen, que escriben SOLO esta pantalla y Movimientos.
   if (container.dataset.screen !== "inicio") {
     container.dataset.screen = "inicio";
     container.innerHTML = skeletonHtml([72, 168, 236, 320]);
   }
-  let period, spent, income, rows, byId, sharedRows, netCents, budgets, prevision, rootRows, days7,
-    meta, partnerName, showPartnerBanner;
+  const hoy = hoyISO();
+  let period, spent, income, rows, byId, sharedRows, netCents, budgets, prevision, rootRows,
+    cuentas, weekRootRows, recentDates, meta, partnerName, showPartnerBanner;
   try {
     period = await getOpenPeriod();
     if (!period) {
       container.innerHTML = `<div class="banner-aviso red">${t("common.noOpenPeriod")}</div>`;
       return;
     }
-    [spent, income, rows, byId, sharedRows, netCents, budgets, prevision, rootRows, days7, meta] = await Promise.all([
+    // weekRange(hoy) da la MISMA ventana de 7 días que usa Semana — semana-logic.js es la única
+    // fuente, así que Inicio no puede llevar una tercera.
+    const week = weekRange(hoy);
+    [spent, income, rows, byId, sharedRows, netCents, budgets, prevision, rootRows,
+      cuentas, weekRootRows, recentDates, meta] = await Promise.all([
       spentOfPeriod(period.id),
       incomeOfPeriod(period.id),
       listByDay(period.id),
@@ -417,7 +506,9 @@ export async function renderInicio(container) {
       budgetsOfPeriod(period.id),
       previsionOfPeriod(period),
       spentByRootCategory(period.id),
-      spentLast7Days(period.id),
+      balancesAt(hoy),
+      spentByDayAndRootCategory(period.id, week.start, week.end),
+      recentTxDates(),
       getMetaAll(),
     ]);
     partnerName = (meta.partner_name || "").trim();
@@ -426,76 +517,82 @@ export async function renderInicio(container) {
     showPartnerBanner = !partnerName && await hasSharedData();
   } catch (e) {
     // userMessage: si el error está escrito para el usuario (un UserError) se enseña tal cual; si
-    // es técnico (SQLite, un bug), se va a console.error y aquí queda el texto genérico. Sigue
-    // pasando por escHtml porque va dentro de un innerHTML.
+    // es técnico (SQLite, un bug), se va a console.error y aquí queda el texto genérico.
     container.innerHTML = `<div class="banner-aviso red">${t("inicio.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
 
   const budgetByCategory = budgetMap(budgets);
-
+  const budgetTotal = Object.values(budgetByCategory).reduce((s, c) => s + c, 0);
   const ahorrado = income - spent;
-  const tasa = income > 0 ? fmtPct(ahorrado / income) : "—";
-  const hoy = hoyISO();
-  // Saludo por hora local (PR polish): sustituye la "Desde el ..." fija de la cabecera —
-  // la fecha de inicio del periodo ya se ve en la línea pequeña vía "día N de M".
+  // Saludo por hora local (PR polish): sustituye la "Desde el ..." fija de la cabecera — la fecha
+  // de inicio del periodo ya se ve en la línea pequeña vía "día N de M".
   const h = new Date().getHours();
   const saludo = h < 7 ? t("inicio.greeting.evening") : h < 14 ? t("inicio.greeting.morning") : h < 21 ? t("inicio.greeting.afternoon") : t("inicio.greeting.evening");
 
-  const movimientosHtml = rows.length === 0
-    ? `<div class="card" style="text-align:center;color:var(--text-3)">
-        <p>${t("inicio.movements.empty")}</p></div>`
-    : `<div class="card" style="display:flex;flex-direction:column;gap:16px;">
-        <div class="section-title">${t("common.movements")}</div>
-        <div style="display:flex;flex-direction:column;gap:12px;">
-          ${groupByDay(rows).map((g) => `
-            <div class="day-label">${g.date === hoy ? t("common.today") : fmtDiaLargo(g.date)}</div>
-            ${g.rows.map((r) => txRowHtml(r, byId, partnerName)).join("")}
-          `).join("")}
-        </div>
-      </div>`;
+  // -- Selector de cuenta (decisiones 1-3): la elegida sobrevive a un repintado en la MISMA
+  // sesión (selectedAccountId es de módulo); si dejó de ser válida (borrada/archivada entre
+  // medias) cae a la resuelta por meta.default_account_id, la misma que usa previsionOfPeriod.
+  if (!(selectedAccountId && cuentas.some((a) => a.id === selectedAccountId))) {
+    selectedAccountId = resolveAccountId(meta.default_account_id, cuentas);
+  }
+  const cuentaActual = cuentas.find((a) => a.id === selectedAccountId) ?? cuentas[0] ?? null;
+
+  // -- Racha (§3.17) y la hucha (§8): las dos usan recentTxDates(), sin filtro de periodo.
+  const racha = streakDays(recentDates, hoy);
+  const renewals = prevision.items
+    .filter((it) => !it.paid && it.rule.type !== "income")
+    // N6: cuando exista recurring_rules.is_subscription, aquí entra .filter(it => it.rule.is_subscription).
+    .map((it) => ({ id: it.rule.id, name: it.rule.name, amountCents: it.myCents, dueDateIso: nextDueDateIso(it.rule, hoy) }))
+    .filter((r) => r.dueDateIso != null)
+    .sort((a, b) => a.dueDateIso.localeCompare(b.dueDateIso));
+  const huchaCategories = rootRows
+    .filter((r) => (budgetByCategory[r.root_id] ?? 0) > 0)
+    .map((r) => ({ id: r.root_id, name: r.name, pct: pctOf(r.spent_cents, budgetByCategory[r.root_id]) }));
+  const hucha = huchaMessage({
+    renewals,
+    categories: huchaCategories,
+    daysSinceLastEntry: daysSinceLastEntry(recentDates, hoy),
+    daysLeftOfPeriod: daysLeftOfPeriod(period.start_date, hoy),
+    todayIso: hoy,
+    dismissed: huchaDismissed,
+  });
+
+  // -- Esta semana (I2): el MISMO constructor que usa la pantalla Semana, a partir de la misma
+  // consulta ya cargada arriba — ninguna divergencia posible entre las dos vistas de la ventana.
+  const semanaDias = daysWithCategories(weekRootRows, weekRange(hoy).dates);
+  const semanaTotal = weekTotals(semanaDias);
+
+  // -- «Te quedarán» (§2.1): disponible del periodo (mismo que alimenta disponibleHtml) menos lo
+  // comprometido en recurrentes. Sin límites definidos, null: ni la fila ni el bloque que no tenga
+  // más pendientes se pintan (ver pendingHtml).
+  const remaining = budgetTotal ? remainingAfterRecurringCents(budgetTotal - spent, prevision.comprometidoCents) : null;
 
   container.innerHTML = `
     ${showPartnerBanner ? partnerBannerHtml() : ""}
 
-    <button type="button" id="inicio-periodo-header" class="link-btn" style="color:inherit;display:flex;flex-direction:column;gap:2px;margin-bottom:14px;">
-      <div style="font-size:12px;font-weight:500;color:var(--text-2);">${t("inicio.header.dayOf", { period: escHtml(period.name), day: dayIndexOfPeriod(period.start_date, hoy), total: expectedPeriodDays(period.start_date) })}</div>
-      <div style="font-size:26px;font-weight:800;letter-spacing:-0.02em;">${saludo}</div>
-    </button>
+    ${cabeceraHtml(period, hoy, saludo, racha)}
 
-    ${disponibleCardHtml(budgetByCategory, spent, period)}
+    ${cuentaActual ? heroCuentaHtml(cuentaActual, cuentas) : ""}
 
-    <div class="card" style="display:flex;flex-direction:column;gap:4px;margin-bottom:16px;">
-      <div class="section-title">${t("inicio.spent.title")}</div>
-      <div class="amount-hero num">${moneyPartsHtml(spent)}</div>
+    ${budgetTotal ? disponibleHtml(budgetTotal, spent, period, prevision.comprometidoCents, hoy) : ""}
 
-      <hr class="divider" style="margin-top:8px;">
+    ${huchaHtml(hucha)}
 
-      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:8px;">
-        <div style="display:flex;flex-direction:column;gap:5px;">
-          <div style="font-size:11px;color:var(--text-3);">${t("inicio.spent.income")}</div>
-          <div class="num text-green" style="font-size:15px;font-weight:600;">${fmtMoney(income)}</div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px;">
-          <div style="font-size:11px;color:var(--text-3);">${t("inicio.spent.saved")}</div>
-          <div class="num ${ahorrado >= 0 ? "text-green" : "text-red"}" style="font-size:15px;font-weight:600;">${fmtMoney(ahorrado)}</div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px;">
-          <div style="font-size:11px;color:var(--text-3);">${t("inicio.spent.rate")}</div>
-          <div class="num" style="font-size:15px;font-weight:600;">${tasa}</div>
-        </div>
-      </div>
-    </div>
+    ${movimientosPlegadosHtml(rows, hoy, byId, partnerName, recentDates.length > 0)}
 
-    ${flujoDeGastoHtml(days7)}
+    ${estaSemanaHtml(semanaDias, semanaTotal, byId)}
 
-    ${gastoPorCategoriaHtml(rootRows, byId, budgetByCategory)}
+    ${categoriaPorCategoriaHtml(rootRows, byId, budgetByCategory)}
 
-    ${sharedBlockHtml(period, sharedRows, netCents, partnerName)}
+    ${statGridHtml(spent, income, ahorrado)}
+    ${savingsLineHtml(income, spent)}
 
-    ${previsionHtml(prevision, byId)}
+    ${sharedBlockHtml(sharedRows, netCents, partnerName)}
 
-    ${movimientosHtml}
+    ${pendingHtml(prevision, remaining)}
+
+    <div style="height:152px;"></div>
   `;
 
   const partnerBannerSaveBtn = container.querySelector("#partner-banner-save");
@@ -529,8 +626,63 @@ export async function renderInicio(container) {
     }
   };
 
-  // Task 7 (6f): único botón Liquidar (antes también #disp-liquidar en disponibleCardHtml, ver
-  // comentario ahí) — un solo id, un solo listener.
+  // Selector de cuenta (decisión 3): parcheo en sitio de los dos nodos con los saldos que YA
+  // vinieron en la carga — nada de renderInicio() aquí, perdería el scroll y parpadearía.
+  const cuentaBtn = container.querySelector("#inicio-cuenta");
+  if (cuentaBtn) cuentaBtn.onclick = () => {
+    selectedAccountId = nextAccountId(cuentas, selectedAccountId);
+    const acc = cuentas.find((a) => a.id === selectedAccountId);
+    container.querySelector("#inicio-cuenta-nombre").textContent = acc.name;
+    const saldoEl = container.querySelector("#inicio-saldo");
+    saldoEl.classList.toggle("is-negative", acc.balance_cents < 0);
+    saldoEl.innerHTML = moneyPartsHtml(acc.balance_cents);
+  };
+
+  if (hucha) {
+    container.querySelector("#inicio-hucha-dismiss").onclick = () => {
+      huchaDismissed.add(hucha.key);
+      renderInicio(container);
+    };
+    container.querySelector("#inicio-hucha-action").onclick = () => {
+      if (hucha.kind === "renewal") {
+        pushBack(() => renderInicio(container));
+        renderRecurrentes(container, goBack);
+      } else if (hucha.kind === "limit") {
+        pushBack(() => renderInicio(container));
+        renderGastoPorCategoria(container, goBack);
+      } else if (hucha.kind === "idle") {
+        pushBack(() => renderInicio(container));
+        renderRegistro(container, goBack, undefined, () => renderInicio(container));
+      } else {
+        document.body.classList.add("onboarding");
+        pushBack(() => {
+          document.body.classList.remove("onboarding");
+          renderInicio(container);
+        });
+        renderPeriodoNuevo(container, { mode: "next", onDone: goBack });
+      }
+    };
+  }
+
+  // Cualquier fila de movimiento (plegados o dentro de un adjustment) abre el detalle real —
+  // ✕/Guardar/Borrar vuelven a Inicio (onBack de openTxDetail).
+  container.querySelectorAll("[data-tx]").forEach((el) => {
+    el.onclick = () => openTxDetail(container, el.dataset.tx, () => renderInicio(container));
+  });
+
+  const movimientosVerBtn = container.querySelector("#inicio-movimientos-ver");
+  if (movimientosVerBtn) movimientosVerBtn.onclick = () => goToTab("movimientos");
+
+  const semanaCard = container.querySelector("#inicio-semana-card");
+  if (semanaCard) {
+    // Un solo listener: el click del <button id="inicio-semana-ver"> del pie burbujea hasta aquí.
+    semanaCard.onclick = () => {
+      pushBack(() => renderInicio(container));
+      renderSemana(container, goBack);
+    };
+  }
+
+  // Task 7 (6f): único botón Liquidar — un solo id, un solo listener.
   const liquidarBtn = container.querySelector("#shared-liquidar");
   if (liquidarBtn) liquidarBtn.onclick = () => {
     pushBack(() => renderInicio(container));
@@ -568,7 +720,7 @@ export async function renderInicio(container) {
         merchant: rule.name,
         ruleId: rule.id,
         isShared: !!rule.is_shared,
-      });
+      }, () => renderInicio(container));
     };
   });
 

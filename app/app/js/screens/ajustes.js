@@ -211,9 +211,9 @@ function periodoCardHtml(period, partnerName, periodError) {
           <div style="font-size:14px; font-weight:600;">${t("ajustes.period.shareLabel")}</div>
           <div style="font-size:11px; color:var(--text-3);">${t("ajustes.period.shareHint", { name: escHtml(partnerName), pct: 100 - pct })}</div>
         </div>
-        <button type="button" id="aj-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}">−</button>
+        <button type="button" id="aj-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
         <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${pct} %</div>
-        <button type="button" id="aj-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}">+</button>
+        <button type="button" id="aj-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
       </div>
       ${periodError ? `<div class="banner-aviso red">${escHtml(periodError)}</div>` : ""}` : ""}
       <button type="button" class="btn-secondary" id="btn-cerrar-periodo" style="width:100%">${t("ajustes.period.closeBtn")}</button>
@@ -393,11 +393,11 @@ export async function renderAjustes(container) {
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
           ${t("ajustes.prefs.body")}</p>
         <div style="display:flex;gap:8px;margin-bottom:12px">
-          <div style="flex:1;background:var(--card2);border-radius:16px;padding:8px 12px;">
+          <div style="flex:1;background:var(--card2);border-radius:0;padding:8px 12px;">
             <div class="section-title" style="margin-bottom:2px;">${t("ajustes.prefs.currency")}</div>
             <select id="pref-currency" style="background:none;border:0;color:var(--text);font:700 14px var(--font-ui);width:100%;padding:2px 0;outline:none;">${currencyOptionsHtml(metaCfg.currency)}</select>
           </div>
-          <div style="flex:1;background:var(--card2);border-radius:16px;padding:8px 12px;">
+          <div style="flex:1;background:var(--card2);border-radius:0;padding:8px 12px;">
             <div class="section-title" style="margin-bottom:2px;">${t("ajustes.prefs.format")}</div>
             <select id="pref-locale" style="background:none;border:0;color:var(--text);font:700 14px var(--font-ui);width:100%;padding:2px 0;outline:none;">${localeOptionsHtml(metaCfg.locale)}</select>
           </div>
@@ -673,7 +673,7 @@ export async function renderAjustes(container) {
   // Fondo de las 3 cajas "de tarjeta suelta" del asistente (fichero / preview / nota del pie):
   // 16px/12-16, no la .card de app.css (22px/16 — pensada para las secciones de nivel de
   // pantalla) — mismo criterio que la caja de vista previa de nombre en categorias.js:renderForm.
-  const ASSIST_BOX_STYLE = "background:var(--card);border-radius:16px;padding:12px 16px;";
+  const ASSIST_BOX_STYLE = "background:var(--card);border-radius:0;padding:12px 16px;";
 
   /** Subvista "asistente de mapeo" (Task 6, PR E): se abre cuando importCsv() devuelve
    *  needsMapping. Recalcula notas/preview/contador/CTA en cada render a partir de
@@ -771,7 +771,7 @@ export async function renderAjustes(container) {
       <div style="display:flex;flex-direction:column;gap:16px;">
 
         <div style="${ASSIST_BOX_STYLE}display:flex;align-items:center;gap:12px;">
-          <div style="width:36px;height:36px;border-radius:12px;background:var(--card2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <div style="width:36px;height:36px;border-radius:0;background:var(--card2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3H6.5A1.5 1.5 0 005 4.5v15A1.5 1.5 0 006.5 21h11a1.5 1.5 0 001.5-1.5V9z"></path><path d="M13 3v6h6M8.5 13h7M8.5 16.5h7"></path></svg>
           </div>
           <div style="flex:1;min-width:0;">
@@ -800,9 +800,9 @@ export async function renderAjustes(container) {
           <div class="section-title" style="margin-bottom:7px;">${t("ajustes.assist.amountTitle")}</div>
           <div class="segmented" style="border-radius:999px;margin-bottom:8px;">
             <button type="button" data-assist-kind="single" class="${a.amountKind === "single" ? "active" : ""}"
-              style="border-radius:999px;${a.amountKind === "single" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("ajustes.assist.amountSingleBtn")}</button>
+              style="border-radius:999px;${a.amountKind === "single" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("ajustes.assist.amountSingleBtn")}</button>
             <button type="button" data-assist-kind="split" class="${a.amountKind === "split" ? "active" : ""}"
-              style="border-radius:999px;${a.amountKind === "split" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("ajustes.assist.amountSplitBtn")}</button>
+              style="border-radius:999px;${a.amountKind === "split" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("ajustes.assist.amountSplitBtn")}</button>
           </div>
           ${a.amountKind === "single" ? chipsRowHtml("amountCol", headerOptions, a.amountCol) : `
           <div class="section-title" style="margin:0 0 6px;">${t("ajustes.assist.debitTitle")}</div>

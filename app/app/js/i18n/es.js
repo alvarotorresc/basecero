@@ -71,6 +71,12 @@ export const ES = {
     weekdays: {
       0: "D", 1: "L", 2: "M", 3: "X", 4: "J", 5: "V", 6: "S",
     },
+    // Nombre largo del día de semana (Inicio v2, plan 2026-09-10: la espina de Semana). MISMO
+    // índice 0=domingo que `weekdays` (getDay()) — arrays fijos, no Intl, por la deriva de ICU
+    // entre versiones de Node ya documentada arriba para months/monthsLong.
+    weekdaysLong: {
+      0: "domingo", 1: "lunes", 2: "martes", 3: "miércoles", 4: "jueves", 5: "viernes", 6: "sábado",
+    },
     demo: {
       rows: { one: "{n} fila", other: "{n} filas" },
     },
@@ -98,54 +104,84 @@ export const ES = {
       evening: "Buenas noches",
     },
     header: { dayOf: "{period} · día {day} de {total}" },
+    // Racha de días registrando seguidos (badge de la cabecera, Inicio v2) — no se pinta con
+    // racha 0 (inicio.js), así que el singular/plural nunca ve n=0 en pantalla.
+    streak: { one: "{n} día de racha", other: "{n} días de racha" },
+    account: { switch: "Cambiar de cuenta" },
     spent: {
       title: "Gastado",
       income: "Ingresos",
       saved: "Ahorrado",
-      rate: "Tasa",
     },
-    movements: { empty: "Registra tu primer gasto con el botón ＋" },
-    flow: {
-      title: "Flujo de gasto",
-      last7: "Últimos 7 días · {total}",
+    movements: {
+      empty: "Registra tu primer gasto con el botón ＋",
+      emptyPeriod: "No hay movimientos en este periodo.",
+      viewAll: "Ver todos",
+    },
+    week: {
+      title: "Esta semana",
+      viewAll: "Ver la semana",
     },
     categorySpend: {
       title: "Gasto por categoría",
-      subtitle: "Solo tu parte de lo compartido",
       empty: "Aún no hay gasto categorizado este periodo.",
-      others: "Otras {n}",
-      spent: "{currency} gastados",
-      of: "de {limit}",
-      noLimit: "sin límite",
-      viewAll: "Ver por categoría →",
+      over: "supera el límite en {amount}",
+      viewAll: "Ver todas",
     },
-    shared: {
-      withPartner: "Con {name}",
-      periodSplit: "Este periodo: {mine} / {theirs}",
-      oldest: {
-        one: "{n} gasto sin liquidar · el más antiguo del {date}",
-        other: "{n} gastos sin liquidar · el más antiguo del {date}",
-      },
+    savings: {
+      rate: "Ahorras el {pct} de lo que ingresas",
+      negative: "Este periodo gastas más de lo que ingresas",
     },
     partnerBanner: {
       title: "¿Con quién compartes gastos?",
       body: "Tienes gastos compartidos registrados. Di su nombre para recuperar el bloque de pendientes y «Liquidar».",
       namePlaceholder: "Su nombre",
     },
+    pending: {
+      title: "Queda por pagar",
+      left: "Te quedarán",
+    },
+    // Solo `manage` sigue viva de este grupo (Task 10: el resto se pintaba en la antigua tarjeta
+    // «Previsión» v1, sustituida en la Task 9). Decisión 19 de la spec: fuera el «→», ningún
+    // glifo de texto hace de icono — es el enlace «Recurrentes» de «Queda por pagar».
     prevision: {
-      title: "Previsión",
-      manage: "Gestionar recurrentes →",
-      paid: "Pagado",
-      pending: "Pendiente",
-      committed: "Comprometido restante",
-      available: "Disponible real",
+      manage: "Recurrentes",
     },
     available: {
       title: "Disponible del periodo",
-      ofBudgeted: "de {amount} presupuestados",
-      paceOver: "▲ {amount} sobre el ritmo del plan",
-      paceUnder: "▼ {amount} bajo el ritmo del plan",
+      days: { one: "{n} día", other: "{n} días" },
+      spentOf: "{spent} gastados de {budget}",
+      today: "Hoy puedes gastar",
     },
+    hucha: {
+      renewal: "{name} se renueva el {date} por {amount}. ¿Lo sigues usando?",
+      limit: "{name} va por el {pct} de su límite este periodo.",
+      idle: { one: "Llevas {n} día sin apuntar nada.", other: "Llevas {n} días sin apuntar nada." },
+      periodEnd: { one: "Este periodo se cierra en {n} día.", other: "Este periodo se cierra en {n} días." },
+      periodEndToday: "Este periodo se cierra hoy.",
+      action: {
+        renewal: "Ver recurrentes",
+        limit: "Ver categorías",
+        idle: "Registrar un gasto",
+        periodEnd: "Abrir el siguiente",
+      },
+      dismiss: "Ahora no",
+    },
+  },
+  semana: {
+    title: "Semana",
+    range: {
+      sameMonth: "Del {from} al {to} de {month}",
+      crossMonth: "Del {from} de {fromMonth} al {to} de {toMonth}",
+    },
+    avgPerDay: "media al día",
+    today: "Hoy",
+    noSpend: "sin gastos",
+    uncategorized: "Sin categoría",
+    where: { title: "Dónde se ha ido esta semana" },
+    empty: "Esta semana no hay nada apuntado todavía.",
+    emptyPeriod: "En este periodo aún no hay nada apuntado esta semana.",
+    error: { load: "No se pudo cargar la semana: {error}" },
   },
   registro: {
     error: { load: "No se pudo cargar la pantalla de registro: {error}" },
@@ -824,5 +860,12 @@ export const ES = {
     savingsRate: {
       subtitle: "Tasa de ahorro del periodo abierto",
     },
+  },
+  recibo: {
+    stamp: "Guardado",
+    total: "Total",
+    undo: "Deshacer",
+    myPart: "Tu parte",
+    undoFailed: "No se pudo deshacer: {error}",
   },
 };

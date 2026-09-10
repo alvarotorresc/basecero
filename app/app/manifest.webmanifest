@@ -3,7 +3,7 @@
   "description": "Tu cuaderno de gastos: offline, sin cuentas, sin nube.",
   "id": "/app/",
   "start_url": "/app/", "scope": "/", "display": "standalone",
-  "background_color": "#121214", "theme_color": "#121214",
+  "background_color": "#0B0B0C", "theme_color": "#0B0B0C",
   "categories": ["finance", "productivity"],
   "icons": [
     { "src": "/app/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },

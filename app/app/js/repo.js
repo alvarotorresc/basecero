@@ -20,7 +20,7 @@ export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[
  *  asistente de cierre normal como el onboarding (modo 'first', sin periodo previo). */
 /** ¿startDate cae on/antes del start_date del periodo open que se va a cerrar? Si es así,
  *  end_date (día anterior a startDate) quedaría ANTES de start_date del periodo que se cierra —
- *  un rango invertido. PURA y sin DB (mismo patrón que sharedFieldsLocked/fillLast7Days: así se
+ *  un rango invertido. PURA y sin DB (mismo patrón que sharedFieldsLocked: así se
  *  testea sin Worker) para que openNextPeriod pueda lanzar el error ANTES de construir el
  *  execMany. Sin periodo abierto (modo 'first') no hay nada que comparar: siempre false. */
 export const periodStartTooEarly = (open, startDate) => !!open && startDate <= open.start_date;
@@ -73,9 +73,14 @@ export async function addTransaction({
   const p = await getOpenPeriod();
   if (!p) throw new UserError(t("errors.common.noOpenPeriod"));
   const now = nowIso();
+  // Subido a variable (antes generado inline dentro del bind) para poder devolverlo: el recibo de
+  // guardado (recibo.js) necesita el id del movimiento recién creado para que «Deshacer» pueda
+  // borrarlo (softDeleteTransaction(newId)), igual que openNextPeriod/createAccount ya devuelven
+  // el suyo.
+  const newId = bcUlid();
   const insertStmt = {
     sql: SQL.insertTransaction,
-    bind: [bcUlid(), date, p.id, type, amountCents, accountId, counterAccountId,
+    bind: [newId, date, p.id, type, amountCents, accountId, counterAccountId,
       categoryId ?? "", bcSanitizeCell(merchant ?? ""), bcSanitizeCell(note ?? ""),
       isShared ? 1 : 0, sharePctOverride, paidBy, 0, refId, ruleId, externalId, status, now, now],
   };
@@ -84,6 +89,7 @@ export async function addTransaction({
   } else {
     await exec(insertStmt.sql, insertStmt.bind);
   }
+  return newId;
 }
 
 export const spentOfPeriod = async (pid) => (await query(SQL.spentOfPeriod, [pid]))[0].spent_cents;
@@ -212,38 +218,15 @@ export async function upsertBudget(periodId, categoryId, amountCents) {
  *  hace nada). No lleva guard: quitar algo que no está es una operación válida. */
 export const deleteBudget = (periodId, categoryId) => exec(SQL.softDeleteBudget, [nowIso(), periodId, categoryId]);
 
-/** Completa los huecos de SQL.spentByDay (que solo trae los días CON movimiento) con 0, para
- *  los 7 días naturales que terminan en `todayIso` (inclusive). Pura — sin I/O — para que
- *  spentLast7Days (que sí hace la query) sea testable sin duplicar la lógica de relleno (ver
- *  tests/app/charts.test.mjs, que reproduce el mismo query+fill a mano). */
-export function fillLast7Days(rows, todayIso) {
-  const byDate = Object.fromEntries(rows.map((r) => [r.date, r.cents]));
-  const end = new Date(todayIso + "T12:00:00");
-  const days = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(end);
-    d.setDate(d.getDate() - i);
-    const iso = d.toLocaleDateString("sv-SE");
-    days.push({ date: iso, cents: byDate[iso] ?? 0 });
-  }
-  return days;
-}
+/** Gasto por día y categoría raíz en [startIso, endIso] (Inicio v2: la espina de Semana, sus chips
+ *  y el desglose de Inicio comparten esta única consulta — ver semana-logic.js#daysWithCategories). */
+export const spentByDayAndRootCategory = (pid, startIso, endIso) =>
+  query(SQL.spentByDayRootCategory, [pid, startIso, endIso]);
 
-/** Tarjeta "Flujo de gasto" de Inicio (Task 12): gasto por día de los últimos 7 días naturales
- *  (hoy incluido), con los días sin movimiento a 0.
- *  LIMITACIÓN CONOCIDA: la query está acotada a `pid` (mismo criterio que el resto de Inicio,
- *  literal del brief: "un rango date BETWEEN ? AND ? del periodo"), así que en los primeros días
- *  de un periodo recién abierto la ventana de 7 días "se corta" en la fecha de inicio — los días
- *  que caen en el periodo ANTERIOR muestran 0 aunque hubiera gasto real ese día. No se resuelve
- *  aquí (quitar el filtro de periodo rompería la consistencia con el resto de números de Inicio,
- *  todos periodo-scoped); documentado para quien la use en la UI. */
-export async function spentLast7Days(pid) {
-  const today = hoyISO();
-  const start = new Date(today + "T12:00:00");
-  start.setDate(start.getDate() - 6);
-  const rows = await query(SQL.spentByDay, [pid, start.toLocaleDateString("sv-SE"), today]);
-  return fillLast7Days(rows, today);
-}
+/** Fechas (ISO, DESC, únicas) con algún gasto/ingreso/devolución — la racha y el «llevas N días sin
+ *  apuntar» de la hucha de Inicio v2. Array plano, no filas: es justo lo que esperan
+ *  inicio-logic.js#streakDays y #daysSinceLastEntry. */
+export const recentTxDates = async () => (await query(SQL.recentTxDates)).map((r) => r.date);
 
 /** Statements de UNA liquidación completa: por cada fila de pendingSettlements, el apunte que la
  *  salda + su UPDATE settled=1. Dos direcciones:
@@ -514,9 +497,8 @@ export async function balancesAt(dateIso) {
 
 /** Suma de balances = patrimonio neto (el pasivo resta solo, por tener opening/movimientos en
  *  negativo — no hace falta tratarlo distinto). PURA a propósito: la alimenta directamente
- *  tests/app/patrimonio.test.mjs con balances calculados a mano vía SQL.accountBalance, mismo
- *  patrón que repo.fillLast7Days (no hay Worker disponible en Node para probar balancesAt tal
- *  cual). */
+ *  tests/app/patrimonio.test.mjs con balances calculados a mano vía SQL.accountBalance (no hay
+ *  Worker disponible en Node para probar balancesAt tal cual). */
 export const netWorthOfBalances = (balances) => balances.reduce((sum, b) => sum + b.balance_cents, 0);
 
 export async function netWorthAt(dateIso) {

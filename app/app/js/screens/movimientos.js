@@ -5,7 +5,7 @@ import {
 } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory, rootOf } from "../category-colors.js";
 import { matchesFilter, isUncategorized } from "../movimientos-filter.js";
-import { fmtMoney, fmtDiaLargo, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { fmtMoney, moneyPartsHtml, fmtDiaLargo, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
@@ -13,6 +13,7 @@ import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { skeletonHtml } from "../skeleton.js";
 import { showConfirm } from "../modal.js";
+import { showToast } from "../toast.js";
 
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -67,7 +68,7 @@ function movRowHtml(r, byId, accById, partnerName) {
         <div class="tx-title">${escHtml(from)} → ${escHtml(to)}</div>
         <div class="tx-sub">${escHtml(r.merchant || r.note || t("movimientos.type.transfer"))}</div>
       </div>
-      <div class="tx-amount num">${fmtMoney(r.amount_cents)}</div>
+      <div class="tx-amount num">${moneyPartsHtml(r.amount_cents)}</div>
     </button>`;
   }
   if (r.type === "adjustment") {
@@ -79,7 +80,7 @@ function movRowHtml(r, byId, accById, partnerName) {
         <div class="tx-title">${t("common.type.adjustment")}</div>
         <div class="tx-sub">${escHtml(r.merchant || r.note || "")}</div>
       </div>
-      <div class="tx-amount num ${isNeg ? "negative" : "positive"}">${isNeg ? "-" : "+"}${fmtMoney(Math.abs(r.amount_cents))}</div>
+      <div class="tx-amount num ${isNeg ? "negative" : "positive"}">${isNeg ? "-" : "+"}${moneyPartsHtml(Math.abs(r.amount_cents))}</div>
     </button>`;
   }
   const cat = byId[r.category_id];
@@ -111,17 +112,28 @@ function movRowHtml(r, byId, accById, partnerName) {
       <div class="tx-title">${escHtml(title)}</div>
       <div class="tx-sub" style="${uncategorized ? "color:var(--amber);" : ""}">${escHtml(subBase)}${escHtml(shareSuffix)}</div>
     </div>
-    <div class="${amountClasses}"${amountStyle}>${sign}${fmtMoney(r.amount_cents)}</div>
+    <div class="${amountClasses}"${amountStyle}>${sign}${moneyPartsHtml(r.amount_cents)}</div>
   </button>`;
 }
 
 /** Pantalla Movimientos: selector de periodo, bandeja de sin-categorizar y lista agrupada por día
- *  (los 5 tipos), con subvista de detalle para editar/borrar cada movimiento. */
-export async function renderMovimientos(container) {
+ *  (los 5 tipos), con subvista de detalle para editar/borrar cada movimiento.
+ *
+ *  Modo «solo detalle» (Inicio v2, I5): `{ detailTxId, onDetailClose }` deja que otra pantalla —
+ *  Inicio, Semana— reutilice ESTA vista de detalle, la única que existe, sin duplicar
+ *  renderDetail(). Sin comportamiento nuevo para la pestaña Movimientos: los dos parámetros son
+ *  opcionales y por defecto no cambian nada. Tres diferencias respecto al modo normal, las tres a
+ *  propósito:
+ *    · NO se escribe container.dataset.screen: ese testigo decide si Inicio repinta su silueta
+ *      gris (inicio.js), dejarlo en "movimientos" haría parpadear a Inicio al volver.
+ *    · NO se pinta el esqueleto de la lista: la lista no se va a ver nunca en este modo.
+ *    · openDetail NO apunta su propia entrada de historial: la apuntó el llamante (open-tx.js). */
+export async function renderMovimientos(container, { detailTxId = null, onDetailClose = null } = {}) {
+  const detailOnly = !!detailTxId;
   // Silueta gris mientras llega la primera consulta (mismo criterio que inicio.js): selector de
   // periodo, fila de chips y lista. Solo en el PRIMER pintado de esta pantalla — el testigo
   // container.dataset.screen lo escriben SOLO Inicio y Movimientos.
-  if (container.dataset.screen !== "movimientos") {
+  if (!detailOnly && container.dataset.screen !== "movimientos") {
     container.dataset.screen = "movimientos";
     container.innerHTML = skeletonHtml([72, 56, 320]);
   }
@@ -202,7 +214,7 @@ export async function renderMovimientos(container) {
     render();
   }
 
-  async function openDetail(id) {
+  async function openDetail(id, { push = true } = {}) {
     // Guard de apertura en curso: la lista sigue viva durante el await, y dos toques seguidos
     // apuntarían DOS entradas de historial para una sola vista abierta.
     if (state.opening) return;
@@ -211,12 +223,16 @@ export async function renderMovimientos(container) {
     try {
       row = await getTransaction(id);
     } catch (e) {
+      if (detailOnly) { showToast(t("movimientos.error.openDetail", { error: userMessage(e) })); onDetailClose?.(); return; }
       errorMsg = t("movimientos.error.openDetail", { error: userMessage(e) });
       state.opening = false;
       render();
       return;
     }
-    if (!row) { state.opening = false; return; }
+    // Fila inexistente (borrada en otra pestaña mientras esta pantalla estaba abierta): en modo
+    // solo detalle, un `return` a secas dejaría la pantalla EN BLANCO y la entrada de historial
+    // que apuntó el llamante (open-tx.js) colgando sin nada que la cierre.
+    if (!row) { state.opening = false; if (detailOnly) onDetailClose?.(); return; }
     state.detailId = id;
     state.detail = {
       type: row.type,
@@ -256,7 +272,9 @@ export async function renderMovimientos(container) {
     // gasto enlazado ya está settled, bajar aquí el importe del refund descuadra la deuda liquidada
     // en silencio (el guard de repo lo rechazaría en save, pero mejor prevenirlo en el input).
     state.detail.refundLocked = (row.type === "refund" || row.type === "adjustment") && !!state.linkedExpense?.settled;
-    pushBack(backToList);
+    // En modo solo detalle la entrada de historial ya la apuntó el llamante (open-tx.js): apuntar
+    // otra aquí obligaría a pulsar «atrás» dos veces para volver a la pantalla de origen.
+    if (push) pushBack(backToList);
     state.view = "detail";
     errorMsg = "";
     state.opening = false;
@@ -408,9 +426,9 @@ export async function renderMovimientos(container) {
             <div class="section-title">${t("common.paidBy.label")}</div>
             <div class="segmented" style="border-radius:999px;">
               <button type="button" data-paidby="me" class="${d.paidBy === "me" ? "active" : ""}" ${locked ? "disabled" : ""}
-                style="flex:1;border-radius:999px;${d.paidBy === "me" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("common.paidBy.me")}</button>
+                style="flex:1;border-radius:999px;${d.paidBy === "me" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("common.paidBy.me")}</button>
               <button type="button" data-paidby="partner" class="${d.paidBy === "partner" ? "active" : ""}" ${locked ? "disabled" : ""}
-                style="flex:1;border-radius:999px;${d.paidBy === "partner" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("common.paidBy.partner", { name: escHtml(partnerName) || t("movimientos.shared.fallbackName") })}</button>
+                style="flex:1;border-radius:999px;${d.paidBy === "partner" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("common.paidBy.partner", { name: escHtml(partnerName) || t("movimientos.shared.fallbackName") })}</button>
             </div>
           </div>` : ""}
           <div style="display:flex; align-items:center; gap:10px;">
@@ -418,16 +436,16 @@ export async function renderMovimientos(container) {
               <div style="font-size:14px; font-weight:600;">${t("common.split.label")}</div>
               <div style="font-size:11px; color:var(--text-3);">${t("common.split.hint", { name: escHtml(partnerName || t("movimientos.shared.fallbackName")), pct: 100 - d.sharePct })}</div>
             </div>
-            <button type="button" id="mov-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}" ${locked ? "disabled" : ""}>−</button>
+            <button type="button" id="mov-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}" ${locked ? "disabled" : ""}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
             <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${d.sharePct} %</div>
-            <button type="button" id="mov-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}" ${locked ? "disabled" : ""}>+</button>
+            <button type="button" id="mov-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}" ${locked ? "disabled" : ""}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
           </div>
           <div style="display:flex; gap:8px;">
-            <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
+            <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
               <div style="font-size:10px; color:var(--text-3);">${t("common.myShare", { pct: d.sharePct })}</div>
               <div class="num" id="mov-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
             </div>
-            <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
+            <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
               <div style="font-size:10px; color:var(--text-3);">${partnerPaid(d) ? t("common.paidFull", { name: escHtml(partnerName) || t("movimientos.shared.fallbackLabel") }) : `${escHtml(partnerName) || t("movimientos.shared.fallbackLabel")} · ${100 - d.sharePct}%`}</div>
               <div class="num" id="mov-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerPaid(d) ? d.cents : partnerCents)}</div>
             </div>
@@ -759,5 +777,8 @@ export async function renderMovimientos(container) {
     container.innerHTML = `<div class="banner-aviso red">${t("movimientos.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
+  // Modo solo detalle: la lista no llega a pintarse nunca — se abre directo en el detalle pedido,
+  // sin apuntar una segunda entrada de historial (push:false, ver openDetail más arriba).
+  if (detailOnly) { await openDetail(detailTxId, { push: false }); return; }
   render();
 }

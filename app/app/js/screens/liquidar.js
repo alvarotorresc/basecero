@@ -1,19 +1,11 @@
 import { pendingSettlements, listAccounts, allCategoriesById, settleAllShared, getMetaAll } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtMoneyParts, fmtDiaCorto } from "../format.js";
+import { fmtMoney, moneyPartsHtml, fmtDiaCorto } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-
-// Compone un importe con los céntimos reducidos en <small> (patrón .amount-hero del design
-// system, ver DesignSystem.dc.html / inicio.js#moneyPartsHtml): main + <small>céntimos</small> +
-// sufijo, sin reimplementar el locale — fmtMoneyParts (format.js) ya hace el split posicional.
-const moneyPartsHtml = (cents) => {
-  const { main, cents: c, suffix } = fmtMoneyParts(cents);
-  return `${escHtml(main)}<small>${escHtml(c)}</small>${escHtml(suffix)}`;
-};
 
 /** Fila de gasto pendiente: .dotico + nombre + sub (fecha · importe original · % de quien debe esa
  *  parte: el de la contraparte en las filas 'partner_owes', el MÍO en las 'i_owe')

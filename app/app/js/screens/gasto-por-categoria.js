@@ -5,7 +5,7 @@ import {
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
 import { budgetStatus, pctOf, relativeWidth, limitTotals, sortRootRows, budgetMap } from "../category-spend.js";
 import { eurToCents } from "../contract.js";
-import { fmtMoney, fmtMoneyParts, hoyISO, currencySymbol } from "../format.js";
+import { fmtMoney, moneyPartsHtml, hoyISO, currencySymbol } from "../format.js";
 import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
@@ -13,14 +13,6 @@ import { showToast } from "../toast.js";
 
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-
-// Importe con los céntimos reducidos en <small> (patrón .amount-hero del design system):
-// main + <small>céntimos</small> + sufijo, sin reimplementar el locale — fmtMoneyParts (format.js)
-// ya hace el split posicional.
-const moneyPartsHtml = (cents) => {
-  const { main, cents: c, suffix } = fmtMoneyParts(cents);
-  return `${escHtml(main)}<small>${escHtml(c)}</small>${escHtml(suffix)}`;
-};
 
 // Espacio DURO (U+00A0) antes del %: sin él el porcentaje se parte en dos líneas al estrecharse el
 // contenedor. fmtPct de format.js no sirve: emite un decimal ("38,8 %").
@@ -136,7 +128,7 @@ export async function renderGastoPorCategoria(container, onBack) {
   function expandedHtml(row, limitCents) {
     const subs = subRowsHtml(row.root_id);
     return `
-      <div style="margin:2px 0 4px;background:var(--card2);border-radius:16px;padding:10px 12px;
+      <div style="margin:2px 0 4px;background:var(--card2);border-radius:0;padding:10px 12px;
         display:flex;flex-direction:column;gap:10px;">
         ${subs}
         ${subs ? '<hr class="divider">' : ""}

@@ -11,53 +11,47 @@ body {
   line-height: 1.4;
 }
 button { font: inherit; color: inherit; }
-::selection { background: var(--text); color: var(--bg); }
+::selection { background: var(--accent); color: var(--accent-ink); }
 
 main#screen {
   display: block;
   min-height: 100dvh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 20px 20px calc(84px + env(safe-area-inset-bottom, 0px) + 24px);
+  padding: 20px var(--pad-screen) calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 88px);
 }
 
-/* ===== componentes base (design/material-expresivo/DesignSystem.dc.html) =====
-   .card y .btn-primary viven también en tokens.css (PR A): app.css carga después,
-   misma especificidad → estas reglas ganan por cascada y sobrescriben el look viejo. */
-.card {
-  border: 0; /* principio 4: cards sin borde, elevación tonal */
-}
+/* ===== componentes base (docs/design/final-v2/SISTEMA.md) =====
+   .card ya no es una tarjeta: SISTEMA.md §1 principio 3 — se agrupa con aire y filete, no con caja.
+   Se mantiene la clase (54 markups la emiten) pero deja de pintar nada. */
+.card { background: transparent; border: 0; border-radius: var(--r-0); padding: 0; }
 .btn-primary {
-  background: var(--text);
-  color: var(--bg);
-  border-radius: 999px;
-  height: 52px;
-  padding: 0 28px;
-  /* width:100% se hereda de tokens.css — la mayoría de usos son CTA a todo el ancho
-     al pie de un formulario; el ejemplo aislado del artboard no representa ese contexto. */
+  background: var(--accent); color: var(--accent-ink);
+  border: 0; border-radius: var(--r-pill);
+  height: 52px; padding: 0 28px; width: 100%;
+  font: 600 16px var(--font-sans); cursor: pointer;
 }
+.text-red { color: var(--danger); }
+.text-green { color: var(--pos); }
 .btn-secondary {
-  background: var(--card2);
-  color: var(--text);
-  border: 0;
-  border-radius: 999px;
-  height: 52px;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-pill);
+  height: 46px;
   padding: 0 28px;
-  font: 600 16px var(--font-ui);
+  font: 600 16px var(--font-sans);
   cursor: pointer;
 }
 
 .section-title {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--text-2);
+  font: var(--t-section);
+  color: var(--ink);
 }
 
 .divider {
   height: 1px;
-  background: var(--rule);
+  background: var(--hairline);
   border: 0;
 }
 
@@ -69,25 +63,23 @@ main#screen {
   margin-bottom: 16px;
 }
 .screen-header h1 {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.2;
+  font: var(--t-title);
+  letter-spacing: -.01em;
 }
 .screen-header p {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-2);
+  font: var(--t-label);
+  color: var(--ink-3);
 }
 
 /* ===== botón icono (p.ej. cerrar pantalla) ===== */
 .icon-btn {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   flex-shrink: 0;
-  border-radius: var(--radius-sm);
-  background: var(--card2);
-  border: 0;
-  color: var(--text-2);
+  border-radius: var(--r-circle);
+  background: transparent;
+  border: 1px solid var(--hairline-strong);
+  color: var(--ink);
   font-size: 14px;
   display: flex;
   align-items: center;
@@ -106,45 +98,45 @@ main#screen {
 .link-btn {
   all: unset;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--text-2);
+  color: var(--accent);
   -webkit-tap-highlight-color: transparent;
 }
 .link-btn:focus-visible {
-  outline: 2px solid var(--text);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
 /* ===== control segmentado (chips de tipo de movimiento, scroll horizontal) ===== */
 .segmented {
   display: flex;
-  gap: 4px;
-  padding: 4px;
-  background: var(--card);
+  gap: 8px;
+  padding: 0;
+  background: transparent;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-0);
   overflow-x: auto;
   scrollbar-width: none;
 }
 .segmented::-webkit-scrollbar { display: none; }
 .segmented button {
   flex: 0 0 auto;
-  height: 38px;
-  padding: 0 16px;
+  height: 44px;
+  padding: 0 15px;
   border: 0;
-  border-radius: 10px;
-  background: none;
-  color: var(--text-2);
-  font-size: 14px;
-  font-weight: 600;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font: 500 14px var(--font-sans);
   cursor: pointer;
   white-space: nowrap;
   -webkit-tap-highlight-color: transparent;
 }
 .segmented button.active {
-  background: var(--text);
-  color: var(--bg);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
 }
 
 /* ===== selector "¿Devuelve un gasto?" (pantalla Registro, tipo devolución) ===== */
@@ -189,17 +181,18 @@ main#screen {
   line-height: 1;
 }
 .amount-display .num {
-  font-size: 56px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font: var(--t-hero);
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
 }
 .amount-display .amount-currency {
-  font-size: 26px;
-  font-weight: 600;
-  color: var(--text-3);
+  font-size: 23px;
+  font-weight: 500;
+  color: var(--ink-3);
 }
 
 /* ===== barra de pestañas + FAB ===== */
+/* ===== tab bar + FAB (SISTEMA.md §4.14) ===== */
 .tabbar {
   position: fixed;
   left: 50%;
@@ -207,13 +200,12 @@ main#screen {
   transform: translateX(-50%);
   width: 100%;
   max-width: 480px;
-  height: calc(84px + env(safe-area-inset-bottom, 0px));
-  padding: 0 14px env(safe-area-inset-bottom, 0px);
+  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+  padding: 0 0 env(safe-area-inset-bottom, 0px);
   display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--bg);
-  border-top: 1px solid var(--rule);
+  align-items: stretch;
+  background: var(--surface);
+  border-top: 1px solid var(--hairline);
   z-index: 20;
 }
 
@@ -229,30 +221,34 @@ main#screen {
   background: none;
   border: 0;
   padding: 0;
-  color: var(--text-3);
+  color: var(--ink-3);
   font-size: 10px;
   font-weight: 500;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 .tab svg {
-  width: 21px;
-  height: 21px;
+  width: 24px;
+  height: 24px;
   stroke: currentColor;
   fill: none;
 }
 .tab.active {
-  color: var(--text);
-  font-weight: 700;
+  color: var(--accent);
+  font-weight: 600;
 }
+.tab.active svg { stroke-width: 2; }
 
+/* Sigue siendo hijo de <nav class="tabbar">: body.onboarding .fab { display:none } (más abajo)
+   sigue funcionando sin tocarlo, aunque flote fuera del flujo de la barra. */
 .fab {
+  position: fixed;
   flex-shrink: 0;
   width: 56px;
   height: 56px;
-  border-radius: 19px;
-  background: var(--text);
-  color: var(--bg);
+  border-radius: var(--r-circle);
+  background: var(--accent);
+  color: var(--accent-ink);
   border: 0;
   display: flex;
   align-items: center;
@@ -262,9 +258,13 @@ main#screen {
   font-weight: 400;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-float);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 16px);
+  /* position:fixed se resuelve contra el viewport, no contra el body de 480px: sin el max(),
+     en escritorio el FAB se iría al borde de la ventana en vez de quedarse junto a la columna. */
+  right: max(18px, calc(50% - 240px + 18px));
 }
-.fab:active { background: color-mix(in srgb, var(--text) 88%, var(--bg)); }
+.fab:active { background: color-mix(in srgb, var(--accent) 88%, var(--bg)); }
 
 /* ===== chips de categoría ===== */
 .chips {
@@ -278,10 +278,10 @@ main#screen {
   align-items: center;
   gap: 9px;
   padding: 0 14px 0 8px;
-  border-radius: 999px;
-  background: var(--card2);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
   border: 0;
-  color: var(--text-2);
+  color: var(--ink-2);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -290,25 +290,25 @@ main#screen {
 .chip-icon {
   width: 30px;
   height: 30px;
-  border-radius: 50%;
+  border-radius: var(--r-circle);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 16px;
   line-height: 1;
-  background: color-mix(in srgb, var(--cat, var(--text-2)) 18%, transparent);
-  color: var(--cat, var(--text-2));
+  background: color-mix(in srgb, var(--cat, var(--ink-2)) 16%, transparent);
+  color: var(--cat, var(--ink-2));
 }
 .chip-icon svg { width: 17px; height: 17px; }
 .chip.active {
-  background: var(--text);
-  color: var(--bg);
-  font-weight: 700;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
 }
 .chip.active .chip-icon {
-  background: color-mix(in srgb, var(--bg) 18%, transparent);
-  color: var(--bg);
+  background: color-mix(in srgb, var(--accent-ink) 16%, transparent);
+  color: var(--accent-ink);
 }
 
 /* fila de chips de filtro en una sola línea con scroll horizontal (Movimientos, Task 4: «Todos» +
@@ -345,10 +345,10 @@ main#screen {
   align-items: center;
   gap: 6px;
   padding: 10px 4px;
-  border-radius: var(--radius-sm);
-  background: var(--card2);
-  border: 0;
-  color: var(--text-2);
+  border-radius: var(--r-0);
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  color: var(--ink-2);
   font-size: 11px;
   font-weight: 500;
   line-height: 1.2;
@@ -369,8 +369,9 @@ main#screen {
   overflow-wrap: anywhere;
 }
 .chip-v.active {
-  background: var(--text);
-  color: var(--bg);
+  background: color-mix(in srgb, var(--cat, var(--accent)) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cat, var(--accent)) 42%, transparent);
+  color: var(--ink);
   font-weight: 700;
 }
 
@@ -379,17 +380,20 @@ main#screen {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-height: 64px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hairline);
 }
 .tx-icon {
   width: 40px;
   height: 40px;
-  border-radius: 14px;
+  border-radius: var(--r-circle);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--cat, var(--text-3)) 18%, transparent);
-  color: var(--cat, var(--text-3));
+  background: color-mix(in srgb, var(--cat, var(--ink-3)) 16%, transparent);
+  color: var(--cat, var(--ink-3));
   font-size: 19px; /* iconForCategory devuelve emoji, no svg: sin esto se ve diminuto (ver task 4, .chip-icon) */
   line-height: 1;
 }
@@ -402,29 +406,27 @@ main#screen {
   min-width: 0;
 }
 .tx-title {
-  font-size: 14px;
-  font-weight: 600;
+  font: var(--t-body);
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .tx-sub {
-  font-size: 11px;
-  color: var(--text-3);
+  font: var(--t-label);
+  color: var(--ink-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .tx-amount {
-  font-family: var(--font-num);
-  font-size: 15px;
-  font-weight: 600;
+  font: var(--t-figure-m);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   flex-shrink: 0;
 }
-.tx-amount.negative { color: var(--red); }
-.tx-amount.positive { color: var(--green); }
+.tx-amount.negative { color: var(--ink); }   /* §4.4: el gasto NO va en rojo, va en tinta normal */
+.tx-amount.positive { color: var(--pos); }
 .tx-tag {
   font-size: 9px;
   font-weight: 700;
@@ -438,11 +440,8 @@ main#screen {
 
 /* ===== cabecera de grupo por día (lista de movimientos de Inicio) ===== */
 .day-header {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--text-2);
+  font: var(--t-micro);
+  color: var(--ink-3);
 }
 
 /* ===== filas de lista genéricas (ajustes) ===== */
@@ -455,13 +454,13 @@ main#screen {
 .list-row-icon {
   width: 42px;
   height: 42px;
-  border-radius: 15px;
+  border-radius: var(--r-circle);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--cat, var(--text-2)) 18%, transparent);
-  color: var(--cat, var(--text-2));
+  background: color-mix(in srgb, var(--cat, var(--ink-3)) 16%, transparent);
+  color: var(--cat, var(--ink-3));
 }
 .list-row-icon svg { width: 20px; height: 20px; }
 .list-row-body { display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0; }
@@ -469,21 +468,28 @@ main#screen {
 .list-row-sub { font-size: 11px; color: var(--text-3); }
 .list-row-chevron { flex-shrink: 0; color: var(--text-3); width: 17px; height: 17px; }
 
-/* ===== campos de formulario ===== */
+/* ===== campos de formulario (SISTEMA.md §4.5): sin caja, filete inferior ===== */
 .field {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  height: 50px;
-  padding: 0 16px;
-  background: var(--card);
+  min-height: 56px;
+  padding: 0;
+  background: transparent;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-bottom: 1px solid var(--hairline-strong);
+  border-radius: var(--r-0);
 }
 .field-label {
-  font-size: 13px;
-  color: var(--text-2);
+  font: var(--t-label);
+  color: var(--ink-3);
+}
+.field:focus-within {
+  border-bottom: 2px solid var(--accent);
+}
+.field:focus-within .field-label {
+  color: var(--accent);
 }
 .field-value {
   display: flex;
@@ -496,24 +502,20 @@ main#screen {
 .field select {
   border: 0;
   background: none;
-  color: var(--text);
-  font: 600 15px var(--font-ui);
+  color: var(--ink);
+  font: 500 16px var(--font-sans);
   text-align: right;
   min-width: 0;
 }
 .field.field-stack {
   flex-direction: column;
   align-items: stretch;
-  height: auto;
-  padding: 12px 16px;
-  gap: 6px;
+  padding: 8px 0 10px;
+  gap: 5px;
 }
 .field.field-stack .field-label {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--text-2);
+  font: var(--t-label);
+  color: var(--ink-3);
 }
 .field.field-stack input,
 .field.field-stack select {
@@ -522,12 +524,12 @@ main#screen {
   width: 100%;
 }
 
-/* ===== interruptor (toggle) ===== */
+/* ===== interruptor (toggle, SISTEMA.md §4.8) ===== */
 .toggle {
   position: relative;
   display: inline-flex;
-  width: 48px;
-  height: 28px;
+  width: 52px;
+  height: 32px;
   flex-shrink: 0;
   cursor: pointer;
 }
@@ -543,8 +545,8 @@ main#screen {
 .toggle-track {
   position: absolute;
   inset: 0;
-  background: var(--card2);
-  border-radius: 14px;
+  background: var(--surface-2);
+  border-radius: var(--r-pill);
   transition: background 0.15s ease;
   pointer-events: none;
 }
@@ -552,49 +554,50 @@ main#screen {
   position: absolute;
   top: 3px;
   left: 3px;
-  width: 22px;
-  height: 22px;
-  border-radius: 11px;
-  background: var(--text);
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-circle);
+  background: var(--ink-3);
   transition: transform 0.15s ease, background 0.15s ease;
 }
 .toggle input[type="checkbox"]:checked ~ .toggle-track {
-  background: var(--text);
+  background: var(--accent);
 }
 .toggle input[type="checkbox"]:checked ~ .toggle-track .toggle-knob {
-  background: var(--bg);
+  background: var(--accent-ink);
   transform: translateX(20px);
 }
 .toggle input[type="checkbox"]:focus-visible ~ .toggle-track {
-  outline: 2px solid var(--text);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* ===== aviso / banner ===== */
+/* ===== aviso / banner (SISTEMA.md §4.17) ===== */
 .banner-aviso {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  min-height: 44px;
   padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--amber) 14%, var(--card));
-  border: 1px solid color-mix(in srgb, var(--amber) 35%, var(--rule));
+  border-radius: var(--r-0);
+  background: var(--warn-tint);
+  border: 0;
   font-size: 12px;
   line-height: 1.5;
-  color: var(--text-2);
+  color: var(--warn);
 }
 .banner-aviso svg {
   flex-shrink: 0;
   width: 18px;
   height: 18px;
   margin-top: 1px;
-  color: var(--amber);
+  color: var(--warn);
 }
 .banner-aviso.red {
-  background: color-mix(in srgb, var(--red) 14%, var(--card));
-  border-color: color-mix(in srgb, var(--red) 35%, var(--rule));
+  background: var(--danger-tint);
+  color: var(--danger);
 }
-.banner-aviso.red svg { color: var(--red); }
+.banner-aviso.red svg { color: var(--danger); }
 
 /* el aviso de almacenamiento no persistente se antepone a body (fuera de #screen):
    franja roja tenue fija arriba, a todo lo ancho del layout */
@@ -628,33 +631,36 @@ body:has(> .banner-aviso) main#screen { margin-top: 46px; }
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.stepper-btn:active { color: var(--text); }
+.stepper-btn:active { color: var(--ink); }
 
-/* variante 44px/radius14 del stepper (Periodo nuevo, Registro, Movimientos, Ajustes) */
-.stepper-btn.lg { width: 44px; height: 44px; border-radius: 14px; background: var(--card2); color: var(--text); font-size: 17px; }
+/* variante 44px circular del stepper (Periodo nuevo, Registro, Movimientos, Ajustes) */
+.stepper-btn.lg { width: 44px; height: 44px; border-radius: var(--r-circle); background: transparent; border: 1px solid var(--hairline-strong); color: var(--ink); font-size: 17px; }
 
-/* input € de cada presupuesto por categoría: vacío = "Sin límite", estilo punteado */
+/* input € de cada presupuesto por categoría (SISTEMA.md §4.5): sin caja, filete inferior;
+   vacío = "Sin límite", estilo punteado */
 .budget-input {
   height: 42px;
   width: 92px;
   flex-shrink: 0;
   padding: 0 24px 0 10px;
-  background: var(--card);
-  border: 1px solid transparent;
-  border-radius: 14px;
-  color: var(--text);
-  font: 600 15px var(--font-num);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--hairline-strong);
+  border-radius: var(--r-0);
+  color: var(--ink);
+  font: var(--t-figure-s);
   text-align: right;
 }
 .budget-input.is-empty {
   background: var(--bg);
-  /* var(--rule) (rgba(154,153,166,0.16)) da ~1.3:1 sobre --card (#1C1C21): insuficiente para el
-     borde funcional "vacío/sin límite" (WCAG 1.4.11, 3:1). Alpha subido a 0.65 → ~3.34:1 sobre
-     --card, ~3.44:1 sobre --bg (ver cálculo en el report de Task 2). Los --rule restantes
-     (separadores decorativos) no se tocan. */
-  border: 1px dashed rgba(154, 153, 166, 0.65);
-  color: var(--text-3);
-  font: 500 12px var(--font-ui);
+  /* --hairline-strong (rgba(244,244,242,.18)) da ~1.6:1 sobre --bg: insuficiente para el borde
+     funcional "vacío/sin límite" (WCAG 1.4.11, 3:1), igual que le pasaba al --rule viejo.
+     Alpha subido a mano a 0.4 (mismo tono --ink) → ~3.5:1 sobre --bg, ~3.3:1 sobre --surface.
+     Los --hairline-strong restantes (.field, .btn-secondary) no se tocan: ahí el borde no es
+     la única señal del estado. */
+  border: 1px dashed rgba(244, 244, 242, 0.4);
+  color: var(--ink-3);
+  font: 500 12px var(--font-sans);
   text-align: center;
   padding: 0 10px;
 }
@@ -668,42 +674,39 @@ body.onboarding .fab { display: none; }
 
 /* ===== componentes nuevos del sistema (consumidos por las tareas 5-8) ===== */
 
-/* icono redondo de categoría/comercio, color sólido + emoji encima (DesignSystem.dc.html) */
+/* Círculo TINTADO al 16 % con el emoji encima (antes: círculo de color sólido). Es lo que hace
+   que el color de categoría sea señal y no bloque (SISTEMA.md §1 principio 2, §4.3). */
 .dotico {
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   flex-shrink: 0;
-  border-radius: 50%;
+  border-radius: var(--r-circle);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 19px;
   line-height: 1;
-  background: var(--cat, var(--text-2));
+  background: color-mix(in srgb, var(--cat, var(--ink-3)) 16%, transparent);
 }
 
-/* etiqueta versalitas 10.5/700/.09em — misma fórmula que .section-title/.day-header */
 .day-label {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--text-2);
+  font: var(--t-micro);
+  color: var(--ink-3);
 }
 
 /* barra de progreso píldora de 8px; <i> es el relleno — el consumidor fija su ancho (width/%)
    y opcionalmente --cat para el color (categoría o estado: bien/al límite/excedido) */
 .bar {
   height: 8px;
-  border-radius: 999px;
-  background: var(--card2);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
   overflow: hidden;
 }
 .bar > i {
   display: block;
   height: 100%;
-  border-radius: 999px;
-  background: var(--cat, var(--green));
+  border-radius: var(--r-pill);
+  background: var(--cat, var(--accent));
 }
 
 /* anillo de progreso conic-gradient con hueco central; el consumidor fija --pct (0-100, número)
@@ -716,14 +719,14 @@ body.onboarding .fab { display: none; }
   position: relative;
   display: grid;
   place-items: center;
-  background: conic-gradient(var(--cat, var(--green)) calc(var(--pct, 0) * 1%), var(--card2) 0);
+  background: conic-gradient(var(--cat, var(--green)) calc(var(--pct, 0) * 1%), var(--surface-2) 0);
 }
 .ring::after {
   content: "";
   position: absolute;
   inset: 5px;
   border-radius: 50%;
-  background: var(--card);
+  background: var(--bg);
 }
 .ring > * {
   position: relative;
@@ -731,18 +734,17 @@ body.onboarding .fab { display: none; }
   font-size: 16px;
 }
 
-/* importe héroe: 34/700 tabular; los céntimos van en un <small> al 60% (principio 3, jerarquía invertida) */
+/* importe héroe de sección (SISTEMA.md §2.3): los céntimos y el símbolo van en .money-cents/.money-cur */
 .amount-hero {
-  font-size: 34px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font: var(--t-figure-xl);
+  letter-spacing: -.015em;
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
 }
-.amount-hero small {
-  font-size: 0.6em;
-  font-weight: 600;
-}
+
+/* Anatomía del importe (SISTEMA.md §2.3). En `em`: la MISMA pareja sirve al héroe de 56px, al
+   total de 34 y a la fila de 16 sin una sola medida absoluta. */
+.money-cents { font-size: 0.56em; color: var(--ink-2); }
+.money-cur { font-size: 0.42em; font-weight: 500; color: var(--ink-3); margin-left: .06em; }
 
 /* ===== animación de aviso (importe/categoría inválidos al guardar) ===== */
 @keyframes bc-shake {
@@ -755,14 +757,14 @@ body.onboarding .fab { display: none; }
 
 /* ---- Onboarding (PR F): indicador de progreso de 4 pasos ---- */
 .onb-dots { display: flex; gap: 6px; justify-content: center; }
-.onb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--card2); }
-.onb-dot.on { background: var(--text); width: 20px; border-radius: 999px; }
+.onb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--surface-2); }
+.onb-dot.on { background: var(--accent); width: 20px; border-radius: 999px; }
 
 /* ===== accesibilidad (Task 2 P2) ===== */
 /* foco visible global: reemplaza los `outline: none` de .field input/select y .budget-input
    eliminados más arriba — todo elemento enfocable por teclado queda con anillo visible. */
 :focus-visible {
-  outline: 2px solid var(--text);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -774,16 +776,21 @@ body.onboarding .fab { display: none; }
 #toast {
   position: fixed;
   left: 50%;
-  bottom: calc(84px + env(safe-area-inset-bottom, 0px) + 12px);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 84px);
   z-index: 25;
-  max-width: min(calc(100% - 40px), 440px);
+  width: calc(100% - 2 * var(--pad-screen));
+  max-width: 440px;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
   padding: 10px 16px;
-  border-radius: 999px;
-  background: var(--card2);
-  color: var(--text);
-  font: 500 13px var(--font-ui);
-  text-align: center;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  border-radius: var(--r-0);
+  background: var(--surface);
+  border: 1px solid var(--hairline-strong);
+  color: var(--ink);
+  font: var(--t-body);
+  text-align: left;
+  box-shadow: var(--shadow-float);
   pointer-events: none;
   opacity: 0;
   transform: translateX(-50%) translateY(8px);
@@ -797,8 +804,8 @@ body.onboarding .fab { display: none; }
 /* ===== esqueleto de carga (skeleton.js) ===== */
 /* Misma tinta y mismo radio que las tarjetas para que la silueta prometa lo que va a llegar. */
 .skeleton {
-  background: var(--card2);
-  border-radius: var(--radius);
+  background: var(--surface-2);
+  border-radius: var(--r-0);
   animation: bc-skeleton 1.2s ease-in-out infinite;
 }
 @keyframes bc-skeleton {
@@ -819,21 +826,127 @@ body.onboarding .fab { display: none; }
    TRAMPA: tokens.css:11 es `* { margin: 0 }` y mata el `margin:auto` con el que el UA centra un
    diálogo modal — sin la primera línea, el modal aparece pegado arriba a la izquierda. */
 .modal {
-  margin: auto;
-  width: min(360px, calc(100% - 40px));
-  padding: 22px 20px 16px;
-  border: 0;                      /* el UA le pone borde y colores de sistema */
-  border-radius: var(--radius);
-  background: var(--card);
-  color: var(--text);
-  font-family: var(--font-ui);
+  margin: auto;                 /* NO borrar: tokens.css (* { margin: 0 }) mata el centrado del UA */
+  width: min(360px, calc(100% - 44px));
+  padding: 24px 20px 20px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-0);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  box-shadow: var(--shadow-float);
 }
-.modal::backdrop { background: rgba(0, 0, 0, 0.55); }
-.modal-title { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
-.modal-text { margin-top: 8px; font-size: 14px; color: var(--text-2); }
-.modal-actions { display: flex; gap: 10px; margin-top: 22px; }
-.modal-actions button { flex: 1; }
+.modal::backdrop { background: var(--scrim); }
+.modal-title { font: var(--t-section); font-size: 17px; }
+.modal-text { margin-top: 8px; font: var(--t-body); color: var(--ink-2); }
+/* destructivo ARRIBA, cancelar debajo, ambos a ancho completo (SISTEMA.md §4.12). column-reverse
+   y no reordenar el DOM: modal.test.mjs fija que Cancelar va primero en la tabulación y en el
+   foco inicial, que es la salida segura. */
+.modal-actions { display: flex; flex-direction: column-reverse; gap: 10px; margin-top: 18px; }
+.modal-actions button { flex: none; width: 100%; }
 .modal-danger {
-  background: var(--red); color: var(--bg); border: 0; border-radius: 999px;
-  height: 52px; padding: 0 20px; font: 600 16px var(--font-ui); cursor: pointer;
+  height: 52px; border-radius: var(--r-pill);
+  background: var(--danger-tint); color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  font: 600 16px var(--font-sans); cursor: pointer;
+}
+
+/* ===== recibo de guardado (recibo.js) ===== */
+/* Único material distinto de toda la app: papel sobre el velo. La mayúscula trackeada de las
+   etiquetas del ticket es la ÚNICA sancionada del sistema (SISTEMA.md §1): ahí es la metáfora. */
+#recibo { position: fixed; inset: 0; z-index: 40; background: var(--scrim);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+  padding: var(--pad-screen); animation: bc-recibo-veil .14s ease-out; }
+.recibo-ticket { width: 296px; color: var(--paper); box-shadow: var(--shadow-float);
+  animation: bc-recibo-print .42s cubic-bezier(.22,1,.36,1); }
+.recibo-body { background: var(--paper); color: var(--paper-ink); padding: 4px 20px 6px; }
+.recibo-label { font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--paper-dim); }
+.recibo-value { font: var(--t-figure-s); color: var(--paper-ink); }
+.recibo-dots { flex: 1; min-width: 10px; border-bottom: 1px dotted #A79E90; transform: translateY(-3px); }
+.recibo-perf { height: 1px; background: repeating-linear-gradient(90deg, #A79E90 0 4px, transparent 4px 8px); }
+.recibo-stamp { color: var(--stamp); transform: rotate(-8deg);
+  animation: bc-recibo-stamp .22s cubic-bezier(.34,1.56,.64,1) .38s backwards; }
+.recibo-undo { height: 44px; border-radius: var(--r-pill); background: transparent;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--accent); font: 600 15px var(--font-sans); padding: 0 26px; cursor: pointer; }
+#recibo.is-leaving { animation: bc-recibo-out .26s ease-in forwards; }
+@keyframes bc-recibo-veil { from { opacity: 0 } }
+@keyframes bc-recibo-print { from { clip-path: inset(0 0 100% 0); transform: translateY(-10px) } }
+@keyframes bc-recibo-stamp { from { opacity: 0; transform: rotate(-18deg) scale(1.6) } }
+@keyframes bc-recibo-out { to { opacity: 0; transform: translateY(-24px) } }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Ni impresión, ni sello, ni rotación, ni escalado: solo opacidad (SISTEMA.md §4.13). */
+  .recibo-ticket, .recibo-stamp { animation: none; }
+  #recibo { animation: bc-recibo-veil .12s linear; }
+  #recibo.is-leaving { animation: bc-recibo-out .12s linear forwards; }
+  @keyframes bc-recibo-out { to { opacity: 0 } }
+}
+
+/* ===== Inicio v2: héroe de cuenta y la hucha (plan 2026-09-10-inicio-v2, Task 7) ===== */
+
+/* Saldo de la cuenta principal (SISTEMA §2.3, --t-hero): distinto de .amount-hero (--t-figure-xl,
+   34px), que sigue siendo el total de sección (Disponible del periodo, Gasto por categoría…). */
+.hero-account { display: flex; flex-direction: column; gap: 6px; }
+.hero-account .balance {
+  font: var(--t-hero);
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+/* Saldo negativo: los tres tramos de la anatomía del importe en --danger (decisión 2 de la spec). */
+.hero-account .balance.is-negative,
+.hero-account .balance.is-negative .money-cents,
+.hero-account .balance.is-negative .money-cur { color: var(--danger); }
+
+/* ===== Línea de tiempo semanal (SISTEMA §4.11): la espina compacta de Inicio y la desplegable de
+   Semana comparten estas mismas clases (Task 8/9). ===== */
+.spine { display: flex; flex-direction: column; }
+.spine-row { display: flex; align-items: stretch; gap: 12px; }
+/* El rail es el propio contenedor: el filete es un hijo normal (no un pseudo-elemento) para poder
+   acortarlo inline en la última fila sin una clase modificadora aparte. */
+.spine-rail { width: 12px; flex-shrink: 0; position: relative; display: flex; justify-content: center; }
+.spine-line { width: 2px; height: 100%; background: var(--hairline-strong); }
+.spine-node { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; }
+
+/* Barra apilada por categoría de un día (decisión 8: apila, no "color dominante") — mismo patrón
+   que .bar/.bar>i pero SIN radio por segmento (los tramos van a hueso, solo la pista es píldora).
+   `width:100%` (no `flex:1`) a propósito: esta pista se usa tanto DENTRO de una fila en columna
+   (Semana, la barra de categoría de Inicio I3 — ahí `flex:1` colapsaría a flex-basis:0 y la
+   pista se quedaría a 0px de alto) como DENTRO de una fila horizontal (la espina compacta de
+   Inicio I2, que SÍ necesita flex:1 para ocupar el hueco entre la etiqueta y el importe — se
+   añade inline en ese único call site, pisando este width). */
+.day-bar { width: 100%; height: 8px; border-radius: var(--r-pill); background: var(--surface-2); overflow: hidden; display: flex; }
+.day-seg { height: 100%; background: var(--cat, var(--accent)); }
+
+/* Chip de categoría de «Dónde se ha ido esta semana» (Semana): tinte al 16% del color, mismo
+   patrón que .chip-icon/.chip-v.active. */
+.week-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--cat, var(--ink-2)) 16%, transparent);
+  padding: 0 13px;
+  color: var(--cat, var(--ink-2));
+  font-size: 13px;
+  font-weight: 500;
+}
+.week-chip .num { font-weight: 600; }
+
+/* Grid de 3 columnas separadas por un filete de 1px (Inicio v2, I1: Gastado/Ingresos/Ahorrado).
+   El filete es el propio fondo del grid asomando por el gap de 1px entre celdas — sin bordes. */
+.stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--hairline); margin-top: var(--gap-section); }
+.stat-grid > div { display: flex; flex-direction: column; gap: 5px; padding: 15px 8px; background: var(--bg); }
+
+/* La hucha (SISTEMA §4.15): franja tintada al acento con filete izquierdo, una sola frase y como
+   mucho dos acciones de texto — nunca un botón primario. */
+.hucha {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--accent-tint);
+  border-left: 2px solid var(--accent);
+  margin-bottom: var(--gap-section);
 }

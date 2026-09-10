@@ -1,14 +1,16 @@
 import {
   addTransaction, getOpenPeriod, listExpenseLeafCategories, listIncomeCategories,
-  listAccounts, allCategoriesById, recentForRefund, getMetaAll,
+  listAccounts, allCategoriesById, recentForRefund, getMetaAll, softDeleteTransaction,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
-import { fmtMoney, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { userMessage } from "../errors.js";
 import { focusInput } from "../viewport.js";
+import { showReceipt } from "../recibo.js";
+import { showToast } from "../toast.js";
 
 // labelKey/SAVE_KEY en vez de texto resuelto: son consts de módulo, evaluadas al importar el
 // fichero (antes de que boot() llame a initI18n con el idioma real) — si guardaran el string ya
@@ -31,8 +33,11 @@ const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt
 
 /** Monta la pantalla completa de registro rápido de un movimiento (5 tipos).
  *  onDone() se llama tanto al cerrar (✕) como tras guardar con éxito.
- *  prefill opcional (Task 11): {type, amountCents, categoryId, accountId, merchant, ruleId, isShared}. */
-export async function renderRegistro(container, onDone, prefill) {
+ *  prefill opcional (Task 11): {type, amountCents, categoryId, accountId, merchant, ruleId, isShared}.
+ *  onUndone opcional (reskin v2, Task 12): refresca la pantalla de detrás cuando se pulsa
+ *  «Deshacer» en el recibo — sin esto, el movimiento borrado se queda pintado hasta la siguiente
+ *  navegación. */
+export async function renderRegistro(container, onDone, prefill, onUndone) {
   let period, expenseCats, incomeCats, accountsAll, byId, meta;
   try {
     [period, expenseCats, incomeCats, accountsAll, byId, meta] = await Promise.all([
@@ -147,7 +152,7 @@ export async function renderRegistro(container, onDone, prefill) {
             ${escHtml(label)} · ${fmtMoney(linked.amount_cents)}
           </div>
         </div>
-        <button type="button" id="reg-refund-unlink" class="icon-btn" aria-label="${t("registro.refund.unlink")}">✕</button>
+        <button type="button" id="reg-refund-unlink" class="icon-btn" aria-label="${t("registro.refund.unlink")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
       </div>`;
     }
     return `
@@ -187,13 +192,13 @@ export async function renderRegistro(container, onDone, prefill) {
   function renderAccountsSection() {
     if (state.tipo === "transfer") {
       return `
-      <div class="card" style="border-radius:16px; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+      <div class="card" style="border-radius:0; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
         <div class="section-title">${t("common.from")}</div>
         <div class="chips">
           ${accounts.map((a) => `<button type="button" class="chip${state.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
         </div>
       </div>
-      <div class="card" style="border-radius:16px; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+      <div class="card" style="border-radius:0; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
         <div class="section-title">${t("common.to")}</div>
         <div class="chips">
           ${accountsAll.filter((a) => a.id !== state.accountId).map((a) => `<button type="button" class="chip${state.counterAccountId === a.id ? " active" : ""}" data-counter-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
@@ -201,7 +206,7 @@ export async function renderRegistro(container, onDone, prefill) {
       </div>`;
     }
     return `
-    <div class="card" style="border-radius:16px; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+    <div class="card" style="border-radius:0; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
       <div class="section-title">${state.tipo === "refund" ? t("common.destAccount") : t("common.account")}</div>
       <div class="chips">
         ${accounts.map((a) => `<button type="button" class="chip${state.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
@@ -215,8 +220,9 @@ export async function renderRegistro(container, onDone, prefill) {
     // Color del display/importe y del botón de guardar: se leen del state en CADA pintado, así
     // que basta con el render() que ya dispara el click de categoría — sin estado nuevo.
     const amountColor = state.categoryId ? textColorForCategory(state.categoryId, byId) : "var(--text)";
+    // §1 principio 2: un solo acento. El CTA es SIEMPRE lima, ya no toma el color de la categoría.
     const saveStyle = needsCategory(state.tipo) && state.categoryId
-      ? `background:${colorForCategory(state.categoryId, byId)};color:#FFF4EC;`
+      ? `background:var(--accent);color:var(--accent-ink);`
       : "";
 
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
@@ -224,14 +230,14 @@ export async function renderRegistro(container, onDone, prefill) {
     container.innerHTML = `
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
         <h1 style="font-size:19px; font-weight:700; letter-spacing:-0.01em;">${t("registro.title")}</h1>
-        <button type="button" class="icon-btn" id="reg-close" aria-label="${t("registro.close")}">✕</button>
+        <button type="button" class="icon-btn" id="reg-close" aria-label="${t("registro.close")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
       </div>
 
       <div class="segmented" style="margin-bottom:18px;border-radius:999px;">
         ${TIPOS.map((tp) => {
           const active = state.tipo === tp.id;
           const segStyle = active
-            ? "border-radius:999px;background:var(--card2);color:var(--text);font-weight:700;"
+            ? "border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:600;"
             : "border-radius:999px;";
           return `<button type="button" data-tipo="${tp.id}" class="${active ? "active" : ""}" style="${segStyle}">${t(tp.labelKey)}</button>`;
         }).join("")}
@@ -258,7 +264,7 @@ export async function renderRegistro(container, onDone, prefill) {
             const icon = iconForCategory(c.id, byId);
             const active = state.categoryId === c.id;
             const chipStyle = active
-              ? `--cat:${color};background:color-mix(in srgb, ${color} 18%, transparent);color:${textColor};font-weight:700;`
+              ? `--cat:${color};background:color-mix(in srgb, ${color} 16%, transparent);color:${textColor};font-weight:700;`
               : `--cat:${color};`;
             return `<button type="button" class="chip-v${active ? " active" : ""}" data-cat="${c.id}" style="${chipStyle}">
               <span class="chip-icon">${icon}</span><span>${escHtml(c.name)}</span>
@@ -287,7 +293,7 @@ export async function renderRegistro(container, onDone, prefill) {
       </label>
 
       ${needsCategory(state.tipo) && state.tipo !== "income" && partnerName ? `
-      <div class="card" style="border-radius:16px; padding:0 16px; margin-bottom:18px;">
+      <div class="card" style="border-radius:0; padding:0 16px; margin-bottom:18px;">
         <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
           <span style="font-size:15px; font-weight:600;">${t("common.sharedWith", { name: escHtml(partnerName) })}</span>
           <span class="toggle">
@@ -302,9 +308,9 @@ export async function renderRegistro(container, onDone, prefill) {
             <div class="section-title">${t("common.paidBy.label")}</div>
             <div class="segmented" style="border-radius:999px;">
               <button type="button" data-paidby="me" class="${state.paidBy === "me" ? "active" : ""}"
-                style="flex:1;border-radius:999px;${state.paidBy === "me" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("common.paidBy.me")}</button>
+                style="flex:1;border-radius:999px;${state.paidBy === "me" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("common.paidBy.me")}</button>
               <button type="button" data-paidby="partner" class="${state.paidBy === "partner" ? "active" : ""}"
-                style="flex:1;border-radius:999px;${state.paidBy === "partner" ? "background:var(--card2);color:var(--text);font-weight:700;" : ""}">${t("common.paidBy.partner", { name: escHtml(partnerName) })}</button>
+                style="flex:1;border-radius:999px;${state.paidBy === "partner" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("common.paidBy.partner", { name: escHtml(partnerName) })}</button>
             </div>
           </div>` : ""}
           <div style="display:flex; align-items:center; gap:10px;">
@@ -312,16 +318,16 @@ export async function renderRegistro(container, onDone, prefill) {
               <div style="font-size:14px; font-weight:600;">${t("common.split.label")}</div>
               <div style="font-size:11px; color:var(--text-3);">${t("common.split.hint", { name: escHtml(partnerName), pct: 100 - state.sharePct })}</div>
             </div>
-            <button type="button" id="reg-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}">−</button>
+            <button type="button" id="reg-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
             <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${state.sharePct} %</div>
-            <button type="button" id="reg-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}">+</button>
+            <button type="button" id="reg-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
           </div>
           <div style="display:flex; gap:8px;">
-            <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
+            <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
               <div style="font-size:10px; color:var(--text-3);">${t("common.myShare", { pct: state.sharePct })}</div>
               <div class="num" id="reg-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
             </div>
-            <div style="flex:1; background:var(--card2); border-radius:14px; padding:10px 11px;">
+            <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
               <div style="font-size:10px; color:var(--text-3);">${partnerPaid() ? t("common.paidFull", { name: escHtml(partnerName) }) : `${escHtml(partnerName)} · ${100 - state.sharePct}%`}</div>
               <div class="num" id="reg-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerPaid() ? state.cents : partnerCents)}</div>
             </div>
@@ -460,13 +466,17 @@ export async function renderRegistro(container, onDone, prefill) {
       btn.disabled = true;
       try {
         const withCategory = needsCategory(state.tipo);
-        await addTransaction({
+        // Mismo guard que sharePctOverride/isShared de abajo: el reparto no se ofrece para
+        // ingresos, así que el recibo tampoco debe imprimir una línea de reparto heredada.
+        const effectiveIsShared = withCategory && state.tipo !== "income" ? state.isShared : false;
+        const effectiveAccountId = partnerPaid() ? "" : state.accountId;
+        const newId = await addTransaction({
           type: state.tipo,
           amountCents: state.tipo === "adjustment" && state.adjustmentSign === "-" ? -state.cents : state.cents,
           date: state.fecha,
           categoryId: withCategory ? state.categoryId : "",
           // Un gasto que pagó la contraparte no toca ninguna cuenta mía hasta liquidar.
-          accountId: partnerPaid() ? "" : state.accountId,
+          accountId: effectiveAccountId,
           counterAccountId: state.tipo === "transfer" ? state.counterAccountId : "",
           merchant: state.merchant,
           note: state.note,
@@ -474,13 +484,38 @@ export async function renderRegistro(container, onDone, prefill) {
           // al 100%, ver sql.js) — este guard evita que un isShared heredado (p.ej. prefill de
           // una regla recurrente marcada compartida, inicio.js) se cuele en el guardado aunque
           // el toggle esté oculto para tipo=income.
-          isShared: withCategory && state.tipo !== "income" ? state.isShared : false,
-          sharePctOverride: withCategory && state.tipo !== "income" && state.isShared ? state.sharePct : null,
+          isShared: effectiveIsShared,
+          sharePctOverride: effectiveIsShared ? state.sharePct : null,
           paidBy: partnerPaid() ? "partner" : "me",
           refId: state.tipo === "refund" ? state.refId : "",
           ruleId: state.ruleId,
         });
-        onDone();
+        onDone();   // primero: el ticket cae sobre la pantalla ya repintada (ReciboGuardado.dc.html)
+        const [y, m, d] = state.fecha.split("-");
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        showReceipt({
+          dateTime: `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}  ${pad(now.getHours())}:${pad(now.getMinutes())}`,
+          lines: [
+            { label: t("common.merchant"), value: state.merchant || "" },
+            { label: t("common.category"), value: withCategory ? (byId[state.categoryId]?.name ?? "") : "" },
+            { label: t("common.account"), value: accountsAll.find((a) => a.id === effectiveAccountId)?.name ?? "" },
+            { label: t("common.date"), value: `${d}/${m}/${y}` },
+            { label: t("common.split.label"), value: effectiveIsShared ? `${partnerName} ${state.sharePct} %` : "" },
+            { label: t("recibo.myPart"), value: effectiveIsShared ? fmtMoney(splitCents(state.cents, state.sharePct).mine) : "" },
+          ],
+          total: fmtMoneyParts(state.cents),
+          stampDate: `${fmtDiaCorto(hoyISO()).toUpperCase()} ${now.getFullYear()}`,
+          labels: { brand: "BaseCero", stamp: t("recibo.stamp"), total: t("recibo.total"), undo: t("recibo.undo") },
+          onUndo: async () => {
+            try {
+              await softDeleteTransaction(newId);
+              onUndone?.();
+            } catch (e) {
+              showToast(t("recibo.undoFailed", { error: userMessage(e) }));
+            }
+          },
+        });
       } catch (e) {
         btn.disabled = false;
         errorMsg = t("common.saveFailed", { error: userMessage(e) });
