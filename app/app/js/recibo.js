@@ -55,7 +55,7 @@ export function ticketHtml({ dateTime, lines, total, stampDate, labels }) {
         <div class="num" style="display:flex;align-items:baseline;gap:2px;">
           <span style="font-size:32px;font-weight:600;letter-spacing:-.02em;">${escHtml(total.main)}</span>
           <span style="font-size:18px;font-weight:600;color:var(--paper-dim);">${escHtml(total.cents)}</span>
-          <span style="font-size:14px;font-weight:500;color:var(--paper-dim);margin-left:3px;">${escHtml(total.cur)}</span>
+          <span style="font-size:14px;font-weight:500;color:var(--paper-dim);margin-left:3px;">${escHtml(total.suffix)}</span>
         </div>
       </div>
       <div style="display:flex;justify-content:center;padding:2px 0 8px;">

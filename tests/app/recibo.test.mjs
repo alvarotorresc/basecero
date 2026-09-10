@@ -7,11 +7,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ticketHtml, createReceipt, showReceipt } from "../../app/app/js/recibo.js";
+import { fmtMoneyParts } from "../../app/app/js/format.js";
 
 const DATA = {
   dateTime: "09/09/2026  19:07",
   lines: [{ label: "Comercio", value: "Bar La Plaza" }, { label: "Categoría", value: "Restauración" }],
-  total: { main: "45", cents: "20", cur: " €" },
+  total: { main: "45", cents: "20", suffix: " €" },
   stampDate: "9 SEP 2026",
   labels: { brand: "BaseCero", stamp: "Guardado", total: "Total", undo: "Deshacer" },
 };
@@ -55,6 +56,12 @@ test("ticketHtml: imprime la cabecera, las líneas con valor y el sello", () => 
   assert.ok(html.includes("Guardado"));
   assert.ok(html.includes("9 SEP 2026"));
   assert.ok(html.includes("recibo-stamp"), "el sello lleva su clase para animarse aparte");
+});
+
+test("ticketHtml: el total, construido con fmtMoneyParts real, imprime el símbolo de moneda", () => {
+  const html = ticketHtml({ ...DATA, total: fmtMoneyParts(4520) });
+  assert.ok(html.includes("€"), "fmtMoneyParts devuelve {main,cents,suffix}: el símbolo vive en suffix, no en cur");
+  assert.ok(!html.includes("undefined"));
 });
 
 test("ticketHtml: una línea sin valor NO se imprime", () => {
@@ -153,7 +160,7 @@ test("dos show() seguidos: solo queda un ticket en el body", () => {
   const receipt = createReceipt(doc, { holdMs: 900 });
   receipt.show(DATA);
   const first = doc.body.children[0];
-  receipt.show({ ...DATA, total: { main: "12", cents: "00", cur: " €" } });
+  receipt.show({ ...DATA, total: { main: "12", cents: "00", suffix: " €" } });
   assert.equal(doc.body.children.length, 1, "el primero se quita sin animación");
   assert.notEqual(doc.body.children[0], first);
   assert.equal(doc.body.children[0].classList.contains("is-leaving"), false);
