@@ -278,8 +278,10 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     const accountName = partnerPaid() ? "" : (accounts.find((a) => a.id === state.accountId)?.name ?? "");
     const dateLabel = state.fecha === hoyISO() ? t("registro.more.summaryToday") : fmtDiaCorto(state.fecha);
     const hasNote = !!state.note.trim();
+    // partnerName SIN escHtml aquí: summaryHtml (abajo) escapa cada trozo del resumen una vez —
+    // escaparlo también aquí convertiría un «&» legítimo del nombre en «&amp;amp;».
     const sharedLabel = needsCategory(state.tipo) && state.tipo !== "income" && partnerName && state.isShared
-      ? t("common.sharedWith", { name: escHtml(partnerName) })
+      ? t("common.sharedWith", { name: partnerName })
       : "";
     const parts = foldedSummaryParts({ accountName, dateLabel, hasNote, hasPhoto: false, sharedLabel }, t);
     const summaryHtml = parts.map((p, i) => (i === 0 ? "" : `<span style="width:1px;height:11px;background:var(--hairline-strong);flex-shrink:0;"></span>`)
