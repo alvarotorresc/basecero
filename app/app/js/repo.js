@@ -1182,6 +1182,14 @@ export async function replaceAll(data) {
 export const listTags = () => query(SQL.listTags);
 const getTag = async (id) => (await query(SQL.getTag, [id]))[0] ?? null;
 
+/** Total de SIEMPRE de cada etiqueta viva (archivadas incluidas, al final — D7: no está acotado a
+ *  un periodo) y cuántos movimientos la llevan. Pantalla Etiquetas. */
+export const tagTotals = () => query(SQL.tagTotals);
+
+/** Total de un periodo concreto por etiqueta (incluye archivadas: un movimiento del periodo puede
+ *  llevar una que ya se archivó). Segunda línea de la tarjeta de Movimientos y qué chips pintar. */
+export const tagTotalsOfPeriod = (periodId) => query(SQL.tagTotalsOfPeriod, [periodId]);
+
 /** Crea una etiqueta y devuelve su id. El nombre se recorta y no puede quedar vacío (mismo guard
  *  que createCategory: el repo es la última línea de defensa). `budgetCents` ausente o `null` es
  *  «sin límite» (D4). No hay guard de nombres duplicados, igual que en categorías. OJO TDZ
