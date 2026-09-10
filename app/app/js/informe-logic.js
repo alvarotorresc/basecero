@@ -126,10 +126,16 @@ function buildCategories({ spentByRoot, prevSpentByRoot, budgets, categoriesById
 
 const byDateDesc = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
 
-function movementItem(t) {
+/** `tagsById` (Etiquetas de proyecto, N11, Task 15): mapa id -> nombre de TODAS las etiquetas
+ *  vivas (archivadas incluidas, D5) — repo.reportInputs lo arma con tagTotals(), no listTags()
+ *  (que solo trae activas y dejaría en blanco la de un movimiento antiguo cuya etiqueta se
+ *  archivó después de ese periodo). `''` sin etiqueta o si el id ya no resuelve (borrado real,
+ *  D5 dice que eso no pasa desde la UI, pero un id huérfano no debe reventar el informe). */
+function movementItem(t, tagsById) {
   return {
     id: t.id, date: t.date, merchant: t.merchant, cents: t.amount_cents,
     type: t.type, isShared: !!t.is_shared, paidBy: t.paid_by,
+    tag: (t.tag_id && tagsById?.[t.tag_id]) || "",
   };
 }
 
@@ -138,9 +144,10 @@ function movementItem(t) {
  *  agruparlos por categoría no significaría nada. El total de cabecera de cada grupo es el de
  *  `categories.rows` (que a su vez viene de `spentByRootCategory`, D12) — NUNCA la suma de los
  *  `items` listados, que puede ser una muestra parcial de los movimientos reales de la raíz. */
-function buildMovements({ transactions, categoriesById }, categories) {
+function buildMovements({ transactions, categoriesById, tagsById }, categories) {
   const txs = transactions ?? [];
   const byId = categoriesById ?? {};
+  const toItem = (t) => movementItem(t, tagsById);
   const othersTypes = new Set(["income", "transfer", "adjustment"]);
   const groupsById = new Map();
   const others = [];
@@ -159,7 +166,7 @@ function buildMovements({ transactions, categoriesById }, categories) {
     const items = groupsById.get(catRow.rootId).slice().sort(byDateDesc);
     groups.push({
       rootId: catRow.rootId, name: catRow.name, color: catRow.color, icon: catRow.icon,
-      totalCents: catRow.spentCents, count: items.length, items: items.map(movementItem),
+      totalCents: catRow.spentCents, count: items.length, items: items.map(toItem),
     });
   }
   // Una raíz con movimientos pero SIN fila en categories.rows (p.ej. archivada a mitad de periodo,
@@ -171,7 +178,7 @@ function buildMovements({ transactions, categoriesById }, categories) {
     groups.push({
       rootId, name: byId[rootId]?.name ?? "", color: colorForCategory(rootId, byId), icon: iconForCategory(rootId, byId),
       totalCents: sorted.reduce((s, t) => s + t.amount_cents, 0), count: sorted.length,
-      items: sorted.map(movementItem),
+      items: sorted.map(toItem),
     });
   }
 
@@ -179,7 +186,7 @@ function buildMovements({ transactions, categoriesById }, categories) {
   return {
     count: txs.length,
     groups,
-    others: { count: sortedOthers.length, items: sortedOthers.map(movementItem) },
+    others: { count: sortedOthers.length, items: sortedOthers.map(toItem) },
   };
 }
 

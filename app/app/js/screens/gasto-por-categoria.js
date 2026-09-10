@@ -181,7 +181,7 @@ export async function renderGastoPorCategoria(container, onBack) {
       : "";
     return `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:1px;">
-        <span class="num" style="font-size:11px;color:var(--text-3);">${escHtml(prevPeriod.name)} ${escHtml(fmtMoney(cmp.prevCents))}</span>
+        <span class="num" style="font-size:11px;color:var(--text-3);">${t("gastoCategoria.compare.prev", { name: escHtml(prevPeriod.name), amount: escHtml(fmtMoney(cmp.prevCents)) })}</span>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
           ${spark}
           ${deltaText ? `

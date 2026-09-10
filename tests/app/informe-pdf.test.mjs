@@ -95,6 +95,9 @@ function reportWith(n, opts = {}) {
     type: "expense",
     isShared: false,
     paidBy: "me",
+    // Etiquetas de proyecto (N11, Task 15): solo el item 0 lleva la etiqueta pedida (mismo
+    // criterio que categoryName/merchant arriba), el resto va sin ('').
+    tag: i === 0 ? (opts.tag ?? "") : "",
   }));
   const group = {
     rootId: "cat-generado", name: catName, color: "#8A8794", icon: "▫️",
@@ -352,6 +355,31 @@ test("buildPdfBytes: un importe de fr-FR (con U+202F) no lanza", async () => {
   const frAmount = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(-1234.5);
   const report = reportWith(3, { merchant: `Pedido ${frAmount}` });
   await assert.doesNotReject(() => buildPdfBytes(PDFLib, report));
+});
+
+// ---- Task 15 (Etiquetas de proyecto, N11): la línea «Etiqueta: {name}» en el PDF -----------------
+
+test("layoutReport: un item con tag no cambia el numero de paginas del PDF (getPageCount sigue cuadrando)", async () => {
+  const report = reportWith(60, { tag: "Viaje Japón" });
+  const bytes = await buildPdfBytes(PDFLib, report);
+  const doc = await PDFLib.PDFDocument.load(bytes);
+  assert.equal(doc.getPageCount(), layoutReport(report).pages.length);
+});
+
+// El caso que revienta en producción si la línea de etiqueta no pasara por winAnsiSafe como el
+// resto de texto de usuario (mismo motivo que el test de categoria con emoji, de arriba).
+test("buildPdfBytes: un nombre de etiqueta con emoji no lanza", async () => {
+  const report = reportWith(3, { tag: "🏔️ Viaje Japón" });
+  await assert.doesNotReject(() => buildPdfBytes(PDFLib, report));
+});
+
+// Con tag, un bloque de texto MÁS por item etiquetado que sin ella (una línea aparte, D2: la
+// misma estructura de "Etiqueta: {name}" que pinta screens/informe.js) — sin acoplarse al copy
+// exacto de la clave i18n, que es cosa de screens/informe.js#movementGroupHtml, no de este módulo.
+test("layoutReport: un item CON tag pinta un bloque de texto mas que el mismo item SIN ella", () => {
+  const withTag = layoutReport(reportWith(1, { tag: "Viaje Japón" })).pages[0].blocks.filter((b) => b.section === "movements");
+  const withoutTag = layoutReport(reportWith(1)).pages[0].blocks.filter((b) => b.section === "movements");
+  assert.equal(withTag.length, withoutTag.length + 1);
 });
 
 test("reportFilename: determinista y sin caracteres de ruta", () => {

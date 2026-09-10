@@ -324,6 +324,9 @@ export const EN = {
       hint: "Tap a category to see the detail or set a limit",
       empty: "You have no active expense categories.",
     },
+    compare: {
+      prev: "{name} {amount}",
+    },
     row: {
       ofLimit: "{spent} of {limit}",
       ofLimitOver: "{spent} of {limit} · over by {over}",
@@ -1036,6 +1039,7 @@ export const EN = {
       groupCount: { one: "{n} movement", other: "{n} movements" },
       andMore: "and {n} more movements",
       others: "Other",
+      tag: "Tag: {name}",
     },
     footer: "The PDF carries all of this plus the full list of the {n} movements, and looks the same on any phone.",
     error: {

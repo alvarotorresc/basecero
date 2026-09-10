@@ -702,7 +702,7 @@ export async function reportInputs(periodId) {
   const [
     accountsStart, accountsEnd, spentByRoot, prevSpentByRoot, budgets, transactions,
     categoriesById, incomeCents, spentCents, prevIncomeCents, prevSpentCents,
-    partnerNetCents, subscriptionRules, meta,
+    partnerNetCents, subscriptionRules, meta, tags,
   ] = await Promise.all([
     balancesAt(prevDayIso(period.start_date)),
     balancesAt(closeDateIso),
@@ -719,6 +719,11 @@ export async function reportInputs(periodId) {
     pendingSettlementNetCents(),
     listRules(),
     getMetaAll(),
+    // Etiquetas de proyecto (N11, Task 15): tagTotals(), NO listTags() — un movimiento de un
+    // periodo cerrado puede llevar una etiqueta archivada DESPUÉS de ese periodo, y listTags()
+    // (solo activas) dejaría su nombre en blanco en el informe. tagTotals() trae TODAS las vivas
+    // (archivadas incluidas, D5) con name; informe-logic.js#movementItem solo necesita el nombre.
+    tagTotals(),
   ]);
   return {
     period, prevPeriod, accountsStart, accountsEnd, spentByRoot, prevSpentByRoot, budgets,
@@ -726,6 +731,7 @@ export async function reportInputs(periodId) {
     partnerNetCents,
     partnerName: (meta.partner_name || "").trim(),
     subscriptionRules,
+    tagsById: Object.fromEntries(tags.map((tg) => [tg.id, tg.name])),
     todayIso: hoyISO(),
   };
 }

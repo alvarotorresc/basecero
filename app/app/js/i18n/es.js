@@ -331,6 +331,12 @@ export const ES = {
       hint: "Toca una categoría para ver el detalle o poner un límite",
       empty: "No tienes ninguna categoría de gasto activa.",
     },
+    // N3 (Task 14): línea de comparativa con el periodo anterior, a la izquierda de la mini
+    // tendencia — mismo criterio de plantilla que el resto de gastoCategoria.row.*, para que un
+    // idioma con otro orden de palabras pueda mover {name}/{amount} sin tocar el JS.
+    compare: {
+      prev: "{name} {amount}",
+    },
     row: {
       ofLimit: "{spent} de {limit}",
       // Solo cuando se ha pasado del límite: el exceso, ya calculado, para no tener que restar de
@@ -1059,6 +1065,7 @@ export const ES = {
       groupCount: { one: "{n} movimiento", other: "{n} movimientos" },
       andMore: "y {n} movimientos más",
       others: "Otros",
+      tag: "Etiqueta: {name}",
     },
     footer: "El PDF lleva todo esto más la lista completa de los {n} movimientos, y se guarda igual en cualquier móvil.",
     error: {

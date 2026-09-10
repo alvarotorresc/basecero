@@ -53,7 +53,7 @@ function fixture() {
       { id: "t-restauracion-hoy", date: "2026-09-09", type: "expense", amount_cents: 1850, category_id: "cat-restauracion", merchant: "Bar La Plaza", note: "", is_shared: 0, account_id: "acc-corriente", counter_account_id: "", share_pct_override: null, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 1850 },
       { id: "t-salud-hoy", date: "2026-09-09", type: "expense", amount_cents: 1490, category_id: "cat-salud", merchant: "Farmacia", note: "", is_shared: 0, account_id: "acc-corriente", counter_account_id: "", share_pct_override: null, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 1490 },
       { id: "t-alimentacion-ayer", date: "2026-09-08", type: "expense", amount_cents: 2345, category_id: "cat-alimentacion", merchant: "Mercadona", note: "", is_shared: 0, account_id: "acc-corriente", counter_account_id: "", share_pct_override: null, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 2345 },
-      { id: "t-casa-7", date: "2026-09-07", type: "expense", amount_cents: 6790, category_id: "cat-casa", merchant: "Ferreteria Ruiz", note: "Reforma bano", is_shared: 0, account_id: "acc-corriente", counter_account_id: "", share_pct_override: null, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 6790 },
+      { id: "t-casa-7", date: "2026-09-07", type: "expense", amount_cents: 6790, category_id: "cat-casa", merchant: "Ferreteria Ruiz", note: "Reforma bano", is_shared: 0, account_id: "acc-corriente", counter_account_id: "", share_pct_override: null, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 6790, tag_id: "tag-reforma" },
       { id: "t-coche-5", date: "2026-09-05", type: "expense", amount_cents: 5230, category_id: "cat-coche", merchant: "Gasolinera", note: "", is_shared: 0, account_id: "acc-corriente", counter_account_id: "", share_pct_override: null, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 5230 },
       { id: "t-alimentacion-compartido", date: "2026-09-02", type: "expense", amount_cents: 8430, category_id: "cat-alimentacion", merchant: "Mercadona", note: "", is_shared: 1, account_id: "acc-corriente", counter_account_id: "", share_pct_override: 50, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 4215 },
       { id: "t-ocio-compartido", date: "2026-09-02", type: "expense", amount_cents: 11510, category_id: "cat-ocio", merchant: "Cafe Central", note: "", is_shared: 1, account_id: "acc-corriente", counter_account_id: "", share_pct_override: 50, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 5755 },
@@ -87,6 +87,12 @@ function fixture() {
       { id: "rule-nube", name: "Almacenamiento nube", type: "expense", amount_cents: 299, category_id: "cat-suscripciones", account_id: "acc-corriente", counter_account_id: "", frequency: "monthly", due_day: 2, due_month: null, is_shared: 0, is_active: 1, is_subscription: 1, cancelled_at: "" },
       { id: "rule-revista", name: "Revista digital", type: "expense", amount_cents: 499, category_id: "cat-suscripciones", account_id: "acc-corriente", counter_account_id: "", frequency: "monthly", due_day: 12, due_month: null, is_shared: 0, is_active: 0, is_subscription: 1, cancelled_at: "2026-06-12" },
     ],
+    // Etiquetas de proyecto (N11, Task 15): mapa id -> nombre de TODAS las etiquetas vivas
+    // (archivadas incluidas, D5), calcado del que repo.reportInputs arma con tagTotals() — no
+    // listTags(), que solo trae activas y dejaría en blanco la de un movimiento antiguo cuya
+    // etiqueta se archivó después. El del ejemplo es el mismo de SISTEMA.md §5: Ferretería Ruiz
+    // (t-casa-7) lleva la etiqueta «Reforma baño».
+    tagsById: { "tag-reforma": "Reforma baño" },
     todayIso: "2026-09-09",
   };
 }
@@ -295,6 +301,29 @@ test("buildReport: el total de un grupo es el del SQL, no la suma de sus filas",
   const sumaFilas = alimentacion.items.reduce((s, i) => s + i.cents, 0);
   assert.equal(alimentacion.totalCents, 18740);
   assert.notEqual(alimentacion.totalCents, sumaFilas);
+});
+
+// ---- Task 15 (Etiquetas de proyecto, N11): tag en cada item de movimientos --------------------
+
+test("buildReport: cada item de movimientos lleva el nombre de su etiqueta, o '' sin ella", () => {
+  const r = buildReport(fixture());
+  const casa = r.movements.groups.find((g) => g.rootId === "cat-casa");
+  const ferreteria = casa.items.find((i) => i.id === "t-casa-7");
+  assert.equal(ferreteria.tag, "Reforma baño");
+  // El resto de items del fixture no llevan tag_id: '', nunca undefined ni null (JSON-friendly).
+  const alimentacion = r.movements.groups.find((g) => g.rootId === "cat-alimentacion");
+  for (const it of alimentacion.items) assert.equal(it.tag, "");
+  for (const it of r.movements.others.items) assert.equal(it.tag, "");
+});
+
+// Sin tagsById en el input (una BD vieja recién migrada, o un llamador que aún no lo pasa): '' en
+// todos los items, nunca un TypeError leyendo de un mapa inexistente.
+test("buildReport: sin tagsById en el input, todos los items dan tag ''", () => {
+  const f = fixture();
+  delete f.tagsById;
+  const r = buildReport(f);
+  const casa = r.movements.groups.find((g) => g.rootId === "cat-casa");
+  assert.equal(casa.items.find((i) => i.id === "t-casa-7").tag, "");
 });
 
 test("buildReport: ingresos, transferencias y ajustes van al grupo 'others'", () => {
