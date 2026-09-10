@@ -36,9 +36,16 @@ export function createSpeech(win) {
       recognition.continuous = false;
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
-      recognition.onresult = (e) => onResult(e.results[0][0].transcript);
-      recognition.onerror = () => onError?.();
-      recognition.start();
+      // D-2 (revisión de código): sin esto la caja se quedaba muerta en "Escuchando…" para
+      // siempre en dos casos — start() lanzando de forma sincrónica (contexto no seguro,
+      // reconocedor ya arrancado, micro ocupado) y un reconocimiento que termina sin resultado
+      // (solo `onend`, sin `onresult` ni `onerror`). `settled` evita que ese `onend` de cierre
+      // llame a onError una segunda vez cuando ya hubo resultado o error.
+      let settled = false;
+      recognition.onresult = (e) => { settled = true; onResult(e.results[0][0].transcript); };
+      recognition.onerror = () => { settled = true; onError?.(); };
+      recognition.onend = () => { if (!settled) onError?.(); };
+      try { recognition.start(); } catch { settled = true; onError?.(); }
     },
     stop() {
       recognition?.stop();
