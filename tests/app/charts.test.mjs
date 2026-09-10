@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { sparklineSvg, netWorthBarsHtml } from "../../app/app/js/charts.js";
+import { sparklineSvg, netWorthBarsHtml, barRowsGeometry, categoryBarsSvg, comparisonBarsSvg } from "../../app/app/js/charts.js";
 import { SQL } from "../../app/app/js/sql.js";
 import { fmtDiaIni } from "../../app/app/js/format.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
@@ -112,4 +112,67 @@ test("fmtDiaIni: iniciales L-D de una semana completa (2026-08-17 lunes .. 08-23
     ["2026-08-17", "2026-08-18", "2026-08-19", "2026-08-20", "2026-08-21", "2026-08-22", "2026-08-23"].map(fmtDiaIni),
     ["L", "M", "X", "J", "V", "S", "D"],
   );
+});
+
+// ---- barRowsGeometry / categoryBarsSvg / comparisonBarsSvg (Task 7, Informe) -------------------
+// Esta es LA garantía de que el PDF y la pantalla no divergen: los dos consumen barRowsGeometry.
+
+test("barRowsGeometry: ancho proporcional al valor y filas apiladas", () => {
+  const geo = barRowsGeometry([
+    { key: "a", value: 50, max: 100, color: "#111111" },
+    { key: "b", value: 100, max: 100, color: "#222222" },
+  ], { width: 200, rowH: 20, barH: 12, gap: 4 });
+  assert.equal(geo[0].w, 100);
+  assert.equal(geo[1].w, 200);
+  assert.equal(geo[0].y, 0);
+  assert.equal(geo[1].y, 20, "filas apiladas: la segunda empieza donde acaba el alto de fila de la primera");
+  assert.equal(geo[0].h, 12);
+});
+
+test("barRowsGeometry: valor negativo -> w 0; max 0 -> todas a 0, sin NaN", () => {
+  const geo = barRowsGeometry([
+    { key: "neg", value: -50, max: 100, color: "#111" },
+    { key: "sinmax", value: 50, max: 0, color: "#222" },
+  ], { width: 100, rowH: 10, barH: 6, gap: 2 });
+  assert.equal(geo[0].w, 0);
+  assert.equal(geo[1].w, 0);
+  assert.ok(!Number.isNaN(geo[0].w));
+  assert.ok(!Number.isNaN(geo[1].w));
+});
+
+test("barRowsGeometry: es determinista — mismo input, misma geometria", () => {
+  const rows = [{ key: "a", value: 30, max: 60, color: "#abcabc" }];
+  const opts = { width: 100, rowH: 10, barH: 6, gap: 2 };
+  assert.deepEqual(barRowsGeometry(rows, opts), barRowsGeometry(rows, opts));
+});
+
+test("categoryBarsSvg: un rect por fila con el color de su categoria", () => {
+  const rows = [
+    { key: "a", value: 50, max: 100, color: "#ff0000" },
+    { key: "b", value: 30, max: 100, color: "#00ff00" },
+  ];
+  const svg = categoryBarsSvg(rows, { width: 200, rowH: 20, barH: 12, gap: 4 });
+  const rects = [...svg.matchAll(/<rect[^>]*fill="([^"]+)"[^>]*>/g)].map((m) => m[1]);
+  assert.deepEqual(rects, ["#ff0000", "#00ff00"]);
+});
+
+test("comparisonBarsSvg: las dos barras a la MISMA escala (el maximo de ambos periodos)", () => {
+  const svg = comparisonBarsSvg(
+    [{ key: "a", value: 80, prevValue: 100, color: "#3366ff" }],
+    { width: 200, rowH: 40, barH: 14, gap: 4 },
+  );
+  const widths = [...svg.matchAll(/<rect[^>]*width="(\d+(?:\.\d+)?)"/g)].map((m) => Number(m[1]));
+  assert.equal(widths.length, 2, "una barra por periodo");
+  const [curW, prevW] = widths;
+  assert.equal(curW, 160, "80/100 del maximo compartido (100) sobre 200 de ancho");
+  assert.equal(prevW, 200, "100/100 del maximo compartido: la barra llena el ancho entero");
+});
+
+test("comparisonBarsSvg: sin periodo anterior no emite la segunda barra", () => {
+  const svg = comparisonBarsSvg(
+    [{ key: "a", value: 80, prevValue: null, color: "#3366ff" }],
+    { width: 200, rowH: 40, barH: 14, gap: 4 },
+  );
+  const rectCount = (svg.match(/<rect/g) || []).length;
+  assert.equal(rectCount, 1, "sin prevValue solo se dibuja la barra actual");
 });
