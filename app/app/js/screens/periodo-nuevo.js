@@ -254,6 +254,10 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
   function barridoDestinoHtml(d, withDivider) {
     const checked = state.sweepChoice === d.goalId;
     const pct = Math.min(100, Math.max(0, d.pct));
+    // Un fondo de emergencia del primer cierre no tiene periodos cerrados de los que sacar el
+    // promedio de gasto (repo.js#goalProgress): targetCents sale 0, así que no hay objetivo real
+    // con el que dar «X / 0,00 €» ni una barra que dibujar (0 % de un objetivo que no existe).
+    const hasTarget = d.targetCents > 0;
     // Tarjeta con borde resaltado cuando está elegida (artboard PeriodoNuevo.dc.html): el margen
     // negativo compensa el padding para que el borde no desplace el contenido de las demás filas.
     return `
@@ -264,9 +268,9 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack }) {
       <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:5px;">
         <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px;">
           <span style="font-size:14px; font-weight:600;">${t("barrido.toGoal", { name: escHtml(d.name) })}</span>
-          <span class="num" style="font-size:11px; color:var(--text-3); flex-shrink:0;">${escHtml(fmtMoney(d.currentCents))} / ${escHtml(fmtMoney(d.targetCents))}</span>
+          <span class="num" style="font-size:11px; color:var(--text-3); flex-shrink:0;">${escHtml(fmtMoney(d.currentCents))}${hasTarget ? ` / ${escHtml(fmtMoney(d.targetCents))}` : ""}</span>
         </div>
-        <div class="bar" style="height:6px;"><i style="width:${pct}%;"></i></div>
+        ${hasTarget ? `<div class="bar" style="height:6px;"><i style="width:${pct}%;"></i></div>` : ""}
         <div class="num" style="font-size:11px; color:var(--text-3);" data-sweep-afterline="${escAttr(d.goalId)}">${sweepAfterLineText(d)}</div>
       </div>
     </label>`;

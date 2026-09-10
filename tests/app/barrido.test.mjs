@@ -88,6 +88,24 @@ test("sweepDestinations: target 0 (fondo sin periodos cerrados) -> pct 0, sin di
   assert.ok(!Number.isNaN(d[0].afterCents));
 });
 
+// El fondo de emergencia del primer cierre no tiene periodos cerrados de los que sacar el
+// promedio (repo.js#goalProgress: targetCents = target_months * avgSpentCents = 0), así que
+// safeDiv ya le da pct 0 ANTES de llegar aquí — el mismo 0 que cualquier hucha con progreso real
+// cero. El sort de abajo NO distingue el motivo del 0: no hace falta penalizarlo aparte, ya
+// queda detrás de cualquier pct > 0 y se desempata por nombre igual que los demás.
+test("sweepDestinations: un fondo sin objetivo (target 0) no se penaliza en el orden — queda con los demas 0 %, por nombre", () => {
+  const gp = [
+    { goal: { id: "g-alto", name: "Casi lleno", type: "provision", account_id: "acc-fondo" },
+      currentCents: 9000, targetCents: 10000, pct: 90, level: "ok" },
+    { goal: { id: "g-sin-objetivo", name: "Fondo nuevo", type: "emergency_fund", account_id: "acc-japon" },
+      currentCents: 0, targetCents: 0, pct: 0, level: "ok" },
+    { goal: { id: "g-cero-real", name: "Aun en cero", type: "savings_target", account_id: "acc-corriente" },
+      currentCents: 0, targetCents: 5000, pct: 0, level: "ok" },
+  ];
+  const d = sweepDestinations(gp, accounts(), 1000, "acc-ninguna");
+  assert.deepEqual(d.map((x) => x.name), ["Casi lleno", "Aun en cero", "Fondo nuevo"]);
+});
+
 test("sweepPlan: por encima del saldo de origen se CAPA y se avisa", () => {
   const p = sweepPlan({ rawAmount: "999", remainderCents: 35280, sourceBalanceCents: 50000 });
   assert.equal(p.amountCents, 50000);

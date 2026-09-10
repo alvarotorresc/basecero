@@ -47,6 +47,12 @@ export function sweepDestinations(goalsProgress, accountsById, sweepCents, sourc
         completes,
       };
     });
+  // Un fondo de emergencia del primer cierre no tiene periodos cerrados de los que sacar el
+  // promedio de gasto (repo.js#goalProgress: targetCents = target_months * avgSpentCents = 0),
+  // así que `gp.pct` YA llega en 0 (safeDiv, repo.js) antes de entrar aquí — el mismo 0 que
+  // cualquier hucha con progreso real cero. No hace falta un caso aparte para "target 0": el
+  // sort ya lo deja detrás de cualquier destino con pct > 0, y lo desempata por nombre entre los
+  // demás 0 % sin penalizarlo más que a esos.
   return rows.sort((a, b) => b.pct - a.pct || a.name.localeCompare(b.name));
 }
 
