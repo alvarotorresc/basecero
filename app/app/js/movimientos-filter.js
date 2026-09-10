@@ -12,11 +12,14 @@ import { rootOf } from "./category-colors.js";
 export const isUncategorized = (r) =>
   r.category_id === "" && (r.type === "expense" || r.type === "income" || r.type === "refund");
 
-/** Predicado puro del filtro de Movimientos. `filter` = { query, rootCatId, uncat } (movimientos.js
- *  Task 4): las tres condiciones se combinan con AND, cada una evaluada de forma independiente —
- *  esta función no asume que rootCatId y uncat sean mutuamente excluyentes (esa exclusión la
- *  garantiza la UI, que solo deja una chip de categoría activa a la vez). Con las tres en su valor
- *  neutro (query:"", rootCatId:null, uncat:false — la chip «Todos») hace match con cualquier fila. */
+/** Predicado puro del filtro de Movimientos. `filter` = { query, rootCatId, uncat, tagId }
+ *  (movimientos.js): las condiciones se combinan con AND, cada una evaluada de forma
+ *  independiente — esta función no asume que rootCatId y uncat sean mutuamente excluyentes (esa
+ *  exclusión la garantiza la UI, que solo deja una chip de categoría activa a la vez). Con todas
+ *  en su valor neutro (query:"", rootCatId:null, uncat:false, tagId ausente/null — la chip
+ *  «Todas») hace match con cualquier fila.
+ *  tagId (Etiquetas, N11): comparación ESTRICTA contra el id, nunca contra el nombre. Es la
+ *  cuarta condición, el mismo AND independiente que las otras tres. */
 export function matchesFilter(row, filter, byId) {
   if (!filter) return true;
   const query = String(filter.query ?? "").trim().toLowerCase();
@@ -27,5 +30,6 @@ export function matchesFilter(row, filter, byId) {
   }
   if (filter.rootCatId && rootOf(row.category_id, byId) !== filter.rootCatId) return false;
   if (filter.uncat && !isUncategorized(row)) return false;
+  if (filter.tagId && row.tag_id !== filter.tagId) return false;
   return true;
 }

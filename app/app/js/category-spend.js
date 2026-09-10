@@ -98,3 +98,60 @@ export function inheritedBudgetsRaw(budgetRows, rootRows) {
   }
   return out;
 }
+
+/** Comparativa de gasto por raíz entre este periodo y el anterior (N3). PURA.
+ *  Una fila por cada raíz del periodo ACTUAL, en el mismo orden en que llegan (el de
+ *  SQL.spentByRootCategory); quien pinta reordena con sortRootRows si quiere.
+ *  Extraída de informe-logic.js (Task 6, etiquetas-design §7.1 y §8.4 de informe-design): esta
+ *  función es la extracción de lo que ya vivía dentro de buildReport, no una regla nueva —
+ *    prevCents  = gasto de esa raíz el periodo anterior, 0 si la raíz no estaba
+ *    deltaCents = spent - prev
+ *    deltaPct   = prev > 0 ? ((spent - prev) / prev) * 100 : null   <- NUNCA se divide por cero
+ *    direction  = "flat" si deltaCents === 0
+ *                 "new"  si prev <= 0 (no había con qué comparar)
+ *                 "up"   si se gastó más   -> se pinta en --danger
+ *                 "down" si se gastó menos -> se pinta en --pos   (gastar menos es bueno, SISTEMA §4.19)
+ *  `hasPrev`: por defecto se deduce de `prevRows`, pero eso confunde «no hay periodo anterior»
+ *  con «hubo periodo anterior y no se gastó nada en él» — ambos llegan con prevRows vacío. Quien
+ *  SÍ sabe la diferencia es el llamante (informe-logic.js#buildCategories ya calcula
+ *  `!!prevPeriod`), así que puede pasarlo explícito; con prevRows vacío pero hasPrev=true todas
+ *  las raíces salen con prevCents 0 (gasto previo real, aunque fuera nulo) en vez de null (no hay
+ *  con qué comparar), y la pantalla pinta la línea «‹periodo› 0,00 €» en vez de omitirla. */
+export function compareRoots(currentRows, prevRows, hasPrev = (prevRows ?? []).length > 0) {
+  const prevByRoot = Object.fromEntries((prevRows ?? []).map((r) => [r.root_id, r.spent_cents]));
+  return (currentRows ?? []).map((r) => {
+    let prevCents = null, deltaCents = null, deltaPct = null, direction = "new";
+    if (hasPrev) {
+      prevCents = prevByRoot[r.root_id] ?? 0;
+      deltaCents = r.spent_cents - prevCents;
+      if (prevCents > 0) {
+        deltaPct = ((r.spent_cents - prevCents) / prevCents) * 100;
+        direction = deltaCents === 0 ? "flat" : deltaCents > 0 ? "up" : "down";
+      } else {
+        // sin gasto previo: "new" si ahora sí se gastó algo, "flat" si sigue sin haber nada — en
+        // ninguno de los dos casos hay un porcentaje que calcular sin dividir por cero.
+        direction = r.spent_cents > 0 ? "new" : "flat";
+      }
+    }
+    return { rootId: r.root_id, prevCents, deltaCents, deltaPct, direction };
+  });
+}
+
+/** Mapa rootId → [céntimos por periodo, del MÁS ANTIGUO al MÁS RECIENTE], para la mini tendencia
+ *  de tres periodos (SISTEMA §4.19). `history`: [{ period, rows }, …], del más antiguo al más
+ *  reciente — mismo orden que espera repo.rootSpendHistory.
+ *  Las raíces son las del ÚLTIMO elemento (el periodo actual): una raíz que ya no aparece no se
+ *  pinta. Donde una raíz no está en un periodo se rellena 0, no un hueco: una categoría creada
+ *  este mes NO gastó nada en julio, y eso es un cero, no un dato que falte.
+ *  Guard `__proto__`, mismo motivo que budgetMap (arriba). */
+export function spentSeriesByRoot(history) {
+  const h = history ?? [];
+  if (h.length === 0) return {};
+  const lastRows = h[h.length - 1].rows ?? [];
+  const out = {};
+  for (const r of lastRows) {
+    if (r.root_id === "__proto__") continue;
+    out[r.root_id] = h.map((p) => (p.rows ?? []).find((x) => x.root_id === r.root_id)?.spent_cents ?? 0);
+  }
+  return out;
+}

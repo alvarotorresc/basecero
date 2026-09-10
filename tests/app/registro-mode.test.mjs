@@ -57,6 +57,28 @@ test("foldedSummaryParts: el reparto se añade al final cuando hay sharedLabel",
   assert.deepEqual(parts, ["Cuenta corriente", "hoy", "registro.more.summaryNoNote", "compartido con Marta"]);
 });
 
+// Task 13 (Etiquetas de proyecto, N11): el resumen plegado de "Más" gana un trozo con el nombre
+// de la etiqueta, justo después de la fecha (misma cercanía visual que en el bloque desplegado,
+// donde el chip vive a la derecha del campo de fecha). Sin etiqueta, ningún trozo nuevo — mismo
+// criterio que el resto de campos opcionales de esta función (accountName/sharedLabel vacíos).
+test("foldedSummaryParts: sin tagName no añade ningún trozo nuevo (compatibilidad con lo ya sembrado)", () => {
+  const tr = (key) => key;
+  const parts = foldedSummaryParts({ accountName: "Cuenta corriente", dateLabel: "hoy", hasNote: false, hasPhoto: false, sharedLabel: "" }, tr);
+  assert.deepEqual(parts, ["Cuenta corriente", "hoy", "registro.more.summaryNoNote"]);
+});
+
+test("foldedSummaryParts: con tagName añade el nombre de la etiqueta justo después de la fecha", () => {
+  const tr = (key) => key;
+  const parts = foldedSummaryParts({ accountName: "Cuenta corriente", dateLabel: "hoy", hasNote: false, hasPhoto: false, sharedLabel: "", tagName: "Viaje Japón" }, tr);
+  assert.deepEqual(parts, ["Cuenta corriente", "hoy", "Viaje Japón", "registro.more.summaryNoNote"]);
+});
+
+test("foldedSummaryParts: tagName y sharedLabel a la vez, cada uno en su sitio", () => {
+  const tr = (key) => key;
+  const parts = foldedSummaryParts({ accountName: "Cuenta corriente", dateLabel: "hoy", hasNote: true, hasPhoto: false, sharedLabel: "compartido con Marta", tagName: "Viaje Japón" }, tr);
+  assert.deepEqual(parts, ["Cuenta corriente", "hoy", "Viaje Japón", "compartido con Marta"]);
+});
+
 test("visibleCategories: con menos categorías que el límite, se enseñan todas y hidden es 0", () => {
   const cats = [{ id: "a" }, { id: "b" }];
   assert.deepEqual(visibleCategories(cats, null, 8), { shown: cats, hidden: 0 });

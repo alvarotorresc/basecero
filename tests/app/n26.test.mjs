@@ -107,7 +107,7 @@ async function runPipeline(d, rows, hashFn = sha256hex) {
       if (categoryId) res.categorized++;
       stmts.push({ sql: SQL.insertTransaction, bind: [id, r.bookingDate, "p1", type, Math.abs(r.amountCents),
         "acc-n26", "", categoryId, pure.bcSanitizeCell(r.partnerName), pure.bcSanitizeCell(r.paymentReference),
-        0, null, "me", 0, "", "", r.externalId, "reconciled", NOW, NOW] });
+        0, null, "me", 0, "", "", "", r.externalId, "reconciled", NOW, NOW] });
       existing.push({ id, dateIso: r.bookingDate, type, amountCents: r.amountCents,
         externalId: r.externalId, status: "reconciled" });
       res.created++;
@@ -224,7 +224,7 @@ test("import CSV: fila de un comercio conocido entra CATEGORIZADA por la memoria
   // la que puede influir en el import de CSV_2ROWS es la memoria de comercios.
   d.prepare(SQL.insertTransaction).run(
     "hist1", "2026-07-01", "p1", "expense", 3000, "acc-n26", "",
-    "cat-alimentacion-supermercado", "MERCADONA", "", 0, null, "me", 0, "", "", "hist-ext-1", "reconciled", T, T);
+    "cat-alimentacion-supermercado", "MERCADONA", "", 0, null, "me", 0, "", "", "", "hist-ext-1", "reconciled", T, T);
 
   const res = await runImport(d, CSV_2ROWS);
   assert.equal(res.categorized, 1);
@@ -242,7 +242,7 @@ test("import CSV: un comercio con historial de OTRO tipo (income) no cuela su ca
   // (mismo comercio pudiendo aparecer, p.ej., en un abono con el mismo remitente que un cargo).
   d.prepare(SQL.insertTransaction).run(
     "hist-income", "2026-07-01", "p1", "income", 5000, "acc-n26", "",
-    "cat-nomina", "MERCADONA", "", 0, null, "me", 0, "", "", "hist-ext-income", "reconciled", T, T);
+    "cat-nomina", "MERCADONA", "", 0, null, "me", 0, "", "", "", "hist-ext-income", "reconciled", T, T);
 
   const res = await runImport(d, CSV_2ROWS); // fila 1: MERCADONA, -45.20 -> expense
   assert.equal(res.categorized, 0);
@@ -254,7 +254,7 @@ test("import CSV: la fila que se CONCILIA no toca la categoría de la fila exist
   const d = db();
   d.prepare(SQL.insertTransaction).run(
     "manual1", "2026-08-19", "p1", "expense", 4520, "acc-n26", "",
-    "cat-alimentacion-supermercado", "Compra en tienda", "", 0, null, "me", 0, "", "", "", "pending", T, T);
+    "cat-alimentacion-supermercado", "Compra en tienda", "", 0, null, "me", 0, "", "", "", "", "pending", T, T);
   const before = d.prepare(`SELECT category_id FROM transactions WHERE id='manual1'`).get().category_id;
 
   await runImport(d, CSV_2ROWS); // fila 1 (MERCADONA, -45.20, 1 día de diferencia) concilia con manual1
@@ -275,7 +275,7 @@ test("fila que casa con un pending manual ≤3 días: reconciled, conserva categ
   const T2 = "2026-08-19T10:00:00Z";
   d.prepare(SQL.insertTransaction).run(
     "manual1", "2026-08-19", "p1", "expense", 4520, "acc-n26", "",
-    "cat-alimentacion-supermercado", "Compra en tienda", "", 0, null, "me", 0, "", "", "", "pending", T2, T2);
+    "cat-alimentacion-supermercado", "Compra en tienda", "", 0, null, "me", 0, "", "", "", "", "pending", T2, T2);
 
   const res = await runImport(d, CSV_2ROWS);
   // Fila 1 (MERCADONA, -45.20, 2026-08-20) casa con manual1 (mismo importe, expense, 1 día de
@@ -299,7 +299,7 @@ test("A2: transferencia pendiente NO se traga un abono ajeno, y su propio cargo 
   // Transferencia manual pendiente de 500€ (dinero saliente de acc-n26 hacia otra cuenta).
   d.prepare(SQL.insertTransaction).run(
     "transfer1", "2026-08-19", "p1", "transfer", 50000, "acc-n26", "acc-ahorro",
-    "", "", "Transferencia a ahorro", 0, null, "me", 0, "", "", "", "pending", T2, T2);
+    "", "", "Transferencia a ahorro", 0, null, "me", 0, "", "", "", "", "pending", T2, T2);
 
   const text = [CSV_HEADER,
     // Fila 1: abono AJENO de 500€ (p.ej. nómina) a 1 día de la transferencia — hoy (bug A2-a)
@@ -437,7 +437,7 @@ test("importCsv (router): perfil que matchea -> crea y concilia por el pipeline 
   const T2 = "2026-08-19T10:00:00Z";
   d.prepare(SQL.insertTransaction).run(
     "manual1", "2026-08-19", "p1", "expense", 4520, "acc-n26", "",
-    "cat-alimentacion-supermercado", "Compra en tienda", "", 0, null, "me", 0, "", "", "", "pending", T2, T2);
+    "cat-alimentacion-supermercado", "Compra en tienda", "", 0, null, "me", 0, "", "", "", "", "pending", T2, T2);
 
   const res = await runImportRouter(d, GENERIC_2ROWS);
   // Fila 1 (Compra super, -45,20, 2026-08-20) casa con manual1 (mismo importe, expense, 1 día de

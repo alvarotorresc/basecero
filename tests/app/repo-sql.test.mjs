@@ -8,6 +8,7 @@ import { prevDayIso } from "../../app/app/js/format.js";
 
 const schema = readFileSync(new URL("../../app/app/js/schema.sql", import.meta.url), "utf8");
 const T = "2026-08-24T18:00:00Z";
+const T2 = "2026-08-24T19:00:00Z";
 function db() {
   const d = new DatabaseSync(":memory:");
   d.exec(schema);
@@ -18,11 +19,32 @@ function db() {
 const tx = (d, over = {}) => {
   const v = { id: "t" + Math.floor(Math.random() * 1e9), date: "2026-08-20", period: "p1", type: "expense",
     cents: 4520, account: "acc-n26", counterAccount: "", category: "cat-alimentacion-supermercado", merchant: "Mercadona",
-    note: "", shared: 0, override: null, paidBy: "me", settled: 0, ref: "", rule: "", external: "", status: "pending", ...over };
+    note: "", shared: 0, override: null, paidBy: "me", settled: 0, ref: "", rule: "", tag: "", external: "", status: "pending", ...over };
   d.prepare(SQL.insertTransaction).run(v.id, v.date, v.period, v.type, v.cents, v.account, v.counterAccount,
-    v.category, v.merchant, v.note, v.shared, v.override, v.paidBy, v.settled, v.ref, v.rule, v.external, v.status, T, T);
+    v.category, v.merchant, v.note, v.shared, v.override, v.paidBy, v.settled, v.ref, v.rule, v.tag, v.external, v.status, T, T);
   return v.id;
 };
+
+// `tag_id` aterriza en medio del bloque de columnas TEXT con default '' (merchant, note, ref_id,
+// rule_id, tag_id, external_id): un desplazamiento entre ellas NO revienta ningún CHECK, escribe
+// mal en silencio. Un centinela distinto por columna y relectura POR NOMBRE es la única guarda.
+test("insertTransaction: cada columna de texto recibe su propio valor", () => {
+  const d = db();
+  d.prepare(SQL.insertTransaction).run(
+    "tx-centinela", "2026-08-20", "p1", "expense", 1000, "acc-n26", "",
+    "cat-alimentacion-supermercado", "MERCHANT-X", "NOTE-X", 0, null, "me", 0,
+    "REF-X", "RULE-X", "TAG-X", "EXTERNAL-X", "pending", T, T,
+  );
+  const row = d.prepare(
+    "SELECT merchant, note, ref_id, rule_id, tag_id, external_id FROM transactions WHERE id='tx-centinela'",
+  ).get();
+  assert.equal(row.merchant, "MERCHANT-X");
+  assert.equal(row.note, "NOTE-X");
+  assert.equal(row.ref_id, "REF-X");
+  assert.equal(row.rule_id, "RULE-X");
+  assert.equal(row.tag_id, "TAG-X");
+  assert.equal(row.external_id, "EXTERNAL-X");
+});
 
 test("getOpenPeriod devuelve el periodo abierto con su pct", () => {
   const d = db();
@@ -224,4 +246,227 @@ test("SQL.accountBalance: prevDayIso(start_date) excluye un movimiento del prime
 
   assert.equal(conFechaDeInicio, 98000, "balancesAt(start_date) YA descontaría el gasto del primer día — la trampa del off-by-one");
   assert.equal(conDiaAnterior, 100000, "el día anterior no ve ningún movimiento del periodo: la apertura correcta");
+});
+
+// ---- Etiquetas de proyecto (Task 4): CRUD --------------------------------------------------
+
+test("SQL.insertTag: guarda con budget_cents null (sin límite)", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", null, T, T);
+  const row = d.prepare("SELECT * FROM tags WHERE id='tag-japon'").get();
+  assert.equal(row.name, "Viaje Japón");
+  assert.equal(row.budget_cents, null);
+  assert.equal(row.is_archived, 0);
+  assert.equal(row.deleted, 0);
+});
+
+test("SQL.insertTag: guarda con budget_cents con límite", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", 150000, T, T);
+  assert.equal(d.prepare("SELECT budget_cents FROM tags WHERE id='tag-japon'").get().budget_cents, 150000);
+});
+
+test("SQL.updateTag: cambia name/budget_cents + updated_at, nunca created_at", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", 150000, T, T);
+  d.prepare(SQL.updateTag).run("Viaje a Japón", 200000, T2, "tag-japon");
+  const row = d.prepare("SELECT * FROM tags WHERE id='tag-japon'").get();
+  assert.equal(row.name, "Viaje a Japón");
+  assert.equal(row.budget_cents, 200000);
+  assert.equal(row.updated_at, T2);
+  assert.equal(row.created_at, T);
+});
+
+test("SQL.updateTag: budget_cents a NULL quita el límite", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", 150000, T, T);
+  d.prepare(SQL.updateTag).run("Viaje Japón", null, T2, "tag-japon");
+  assert.equal(d.prepare("SELECT budget_cents FROM tags WHERE id='tag-japon'").get().budget_cents, null);
+});
+
+test("SQL.setTagArchived: marca is_archived + updated_at, en los dos sentidos", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-reforma", "Reforma baño", null, T, T);
+  d.prepare(SQL.setTagArchived).run(1, T2, "tag-reforma");
+  assert.equal(d.prepare("SELECT is_archived, updated_at FROM tags WHERE id='tag-reforma'").get().is_archived, 1);
+  d.prepare(SQL.setTagArchived).run(0, T, "tag-reforma");
+  assert.equal(d.prepare("SELECT is_archived FROM tags WHERE id='tag-reforma'").get().is_archived, 0);
+});
+
+test("SQL.listTags: deja fuera archivadas y borradas", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", 150000, T, T);
+  d.prepare(SQL.insertTag).run("tag-reforma", "Reforma baño", null, T, T);
+  d.prepare(SQL.insertTag).run("tag-archivada", "Boda", null, T, T);
+  d.prepare(SQL.setTagArchived).run(1, T, "tag-archivada");
+  d.prepare(SQL.insertTag).run("tag-borrada", "Vieja", null, T, T);
+  d.prepare("UPDATE tags SET deleted=1 WHERE id='tag-borrada'").run();
+
+  const rows = d.prepare(SQL.listTags).all();
+  assert.deepEqual(rows.map((r) => r.id).sort(), ["tag-japon", "tag-reforma"]);
+});
+
+test("SQL.getTag: trae la fila por id, undefined si no existe o está borrada", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", 150000, T, T);
+  assert.equal(d.prepare(SQL.getTag).get("tag-japon").name, "Viaje Japón");
+  assert.equal(d.prepare(SQL.getTag).get("no-existe"), undefined);
+  d.prepare("UPDATE tags SET deleted=1 WHERE id='tag-japon'").run();
+  assert.equal(d.prepare(SQL.getTag).get("tag-japon"), undefined);
+});
+
+// ---- createTag/updateTag (reproducidos): el merge-on-current de repo.js, no alcanzable en Node
+// sin Worker (mismo criterio que updateCategoryReproduced/updateGoalReproduced en otros ficheros) --
+
+function createTagReproduced(d, { name, budgetCents }, now = T) {
+  const trimmed = String(name ?? "").trim();
+  if (!trimmed) throw new Error("errors.repo.tagNameEmpty");
+  const id = "tag-" + Math.floor(Math.random() * 1e9);
+  d.prepare(SQL.insertTag).run(id, trimmed, budgetCents ?? null, now, now);
+  return id;
+}
+function updateTagReproduced(d, id, fields, now = T2) {
+  const cur = d.prepare(SQL.getTag).get(id);
+  if (!cur) throw new Error("errors.repo.tagNotFound");
+  let name = cur.name;
+  if (fields.name !== undefined) {
+    const trimmed = String(fields.name).trim();
+    if (!trimmed) throw new Error("errors.repo.tagNameEmpty");
+    name = trimmed;
+  }
+  const budgetCents = fields.budgetCents !== undefined ? fields.budgetCents : cur.budget_cents;
+  d.prepare(SQL.updateTag).run(name, budgetCents, now, id);
+}
+
+test("updateTag (reproducido): renombrar NO toca el límite", () => {
+  const d = db();
+  const id = createTagReproduced(d, { name: "Viaje Japón", budgetCents: 150000 });
+  updateTagReproduced(d, id, { name: "Viaje a Japón" });
+  const row = d.prepare(SQL.getTag).get(id);
+  assert.equal(row.name, "Viaje a Japón");
+  assert.equal(row.budget_cents, 150000, "el límite no se toca: la clave budgetCents ni siquiera vino");
+});
+
+test("updateTag (reproducido): cambiar solo el límite NO toca el nombre", () => {
+  const d = db();
+  const id = createTagReproduced(d, { name: "Viaje Japón", budgetCents: 150000 });
+  updateTagReproduced(d, id, { budgetCents: 200000 });
+  const row = d.prepare(SQL.getTag).get(id);
+  assert.equal(row.name, "Viaje Japón");
+  assert.equal(row.budget_cents, 200000);
+});
+
+test("updateTag (reproducido): budgetCents:null quita el límite explícitamente", () => {
+  const d = db();
+  const id = createTagReproduced(d, { name: "Viaje Japón", budgetCents: 150000 });
+  updateTagReproduced(d, id, { budgetCents: null });
+  assert.equal(d.prepare(SQL.getTag).get(id).budget_cents, null);
+});
+
+test("createTag (reproducido): rechaza nombre vacío tras el recorte (trim)", () => {
+  const d = db();
+  assert.throws(() => createTagReproduced(d, { name: "   " }), /tagNameEmpty/);
+});
+
+// ---- Etiquetas de proyecto (Task 5): tagTotals / tagTotalsOfPeriod, MISMO criterio de gasto
+// que spentByRootCategory (MY_AMOUNT + REFUND_REDUCES_SPEND) --------------------------------
+
+// Segundo periodo, CERRADO, con su PROPIO pct — mismo patrón que compartidos.test.mjs (insertPeriod
+// siempre crea uno 'open', y solo puede haber uno vivo a la vez: uno de los dos hay que insertarlo
+// a mano ya cerrado).
+function addSecondPeriod(d, id = "p2", pct = 50) {
+  d.prepare(`INSERT INTO periods (id,name,start_date,end_date,status,my_share_pct,notes,created_at,updated_at,deleted)
+    VALUES (?,'Julio 2026','2026-06-27','2026-07-26','closed',?,'',?,?,0)`).run(id, pct, T, T);
+}
+
+test("SQL.tagTotals: mi parte en un compartido al 50 % (no el ticket entero)", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", null, T, T);
+  tx(d, { cents: 10000, shared: 1, override: 50, tag: "tag-japon" });
+  const row = d.prepare(SQL.tagTotals).all().find((r) => r.id === "tag-japon");
+  assert.equal(row.spent_cents, 5000, "50 % de 10000, no el ticket entero");
+  assert.equal(row.n, 1);
+});
+
+test("SQL.tagTotals: una devolución normal resta", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", null, T, T);
+  tx(d, { cents: 10000, shared: 0, tag: "tag-japon" });
+  tx(d, { type: "refund", cents: 3000, shared: 0, tag: "tag-japon" });
+  const row = d.prepare(SQL.tagTotals).all().find((r) => r.id === "tag-japon");
+  assert.equal(row.spent_cents, 7000);
+  assert.equal(row.n, 2);
+});
+
+test("SQL.tagTotals: una devolución que liquida un compartido NO resta (REFUND_REDUCES_SPEND)", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", null, T, T);
+  const gastoId = tx(d, { cents: 10000, shared: 1, override: 50, tag: "tag-japon" }); // mi parte: 5000
+  // La liquidación en sí nunca lleva tag_id (Task 3, D6/§6 de la spec) — este tag_id manual
+  // reproduce el único camino por el que podría aparecer: una hoja editada a mano.
+  tx(d, { type: "refund", cents: 5000, shared: 1, ref: gastoId, tag: "tag-japon" });
+  const row = d.prepare(SQL.tagTotals).all().find((r) => r.id === "tag-japon");
+  assert.equal(row.spent_cents, 5000, "la devolución de liquidación no resta: mi parte del gasto sigue contando sola");
+  assert.equal(row.n, 2, "las dos filas SÍ llevan la etiqueta, aunque la devolución no reste");
+});
+
+test("SQL.tagTotals: movimientos borrados fuera", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", null, T, T);
+  const id = tx(d, { cents: 10000, shared: 0, tag: "tag-japon" });
+  d.prepare("UPDATE transactions SET deleted=1 WHERE id=?").run(id);
+  const row = d.prepare(SQL.tagTotals).all().find((r) => r.id === "tag-japon");
+  assert.equal(row.spent_cents, 0);
+  assert.equal(row.n, 0);
+});
+
+test("SQL.tagTotals: suma de VARIOS periodos (D7 — una etiqueta cruza periodos)", () => {
+  const d = db();
+  addSecondPeriod(d);
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", null, T, T);
+  tx(d, { period: "p1", cents: 10000, shared: 0, tag: "tag-japon" });
+  tx(d, { period: "p2", cents: 6000, shared: 0, tag: "tag-japon" });
+  const row = d.prepare(SQL.tagTotals).all().find((r) => r.id === "tag-japon");
+  assert.equal(row.spent_cents, 16000, "el total NO está acotado a un periodo");
+  assert.equal(row.n, 2);
+});
+
+test("SQL.tagTotals: etiqueta sin movimientos -> 0 y n=0", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-vacia", "Reforma baño", null, T, T);
+  const row = d.prepare(SQL.tagTotals).all().find((r) => r.id === "tag-vacia");
+  assert.equal(row.spent_cents, 0);
+  assert.equal(row.n, 0);
+});
+
+test("SQL.tagTotals: las archivadas van al final", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-activa", "Viaje Japón", null, T, T);
+  d.prepare(SQL.insertTag).run("tag-archivada", "Boda", null, T, T);
+  d.prepare(SQL.setTagArchived).run(1, T, "tag-archivada");
+  tx(d, { cents: 100, shared: 0, tag: "tag-activa" });
+  tx(d, { cents: 99999, shared: 0, tag: "tag-archivada" }); // gasto MAYOR, pero archivada: igual va al final
+  const ids = d.prepare(SQL.tagTotals).all().map((r) => r.id);
+  assert.deepEqual(ids, ["tag-activa", "tag-archivada"]);
+});
+
+test("SQL.tagTotalsOfPeriod: acotado al periodo, y una etiqueta archivada con movimientos en el periodo SIGUE apareciendo", () => {
+  const d = db();
+  addSecondPeriod(d);
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", null, T, T);
+  d.prepare(SQL.setTagArchived).run(1, T, "tag-japon");
+  tx(d, { period: "p1", cents: 10000, shared: 0, tag: "tag-japon" });
+  tx(d, { period: "p2", cents: 6000, shared: 0, tag: "tag-japon" });
+
+  const ofP1 = d.prepare(SQL.tagTotalsOfPeriod).all("p1").find((r) => r.id === "tag-japon");
+  assert.equal(ofP1.spent_cents, 10000, "solo lo de p1, aunque el total de tagTotals sería 16000");
+  assert.equal(ofP1.n, 1);
+});
+
+test("SQL.listAllByDay trae tag_id", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", null, T, T);
+  tx(d, { cents: 1000, tag: "tag-japon" });
+  const row = d.prepare(SQL.listAllByDay).all("p1")[0];
+  assert.equal(row.tag_id, "tag-japon");
 });

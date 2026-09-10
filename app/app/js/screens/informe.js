@@ -250,10 +250,13 @@ function subscriptionsHtml(report) {
  *  (criterio de gasto-por-categoria.js:34-38: un botón dentro de otro es HTML inválido). */
 function movementGroupHtml(g, expanded) {
   const rowsHtml = g.items.slice(0, MOVEMENTS_PREVIEW).map((it) => `
-    <div style="display:flex;align-items:center;gap:10px;padding:6px 0;">
-      <span style="flex:1;min-width:0;font-size:13px;color:var(--ink-2);">${escHtml(it.merchant || "")}</span>
-      <span class="num" style="font-size:12px;color:var(--ink-3);">${escHtml(fmtDiaCorto(it.date))}</span>
-      <span class="num" style="font-size:13px;font-weight:600;">${escHtml(fmtMoney(it.cents))}</span>
+    <div style="display:flex;flex-direction:column;gap:1px;padding:6px 0;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="flex:1;min-width:0;font-size:13px;color:var(--ink-2);">${escHtml(it.merchant || "")}</span>
+        <span class="num" style="font-size:12px;color:var(--ink-3);">${escHtml(fmtDiaCorto(it.date))}</span>
+        <span class="num" style="font-size:13px;font-weight:600;">${escHtml(fmtMoney(it.cents))}</span>
+      </div>
+      ${it.tag ? `<div style="font-size:11px;color:var(--ink-3);">${escHtml(t("informe.movements.tag", { name: it.tag }))}</div>` : ""}
     </div>`).join("");
   const more = g.items.length > MOVEMENTS_PREVIEW
     ? `<div style="font-size:11px;color:var(--ink-3);padding-top:4px;">${t("informe.movements.andMore", { n: g.items.length - MOVEMENTS_PREVIEW })}</div>` : "";

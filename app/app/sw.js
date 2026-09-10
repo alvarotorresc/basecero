@@ -1,4 +1,4 @@
-const CACHE = "bc-v41";
+const CACHE = "bc-v42";
 // sqlite3-opfs-async-proxy.js queda fuera a propósito: solo lo usa el VFS "opfs" clásico (requiere COOP/COEP), no el sahpool que usamos.
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon.svg", "icons/icon-maskable.svg",
   "css/tokens.css", "css/app.css", "vendor/pure.js", "vendor/xlsx/xlsx.full.min.js", "vendor/pdf-lib/pdf-lib.min.js", "vendor/fonts/fonts.css",
@@ -10,7 +10,7 @@ const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon.svg", "ic
   "js/onboarding.js", "js/screens/registro.js", "js/screens/inicio.js", "js/screens/semana.js",
   "js/movimientos-filter.js", "js/open-tx.js", "js/screens/movimientos.js", "js/screens/liquidar.js", "js/screens/periodo-nuevo.js", "js/subscriptions.js", "js/subscription-detect.js",
   "js/screens/gasto-por-categoria.js", "js/screens/recurrentes.js", "js/screens/patrimonio.js", "js/screens/suscripciones.js", "js/screens/informe.js",
-  "js/screens/ajustes.js", "js/screens/categorias.js", "js/screens/onboarding.js",
+  "js/screens/ajustes.js", "js/screens/categorias.js", "js/screens/etiquetas.js", "js/screens/onboarding.js",
   "vendor/sqlite-wasm/jswasm/sqlite3.mjs", "vendor/sqlite-wasm/jswasm/sqlite3.wasm"];
 self.addEventListener("install", (e) => {
   // cache: "reload" evita que una versión nueva de CACHE reutilice respuestas

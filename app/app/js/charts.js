@@ -127,3 +127,45 @@ export function comparisonBarsSvg(rows, { width, rowH, barH, gap = 0 }) {
   }).join("");
   return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${body}</svg>`;
 }
+
+// ---- trendOf / trendSvg (Etiquetas, N3: mini tendencia de 3 periodos, SISTEMA §4.19) ----------
+
+export const TREND_H = 18, TREND_W = 4, TREND_GAP = 3, TREND_MIN_H = 2;
+
+/** Alturas en px de la mini tendencia de 3 periodos. PURA: devuelve números, no SVG.
+ *  values: céntimos del MÁS ANTIGUO al MÁS RECIENTE (jul, ago, sep).
+ *  null cuando no hay nada que dibujar: menos de 2 valores, o max <= 0 (una raíz con más
+ *  devoluciones que gasto existe — el mismo caso que documenta relativeWidth, category-spend.js).
+ *  Escala: h = round(v / max * 18), con max = el MAYOR de la serie (no el actual) — Alimentación
+ *  (etiquetas-design §8.2) es la fila que lo demuestra: su barra de 18px es la de AGOSTO. */
+export function trendOf(values) {
+  const vals = values ?? [];
+  if (vals.length < 2) return null;
+  const max = Math.max(...vals);
+  if (!(max > 0)) return null;
+  const heights = vals.map((v) => {
+    const h = Math.round((v / max) * TREND_H);
+    // Una barra invisible se lee como "no hay dato" en vez de "casi nada" (TREND_MIN_H no es una
+    // copia: precedente BAR_MIN_H/netWorthBarsHtml en este mismo módulo).
+    return v > 0 && h <= 0 ? TREND_MIN_H : Math.max(0, h);
+  });
+  return { heights, max };
+}
+
+/** Las barras de trendOf: las anteriores al 45 % de opacidad y la ÚLTIMA (la actual) a opacidad
+ *  plena, en el color de la categoría. Devuelve "" cuando trendOf da null: quien llama interpola
+ *  sin condicional. */
+export function trendSvg(values, color) {
+  const t = trendOf(values);
+  if (!t) return "";
+  const n = t.heights.length;
+  const width = n * TREND_W + (n - 1) * TREND_GAP;
+  const bars = t.heights.map((h, i) => {
+    const x = i * (TREND_W + TREND_GAP);
+    const y = TREND_H - h;
+    const isLast = i === n - 1;
+    const opacityAttr = isLast ? "" : ` fill-opacity="0.45"`;
+    return `<rect x="${x}" y="${y}" width="${TREND_W}" height="${h}" fill="${color}"${opacityAttr}></rect>`;
+  }).join("");
+  return `<svg width="${width}" height="${TREND_H}" viewBox="0 0 ${width} ${TREND_H}">${bars}</svg>`;
+}

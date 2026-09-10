@@ -7,6 +7,7 @@ export const ES = {
     save: "Guardar",
     cancel: "Cancelar",
     delete: "Borrar",
+    edit: "Editar",
     saveFailed: "No se pudo guardar: {error}",
     saveChanges: "Guardar cambios",
     deleteFailed: "No se pudo borrar: {error}",
@@ -245,6 +246,17 @@ export const ES = {
     type: { transfer: "Transferencia" },
     detail: {
       lockedNote: "Tiene un apunte de liquidación enlazado (devolución o ajuste): para cambiar el importe o el reparto, bórralo antes.",
+      tagLabel: "Etiqueta",
+      noTag: "Sin etiqueta",
+      newTag: "Nueva etiqueta",
+    },
+    tagCard: {
+      movements: { one: "{n} movimiento", other: "{n} movimientos" },
+      ofLimit: "de {limit}",
+      periodLine: {
+        one: "{amount} en {period}, {n} movimiento",
+        other: "{amount} en {period}, {n} movimientos",
+      },
     },
     shared: {
       fallbackName: "la contraparte",
@@ -318,6 +330,12 @@ export const ES = {
       title: "Por categoría",
       hint: "Toca una categoría para ver el detalle o poner un límite",
       empty: "No tienes ninguna categoría de gasto activa.",
+    },
+    // N3 (Task 14): línea de comparativa con el periodo anterior, a la izquierda de la mini
+    // tendencia — mismo criterio de plantilla que el resto de gastoCategoria.row.*, para que un
+    // idioma con otro orden de palabras pueda mover {name}/{amount} sin tocar el JS.
+    compare: {
+      prev: "{name} {amount}",
     },
     row: {
       ofLimit: "{spent} de {limit}",
@@ -518,6 +536,36 @@ export const ES = {
       create: "Crear categoría",
     },
   },
+  etiquetas: {
+    title: "Etiquetas de proyecto",
+    intro: "Cruzan las categorías: agrupan lo que gastas en un viaje, una reforma o una boda, sin importar en qué categoría caiga cada gasto.",
+    footerNote: "Archivar una etiqueta la quita de los selectores, pero sus movimientos la siguen enseñando.",
+    new: "Nueva etiqueta",
+    row: {
+      movements: { one: "{n} movimiento", other: "{n} movimientos" },
+      open: "abierta",
+      archived: "archivada",
+      noLimit: "sin límite",
+      ofLimit: "{spent} de {limit}",
+      seeMovements: "Ver sus movimientos",
+    },
+    form: {
+      titleNew: "Nueva etiqueta",
+      titleEdit: "Editar etiqueta",
+      nameLabel: "Nombre",
+      namePlaceholder: "p. ej. Viaje Japón",
+      limitLabel: "Límite (opcional)",
+      limitPlaceholder: "Sin límite",
+      save: "Guardar",
+      archive: "Archivar",
+      unarchive: "Desarchivar",
+    },
+    error: {
+      load: "No se pudieron cargar las etiquetas: {error}",
+      save: "No se pudo guardar: {error}",
+      archive: "No se pudo archivar: {error}",
+    },
+  },
   periodo: {
     error: {
       noOpenToClose: "No hay ningún periodo abierto que cerrar.",
@@ -619,6 +667,10 @@ export const ES = {
       title: "Categorías",
       subtitleWithCount: "{n} categorías · colores e iconos",
       subtitleNoCount: "colores e iconos",
+    },
+    tags: {
+      title: "Etiquetas de proyecto",
+      sub: { one: "{n} activa", other: "{n} activas" },
     },
     bank: {
       title: "Banco",
@@ -868,6 +920,8 @@ export const ES = {
       categoryHasChildren: "Esta categoría tiene subcategorías: solo se permiten dos niveles, no puede convertirse en subcategoría de otra",
       colorUnavailable: "Ese color no está disponible",
       iconUnavailable: "Ese icono no está disponible",
+      tagNameEmpty: "El nombre de la etiqueta no puede estar vacío",
+      tagNotFound: "Etiqueta no encontrada",
     },
     // Compartida entre repo.js y n26.js (3 sitios, mismo mensaje EXACTO): distinta de
     // common.noOpenPeriod (esa lleva punto final, esta no — no son byte-idénticas).
@@ -956,6 +1010,7 @@ export const ES = {
     undo: "Deshacer",
     undone: "Movimiento deshecho",
     myPart: "Tu parte",
+    tagLabel: "Etiqueta",
     undoFailed: "No se pudo deshacer: {error}",
   },
   // Informe del periodo (F1). screens/informe.js.
@@ -1010,6 +1065,7 @@ export const ES = {
       groupCount: { one: "{n} movimiento", other: "{n} movimientos" },
       andMore: "y {n} movimientos más",
       others: "Otros",
+      tag: "Etiqueta: {name}",
     },
     footer: "El PDF lleva todo esto más la lista completa de los {n} movimientos, y se guarda igual en cualquier móvil.",
     error: {

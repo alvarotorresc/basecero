@@ -1,7 +1,7 @@
 import {
   addTransaction, getOpenPeriod, listExpenseLeafCategories, listIncomeCategories,
   listAccounts, allCategoriesById, recentForRefund, getMetaAll, softDeleteTransaction,
-  loadMerchantMemory, spentByRootCategory, budgetsOfPeriod,
+  loadMerchantMemory, spentByRootCategory, budgetsOfPeriod, listTags, createTag,
 } from "../repo.js";
 import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
 import { budgetMap } from "../category-spend.js";
@@ -39,6 +39,12 @@ const CATS_GRID_LIMIT = 8;
 const escAttr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
+// Icono "etiqueta" del repertorio SISTEMA.md §3, mismo path que movimientos.js#ICON_TAG (Task 13:
+// mismo selector inline que el detalle, ver su comentario). `currentColor` para heredar el tinte
+// de la chip cerrada (etiqueta puesta/sin etiqueta) o de una opción del selector abierto.
+const ICON_TAG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V4h7l9 9-7 7z"></path><circle cx="8" cy="8" r="1.2"></circle></svg>`;
+const ICON_PLUS_SMALL = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>`;
+
 /** Copia de la banda de límite (Registro v2 §6.2): «Con este gasto quedan {amount} de {name}» en
  *  ok/warn, «…te pasas {amount}…» en over. Devuelve texto SIN escapar — quien la use en un
  *  `innerHTML` (render()) lo escapa; quien la use en `textContent` (el oninput del importe) no
@@ -58,9 +64,9 @@ function limitBandText(warning) {
  *  «Deshacer» en el recibo — sin esto, el movimiento borrado se queda pintado hasta la siguiente
  *  navegación. */
 export async function renderRegistro(container, onDone, prefill, onUndone) {
-  let period, expenseCats, incomeCats, accountsAll, byId, meta, merchantMemoryMap;
+  let period, expenseCats, incomeCats, accountsAll, byId, meta, merchantMemoryMap, tagsAll;
   try {
-    [period, expenseCats, incomeCats, accountsAll, byId, meta, merchantMemoryMap] = await Promise.all([
+    [period, expenseCats, incomeCats, accountsAll, byId, meta, merchantMemoryMap, tagsAll] = await Promise.all([
       getOpenPeriod(),
       listExpenseLeafCategories(),
       listIncomeCategories(),
@@ -68,6 +74,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       allCategoriesById(),
       getMetaAll(),
       loadMerchantMemory(),
+      listTags(),
     ]);
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">${t("registro.error.load", { error: escHtml(userMessage(e)) })}</div>`;
@@ -116,6 +123,13 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     note: "",
     refId: "",
     ruleId: prefill?.ruleId ?? "",
+    // Etiquetas de proyecto (N11, Task 13): D11 — jamás llega de merchantMemory/memoryPatch (ver
+    // merchant-memory.test.mjs), solo de un prefill explícito (p.ej. una regla recurrente que ya
+    // trajera una). tagPickerOpen/newTagDraft son puro estado de UI del selector inline, igual que
+    // en movimientos.js#openDetail.
+    tagId: prefill?.tagId ?? null,
+    tagPickerOpen: false,
+    newTagDraft: null,
     adjustmentSign: "+",
     refundPickerOpen: false,
     // Registro v2 §4: quick gobierna qué se pinta (registro-mode.js#detailsOpen); expanded es el
@@ -175,6 +189,43 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
   function clearRefundLink() {
     state.refId = "";
     render();
+  }
+
+  /** Nombre de una etiqueta por id (Task 13). `tagsAll` es SOLO activas (listTags, un movimiento
+   *  nuevo no puede nacer con una ya archivada salvo por un prefill futuro que hoy nadie manda) —
+   *  a diferencia de movimientos.js#tagName, que resuelve contra tagTotalsAll para poder enseñar
+   *  el nombre de una archivada ya asignada a un movimiento existente. */
+  function tagName(id) {
+    return tagsAll.find((tg) => tg.id === id)?.name ?? "";
+  }
+
+  /** Control «Etiqueta» (Task 13, mismo selector inline que movimientos.js#renderTagControl —
+   *  ver el Step 2 del plan: «mismo que el detalle»). Vive dentro del bloque que se pliega tras
+   *  «Más» en modo rápido (misma guarda que cuenta/comercio/fecha/nota, ver render()). */
+  function renderTagControl() {
+    if (!state.tagPickerOpen) {
+      const hasTag = !!state.tagId;
+      return `
+      <button type="button" class="chip${hasTag ? " active" : ""}" id="reg-tag-chip"
+        style="align-self:flex-start;padding:0 14px;display:inline-flex;align-items:center;gap:7px;${hasTag ? "" : "background:transparent;border:1px dashed var(--rule);"}">
+        ${ICON_TAG}${hasTag ? escHtml(tagName(state.tagId)) : t("movimientos.detail.noTag")}
+      </button>`;
+    }
+    return `
+    <div class="chips">
+      <button type="button" class="chip${!state.tagId ? " active" : ""}" data-tag-pick="">${t("movimientos.detail.noTag")}</button>
+      ${tagsAll.map((tg) => `<button type="button" class="chip${state.tagId === tg.id ? " active" : ""}" data-tag-pick="${escAttr(tg.id)}">${ICON_TAG}${escHtml(tg.name)}</button>`).join("")}
+      ${state.newTagDraft == null ? `
+      <button type="button" id="reg-tag-new" class="chip" style="background:transparent;border:1px dashed var(--rule);">${ICON_PLUS_SMALL}${t("movimientos.detail.newTag")}</button>
+      ` : `
+      <span style="display:inline-flex;align-items:center;gap:6px;">
+        <input type="text" id="reg-tag-new-input" value="${escAttr(state.newTagDraft)}" placeholder="${escAttr(t("etiquetas.form.namePlaceholder"))}"
+          style="height:44px;min-width:0;border:1px solid var(--rule);border-radius:999px;padding:0 14px;background:none;color:var(--text);font:14px inherit;">
+        <button type="button" id="reg-tag-new-save" class="icon-btn" aria-label="${t("common.save")}" style="width:44px;height:44px;flex-shrink:0;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"></path></svg>
+        </button>
+      </span>`}
+    </div>`;
   }
 
   function validationError() {
@@ -283,7 +334,8 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     const sharedLabel = needsCategory(state.tipo) && state.tipo !== "income" && partnerName && state.isShared
       ? t("common.sharedWith", { name: partnerName })
       : "";
-    const parts = foldedSummaryParts({ accountName, dateLabel, hasNote, hasPhoto: false, sharedLabel }, t);
+    const tagLabel = state.tagId ? tagName(state.tagId) : "";
+    const parts = foldedSummaryParts({ accountName, dateLabel, hasNote, hasPhoto: false, sharedLabel, tagName: tagLabel }, t);
     const summaryHtml = parts.map((p, i) => (i === 0 ? "" : `<span style="width:1px;height:11px;background:var(--hairline-strong);flex-shrink:0;"></span>`)
       + `<span style="font-size:12px;font-weight:500;color:var(--text-3);">${escHtml(p)}</span>`).join("");
     return `
@@ -406,6 +458,12 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       <datalist id="reg-merchants">
         ${merchantOptions.map((e) => `<option value="${escAttr(e.display)}"></option>`).join("")}
       </datalist>
+
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
+        <div class="section-title">${t("movimientos.detail.tagLabel")}</div>
+        ${renderTagControl()}
+      </div>
+
       <label class="field field-stack" style="margin-bottom:18px;">
         <span class="field-label">${t("common.note")}</span>
         <input type="text" id="reg-note" value="${escAttr(state.note)}" placeholder="${t("common.optional")}">
@@ -610,6 +668,53 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     const fechaInput = container.querySelector("#reg-fecha");
     if (fechaInput) fechaInput.onchange = (e) => { state.fecha = e.target.value || hoyISO(); };
 
+    // Selector de etiqueta (Task 13): mismo criterio que movimientos.js#wireDetail — puro estado
+    // de UI hasta guardar. Invariante del foco (§4.5): SOLO el handler de «Nueva etiqueta» pide
+    // foco tras su propio render(), nunca desde render() en sí — el foco de #reg-raw al arrancar
+    // la pantalla (línea final de renderRegistro) no debe volver a robarse en cada repintado.
+    const tagChip = container.querySelector("#reg-tag-chip");
+    if (tagChip) tagChip.onclick = () => { state.tagPickerOpen = true; render(); };
+    container.querySelectorAll("[data-tag-pick]").forEach((b) => {
+      b.onclick = () => {
+        state.tagId = b.dataset.tagPick || null;
+        state.tagPickerOpen = false;
+        state.newTagDraft = null;
+        render();
+      };
+    });
+    const tagNewBtn = container.querySelector("#reg-tag-new");
+    if (tagNewBtn) tagNewBtn.onclick = () => {
+      state.newTagDraft = "";
+      render();
+      focusInput(container.querySelector("#reg-tag-new-input"));
+    };
+    const tagNewInput = container.querySelector("#reg-tag-new-input");
+    if (tagNewInput) {
+      // Sin render() en oninput (perdería el foco, mismo motivo que #reg-raw/#reg-merchant): el
+      // valor tecleado solo se lee al pulsar guardar o Enter, ver submitNewTag.
+      tagNewInput.oninput = (e) => { state.newTagDraft = e.target.value; };
+      tagNewInput.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); submitNewTag(); } };
+    }
+    const tagNewSave = container.querySelector("#reg-tag-new-save");
+    if (tagNewSave) tagNewSave.onclick = () => submitNewTag();
+
+    async function submitNewTag() {
+      const btn = container.querySelector("#reg-tag-new-save");
+      if (btn) btn.disabled = true;
+      try {
+        const newId = await createTag({ name: state.newTagDraft });
+        tagsAll = await listTags();
+        state.tagId = newId;
+        state.tagPickerOpen = false;
+        state.newTagDraft = null;
+        render();
+      } catch (e) {
+        if (btn) btn.disabled = false;
+        errorMsg = t("common.saveFailed", { error: userMessage(e) });
+        render();
+      }
+    }
+
     const catsMoreBtn = container.querySelector("#reg-cats-more");
     if (catsMoreBtn) catsMoreBtn.onclick = () => {
       state.allCats = true;
@@ -678,6 +783,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
           paidBy: partnerPaid() ? "partner" : "me",
           refId: state.tipo === "refund" ? state.refId : "",
           ruleId: state.ruleId,
+          tagId: state.tagId || "",
         });
         onDone();   // primero: el ticket cae sobre la pantalla ya repintada (ReciboGuardado.dc.html)
         const [y, m, d] = state.fecha.split("-");
@@ -690,6 +796,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
             { label: t("common.category"), value: withCategory ? (byId[state.categoryId]?.name ?? "") : "" },
             { label: t("common.account"), value: accountsAll.find((a) => a.id === effectiveAccountId)?.name ?? "" },
             { label: t("common.date"), value: `${d}/${m}/${y}` },
+            { label: t("recibo.tagLabel"), value: state.tagId ? tagName(state.tagId) : "" },
             { label: t("common.split.label"), value: effectiveIsShared ? `${partnerName} ${state.sharePct} %` : "" },
             { label: t("recibo.myPart"), value: effectiveIsShared ? fmtMoney(splitCents(state.cents, state.sharePct).mine) : "" },
           ],

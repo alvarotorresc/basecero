@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { sparklineSvg, netWorthBarsHtml, barRowsGeometry, categoryBarsSvg, comparisonBarsSvg } from "../../app/app/js/charts.js";
+import { sparklineSvg, netWorthBarsHtml, barRowsGeometry, categoryBarsSvg, comparisonBarsSvg, trendOf, trendSvg, TREND_MIN_H } from "../../app/app/js/charts.js";
 import { SQL } from "../../app/app/js/sql.js";
 import { fmtDiaIni } from "../../app/app/js/format.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
@@ -78,13 +78,13 @@ function tx(d, over = {}) {
     date: "2026-08-20", period: "per-1", type: "expense", cents: 1000,
     account: "acc-n26", counterAccount: "", category: "cat-casa-alquiler",
     merchant: "", note: "", shared: 0, override: null, paidBy: "me", settled: 0,
-    ref: "", rule: "", external: "", status: "pending",
+    ref: "", rule: "", tag: "", external: "", status: "pending",
     ...over,
   };
   d.prepare(SQL.insertTransaction).run(
     v.id, v.date, v.period, v.type, v.cents, v.account, v.counterAccount,
     v.category, v.merchant, v.note, v.shared, v.override, v.paidBy, v.settled,
-    v.ref, v.rule, v.external, v.status, T, T,
+    v.ref, v.rule, v.tag, v.external, v.status, T, T,
   );
   return v.id;
 }
@@ -175,4 +175,63 @@ test("comparisonBarsSvg: sin periodo anterior no emite la segunda barra", () => 
   );
   const rectCount = (svg.match(/<rect/g) || []).length;
   assert.equal(rectCount, 1, "sin prevValue solo se dibuja la barra actual");
+});
+
+// ---- trendOf / trendSvg (Task 8: mini tendencia de 3 periodos, N3 — SISTEMA §4.19) -----------
+
+// La tabla entera de SISTEMA §5 / etiquetas-design §8.2: jul/ago/sep en céntimos, alturas
+// esperadas y el `max` de la serie (nunca el actual — Alimentación lo demuestra: su barra de
+// 18px es la de AGOSTO, no la de septiembre).
+const TREND_ROWS = [
+  { name: "Casa", values: [23100, 23800, 24560], heights: [17, 17, 18] },
+  { name: "Alimentación", values: [19650, 21490, 18740], heights: [16, 18, 16] },
+  { name: "Coche", values: [14320, 7640, 12180], heights: [18, 10, 15] },
+  { name: "Restauración", values: [11840, 14210, 9630], heights: [15, 18, 12] },
+  { name: "Ocio", values: [7480, 6130, 8995], heights: [15, 12, 18] },
+  { name: "Transporte", values: [6100, 5820, 6400], heights: [17, 16, 18] },
+  { name: "Salud", values: [2890, 3350, 4215], heights: [12, 14, 18] },
+];
+
+test("trendOf: las siete filas de SISTEMA §5, al píxel", () => {
+  for (const row of TREND_ROWS) {
+    const t = trendOf(row.values);
+    assert.deepEqual(t.heights, row.heights, row.name);
+    assert.equal(t.max, Math.max(...row.values), row.name);
+  }
+});
+
+test("trendOf: null con 1 solo valor", () => {
+  assert.equal(trendOf([1000]), null);
+});
+
+test("trendOf: null con max <= 0 (una raíz con más devoluciones que gasto)", () => {
+  assert.equal(trendOf([0, -200, -100]), null);
+  assert.equal(trendOf([0, 0]), null);
+});
+
+test("trendOf: un valor positivo que redondea a 0 sube a TREND_MIN_H", () => {
+  const t = trendOf([120, 50000]); // 120/50000*18 = 0.0432 -> round 0
+  assert.equal(t.heights[0], TREND_MIN_H);
+  assert.ok(TREND_MIN_H > 0);
+});
+
+test("trendOf: 2 valores -> 2 alturas", () => {
+  const t = trendOf([10000, 20000]);
+  assert.equal(t.heights.length, 2);
+  assert.deepEqual(t.heights, [9, 18]);
+});
+
+test("trendSvg: una barra por valor, la última a opacidad 1 y las demás a .45, con el color recibido", () => {
+  const svg = trendSvg([23100, 23800, 24560], "#ff0000");
+  const rects = svg.match(/<rect[^>]*>/g);
+  assert.equal(rects.length, 3);
+  assert.match(rects[0], /fill-opacity="0\.45"/);
+  assert.match(rects[1], /fill-opacity="0\.45"/);
+  assert.doesNotMatch(rects[2], /fill-opacity/, "la última va a opacidad 1: sin fill-opacity, o 1 explícito");
+  for (const r of rects) assert.match(r, /fill="#ff0000"/);
+});
+
+test("trendSvg: devuelve \"\" cuando trendOf da null", () => {
+  assert.equal(trendSvg([1000], "#ff0000"), "");
+  assert.equal(trendSvg([0, 0], "#ff0000"), "");
 });

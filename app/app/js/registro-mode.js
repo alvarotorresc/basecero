@@ -32,11 +32,18 @@ export function detailsOpen({ quick, expanded, tipo }) {
  *  «con nota, sin foto». Con foto, gana «con foto» (es la señal más fuerte: en Parte A siempre
  *  false, la foto es de la PR B); sin foto pero con nota, no se añade nada — el hueco vacío es la
  *  forma de decir «hay algo aquí» sin inventar una clave nueva; sin nota ni foto, se dice
- *  explícitamente. */
-export function foldedSummaryParts({ accountName, dateLabel, hasNote, hasPhoto, sharedLabel }, tr) {
+ *  explícitamente.
+ *
+ *  `tagName` (Etiquetas de proyecto, N11, Task 13): el nombre de la etiqueta puesta, justo
+ *  después de la fecha — misma cercanía que en el bloque desplegado, donde el chip «Etiqueta»
+ *  vive a la derecha del campo de fecha (RegistroCompleto.dc.html:132-136). Ausente o vacía, sin
+ *  trozo nuevo: ya es opcional en el bloque desplegado, y el resumen plegado no debe insinuar que
+ *  falta algo que nunca se pidió. */
+export function foldedSummaryParts({ accountName, dateLabel, hasNote, hasPhoto, sharedLabel, tagName }, tr) {
   const parts = [];
   if (accountName) parts.push(accountName);
   if (dateLabel) parts.push(dateLabel);
+  if (tagName) parts.push(tagName);
   if (hasPhoto) parts.push(tr("registro.more.summaryPhoto"));
   else if (!hasNote) parts.push(tr("registro.more.summaryNoNote"));
   if (sharedLabel) parts.push(sharedLabel);

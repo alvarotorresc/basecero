@@ -12,7 +12,7 @@ import { UserError } from "./errors.js";
 import { MEMORY_WINDOW, merchantMemory } from "./merchant-memory.js";
 import { IGNORED_MAX, parseIgnored, parseSnoozed } from "./subscriptions.js";
 import { DETECT_WINDOW_DAYS } from "./subscription-detect.js";
-import { previousPeriodOf } from "./informe-logic.js";
+import { previousPeriodOf, previousPeriodsOf } from "./informe-logic.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -31,7 +31,7 @@ export const periodStartTooEarly = (open, startDate) => !!open && startDate <= o
 
 /** Statement de la transferencia del barrido (N4). PURO (mismo criterio que settleAllSharedStmts,
  *  arriba): recibe todo resuelto y devuelve {sql, bind}, para que el test pueda verificar el
- *  ORDEN EXACTO de los 20 campos de SQL.insertTransaction llamando a la función REAL.
+ *  ORDEN EXACTO de los 21 campos de SQL.insertTransaction llamando a la función REAL.
  *  bcUlid/bcSanitizeCell son globales (vendor/pure.js), igual que en addTransaction.
  *  `type='transfer'`, `category_id=''`, `merchant` = nombre del objetivo (saneado), `is_shared=0`,
  *  `paid_by='me'`. OJO TDZ: aquí NO puede declararse ningún `const t` local. */
@@ -41,7 +41,7 @@ export function sweepTransferStmt({ periodId, date, amountCents, fromAccountId, 
     bind: [
       bcUlid(), date, periodId, "transfer", amountCents, fromAccountId, toAccountId,
       "", bcSanitizeCell(goalName ?? ""), t("barrido.note"),
-      0, null, "me", 0, "", "", "", "pending", now, now,
+      0, null, "me", 0, "", "", "", "", "pending", now, now,
     ],
   };
 }
@@ -88,7 +88,7 @@ export async function updatePeriodSharePct(id, pct) {
 
 export async function addTransaction({
   type, amountCents, date, categoryId, accountId, merchant, note, isShared,
-  counterAccountId = "", sharePctOverride = null, paidBy = "me", refId = "", ruleId = "", externalId = "", status = "pending",
+  counterAccountId = "", sharePctOverride = null, paidBy = "me", refId = "", ruleId = "", tagId = "", externalId = "", status = "pending",
 }) {
   // Invariante de columna cruzada de paid_by (la misma que validateImport aplica a una hoja,
   // xlsx.js): solo un GASTO COMPARTIDO puede haberlo pagado la contraparte. Se comprueba ANTES de
@@ -114,7 +114,7 @@ export async function addTransaction({
     sql: SQL.insertTransaction,
     bind: [newId, date, p.id, type, amountCents, accountId, counterAccountId,
       categoryId ?? "", bcSanitizeCell(merchant ?? ""), bcSanitizeCell(note ?? ""),
-      isShared ? 1 : 0, sharePctOverride, paidBy, 0, refId, ruleId, externalId, status, now, now],
+      isShared ? 1 : 0, sharePctOverride, paidBy, 0, refId, ruleId, tagId, externalId, status, now, now],
   };
   if (refId) {
     await execMany([insertStmt, { sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [now, refId] }]);
@@ -303,7 +303,10 @@ export function settleAllSharedStmts(rows, accountId, periodId, date, now, partn
         bcSanitizeCell(isOut ? outMerchant : (row.merchant ?? "")),
         note,
         0, null, "me", 0,
-        row.id, "", "", "pending", now, now,
+        // tag_id='' SIEMPRE (el "" tras rule_id): liquidar con la contraparte no forma parte de
+        // ningún proyecto, y aunque lo llevara no movería ninguna cifra (REFUND_REDUCES_SPEND ya
+        // excluye del gasto las devoluciones que liquidan un compartido, sql.js).
+        row.id, "", "", "", "pending", now, now,
       ],
     });
     stmts.push({ sql: "UPDATE transactions SET settled=1, updated_at=? WHERE id=?", bind: [now, row.id] });
@@ -359,6 +362,9 @@ export async function updateTransaction(id, fields) {
     paidBy: fields.paidBy ?? cur.paid_by,
     refId: fields.refId ?? cur.ref_id,
     ruleId: fields.ruleId ?? cur.rule_id,
+    // ?? y no ||: "" NO es nullish, así que mandar tagId:"" desde el detalle SÍ quita la etiqueta,
+    // mientras que no mandar la clave (undefined) conserva la que ya tenía la fila.
+    tagId: fields.tagId ?? cur.tag_id,
     status: fields.status ?? cur.status,
   };
   // Misma invariante de columna cruzada que en addTransaction (y que validateImport): solo un gasto
@@ -391,7 +397,7 @@ export async function updateTransaction(id, fields) {
   await exec(SQL.updateTransaction, [
     f.type, f.amountCents, f.date, f.categoryId ?? "", f.accountId, f.counterAccountId ?? "",
     bcSanitizeCell(f.merchant ?? ""), bcSanitizeCell(f.note ?? ""), f.isShared ? 1 : 0,
-    f.sharePctOverride, f.paidBy, f.refId ?? "", f.ruleId ?? "", f.status, now, id,
+    f.sharePctOverride, f.paidBy, f.refId ?? "", f.ruleId ?? "", f.tagId ?? "", f.status, now, id,
   ]);
 }
 
@@ -696,7 +702,7 @@ export async function reportInputs(periodId) {
   const [
     accountsStart, accountsEnd, spentByRoot, prevSpentByRoot, budgets, transactions,
     categoriesById, incomeCents, spentCents, prevIncomeCents, prevSpentCents,
-    partnerNetCents, subscriptionRules, meta,
+    partnerNetCents, subscriptionRules, meta, tags,
   ] = await Promise.all([
     balancesAt(prevDayIso(period.start_date)),
     balancesAt(closeDateIso),
@@ -713,6 +719,11 @@ export async function reportInputs(periodId) {
     pendingSettlementNetCents(),
     listRules(),
     getMetaAll(),
+    // Etiquetas de proyecto (N11, Task 15): tagTotals(), NO listTags() — un movimiento de un
+    // periodo cerrado puede llevar una etiqueta archivada DESPUÉS de ese periodo, y listTags()
+    // (solo activas) dejaría su nombre en blanco en el informe. tagTotals() trae TODAS las vivas
+    // (archivadas incluidas, D5) con name; informe-logic.js#movementItem solo necesita el nombre.
+    tagTotals(),
   ]);
   return {
     period, prevPeriod, accountsStart, accountsEnd, spentByRoot, prevSpentByRoot, budgets,
@@ -720,8 +731,28 @@ export async function reportInputs(periodId) {
     partnerNetCents,
     partnerName: (meta.partner_name || "").trim(),
     subscriptionRules,
+    tagsById: Object.fromEntries(tags.map((tg) => [tg.id, tg.name])),
     todayIso: hoyISO(),
   };
+}
+
+/** Gasto por raíz de este periodo y los n-1 anteriores, del MÁS ANTIGUO al MÁS RECIENTE (el
+ *  último elemento es SIEMPRE `periodId`) — Task 7, N3: la comparativa y la mini tendencia de
+ *  «Gasto por categoría». Un solo Promise.all. Con menos periodos en la BD (o un `periodId`
+ *  desconocido) devuelve menos entradas —incluso `[]`— y quien pinta decide: comparativa con
+ *  >= 2, tendencia con >= 2 (category-spend.js#spentSeriesByRoot/charts.js#trendOf). */
+export async function rootSpendHistory(periodId, n = 3) {
+  const periods = await listPeriods();
+  const current = periods.find((p) => p.id === periodId);
+  if (!current) return [];
+  // previousPeriodsOf devuelve del MÁS RECIENTE al MÁS ANTIGUO; se invierte para que el array
+  // completo quede del más antiguo al más reciente, con `current` siempre al final.
+  const ordered = [...previousPeriodsOf(periods, periodId, n - 1)].reverse().concat(current);
+  const rowsByPeriod = await Promise.all(ordered.map((p) => spentByRootCategory(p.id)));
+  return ordered.map((p, i) => ({
+    period: { id: p.id, name: p.name, start_date: p.start_date },
+    rows: rowsByPeriod[i],
+  }));
 }
 
 // den<=0 -> 0 en vez de NaN/Infinity: mismo criterio que budgetStatus (category-spend.js), pero sin
@@ -1170,3 +1201,51 @@ export function replaceAllStmts(data) {
 export async function replaceAll(data) {
   await execMany(replaceAllStmts(data));
 }
+
+// ---- Etiquetas de proyecto (N11) ---------------------------------------------
+
+export const listTags = () => query(SQL.listTags);
+const getTag = async (id) => (await query(SQL.getTag, [id]))[0] ?? null;
+
+/** Total de SIEMPRE de cada etiqueta viva (archivadas incluidas, al final — D7: no está acotado a
+ *  un periodo) y cuántos movimientos la llevan. Pantalla Etiquetas. */
+export const tagTotals = () => query(SQL.tagTotals);
+
+/** Total de un periodo concreto por etiqueta (incluye archivadas: un movimiento del periodo puede
+ *  llevar una que ya se archivó). Segunda línea de la tarjeta de Movimientos y qué chips pintar. */
+export const tagTotalsOfPeriod = (periodId) => query(SQL.tagTotalsOfPeriod, [periodId]);
+
+/** Crea una etiqueta y devuelve su id. El nombre se recorta y no puede quedar vacío (mismo guard
+ *  que createCategory: el repo es la última línea de defensa). `budgetCents` ausente o `null` es
+ *  «sin límite» (D4). No hay guard de nombres duplicados, igual que en categorías. OJO TDZ
+ *  (repo.js): esta función llama al t() de i18n, así que NO puede declarar ningún `const t` local. */
+export async function createTag({ name, budgetCents } = {}) {
+  const trimmed = String(name ?? "").trim();
+  if (!trimmed) throw new UserError(t("errors.repo.tagNameEmpty"));
+  const id = bcUlid();
+  const now = nowIso();
+  await exec(SQL.insertTag, [id, bcSanitizeCell(trimmed), budgetCents ?? null, now, now]);
+  return id;
+}
+
+/** Merge-on-current (mismo criterio que updateCategory/updateRule/updateGoal): un campo ausente
+ *  conserva el valor actual. `budgetCents: null` quita el límite explícitamente — por eso compara
+ *  con `!== undefined` y no con `??`, que resucitaría el límite anterior. OJO TDZ: ningún `const t`
+ *  local aquí tampoco. */
+export async function updateTag(id, fields) {
+  const cur = await getTag(id);
+  if (!cur) throw new UserError(t("errors.repo.tagNotFound"));
+  let name = cur.name;
+  if (fields.name !== undefined) {
+    const trimmed = String(fields.name).trim();
+    if (!trimmed) throw new UserError(t("errors.repo.tagNameEmpty"));
+    name = bcSanitizeCell(trimmed);
+  }
+  const budgetCents = fields.budgetCents !== undefined ? fields.budgetCents : cur.budget_cents;
+  const now = nowIso();
+  await exec(SQL.updateTag, [name, budgetCents, now, id]);
+}
+
+/** Archiva/desarchiva (D5: no hay deleteTag — solo archivar). Sin cascada: una etiqueta no tiene
+ *  hijas. */
+export const setTagArchived = (id, archived) => exec(SQL.setTagArchived, [archived ? 1 : 0, nowIso(), id]);

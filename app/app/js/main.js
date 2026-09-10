@@ -18,12 +18,15 @@ import { setTabNavigator } from "./tabs.js";
 const screen = document.getElementById("screen");
 const RUTAS = {
   inicio: () => renderInicio(screen),
-  movimientos: () => renderMovimientos(screen),
+  movimientos: (opts) => renderMovimientos(screen, opts),
   patrimonio: () => renderPatrimonio(screen),
   ajustes: () => renderAjustes(screen),
 };
 
-export function nav(tab) {
+/** `opts` viaja tal cual a la pantalla de destino (RUTAS[tab](opts)). Hoy solo lo usa Etiquetas
+ *  para abrir Movimientos con su filtro puesto: nav("movimientos", { tagId }). Los toques de la
+ *  tab bar (más abajo) llaman sin `opts`, así que quedan sin cambio de comportamiento. */
+export function nav(tab, opts) {
   // Durante el asistente de Nuevo periodo (onboarding o cierre normal) el chrome está oculto
   // (ver app.css `body.onboarding`): ignora cualquier navegación mientras dure.
   if (document.body.classList.contains("onboarding")) return;
@@ -42,7 +45,7 @@ export function nav(tab) {
   // clearBack()/resetBack() no ejecutan callbacks (su history.go cae en el guard del popstate,
   // back.js:26), así que el cambio de pestaña se resetea aquí.
   scrollScreenTop();
-  RUTAS[tab]();
+  RUTAS[tab](opts);
 }
 setTabNavigator(nav);   // deja que una pantalla pida un cambio de pestaña sin importar main.js
 

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildReport, previousPeriodOf } from "../../app/app/js/informe-logic.js";
+import { buildReport, previousPeriodOf, previousPeriodsOf } from "../../app/app/js/informe-logic.js";
 
 /** Fixture calcada de la hoja de datos del sistema (SISTEMA.md §5, periodo Septiembre 2026):
  *  periodo 2026-09-01, hoy 2026-09-09, ingresos 1.850,00 €, gastado 847,20 €, presupuesto
@@ -53,7 +53,7 @@ function fixture() {
       { id: "t-restauracion-hoy", date: "2026-09-09", type: "expense", amount_cents: 1850, category_id: "cat-restauracion", merchant: "Bar La Plaza", note: "", is_shared: 0, account_id: "acc-corriente", counter_account_id: "", share_pct_override: null, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 1850 },
       { id: "t-salud-hoy", date: "2026-09-09", type: "expense", amount_cents: 1490, category_id: "cat-salud", merchant: "Farmacia", note: "", is_shared: 0, account_id: "acc-corriente", counter_account_id: "", share_pct_override: null, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 1490 },
       { id: "t-alimentacion-ayer", date: "2026-09-08", type: "expense", amount_cents: 2345, category_id: "cat-alimentacion", merchant: "Mercadona", note: "", is_shared: 0, account_id: "acc-corriente", counter_account_id: "", share_pct_override: null, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 2345 },
-      { id: "t-casa-7", date: "2026-09-07", type: "expense", amount_cents: 6790, category_id: "cat-casa", merchant: "Ferreteria Ruiz", note: "Reforma bano", is_shared: 0, account_id: "acc-corriente", counter_account_id: "", share_pct_override: null, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 6790 },
+      { id: "t-casa-7", date: "2026-09-07", type: "expense", amount_cents: 6790, category_id: "cat-casa", merchant: "Ferreteria Ruiz", note: "Reforma bano", is_shared: 0, account_id: "acc-corriente", counter_account_id: "", share_pct_override: null, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 6790, tag_id: "tag-reforma" },
       { id: "t-coche-5", date: "2026-09-05", type: "expense", amount_cents: 5230, category_id: "cat-coche", merchant: "Gasolinera", note: "", is_shared: 0, account_id: "acc-corriente", counter_account_id: "", share_pct_override: null, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 5230 },
       { id: "t-alimentacion-compartido", date: "2026-09-02", type: "expense", amount_cents: 8430, category_id: "cat-alimentacion", merchant: "Mercadona", note: "", is_shared: 1, account_id: "acc-corriente", counter_account_id: "", share_pct_override: 50, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 4215 },
       { id: "t-ocio-compartido", date: "2026-09-02", type: "expense", amount_cents: 11510, category_id: "cat-ocio", merchant: "Cafe Central", note: "", is_shared: 1, account_id: "acc-corriente", counter_account_id: "", share_pct_override: 50, paid_by: "me", ref_id: "", rule_id: "", status: "pending", my_amount_cents: 5755 },
@@ -87,6 +87,12 @@ function fixture() {
       { id: "rule-nube", name: "Almacenamiento nube", type: "expense", amount_cents: 299, category_id: "cat-suscripciones", account_id: "acc-corriente", counter_account_id: "", frequency: "monthly", due_day: 2, due_month: null, is_shared: 0, is_active: 1, is_subscription: 1, cancelled_at: "" },
       { id: "rule-revista", name: "Revista digital", type: "expense", amount_cents: 499, category_id: "cat-suscripciones", account_id: "acc-corriente", counter_account_id: "", frequency: "monthly", due_day: 12, due_month: null, is_shared: 0, is_active: 0, is_subscription: 1, cancelled_at: "2026-06-12" },
     ],
+    // Etiquetas de proyecto (N11, Task 15): mapa id -> nombre de TODAS las etiquetas vivas
+    // (archivadas incluidas, D5), calcado del que repo.reportInputs arma con tagTotals() — no
+    // listTags(), que solo trae activas y dejaría en blanco la de un movimiento antiguo cuya
+    // etiqueta se archivó después. El del ejemplo es el mismo de SISTEMA.md §5: Ferretería Ruiz
+    // (t-casa-7) lleva la etiqueta «Reforma baño».
+    tagsById: { "tag-reforma": "Reforma baño" },
     todayIso: "2026-09-09",
   };
 }
@@ -217,6 +223,20 @@ test("buildReport: sin periodo anterior no hay comparativa", () => {
   }
 });
 
+test("buildReport: hubo periodo anterior pero sin gasto (prevSpentByRoot vacio) -> filas con prevCents 0, no sin comparativa", () => {
+  // hasPrev se decide por prevPeriod (!!prevPeriod), no por si prevSpentByRoot trae filas: un
+  // periodo anterior real en el que no se gasto nada llega con las dos cosas a la vez, y ahi la
+  // pantalla SI debe pintar «‹periodo› 0,00 €» en cada fila (no omitir la comparativa entera).
+  const r = buildReport({ ...fixture(), prevSpentByRoot: [] });
+  assert.equal(r.categories.hasPrev, true);
+  for (const row of r.categories.rows) {
+    assert.equal(row.prevCents, 0);
+    assert.equal(row.direction, "new");
+    assert.equal(row.deltaPct, null, "sin gasto previo no hay porcentaje que calcular");
+  }
+  assert.equal(r.categories.prevTotalCents, 0);
+});
+
 test("buildReport: categoria que no existia antes -> 'new', sin dividir por cero", () => {
   const f = fixture();
   f.spentByRoot.push({ root_id: "cat-nueva", name: "Categoria nueva", spent_cents: 5000 });
@@ -297,6 +317,29 @@ test("buildReport: el total de un grupo es el del SQL, no la suma de sus filas",
   assert.notEqual(alimentacion.totalCents, sumaFilas);
 });
 
+// ---- Task 15 (Etiquetas de proyecto, N11): tag en cada item de movimientos --------------------
+
+test("buildReport: cada item de movimientos lleva el nombre de su etiqueta, o '' sin ella", () => {
+  const r = buildReport(fixture());
+  const casa = r.movements.groups.find((g) => g.rootId === "cat-casa");
+  const ferreteria = casa.items.find((i) => i.id === "t-casa-7");
+  assert.equal(ferreteria.tag, "Reforma baño");
+  // El resto de items del fixture no llevan tag_id: '', nunca undefined ni null (JSON-friendly).
+  const alimentacion = r.movements.groups.find((g) => g.rootId === "cat-alimentacion");
+  for (const it of alimentacion.items) assert.equal(it.tag, "");
+  for (const it of r.movements.others.items) assert.equal(it.tag, "");
+});
+
+// Sin tagsById en el input (una BD vieja recién migrada, o un llamador que aún no lo pasa): '' en
+// todos los items, nunca un TypeError leyendo de un mapa inexistente.
+test("buildReport: sin tagsById en el input, todos los items dan tag ''", () => {
+  const f = fixture();
+  delete f.tagsById;
+  const r = buildReport(f);
+  const casa = r.movements.groups.find((g) => g.rootId === "cat-casa");
+  assert.equal(casa.items.find((i) => i.id === "t-casa-7").tag, "");
+});
+
 test("buildReport: ingresos, transferencias y ajustes van al grupo 'others'", () => {
   const r = buildReport(fixture());
   const types = r.movements.others.items.map((i) => i.type).sort();
@@ -364,5 +407,35 @@ test("previousPeriodOf: el anterior por start_date; el primero -> null; id desco
   assert.equal(previousPeriodOf(periods, "p2").id, "p1");
   assert.equal(previousPeriodOf(periods, "p1"), null, "el primero de la vida del usuario no tiene anterior");
   assert.equal(previousPeriodOf(periods, "desconocido"), null);
+  assert.equal(previousPeriodOf([], "cualquiera"), null);
+});
+
+// ---- Task 7: previousPeriodsOf (serie de tres periodos, N3) --------------------------------
+
+const FOUR_PERIODS = [
+  { id: "p4", start_date: "2026-09-01" },
+  { id: "p3", start_date: "2026-08-01" },
+  { id: "p2", start_date: "2026-07-01" },
+  { id: "p1", start_date: "2026-06-01" },
+];
+
+test("previousPeriodsOf: los n anteriores por start_date, del MÁS RECIENTE al MÁS ANTIGUO", () => {
+  assert.deepEqual(previousPeriodsOf(FOUR_PERIODS, "p4", 2).map((p) => p.id), ["p3", "p2"]);
+  assert.deepEqual(previousPeriodsOf(FOUR_PERIODS, "p4", 3).map((p) => p.id), ["p3", "p2", "p1"]);
+});
+
+test("previousPeriodsOf: menos de n si no hay tantos anteriores", () => {
+  assert.deepEqual(previousPeriodsOf(FOUR_PERIODS, "p2", 3).map((p) => p.id), ["p1"]);
+});
+
+test("previousPeriodsOf: [] para el más antiguo y para un id desconocido", () => {
+  assert.deepEqual(previousPeriodsOf(FOUR_PERIODS, "p1", 3), []);
+  assert.deepEqual(previousPeriodsOf(FOUR_PERIODS, "no-existe", 3), []);
+});
+
+test("previousPeriodOf sigue devolviendo EXACTAMENTE lo mismo que antes (delega en previousPeriodsOf)", () => {
+  assert.equal(previousPeriodOf(FOUR_PERIODS, "p4").id, "p3");
+  assert.equal(previousPeriodOf(FOUR_PERIODS, "p1"), null);
+  assert.equal(previousPeriodOf(FOUR_PERIODS, "no-existe"), null);
   assert.equal(previousPeriodOf([], "cualquiera"), null);
 });

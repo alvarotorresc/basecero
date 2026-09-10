@@ -260,12 +260,18 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
     });
     for (const it of g.items) {
       text("movements", `${fmtDiaCorto(it.date)}   ${it.merchant}   ${fmtMoney(it.cents)}`, { size: 10, mono: true });
+      // Etiquetas de proyecto (N11, Task 15): D2 — pantalla y PDF son dos presentadores de la
+      // misma estructura, así que la misma clave i18n y el mismo criterio de "línea aparte, solo
+      // si hay etiqueta" que screens/informe.js#movementGroupHtml. winAnsiSafe la sanea igual que
+      // cualquier otro texto de usuario (text() la aplica siempre, ver drawText más abajo).
+      if (it.tag) text("movements", t("informe.movements.tag", { name: it.tag }), { size: 9 });
     }
   }
   if (report.movements.others.items.length) {
     text("movements", t("informe.pdf.others"), { size: 12, bold: true });
     for (const it of report.movements.others.items) {
       text("movements", `${fmtDiaCorto(it.date)}   ${it.merchant}   ${fmtMoney(it.cents)}`, { size: 10, mono: true });
+      if (it.tag) text("movements", t("informe.movements.tag", { name: it.tag }), { size: 9 });
     }
   }
 

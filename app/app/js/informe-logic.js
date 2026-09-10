@@ -7,18 +7,24 @@
  *  números, strings y arrays, nunca HTML ni nodos ni funciones. La pantalla y el PDF son dos
  *  presentadores de este mismo objeto (spec §5.2, D2). */
 import { dayIndexOfPeriod, expectedPeriodDays, ruleApplies, myAmountOfRule, periodMonth } from "./prevision.js";
-import { budgetMap, budgetStatus, pctOf, relativeWidth, sortRootRows } from "./category-spend.js";
+import { budgetMap, budgetStatus, pctOf, relativeWidth, sortRootRows, compareRoots } from "./category-spend.js";
 import { colorForCategory, textColorForCategory, iconForCategory, rootOf } from "./category-colors.js";
 import { activeSubscriptions, monthlyTotalCents, annualTotalCents } from "./subscriptions.js";
 
-/** El periodo inmediatamente anterior por `start_date`. `listPeriods()` ya viene
- *  `ORDER BY start_date DESC` (sql.js:100): el anterior es el SIGUIENTE elemento del array.
- *  `null` si `periodId` es el primero de la vida del usuario o si no aparece en `periods`. */
-export function previousPeriodOf(periods, periodId) {
+/** Los n periodos ANTERIORES a `periodId`, del más reciente al más antiguo (Task 7, N3: la serie
+ *  de tres periodos). `periods` llega de listPeriods(), ya ordenada por start_date DESC
+ *  (sql.js:100): los anteriores son simplemente los SIGUIENTES elementos del array. Devuelve
+ *  MENOS de n si no hay tantos, y `[]` si `periodId` es el más antiguo o no aparece en `periods`. */
+export function previousPeriodsOf(periods, periodId, n = 1) {
   const idx = (periods ?? []).findIndex((p) => p.id === periodId);
-  if (idx === -1) return null;
-  return periods[idx + 1] ?? null;
+  if (idx === -1) return [];
+  return (periods ?? []).slice(idx + 1, idx + 1 + n);
 }
+
+/** El periodo inmediatamente anterior por `start_date`. `null` si `periodId` es el primero de la
+ *  vida del usuario o si no aparece en `periods`. Delega en previousPeriodsOf (Task 7): mismo
+ *  comportamiento exacto que antes, ahora como el caso n=1. */
+export const previousPeriodOf = (periods, periodId) => previousPeriodsOf(periods, periodId, 1)[0] ?? null;
 
 function buildMeta({ period, todayIso }) {
   const isOpen = period.status === "open";
@@ -80,27 +86,22 @@ function buildAccounts({ accountsStart, accountsEnd }) {
 function buildCategories({ spentByRoot, prevSpentByRoot, budgets, categoriesById, prevPeriod }) {
   const hasPrev = !!prevPeriod;
   const budgetByCategory = budgetMap(budgets ?? []);
-  const prevByRoot = Object.fromEntries((prevSpentByRoot ?? []).map((r) => [r.root_id, r.spent_cents]));
   const byId = categoriesById ?? {};
   const sorted = sortRootRows(spentByRoot ?? [], budgetByCategory);
   const maxSpent = Math.max(0, ...sorted.map((r) => r.spent_cents), 0);
+  // compareRoots (category-spend.js) es la extracción de lo que vivía aquí (Task 6,
+  // etiquetas-design §7.1): un índice por rootId porque `sorted` ya reordenó las filas y
+  // compareRoots devuelve su propio array en el orden de entrada, no el de pintado.
+  // hasPrev explícito: el periodo anterior puede existir sin gasto (prevSpentByRoot vacío), y
+  // compareRoots no puede distinguir eso de «no hay periodo anterior» a partir de las filas solas.
+  const cmpByRoot = Object.fromEntries(
+    compareRoots(spentByRoot ?? [], prevSpentByRoot ?? [], hasPrev).map((c) => [c.rootId, c]),
+  );
 
   const rows = sorted.map((r) => {
     const limitCents = budgetByCategory[r.root_id] ?? 0;
     const status = budgetStatus(r.spent_cents, limitCents);
-    let prevCents = null, deltaCents = null, deltaPct = null, direction = "new";
-    if (hasPrev) {
-      prevCents = prevByRoot[r.root_id] ?? 0;
-      deltaCents = r.spent_cents - prevCents;
-      if (prevCents > 0) {
-        deltaPct = ((r.spent_cents - prevCents) / prevCents) * 100;
-        direction = deltaCents === 0 ? "flat" : deltaCents > 0 ? "up" : "down";
-      } else {
-        // sin gasto previo: "new" si ahora sí se gastó algo, "flat" si sigue sin haber nada —
-        // en ninguno de los dos casos hay un porcentaje que calcular sin dividir por cero.
-        direction = r.spent_cents > 0 ? "new" : "flat";
-      }
-    }
+    const cmp = cmpByRoot[r.root_id];
     return {
       rootId: r.root_id,
       name: r.name,
@@ -112,10 +113,10 @@ function buildCategories({ spentByRoot, prevSpentByRoot, budgets, categoriesById
       pctOfLimit: pctOf(r.spent_cents, limitCents),
       level: status?.level ?? null,
       shareOfMax: relativeWidth(r.spent_cents, maxSpent),
-      prevCents,
-      deltaCents,
-      deltaPct,
-      direction,
+      prevCents: cmp.prevCents,
+      deltaCents: cmp.deltaCents,
+      deltaPct: cmp.deltaPct,
+      direction: cmp.direction,
     };
   });
 
@@ -127,10 +128,16 @@ function buildCategories({ spentByRoot, prevSpentByRoot, budgets, categoriesById
 
 const byDateDesc = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
 
-function movementItem(t) {
+/** `tagsById` (Etiquetas de proyecto, N11, Task 15): mapa id -> nombre de TODAS las etiquetas
+ *  vivas (archivadas incluidas, D5) — repo.reportInputs lo arma con tagTotals(), no listTags()
+ *  (que solo trae activas y dejaría en blanco la de un movimiento antiguo cuya etiqueta se
+ *  archivó después de ese periodo). `''` sin etiqueta o si el id ya no resuelve (borrado real,
+ *  D5 dice que eso no pasa desde la UI, pero un id huérfano no debe reventar el informe). */
+function movementItem(t, tagsById) {
   return {
     id: t.id, date: t.date, merchant: t.merchant, cents: t.amount_cents,
     type: t.type, isShared: !!t.is_shared, paidBy: t.paid_by,
+    tag: (t.tag_id && tagsById?.[t.tag_id]) || "",
   };
 }
 
@@ -139,9 +146,10 @@ function movementItem(t) {
  *  agruparlos por categoría no significaría nada. El total de cabecera de cada grupo es el de
  *  `categories.rows` (que a su vez viene de `spentByRootCategory`, D12) — NUNCA la suma de los
  *  `items` listados, que puede ser una muestra parcial de los movimientos reales de la raíz. */
-function buildMovements({ transactions, categoriesById }, categories) {
+function buildMovements({ transactions, categoriesById, tagsById }, categories) {
   const txs = transactions ?? [];
   const byId = categoriesById ?? {};
+  const toItem = (t) => movementItem(t, tagsById);
   const othersTypes = new Set(["income", "transfer", "adjustment"]);
   const groupsById = new Map();
   const others = [];
@@ -160,7 +168,7 @@ function buildMovements({ transactions, categoriesById }, categories) {
     const items = groupsById.get(catRow.rootId).slice().sort(byDateDesc);
     groups.push({
       rootId: catRow.rootId, name: catRow.name, color: catRow.color, icon: catRow.icon,
-      totalCents: catRow.spentCents, count: items.length, items: items.map(movementItem),
+      totalCents: catRow.spentCents, count: items.length, items: items.map(toItem),
     });
   }
   // Una raíz con movimientos pero SIN fila en categories.rows (p.ej. archivada a mitad de periodo,
@@ -172,7 +180,7 @@ function buildMovements({ transactions, categoriesById }, categories) {
     groups.push({
       rootId, name: byId[rootId]?.name ?? "", color: colorForCategory(rootId, byId), icon: iconForCategory(rootId, byId),
       totalCents: sorted.reduce((s, t) => s + t.amount_cents, 0), count: sorted.length,
-      items: sorted.map(movementItem),
+      items: sorted.map(toItem),
     });
   }
 
@@ -180,7 +188,7 @@ function buildMovements({ transactions, categoriesById }, categories) {
   return {
     count: txs.length,
     groups,
-    others: { count: sortedOthers.length, items: sortedOthers.map(movementItem) },
+    others: { count: sortedOthers.length, items: sortedOthers.map(toItem) },
   };
 }
 

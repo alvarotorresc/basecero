@@ -7,6 +7,7 @@ export const EN = {
     save: "Save",
     cancel: "Cancel",
     delete: "Delete",
+    edit: "Edit",
     saveFailed: "Couldn’t save: {error}",
     saveChanges: "Save changes",
     deleteFailed: "Couldn’t delete: {error}",
@@ -238,6 +239,17 @@ export const EN = {
     type: { transfer: "Transfer" },
     detail: {
       lockedNote: "It has a linked settlement entry (refund or adjustment): delete it first to change the amount or the split.",
+      tagLabel: "Tag",
+      noTag: "No tag",
+      newTag: "New tag",
+    },
+    tagCard: {
+      movements: { one: "{n} movement", other: "{n} movements" },
+      ofLimit: "of {limit}",
+      periodLine: {
+        one: "{amount} in {period}, {n} movement",
+        other: "{amount} in {period}, {n} movements",
+      },
     },
     shared: {
       fallbackName: "the other party",
@@ -311,6 +323,9 @@ export const EN = {
       title: "By category",
       hint: "Tap a category to see the detail or set a limit",
       empty: "You have no active expense categories.",
+    },
+    compare: {
+      prev: "{name} {amount}",
     },
     row: {
       ofLimit: "{spent} of {limit}",
@@ -510,6 +525,36 @@ export const EN = {
       create: "Create category",
     },
   },
+  etiquetas: {
+    title: "Project tags",
+    intro: "They cross categories: they group what you spend on a trip, a renovation, or a wedding, no matter which category each expense falls under.",
+    footerNote: "Archiving a tag removes it from the pickers, but its movements still show it.",
+    new: "New tag",
+    row: {
+      movements: { one: "{n} movement", other: "{n} movements" },
+      open: "open",
+      archived: "archived",
+      noLimit: "no limit",
+      ofLimit: "{spent} of {limit}",
+      seeMovements: "See its movements",
+    },
+    form: {
+      titleNew: "New tag",
+      titleEdit: "Edit tag",
+      nameLabel: "Name",
+      namePlaceholder: "e.g. Trip to Japan",
+      limitLabel: "Limit (optional)",
+      limitPlaceholder: "No limit",
+      save: "Save",
+      archive: "Archive",
+      unarchive: "Unarchive",
+    },
+    error: {
+      load: "Couldn’t load the tags: {error}",
+      save: "Couldn’t save: {error}",
+      archive: "Couldn’t archive: {error}",
+    },
+  },
   periodo: {
     error: {
       noOpenToClose: "There’s no open period to close.",
@@ -609,6 +654,10 @@ export const EN = {
       title: "Categories",
       subtitleWithCount: "{n} categories · colors and icons",
       subtitleNoCount: "colors and icons",
+    },
+    tags: {
+      title: "Project tags",
+      sub: { one: "{n} active", other: "{n} active" },
     },
     bank: {
       title: "Bank",
@@ -849,6 +898,8 @@ export const EN = {
       categoryHasChildren: "This category has subcategories: only two levels are allowed, it can’t become a subcategory of another one",
       colorUnavailable: "That color isn’t available",
       iconUnavailable: "That icon isn’t available",
+      tagNameEmpty: "The tag name can’t be empty",
+      tagNotFound: "Tag not found",
     },
     common: {
       noOpenPeriod: "There’s no open period",
@@ -933,6 +984,7 @@ export const EN = {
     undo: "Undo",
     undone: "Movement undone",
     myPart: "Your share",
+    tagLabel: "Tag",
     undoFailed: "Could not undo: {error}",
   },
   // Period report (F1). screens/informe.js.
@@ -987,6 +1039,7 @@ export const EN = {
       groupCount: { one: "{n} movement", other: "{n} movements" },
       andMore: "and {n} more movements",
       others: "Other",
+      tag: "Tag: {name}",
     },
     footer: "The PDF carries all of this plus the full list of the {n} movements, and looks the same on any phone.",
     error: {
