@@ -57,7 +57,7 @@ test("merchantMemory: filas sin comercio se ignoran", () => {
     { merchant: "", category_id: "c1", account_id: "a1", is_shared: 0, share_pct_override: null, paid_by: "me", date: "2026-09-05", type: "expense" },
     { merchant: "   ", category_id: "c1", account_id: "a1", is_shared: 0, share_pct_override: null, paid_by: "me", date: "2026-09-05", type: "expense" },
   ];
-  assert.deepEqual(merchantMemory(rows), {});
+  assert.deepEqual(merchantMemory(rows), Object.create(null));
 });
 
 test("merchantMemory: un comercio llamado __proto__ no envenena el mapa", () => {
@@ -65,9 +65,18 @@ test("merchantMemory: un comercio llamado __proto__ no envenena el mapa", () => 
     { merchant: "__proto__", category_id: "c1", account_id: "a1", is_shared: 0, share_pct_override: null, paid_by: "me", date: "2026-09-05", type: "expense" },
   ];
   const mem = merchantMemory(rows);
-  assert.equal(Object.getPrototypeOf(mem), Object.prototype);
+  assert.equal(Object.getPrototypeOf(mem), null);
   assert.equal(mem.polluted, undefined);
   assert.ok(!Object.hasOwn(mem, "__proto__"));
+});
+
+test("merchantMemory: «constructor»/«toString» no dan una entrada fantasma heredada del prototipo", () => {
+  const rows = [
+    { merchant: "Mercadona", category_id: "c1", account_id: "a1", is_shared: 0, share_pct_override: null, paid_by: "me", date: "2026-09-05", type: "expense" },
+  ];
+  const mem = merchantMemory(rows);
+  assert.equal(mem["constructor"], undefined);
+  assert.equal(mem["toString"], undefined);
 });
 
 test("memoryPatch: no pisa los campos que ya están en touched", () => {

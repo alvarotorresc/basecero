@@ -36,9 +36,15 @@ export function normalizeMerchant(s) {
  *  Guard `__proto__`: mismo criterio que budgetMap (category-spend.js#budgetMap) — un comercio
  *  llamado literalmente «__proto__» dispararía el setter especial de Object.prototype al escribir
  *  en el mapa con `out[key] = …`. Se descarta la fila entera (no se cuenta ni como aparición): no
- *  hay ranura segura donde guardarla. */
+ *  hay ranura segura donde guardarla.
+ *
+ *  `out` nace con `Object.create(null)`, no `{}`: un comercio llamado «constructor» o «toString»
+ *  no pisa esas claves, pero con `{}` seguirían siendo accesos válidos por herencia de
+ *  Object.prototype — `mem["constructor"]` daría el constructor Function (siempre truthy) aunque
+ *  jamás se hubiera guardado esa fila, y registro.js (`if (entry) …`) lo tomaría por una entrada de
+ *  verdad. Sin prototipo, esas claves solo existen si de verdad se escribieron. */
 export function merchantMemory(rows) {
-  const out = {};
+  const out = Object.create(null);
   for (const r of rows ?? []) {
     const display = String(r.merchant ?? "").trim();
     if (!display) continue;
