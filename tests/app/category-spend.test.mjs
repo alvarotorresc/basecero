@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   budgetStatus, pctOf, relativeWidth, limitTotals, sortRootRows, budgetMap, inheritedBudgetsRaw,
-  compareRoots,
+  compareRoots, spentSeriesByRoot,
 } from "../../app/app/js/category-spend.js";
 
 test("budgetStatus: 82% del límite -> ok", () => {
@@ -235,4 +235,35 @@ test("compareRoots: una raíz con spent_cents negativo (más devoluciones que ga
     [{ root_id: "cat-negativa", name: "Negativa", spent_cents: -500 }],
     [{ root_id: "cat-negativa", name: "Negativa", spent_cents: 1000 }],
   ));
+});
+
+// ---- spentSeriesByRoot (Task 7: la serie de tres periodos, N3) --------------------------------
+
+test("spentSeriesByRoot: rellena 0 donde una raíz no está en un periodo (no un hueco)", () => {
+  const history = [
+    { period: { id: "p-jul" }, rows: [{ root_id: "cat-casa", name: "Casa", spent_cents: 1000 }] },
+    { period: { id: "p-ago" }, rows: [
+      { root_id: "cat-casa", name: "Casa", spent_cents: 2000 },
+      { root_id: "cat-ocio", name: "Ocio", spent_cents: 500 },
+    ] },
+  ];
+  const series = spentSeriesByRoot(history);
+  assert.deepEqual(series["cat-casa"], [1000, 2000], "del MÁS ANTIGUO al MÁS RECIENTE");
+  assert.deepEqual(series["cat-ocio"], [0, 500], "cat-ocio no gastó nada en julio: un 0, no un hueco");
+});
+
+test("spentSeriesByRoot: solo las raíces del ÚLTIMO periodo — una que ya no aparece no se pinta", () => {
+  const history = [
+    { period: { id: "p-jul" }, rows: [{ root_id: "cat-vieja", name: "Vieja", spent_cents: 100 }] },
+    { period: { id: "p-ago" }, rows: [{ root_id: "cat-casa", name: "Casa", spent_cents: 200 }] },
+  ];
+  const series = spentSeriesByRoot(history);
+  assert.deepEqual(Object.keys(series), ["cat-casa"]);
+});
+
+test("spentSeriesByRoot: guard __proto__ (mismo motivo que budgetMap)", () => {
+  const history = [{ period: { id: "p-ago" }, rows: [{ root_id: "__proto__", name: "x", spent_cents: 100 }] }];
+  const series = spentSeriesByRoot(history);
+  assert.deepEqual(Object.keys(series), []);
+  assert.equal(({}).polluted, undefined);
 });

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildReport, previousPeriodOf } from "../../app/app/js/informe-logic.js";
+import { buildReport, previousPeriodOf, previousPeriodsOf } from "../../app/app/js/informe-logic.js";
 
 /** Fixture calcada de la hoja de datos del sistema (SISTEMA.md §5, periodo Septiembre 2026):
  *  periodo 2026-09-01, hoy 2026-09-09, ingresos 1.850,00 €, gastado 847,20 €, presupuesto
@@ -364,5 +364,35 @@ test("previousPeriodOf: el anterior por start_date; el primero -> null; id desco
   assert.equal(previousPeriodOf(periods, "p2").id, "p1");
   assert.equal(previousPeriodOf(periods, "p1"), null, "el primero de la vida del usuario no tiene anterior");
   assert.equal(previousPeriodOf(periods, "desconocido"), null);
+  assert.equal(previousPeriodOf([], "cualquiera"), null);
+});
+
+// ---- Task 7: previousPeriodsOf (serie de tres periodos, N3) --------------------------------
+
+const FOUR_PERIODS = [
+  { id: "p4", start_date: "2026-09-01" },
+  { id: "p3", start_date: "2026-08-01" },
+  { id: "p2", start_date: "2026-07-01" },
+  { id: "p1", start_date: "2026-06-01" },
+];
+
+test("previousPeriodsOf: los n anteriores por start_date, del MÁS RECIENTE al MÁS ANTIGUO", () => {
+  assert.deepEqual(previousPeriodsOf(FOUR_PERIODS, "p4", 2).map((p) => p.id), ["p3", "p2"]);
+  assert.deepEqual(previousPeriodsOf(FOUR_PERIODS, "p4", 3).map((p) => p.id), ["p3", "p2", "p1"]);
+});
+
+test("previousPeriodsOf: menos de n si no hay tantos anteriores", () => {
+  assert.deepEqual(previousPeriodsOf(FOUR_PERIODS, "p2", 3).map((p) => p.id), ["p1"]);
+});
+
+test("previousPeriodsOf: [] para el más antiguo y para un id desconocido", () => {
+  assert.deepEqual(previousPeriodsOf(FOUR_PERIODS, "p1", 3), []);
+  assert.deepEqual(previousPeriodsOf(FOUR_PERIODS, "no-existe", 3), []);
+});
+
+test("previousPeriodOf sigue devolviendo EXACTAMENTE lo mismo que antes (delega en previousPeriodsOf)", () => {
+  assert.equal(previousPeriodOf(FOUR_PERIODS, "p4").id, "p3");
+  assert.equal(previousPeriodOf(FOUR_PERIODS, "p1"), null);
+  assert.equal(previousPeriodOf(FOUR_PERIODS, "no-existe"), null);
   assert.equal(previousPeriodOf([], "cualquiera"), null);
 });

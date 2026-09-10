@@ -12,7 +12,7 @@ import { UserError } from "./errors.js";
 import { MEMORY_WINDOW, merchantMemory } from "./merchant-memory.js";
 import { IGNORED_MAX, parseIgnored, parseSnoozed } from "./subscriptions.js";
 import { DETECT_WINDOW_DAYS } from "./subscription-detect.js";
-import { previousPeriodOf } from "./informe-logic.js";
+import { previousPeriodOf, previousPeriodsOf } from "./informe-logic.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -728,6 +728,25 @@ export async function reportInputs(periodId) {
     subscriptionRules,
     todayIso: hoyISO(),
   };
+}
+
+/** Gasto por raíz de este periodo y los n-1 anteriores, del MÁS ANTIGUO al MÁS RECIENTE (el
+ *  último elemento es SIEMPRE `periodId`) — Task 7, N3: la comparativa y la mini tendencia de
+ *  «Gasto por categoría». Un solo Promise.all. Con menos periodos en la BD (o un `periodId`
+ *  desconocido) devuelve menos entradas —incluso `[]`— y quien pinta decide: comparativa con
+ *  >= 2, tendencia con >= 2 (category-spend.js#spentSeriesByRoot/charts.js#trendOf). */
+export async function rootSpendHistory(periodId, n = 3) {
+  const periods = await listPeriods();
+  const current = periods.find((p) => p.id === periodId);
+  if (!current) return [];
+  // previousPeriodsOf devuelve del MÁS RECIENTE al MÁS ANTIGUO; se invierte para que el array
+  // completo quede del más antiguo al más reciente, con `current` siempre al final.
+  const ordered = [...previousPeriodsOf(periods, periodId, n - 1)].reverse().concat(current);
+  const rowsByPeriod = await Promise.all(ordered.map((p) => spentByRootCategory(p.id)));
+  return ordered.map((p, i) => ({
+    period: { id: p.id, name: p.name, start_date: p.start_date },
+    rows: rowsByPeriod[i],
+  }));
 }
 
 // den<=0 -> 0 en vez de NaN/Infinity: mismo criterio que budgetStatus (category-spend.js), pero sin

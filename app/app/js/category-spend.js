@@ -133,3 +133,22 @@ export function compareRoots(currentRows, prevRows) {
     return { rootId: r.root_id, prevCents, deltaCents, deltaPct, direction };
   });
 }
+
+/** Mapa rootId → [céntimos por periodo, del MÁS ANTIGUO al MÁS RECIENTE], para la mini tendencia
+ *  de tres periodos (SISTEMA §4.19). `history`: [{ period, rows }, …], del más antiguo al más
+ *  reciente — mismo orden que espera repo.rootSpendHistory.
+ *  Las raíces son las del ÚLTIMO elemento (el periodo actual): una raíz que ya no aparece no se
+ *  pinta. Donde una raíz no está en un periodo se rellena 0, no un hueco: una categoría creada
+ *  este mes NO gastó nada en julio, y eso es un cero, no un dato que falte.
+ *  Guard `__proto__`, mismo motivo que budgetMap (arriba). */
+export function spentSeriesByRoot(history) {
+  const h = history ?? [];
+  if (h.length === 0) return {};
+  const lastRows = h[h.length - 1].rows ?? [];
+  const out = {};
+  for (const r of lastRows) {
+    if (r.root_id === "__proto__") continue;
+    out[r.root_id] = h.map((p) => (p.rows ?? []).find((x) => x.root_id === r.root_id)?.spent_cents ?? 0);
+  }
+  return out;
+}

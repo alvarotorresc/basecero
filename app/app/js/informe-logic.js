@@ -11,14 +11,20 @@ import { budgetMap, budgetStatus, pctOf, relativeWidth, sortRootRows, compareRoo
 import { colorForCategory, textColorForCategory, iconForCategory, rootOf } from "./category-colors.js";
 import { activeSubscriptions, monthlyTotalCents, annualTotalCents } from "./subscriptions.js";
 
-/** El periodo inmediatamente anterior por `start_date`. `listPeriods()` ya viene
- *  `ORDER BY start_date DESC` (sql.js:100): el anterior es el SIGUIENTE elemento del array.
- *  `null` si `periodId` es el primero de la vida del usuario o si no aparece en `periods`. */
-export function previousPeriodOf(periods, periodId) {
+/** Los n periodos ANTERIORES a `periodId`, del más reciente al más antiguo (Task 7, N3: la serie
+ *  de tres periodos). `periods` llega de listPeriods(), ya ordenada por start_date DESC
+ *  (sql.js:100): los anteriores son simplemente los SIGUIENTES elementos del array. Devuelve
+ *  MENOS de n si no hay tantos, y `[]` si `periodId` es el más antiguo o no aparece en `periods`. */
+export function previousPeriodsOf(periods, periodId, n = 1) {
   const idx = (periods ?? []).findIndex((p) => p.id === periodId);
-  if (idx === -1) return null;
-  return periods[idx + 1] ?? null;
+  if (idx === -1) return [];
+  return (periods ?? []).slice(idx + 1, idx + 1 + n);
 }
+
+/** El periodo inmediatamente anterior por `start_date`. `null` si `periodId` es el primero de la
+ *  vida del usuario o si no aparece en `periods`. Delega en previousPeriodsOf (Task 7): mismo
+ *  comportamiento exacto que antes, ahora como el caso n=1. */
+export const previousPeriodOf = (periods, periodId) => previousPeriodsOf(periods, periodId, 1)[0] ?? null;
 
 function buildMeta({ period, todayIso }) {
   const isOpen = period.status === "open";
