@@ -3,11 +3,15 @@
    (con User-Agent de Chrome: así Google sirve woff2 VARIABLE, un fichero por familia, y el
    navegador instancia cada peso por el eje wght). Solo se conserva el subset latin; los no
    latinos (cyrillic, greek, vietnamese, latin-ext) se omiten, igual que con Outfit.
-   Schibsted Grotesk v7 · 46 752 B — JetBrains Mono v24 · 31 432 B. */
+   Schibsted Grotesk v7 · 46 752 B — JetBrains Mono v24 · 31 432 B.
+   El font-weight de cada @font-face de abajo NO repite el rango pedido en esa URL: el woff2 que
+   Google sirve es el eje wght completo del proyecto upstream (400-900 Schibsted, 400-800
+   JetBrains) aunque la query string solo pidiera hasta 700/600, así que declararlo así en vez de
+   recortarlo evita que el navegador sature un H1 a 800 al peso 700 más cercano dentro del rango. */
 @font-face {
   font-family: 'Schibsted Grotesk';
   font-style: normal;
-  font-weight: 400 700;
+  font-weight: 400 900;
   font-display: swap;
   src: url(./schibsted-grotesk-latin.woff2) format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
@@ -15,7 +19,7 @@
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
-  font-weight: 400 600;
+  font-weight: 400 800;
   font-display: swap;
   src: url(./jetbrains-mono-latin.woff2) format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;

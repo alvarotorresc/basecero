@@ -23,6 +23,16 @@ test("fonts.css: el subset latin cubre el euro y los diacríticos del español",
   assert.ok(fonts.includes("U+20AC"));
 });
 
+test("fonts.css: declara el rango completo de pesos que traen los woff2 variables", () => {
+  // Los ficheros son variables de verdad (wght 400-900 Schibsted, 400-800 JetBrains): declarar un
+  // rango más corto en @font-face no falla, pero recorta el eje y el navegador satura al extremo
+  // declarado — un H1 a 800 se pinta como si fuera 700.
+  assert.match(fonts, /font-family:\s*'Schibsted Grotesk';[\s\S]*?font-weight:\s*400 900;/,
+    "Schibsted Grotesk debería declarar font-weight: 400 900");
+  assert.match(fonts, /font-family:\s*'JetBrains Mono';[\s\S]*?font-weight:\s*400 800;/,
+    "JetBrains Mono debería declarar font-weight: 400 800");
+});
+
 const tokens = readFileSync(CSS + "tokens.css", "utf8");
 const declara = (n) => new RegExp(`^\\s*${n.replace("--", "--")}\\s*:`, "m").test(tokens);
 
