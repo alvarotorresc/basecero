@@ -5,7 +5,7 @@ import { openDb, seedMinimal } from "./helpers.mjs";
 
 const T = "2026-08-24T18:00:00Z";
 
-/** Inserta una transacción usando la firma NUEVA (20 posicionales) de SQL.insertTransaction. */
+/** Inserta una transacción usando la firma NUEVA (21 posicionales) de SQL.insertTransaction. */
 function ins(db, over = {}) {
   const v = {
     id: "t" + Math.floor(Math.random() * 1e9),

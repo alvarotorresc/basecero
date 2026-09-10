@@ -275,7 +275,7 @@ function execManyRaw(db, stmts) {
  *  en Node (depende del Worker vía query/execMany, mismo motivo por el que la liquidación de una
  *  sola fila y openNextPeriod de este mismo fichero se reproducen en vez de importarse). El ARRAY de
  *  statements NO se reproduce a mano aquí: se delega en la settleAllSharedStmts REAL importada de
- *  repo.js (arriba) — así un bug en el bind de insertTransaction (orden de los 20 campos) lo
+ *  repo.js (arriba) — así un bug en el bind de insertTransaction (orden de los 21 campos) lo
  *  detectaría este test, cosa que una copia manual del bind no podría hacer. "Alex" es el
  *  partner_name que repo.settleAllShared saca de meta y pasa como sexto argumento. */
 function settleAllSharedReproduced(db, ids, accountId, now, periodId = "per-1") {
@@ -685,6 +685,22 @@ test("updateTransaction (reproducido): editar categoría/nota del refund enlazad
   const refund = db.prepare("SELECT amount_cents, note FROM transactions WHERE id=?").get(refundId);
   assert.equal(refund.note, "Liquidación de agosto");
   assert.equal(refund.amount_cents, 2000, "el importe no debe tocarse por un cambio de nota");
+});
+
+test("updateTransaction (reproducido): tagId:'' quita la etiqueta; sin la clave tagId se conserva", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const gastoId = ins(db, { id: "gasto-etiquetado", date: "2026-08-12", period: "per-1", cents: 3000, tag: "tag-reforma" });
+
+  // "" no es undefined: fields.tagId ?? cur.tag_id toma la cadena vacía, no el valor previo.
+  updateTransactionReproduced(db, gastoId, { tagId: "" });
+  assert.equal(db.prepare("SELECT tag_id FROM transactions WHERE id=?").get(gastoId).tag_id, "");
+
+  // Sin la clave tagId en fields, el `??` cae al valor actual (ya vacío tras el paso anterior):
+  // se reetiqueta y se comprueba que un update SIN tagId no lo toca.
+  db.prepare("UPDATE transactions SET tag_id=? WHERE id=?").run("tag-reforma", gastoId);
+  updateTransactionReproduced(db, gastoId, { note: "Sin tocar la etiqueta" });
+  assert.equal(db.prepare("SELECT tag_id FROM transactions WHERE id=?").get(gastoId).tag_id, "tag-reforma");
 });
 
 test("updateTransaction (reproducido): pasar un gasto compartido a paidBy:'partner' vacía account_id", () => {
