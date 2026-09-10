@@ -7,6 +7,7 @@ export const ES = {
     save: "Guardar",
     cancel: "Cancelar",
     delete: "Borrar",
+    edit: "Editar",
     saveFailed: "No se pudo guardar: {error}",
     saveChanges: "Guardar cambios",
     deleteFailed: "No se pudo borrar: {error}",
@@ -518,6 +519,38 @@ export const ES = {
       create: "Crear categoría",
     },
   },
+  etiquetas: {
+    title: "Etiquetas de proyecto",
+    intro: "Cruzan las categorías: agrupan lo que gastas en un viaje, una reforma o una boda, sin importar en qué categoría caiga cada gasto.",
+    footerNote: "Archivar una etiqueta la quita de los selectores, pero sus movimientos la siguen enseñando.",
+    new: "Nueva etiqueta",
+    empty: "Aún no tienes ninguna etiqueta.",
+    row: {
+      movements: "{n} movimientos",
+      open: "abierta",
+      archived: "archivada",
+      noLimit: "sin límite",
+      ofLimit: "{spent} de {limit}",
+      seeMovements: "Ver sus movimientos",
+    },
+    form: {
+      titleNew: "Nueva etiqueta",
+      titleEdit: "Editar etiqueta",
+      nameLabel: "Nombre",
+      namePlaceholder: "p. ej. Viaje Japón",
+      limitLabel: "Límite (opcional)",
+      limitPlaceholder: "Sin límite",
+      save: "Guardar",
+      archive: "Archivar",
+      unarchive: "Desarchivar",
+      removeLimit: "Quitar límite",
+    },
+    error: {
+      load: "No se pudieron cargar las etiquetas: {error}",
+      save: "No se pudo guardar: {error}",
+      archive: "No se pudo archivar: {error}",
+    },
+  },
   periodo: {
     error: {
       noOpenToClose: "No hay ningún periodo abierto que cerrar.",
@@ -619,6 +652,10 @@ export const ES = {
       title: "Categorías",
       subtitleWithCount: "{n} categorías · colores e iconos",
       subtitleNoCount: "colores e iconos",
+    },
+    tags: {
+      title: "Etiquetas de proyecto",
+      sub: "{n} activas",
     },
     bank: {
       title: "Banco",

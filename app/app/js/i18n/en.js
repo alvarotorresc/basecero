@@ -7,6 +7,7 @@ export const EN = {
     save: "Save",
     cancel: "Cancel",
     delete: "Delete",
+    edit: "Edit",
     saveFailed: "Couldn’t save: {error}",
     saveChanges: "Save changes",
     deleteFailed: "Couldn’t delete: {error}",
@@ -510,6 +511,38 @@ export const EN = {
       create: "Create category",
     },
   },
+  etiquetas: {
+    title: "Project tags",
+    intro: "They cross categories: they group what you spend on a trip, a renovation, or a wedding, no matter which category each expense falls under.",
+    footerNote: "Archiving a tag removes it from the pickers, but its movements still show it.",
+    new: "New tag",
+    empty: "You don’t have any tags yet.",
+    row: {
+      movements: "{n} movements",
+      open: "open",
+      archived: "archived",
+      noLimit: "no limit",
+      ofLimit: "{spent} of {limit}",
+      seeMovements: "See its movements",
+    },
+    form: {
+      titleNew: "New tag",
+      titleEdit: "Edit tag",
+      nameLabel: "Name",
+      namePlaceholder: "e.g. Trip to Japan",
+      limitLabel: "Limit (optional)",
+      limitPlaceholder: "No limit",
+      save: "Save",
+      archive: "Archive",
+      unarchive: "Unarchive",
+      removeLimit: "Remove limit",
+    },
+    error: {
+      load: "Couldn’t load the tags: {error}",
+      save: "Couldn’t save: {error}",
+      archive: "Couldn’t archive: {error}",
+    },
+  },
   periodo: {
     error: {
       noOpenToClose: "There’s no open period to close.",
@@ -609,6 +642,10 @@ export const EN = {
       title: "Categories",
       subtitleWithCount: "{n} categories · colors and icons",
       subtitleNoCount: "colors and icons",
+    },
+    tags: {
+      title: "Project tags",
+      sub: "{n} active",
     },
     bank: {
       title: "Bank",

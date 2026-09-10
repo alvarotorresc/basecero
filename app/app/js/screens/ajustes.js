@@ -1,4 +1,4 @@
-import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta, setMetaMany, allCategoriesById, retranslateSeedNames, updatePeriodSharePct } from "../repo.js";
+import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta, setMetaMany, allCategoriesById, retranslateSeedNames, updatePeriodSharePct, listTags } from "../repo.js";
 import { PCT_STEP, normalizePct, stepPct } from "../share-pct.js";
 import { quickRegisterEnabled } from "../registro-mode.js";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
@@ -7,6 +7,7 @@ import { renderPeriodoNuevo } from "./periodo-nuevo.js";
 import { renderRecurrentes } from "./recurrentes.js";
 import { renderSuscripciones } from "./suscripciones.js";
 import { renderCategorias } from "./categorias.js";
+import { renderEtiquetas } from "./etiquetas.js";
 import { renderInforme } from "./informe.js";
 import { pushBack, goBack } from "../back.js";
 import { importCsv, importWithProfile } from "../n26.js";
@@ -264,6 +265,11 @@ export async function renderAjustes(container) {
     ? t("ajustes.categories.subtitleWithCount", { n: categoryCount })
     : t("ajustes.categories.subtitleNoCount");
 
+  // N de etiquetas ACTIVAS (listTags ya deja fuera archivadas y borradas) — mismo try/catch
+  // aislado que categoryCount: un fallo aquí no debe dejar Ajustes en blanco.
+  let tagCount = 0;
+  try { tagCount = (await listTags()).length; } catch { tagCount = 0; }
+
   const state = {
     errors: null, pending: null, busy: false, n26Result: null, n26Error: null,
     encExport: false, encImport: null, periodError: "",
@@ -408,6 +414,22 @@ export async function renderAjustes(container) {
       </div>
 
       <div class="card" style="margin-bottom:12px">
+        <button type="button" id="btn-etiquetas" class="list-row"
+          style="width:100%;text-align:left;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+          <div class="list-row-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 11V4h7l9 9-7 7z"></path><circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none"></circle>
+            </svg>
+          </div>
+          <div class="list-row-body">
+            <div class="list-row-title">${t("ajustes.tags.title")}</div>
+            <div class="list-row-sub">${t("ajustes.tags.sub", { n: tagCount })}</div>
+          </div>
+          <svg class="list-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg>
+        </button>
+      </div>
+
+      <div class="card" style="margin-bottom:12px">
         <p style="font-weight:600;margin-bottom:4px">${t("ajustes.bank.title")}</p>
         <p style="color:var(--text-2);font-size:13px;margin-bottom:14px">
           ${t("ajustes.bank.body")}</p>
@@ -506,6 +528,11 @@ export async function renderAjustes(container) {
     container.querySelector("#btn-categorias").onclick = () => {
       pushBack(() => renderAjustes(container));
       renderCategorias(container, goBack);
+    };
+
+    container.querySelector("#btn-etiquetas").onclick = () => {
+      pushBack(() => renderAjustes(container));
+      renderEtiquetas(container, goBack);
     };
 
     container.querySelector("#btn-n26-import").onclick = () => {
