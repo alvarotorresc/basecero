@@ -246,6 +246,14 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
     const f = state.form;
     const cats = categoriesFor(f.type);
     const withCategory = needsCategory(f.type);
+    // «Cancelar la suscripción» solo tiene sentido sobre lo GUARDADO, no sobre el formulario en
+    // curso: f.isSubscription/f.isActive cambian con cada toggle sin guardar, así que un usuario
+    // que desmarca "es una suscripción" (o la desactiva) vería el botón desaparecer/aparecer antes
+    // de pulsar "Guardar cambios" — y si lo pulsa, cancelSubscription() actuaría sobre una fila
+    // cuyo estado real en BD puede no ser ni suscripción ni activa. Se mira state.rules (la última
+    // lista recargada tras guardar), nunca el formulario vivo.
+    const saved = state.rules.find((r) => r.id === state.editId);
+    const canCancelSubscription = !!(saved?.is_subscription && saved?.is_active);
 
     const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
 
@@ -355,7 +363,7 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
       <button type="button" class="btn-primary" id="rec-save" style="margin-bottom:${state.editId ? "10px" : "0"};">
         ${state.editId ? t("common.saveChanges") : t("recurrentes.form.create")}
       </button>
-      ${state.editId && f.isSubscription && f.isActive ? `
+      ${state.editId && canCancelSubscription ? `
       <button type="button" id="rec-cancel-subscription"
         style="width:100%;background:var(--danger-tint);color:var(--danger);
           border:1px solid rgba(255,122,107,.4);border-radius:999px;padding:16px;font:600 15px var(--font-ui);
