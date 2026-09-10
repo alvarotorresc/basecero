@@ -929,6 +929,11 @@ body.onboarding .fab { display: none; }
 }
 .week-chip .num { font-weight: 600; }
 
+/* Grid de 3 columnas separadas por un filete de 1px (Inicio v2, I1: Gastado/Ingresos/Ahorrado).
+   El filete es el propio fondo del grid asomando por el gap de 1px entre celdas — sin bordes. */
+.stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--hairline); margin-top: var(--gap-section); }
+.stat-grid > div { display: flex; flex-direction: column; gap: 5px; padding: 15px 8px; background: var(--bg); }
+
 /* La hucha (SISTEMA §4.15): franja tintada al acento con filete izquierdo, una sola frase y como
    mucho dos acciones de texto — nunca un botón primario. */
 .hucha {
