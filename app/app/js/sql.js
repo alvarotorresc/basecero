@@ -251,6 +251,38 @@ export const SQL = {
   WHERE t.period_id=? AND t.deleted=0 AND t.date BETWEEN ? AND ?
   GROUP BY t.date`,
 
+  // Gasto por día Y categoría RAÍZ (Inicio v2, plan 2026-09-10: la espina de Semana y sus chips).
+  // Mismo criterio de prorrateo/devoluciones que spentByDay — (a) LEFT JOIN en vez de JOIN: el
+  // total de un día tiene que poder seguir siendo el mismo que da spentByDay aunque el movimiento
+  // no tenga categoría o su categoría esté borrada (root_id cae a ''); con INNER JOIN esas filas
+  // desaparecerían y la suma por root_id de un día dejaría de cuadrar con spentByDay de ese día
+  // (invariante fijada por el test "invariante" de repo-sql.test.mjs). (b) NO se filtra
+  // root.is_archived (a diferencia de spentByRootCategory:188 más abajo): esta consulta agrupa por
+  // DÍA, no por periodo, así que una raíz archivada con historial en la ventana sigue sumando en
+  // su día — divergencia aceptada y documentada en la spec (decisión 10): aquí importa más que el
+  // total del día cuadre que la simetría con el desglose del periodo. (c) bind:
+  // [periodId, startIso, endIso].
+  spentByDayRootCategory: `SELECT t.date AS date, COALESCE(root.id, '') AS root_id,
+    COALESCE(SUM(CASE WHEN t.type='expense' THEN ${MY_AMOUNT}
+                 WHEN t.type='refund' AND ${REFUND_REDUCES_SPEND} THEN -${MY_AMOUNT} ELSE 0 END),0) AS cents
+  FROM transactions t
+  JOIN periods p ON p.id = t.period_id
+  LEFT JOIN categories child ON child.id = t.category_id AND child.deleted = 0
+  LEFT JOIN categories root ON root.id = CASE WHEN COALESCE(child.parent_id,'') = '' THEN child.id ELSE child.parent_id END
+  WHERE t.period_id = ? AND t.deleted = 0 AND t.date BETWEEN ? AND ?
+    AND t.type IN ('expense','refund')
+  GROUP BY t.date, root_id`,
+
+  // Fechas (únicas) con algún apunte de dinero real, más recientes primero — la racha y el «llevas
+  // N días sin apuntar» de la hucha (Inicio v2). SIN filtro de periodo a propósito (spec decisión
+  // 17): acotarla al periodo abierto haría que el día 1 de un periodo nuevo una racha de 40 días se
+  // leyera «1 día». transfer/adjustment quedan fuera: mover dinero entre cuentas propias o el
+  // apunte automático de una liquidación no son «haber apuntado algo». LIMIT 60 acota el coste —
+  // de sobra para una racha que se enseña en dos dígitos.
+  recentTxDates: `SELECT DISTINCT date FROM transactions
+    WHERE deleted = 0 AND type IN ('expense','income','refund')
+    ORDER BY date DESC LIMIT 60`,
+
   // Reglas recurrentes (Task 10). Activas primero, luego alfabético — mismo criterio que la
   // lista de Recurrentes (las inactivas se apilan al final con su badge gris).
   listRules: `SELECT * FROM recurring_rules WHERE deleted=0 ORDER BY is_active DESC, name`,

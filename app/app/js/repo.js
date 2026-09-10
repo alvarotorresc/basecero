@@ -241,6 +241,16 @@ export async function spentLast7Days(pid) {
   return fillLast7Days(rows, today);
 }
 
+/** Gasto por día y categoría raíz en [startIso, endIso] (Inicio v2: la espina de Semana, sus chips
+ *  y el desglose de Inicio comparten esta única consulta — ver semana-logic.js#daysWithCategories). */
+export const spentByDayAndRootCategory = (pid, startIso, endIso) =>
+  query(SQL.spentByDayRootCategory, [pid, startIso, endIso]);
+
+/** Fechas (ISO, DESC, únicas) con algún gasto/ingreso/devolución — la racha y el «llevas N días sin
+ *  apuntar» de la hucha de Inicio v2. Array plano, no filas: es justo lo que esperan
+ *  inicio-logic.js#streakDays y #daysSinceLastEntry. */
+export const recentTxDates = async () => (await query(SQL.recentTxDates)).map((r) => r.date);
+
 /** Statements de UNA liquidación completa: por cada fila de pendingSettlements, el apunte que la
  *  salda + su UPDATE settled=1. Dos direcciones:
  *   - direction 'partner_owes' (lo pagué yo): devolución ENTRANTE por settle_cents en la cuenta

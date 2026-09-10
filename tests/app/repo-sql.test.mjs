@@ -92,3 +92,60 @@ test("categorías hoja de gasto para los chips (sin raíces con hijas, sin incom
   assert.ok(names.includes("Supermercado") && names.includes("Ropa y cuidado personal"));
   assert.ok(!names.includes("Casa") && !names.includes("Ingresos"));
 });
+
+// ---- SQL.spentByDayRootCategory / SQL.recentTxDates (plan Inicio v2, Task 3) ----------------
+
+test("spentByDayRootCategory: un gasto en una hija se atribuye a su raíz; uno anotado en la raíz también", () => {
+  const d = db();
+  tx(d, { date: "2026-08-20", cents: 2000, category: "cat-alimentacion-supermercado" }); // hija
+  tx(d, { date: "2026-08-20", cents: 500, category: "cat-alimentacion" });               // raíz directa
+  const rows = d.prepare(SQL.spentByDayRootCategory).all("p1", "2026-08-01", "2026-08-31");
+  const row = rows.find((r) => r.root_id === "cat-alimentacion");
+  assert.equal(row.cents, 2500);
+});
+
+test("spentByDayRootCategory: prorratea compartidos igual que spentOfPeriod; una devolución de tienda resta; la de una liquidación no", () => {
+  const d = db();
+  tx(d, { date: "2026-08-20", cents: 4520, shared: 1, category: "cat-alimentacion-supermercado" }); // 60% -> 2712
+  const gastoCompartido = tx(d, { date: "2026-08-20", cents: 3000, shared: 1, category: "cat-alimentacion-supermercado" }); // 60% -> 1800
+  tx(d, { date: "2026-08-20", type: "refund", cents: 1000, category: "cat-alimentacion-supermercado" }); // tienda: resta entera (no compartida)
+  tx(d, { date: "2026-08-20", type: "refund", cents: 500, category: "cat-alimentacion-supermercado", ref: gastoCompartido }); // liquidación: NO resta
+  const rows = d.prepare(SQL.spentByDayRootCategory).all("p1", "2026-08-01", "2026-08-31");
+  const row = rows.find((r) => r.root_id === "cat-alimentacion");
+  assert.equal(row.cents, 2712 + 1800 - 1000);
+});
+
+test("spentByDayRootCategory: sin categorizar y con la categoría borrada caen en root_id=''", () => {
+  const d = db();
+  tx(d, { date: "2026-08-20", cents: 700, category: "" });
+  d.prepare("UPDATE categories SET deleted=1 WHERE id=?").run("cat-alimentacion-supermercado");
+  tx(d, { date: "2026-08-20", cents: 300, category: "cat-alimentacion-supermercado" });
+  const rows = d.prepare(SQL.spentByDayRootCategory).all("p1", "2026-08-01", "2026-08-31");
+  const row = rows.find((r) => r.root_id === "");
+  assert.equal(row.cents, 1000);
+});
+
+test("spentByDayRootCategory: invariante — la suma por root_id de un día es exactamente el cents de SQL.spentByDay de ese día", () => {
+  const d = db();
+  const date = "2026-08-20";
+  tx(d, { date, cents: 2000, category: "cat-alimentacion-supermercado" });
+  tx(d, { date, cents: 500, category: "" });
+  tx(d, { date, type: "refund", cents: 300, category: "cat-alimentacion-supermercado" });
+  const totalByDay = d.prepare(SQL.spentByDay).all("p1", date, date).find((r) => r.date === date).cents;
+  const totalByRoot = d.prepare(SQL.spentByDayRootCategory).all("p1", date, date)
+    .filter((r) => r.date === date).reduce((s, r) => s + r.cents, 0);
+  assert.equal(totalByRoot, totalByDay);
+});
+
+test("recentTxDates: fechas distintas, DESC, sin borradas ni transfer/adjustment", () => {
+  const d = db();
+  tx(d, { date: "2026-08-18", cents: 1000 });
+  tx(d, { date: "2026-08-18", cents: 2000 }); // misma fecha: no debe duplicarse
+  tx(d, { date: "2026-08-20", type: "income", cents: 500, category: "cat-nomina" });
+  const borrado = tx(d, { date: "2026-08-21", cents: 100 });
+  d.prepare(SQL.softDeleteTransaction).run(T, borrado);
+  tx(d, { date: "2026-08-22", type: "transfer", cents: 999, category: "", account: "acc-n26", counterAccount: "acc-revolut" });
+  tx(d, { date: "2026-08-23", type: "adjustment", cents: 50, category: "" });
+  const rows = d.prepare(SQL.recentTxDates).all();
+  assert.deepEqual(rows.map((r) => r.date), ["2026-08-20", "2026-08-18"]);
+});
