@@ -128,7 +128,7 @@ function movRowHtml(r, byId, accById, partnerName) {
  *      gris (inicio.js), dejarlo en "movimientos" haría parpadear a Inicio al volver.
  *    · NO se pinta el esqueleto de la lista: la lista no se va a ver nunca en este modo.
  *    · openDetail NO apunta su propia entrada de historial: la apuntó el llamante (open-tx.js). */
-export async function renderMovimientos(container, { detailTxId = null, onDetailClose = null } = {}) {
+export async function renderMovimientos(container, { detailTxId = null, onDetailClose = null, tagId = null } = {}) {
   const detailOnly = !!detailTxId;
   // Silueta gris mientras llega la primera consulta (mismo criterio que inicio.js): selector de
   // periodo, fila de chips y lista. Solo en el PRIMER pintado de esta pantalla — el testigo
@@ -163,8 +163,11 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     // Task 4: filtro cliente sobre state.rows (buscador + chips por categoría raíz). Los tres
     // campos se combinan con AND en matchesFilter (movimientos-filter.js); la UI garantiza que
     // rootCatId y uncat no estén activos a la vez (chips de selección única, ver wireList).
-    // «Todos» = los tres en su valor neutro.
-    filter: { query: "", rootCatId: null, uncat: false },
+    // «Todos» = los tres en su valor neutro. tagId (Etiquetas, N11) llega de nav("movimientos",
+    // { tagId }) al entrar desde la pantalla Etiquetas — D13: NUNCA se autolimpia (a diferencia de
+    // rootCatId, ver loadPeriodData) y sobrevive a un cambio de periodo (ver el onchange de
+    // #mov-period): una etiqueta es transversal por definición.
+    filter: { query: "", rootCatId: null, uncat: false, tagId },
     // Muestra/oculta el input de búsqueda bajo la lupa del header — no forma parte del filtro en
     // sí (tener texto buscado con el input oculto sería confuso, así que cerrar limpia
     // filter.query, ver wireList#mov-search-toggle).
