@@ -112,15 +112,10 @@ export const ES = {
       title: "Gastado",
       income: "Ingresos",
       saved: "Ahorrado",
-      rate: "Tasa",
     },
     movements: {
       empty: "Registra tu primer gasto con el botón ＋",
       viewAll: "Ver todos",
-    },
-    flow: {
-      title: "Flujo de gasto",
-      last7: "Últimos 7 días · {total}",
     },
     week: {
       title: "Esta semana",
@@ -128,26 +123,13 @@ export const ES = {
     },
     categorySpend: {
       title: "Gasto por categoría",
-      subtitle: "Solo tu parte de lo compartido",
       empty: "Aún no hay gasto categorizado este periodo.",
-      others: "Otras {n}",
-      spent: "{currency} gastados",
-      of: "de {limit}",
-      noLimit: "sin límite",
       over: "supera el límite en {amount}",
       viewAll: "Ver todas",
     },
     savings: {
       rate: "Ahorras el {pct} de lo que ingresas",
       negative: "Este periodo gastas más de lo que ingresas",
-    },
-    shared: {
-      withPartner: "Con {name}",
-      periodSplit: "Este periodo: {mine} / {theirs}",
-      oldest: {
-        one: "{n} gasto sin liquidar · el más antiguo del {date}",
-        other: "{n} gastos sin liquidar · el más antiguo del {date}",
-      },
     },
     partnerBanner: {
       title: "¿Con quién compartes gastos?",
@@ -158,24 +140,17 @@ export const ES = {
       title: "Queda por pagar",
       left: "Te quedarán",
     },
+    // Solo `manage` sigue viva de este grupo (Task 10: el resto se pintaba en la antigua tarjeta
+    // «Previsión» v1, sustituida en la Task 9). Decisión 19 de la spec: fuera el «→», ningún
+    // glifo de texto hace de icono — es el enlace «Recurrentes» de «Queda por pagar».
     prevision: {
-      title: "Previsión",
-      // Task 6 (decisión 19 de la spec): fuera el «→», ningún glifo de texto hace de icono. La
-      // clave sigue viva: es el enlace «Recurrentes» de la sección «Queda por pagar» (Task 9).
       manage: "Recurrentes",
-      paid: "Pagado",
-      pending: "Pendiente",
-      committed: "Comprometido restante",
-      available: "Disponible real",
     },
     available: {
       title: "Disponible del periodo",
       days: { one: "{n} día", other: "{n} días" },
       spentOf: "{spent} gastados de {budget}",
       today: "Hoy puedes gastar",
-      ofBudgeted: "de {amount} presupuestados",
-      paceOver: "▲ {amount} sobre el ritmo del plan",
-      paceUnder: "▼ {amount} bajo el ritmo del plan",
     },
     hucha: {
       renewal: "{name} se renueva el {date} por {amount}. ¿Lo sigues usando?",

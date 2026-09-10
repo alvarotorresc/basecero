@@ -1,109 +1,14 @@
 // Módulo PURO (sin DOM ni imports de db/repo): construye y devuelve strings SVG/HTML para las
-// gráficas de Inicio (Task 12) y del detalle de cuenta (sparklineSvg, Task 13). Esto permite que
-// los tests de node importen el módulo directamente, sin worker ni DOM (ver tests/app/charts.test.mjs).
-// Importa fmtNum2 y fmtNum0 de format.js para el formateo de números — format.js también es puro
-// (sin DOM ni imports de db/repo), así que esta independencia se mantiene.
-
-import { fmtNum2, fmtNum0 } from "./format.js";
-
-const centsToStr = (cents) => fmtNum2((cents ?? 0) / 100);
-// Redondeado a la unidad, sin decimales — para las etiquetas inactivas de barChartSvg (ver ahí
-// el porqué).
-const centsToUnitStr = (cents) => fmtNum0(Math.round((cents ?? 0) / 100));
-
-// ---- barChartSvg ----------------------------------------------------------
-
-const BAR_AREA_H = 124; // alto del área de barras, igual que docs/design/material-expresivo/Resumen.dc.html:73
-const BAR_MAX_H = 100;  // tope de la barra más alta — deja hueco arriba para la etiqueta que ahora llevan TODAS las barras (antes solo la activa)
-const BAR_MIN_H = 3;    // alto mínimo visible para un día sin gasto (evita una barra invisible)
-const BAR_INACTIVE_COLOR = "var(--card2)";
-
-/** Tarjeta "Flujo de gasto": grid de N barras `align-items:end` + fila de iniciales de día
- *  debajo — réplica de docs/design/material-expresivo/Resumen.dc.html:73-106. Sin ejes.
- *  days: [{label, cents, active}] — la barra `active` (hoy) usa el color de acento; todas llevan
- *  su importe encima (la activa en acento, el resto atenuadas). La escala es relativa al día de
- *  mayor gasto del propio array (ese día ocupa el 100% de BAR_MAX_H). */
-export function barChartSvg(days) {
-  const maxCents = Math.max(0, ...days.map((d) => Math.max(0, d.cents ?? 0)));
-  const scale = maxCents > 0 ? BAR_MAX_H / maxCents : 0;
-
-  const barsHtml = days.map((d) => {
-    const cents = Math.max(0, d.cents ?? 0);
-    const h = Math.max(BAR_MIN_H, Math.round(cents * scale));
-    const fillColor = d.active ? "var(--accent)" : BAR_INACTIVE_COLOR;
-    // Importe encima de CADA barra (antes solo la activa): hoy en acento y negrita, el resto
-    // atenuado — los días a cero muestran «0» para que no parezca que falta la cifra.
-    // Las inactivas van SIN decimales, redondeadas a la unidad (1250 -> «13», no «12,50»): a
-    // 390px cada una de las 7 columnas mide ~37px, y «1.200,00» a 10px ocupa ~41px — dos días
-    // vecinos de cuatro cifras se solapan. Sin decimales, «1.200» sí cabe. Hoy (la activa) es
-    // la única que se lee suelta, así que conserva los céntimos.
-    const labelStyle = d.active
-      ? "font-size:10px;font-weight:700;color:var(--accent);"
-      : "font-size:10px;font-weight:500;color:var(--text-3);";
-    const labelStr = d.active ? centsToStr(cents) : centsToUnitStr(cents);
-    const labelHtml = `<div class="flujo-bar-label${d.active ? " flujo-bar-label--active" : ""}" style="${labelStyle}text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;">${labelStr}</div>`;
-    return `
-      <div class="flujo-bar${d.active ? " flujo-bar--active" : ""}" data-cents="${cents}"
-        style="display:flex;flex-direction:column;align-items:stretch;justify-content:flex-end;gap:6px;">
-        ${labelHtml}
-        <div class="flujo-bar-fill${d.active ? " flujo-bar-fill--active" : ""}"
-          style="height:${h}px;background:${fillColor};border-radius:12px;"></div>
-      </div>`;
-  }).join("");
-
-  const labelsHtml = days.map((d) => `
-    <div class="flujo-day-label${d.active ? " flujo-day-label--active" : ""}"
-      style="font-size:11px;text-align:center;${d.active ? "font-weight:700;color:var(--text);" : "color:var(--text-3);"}">${d.label}</div>`).join("");
-
-  return `
-    <div style="display:grid;grid-template-columns:repeat(${days.length},minmax(0,1fr));gap:10px;height:${BAR_AREA_H}px;align-items:end;">${barsHtml}
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(${days.length},minmax(0,1fr));gap:10px;">${labelsHtml}
-    </div>`;
-}
-
-// ---- donutSvg ---------------------------------------------------------
-
-const DONUT_R = 54;
-const DONUT_CIRC = 2 * Math.PI * DONUT_R;
-
-/** Tarjeta "Gasto por categoría": SVG 140×140, r=54, stroke 20, arcos con
- *  stroke-dasharray/stroke-dashoffset rotados −90° (empiezan arriba, avanzan en sentido horario)
- *  — réplica de docs/design/material-expresivo/Resumen.dc.html:119-137. slices: [{color, cents}], ya en el orden en que
- *  deben pintarse. centerTitle/centerSub: texto ya formateado por quien llama (p.ej. "1.762,40"
- *  / "EUR gastados") — este módulo no conoce fmtMoney ni ninguna moneda. */
-export function donutSvg(slices, centerTitle, centerSub) {
-  const total = slices.reduce((s, sl) => s + Math.max(0, sl.cents ?? 0), 0);
-
-  let arcsHtml;
-  if (total > 0) {
-    let offset = 0;
-    arcsHtml = slices.filter((sl) => (sl.cents ?? 0) > 0).map((sl) => {
-      const len = (sl.cents / total) * DONUT_CIRC;
-      const circle = `<circle cx="70" cy="70" r="${DONUT_R}" stroke="${sl.color}"
-        stroke-dasharray="${len.toFixed(2)} ${(DONUT_CIRC - len).toFixed(2)}"
-        stroke-dashoffset="${(-offset).toFixed(2)}"></circle>`;
-      offset += len;
-      return circle;
-    }).join("");
-  } else {
-    // Sin gasto todavía: anillo neutro completo en vez de dividir por cero.
-    arcsHtml = `<circle cx="70" cy="70" r="${DONUT_R}" stroke="${BAR_INACTIVE_COLOR}"
-      stroke-dasharray="${DONUT_CIRC.toFixed(2)} 0" stroke-dashoffset="0"></circle>`;
-  }
-
-  return `
-    <div style="display:grid;width:140px;height:140px;flex-shrink:0;">
-      <svg width="140" height="140" viewBox="0 0 140 140" style="grid-area:1 / 1;">
-        <g transform="rotate(-90 70 70)" fill="none" stroke-width="20">${arcsHtml}
-        </g>
-      </svg>
-      <div style="grid-area:1 / 1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;">
-        <div class="num" style="font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;">${centerTitle}</div>
-        <div style="font-size:9px;color:var(--text-3);">${centerSub}</div>
-      </div>
-    </div>`;
-}
+// gráficas de Patrimonio (sparklineSvg, netWorthBarsHtml). Esto permite que los tests de node
+// importen el módulo directamente, sin worker ni DOM (ver tests/app/charts.test.mjs).
+//
+// `barChartSvg` (Flujo de gasto) y `donutSvg` (donut de Gasto por categoría) vivieron aquí hasta
+// el plan Inicio v2 (2026-09-10): la Task 9 sustituyó sus dos únicos consumidores —los dos en
+// inicio.js— por la espina de semana-logic.js y las barras horizontales de I3, y el sistema v2
+// («Neto») no tiene ninguna rueda en ninguna de sus pantallas, así que no van a volver. Se
+// borraron aquí en la Task 10 junto con sus tests y sus constantes privadas (STANDARDS §6: si no
+// se usa, se borra) — ninguna de las dos funciones restantes (sparklineSvg, netWorthBarsHtml)
+// formatea números, así que el import de fmtNum2/fmtNum0 se fue con ellas.
 
 // ---- sparklineSvg -------------------------------------------------------
 

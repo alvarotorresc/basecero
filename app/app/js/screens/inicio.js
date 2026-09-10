@@ -5,7 +5,7 @@ import {
   getMetaAll, setMeta, hasSharedData,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, moneyPartsHtml, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtPct } from "../format.js";
+import { fmtMoney, moneyPartsHtml, fmtDiaLargo, fmtDiaCorto, fmtDiaIni, hoyISO, fmtPct0 } from "../format.js";
 import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
 import {
   nextAccountId, daysLeftOfPeriod, dailyAllowanceCents, nextDueDateIso, streakDays,
@@ -412,13 +412,14 @@ function statGridHtml(spent, income, ahorrado) {
 }
 
 /** «Ahorras el X % de lo que ingresas» (I1, Main.dc.html:307-309): savingsSentence decide el
- *  kind; sin ingresos, null → no se pinta nada. fmtPct da un decimal (54,2 %); Task 10 lo
- *  sustituye por fmtPct0 (54 %) en cuanto exista, sin tocar esta función. */
+ *  kind; sin ingresos, null → no se pinta nada. fmtPct0 (Task 10, sin decimales: «54 %») en vez
+ *  de fmtPct (que mete un decimal, «54,2 %») — coherente con el resto de cifras de la pantalla,
+ *  que van a un vistazo, no a precisión contable. */
 function savingsLineHtml(income, spent) {
   const s = savingsSentence(income, spent);
   if (!s) return "";
   const text = s.kind === "saves"
-    ? t("inicio.savings.rate", { pct: fmtPct(s.ratio) })
+    ? t("inicio.savings.rate", { pct: fmtPct0(s.ratio) })
     : t("inicio.savings.negative");
   return `<div style="padding-top:10px;"><span style="font-size:13px;font-weight:500;color:var(--ink-3);">${text}</span></div>`;
 }

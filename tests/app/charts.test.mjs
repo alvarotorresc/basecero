@@ -1,110 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { barChartSvg, donutSvg, sparklineSvg, netWorthBarsHtml } from "../../app/app/js/charts.js";
+import { sparklineSvg, netWorthBarsHtml } from "../../app/app/js/charts.js";
 import { SQL } from "../../app/app/js/sql.js";
 import { fillLast7Days } from "../../app/app/js/repo.js";
 import { fmtDiaIni } from "../../app/app/js/format.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
 const T = "2026-08-24T18:00:00Z";
-const CIRC = 2 * Math.PI * 54;
 
-// ---- donutSvg ----------------------------------------------------------
-
-test("donutSvg: la suma de los arcos (stroke-dasharray 'on') ≈ 2π·54, un circle por slice con su color", () => {
-  const slices = [
-    { color: "#8b9ff5", cents: 69000 },
-    { color: "#58d68d", cents: 31245 },
-    { color: "#ddb455", cents: 24615 },
-  ];
-  const svg = donutSvg(slices, "1.247,60", "EUR gastados");
-
-  const circles = [...svg.matchAll(/<circle[^>]*stroke="(#[0-9a-f]{6})"[^>]*stroke-dasharray="([\d.]+) ([\d.]+)"/gi)];
-  assert.equal(circles.length, slices.length, "un <circle> por slice");
-  circles.forEach((m, i) => assert.equal(m[1], slices[i].color));
-
-  const total = circles.reduce((s, m) => s + Number(m[2]), 0);
-  assert.ok(Math.abs(total - CIRC) <= 1, `suma ${total} debería ser ≈ ${CIRC} (±1)`);
-
-  assert.ok(svg.includes("1.247,60"));
-  assert.ok(svg.includes("EUR gastados"));
-});
-
-test("donutSvg: sin gasto (todo a 0) no revienta y no pinta arcos con NaN", () => {
-  const svg = donutSvg([{ color: "#8b9ff5", cents: 0 }], "0,00", "EUR gastados");
-  assert.ok(!svg.includes("NaN"));
-});
-
-// ---- barChartSvg --------------------------------------------------------
-
-test("barChartSvg: la barra de mayor importe tiene la altura máxima; la activa lleva el marcador de acento", () => {
-  const days = [
-    { label: "L", cents: 2600, active: false },
-    { label: "M", cents: 6400, active: false },
-    { label: "X", cents: 1900, active: false },
-    { label: "J", cents: 4400, active: false },
-    { label: "V", cents: 3500, active: false },
-    { label: "S", cents: 9640, active: true },
-    { label: "D", cents: 9000, active: false },
-  ];
-  const html = barChartSvg(days);
-
-  // una barra por día, con su cents y altura
-  const bars = [...html.matchAll(/data-cents="(\d+)"[^]*?height:(\d+)px/g)];
-  assert.equal(bars.length, days.length);
-
-  const heights = bars.map((m) => Number(m[2]));
-  const maxHeightBarIdx = heights.indexOf(Math.max(...heights));
-  // el día de mayor cents (S, índice 5, 9640) debe llevar la altura máxima
-  assert.equal(Number(bars[maxHeightBarIdx][1]), 9640);
-
-  // la barra activa lleva la clase/marcador de acento
-  assert.ok(html.includes("flujo-bar--active"));
-  assert.ok(html.includes("var(--accent)"));
-
-  // la inicial de HOY (S, la marcada active:true) lleva su propia clase de acento — no basta con
-  // que ">S<" aparezca en algún sitio, tiene que ser justo la etiqueta con el marcador
-  assert.match(html, /flujo-day-label--active"[^>]*>S</);
-});
-
-test("barChartSvg: todos los días a 0 no revienta (altura mínima, sin NaN)", () => {
-  const days = [0, 0, 0, 0, 0, 0, 0].map((cents, i) => ({ label: "LMXJVSD"[i], cents, active: i === 6 }));
-  const html = barChartSvg(days);
-  assert.ok(!html.includes("NaN"));
-  assert.ok(!html.includes("Infinity"));
-});
-
-test("barChartSvg: todas las barras llevan su importe; la activa con marcador --active y el resto atenuadas", () => {
-  const days = [
-    { label: "L", cents: 1250, active: false },
-    { label: "M", cents: 0, active: false },
-    { label: "X", cents: 99900, active: true },
-  ];
-  const html = barChartSvg(days);
-
-  // una etiqueta de importe por día, no solo para la activa
-  const labelOpens = html.match(/class="flujo-bar-label/g) || [];
-  assert.equal(labelOpens.length, 3);
-
-  // las inactivas van sin decimales, redondeadas a la unidad (1250 -> 13, 0 -> 0); la activa
-  // conserva los céntimos (999,00)
-  assert.match(html, />13</);
-  assert.match(html, />0</);
-  assert.match(html, />999,00</);
-
-  // solo la activa lleva el marcador --active
-  const activeMarkers = html.match(/flujo-bar-label--active/g) || [];
-  assert.equal(activeMarkers.length, 1);
-
-  // la etiqueta de un día no activo va atenuada; la de la activa, en color de acento
-  const inactiveMatch = html.match(/<div class="flujo-bar-label[^>]*>13</);
-  assert.ok(inactiveMatch, "debe existir la etiqueta inactiva redondeada");
-  assert.match(inactiveMatch[0], /color:var\(--text-3\)/);
-  const activeMatch = html.match(/<div class="flujo-bar-label[^>]*>999,00</);
-  assert.ok(activeMatch, "debe existir la etiqueta activa con decimales");
-  assert.match(activeMatch[0], /color:var\(--accent\)/);
-});
+// donutSvg y barChartSvg (y sus tests de aquí) se borraron en el plan Inicio v2, Task 10: sin
+// consumidor desde que la Task 9 sustituyó el donut y el flujo de gasto de Inicio por la espina y
+// las barras horizontales — ver el comentario de cabecera de charts.js.
 
 // ---- sparklineSvg --------------------------------------------------------
 

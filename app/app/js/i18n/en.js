@@ -107,15 +107,10 @@ export const EN = {
       title: "Spent",
       income: "Income",
       saved: "Saved",
-      rate: "Rate",
     },
     movements: {
       empty: "Log your first expense with the ＋ button",
       viewAll: "View all",
-    },
-    flow: {
-      title: "Spending flow",
-      last7: "Last 7 days · {total}",
     },
     week: {
       title: "This week",
@@ -123,26 +118,13 @@ export const EN = {
     },
     categorySpend: {
       title: "Spending by category",
-      subtitle: "Only your share of shared expenses",
       empty: "No categorized spending yet this period.",
-      others: "{n} others",
-      spent: "{currency} spent",
-      of: "of {limit}",
-      noLimit: "no limit",
       over: "over the limit by {amount}",
       viewAll: "View all",
     },
     savings: {
       rate: "You’re saving {pct} of what you earn",
       negative: "You’re spending more than you earn this period",
-    },
-    shared: {
-      withPartner: "With {name}",
-      periodSplit: "This period: {mine} / {theirs}",
-      oldest: {
-        one: "{n} unsettled expense · oldest from {date}",
-        other: "{n} unsettled expenses · oldest from {date}",
-      },
     },
     partnerBanner: {
       title: "Who do you share expenses with?",
@@ -153,22 +135,17 @@ export const EN = {
       title: "Still to pay",
       left: "You’ll have left",
     },
+    // Only `manage` survives from this group (Task 10: the rest painted the old v1 "Forecast"
+    // card, replaced in Task 9). Decision 19: no arrow, no text-glyph icons — it's the
+    // "Recurring" link under "Still to pay".
     prevision: {
-      title: "Forecast",
       manage: "Recurring",
-      paid: "Paid",
-      pending: "Pending",
-      committed: "Remaining committed",
-      available: "Actually available",
     },
     available: {
       title: "Available this period",
       days: { one: "{n} day", other: "{n} days" },
       spentOf: "{spent} spent of {budget}",
       today: "You can spend today",
-      ofBudgeted: "of {amount} budgeted",
-      paceOver: "▲ {amount} over the plan’s pace",
-      paceUnder: "▼ {amount} under the plan’s pace",
     },
     hucha: {
       renewal: "{name} renews on {date} for {amount}. Still using it?",
