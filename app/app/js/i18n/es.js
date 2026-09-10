@@ -277,6 +277,15 @@ export const ES = {
         other: "{amount} en {period}, {n} movimientos",
       },
     },
+    // Nota de cierre del filtro de etiqueta (Movimientos.dc.html:146-148): tagTotalsAll.n menos
+    // tagTotalsOfPeriod.n, solo con etiqueta activa y resto > 0. {n} solo aparece en «other»: el
+    // singular ya dice «el otro movimiento», sin numeral.
+    tag: {
+      olderNote: {
+        one: "El otro movimiento de {tag} es de un periodo anterior. Quita el filtro para ver todo {period}.",
+        other: "Los otros {n} movimientos de {tag} son de periodos anteriores. Quita el filtro para ver todo {period}.",
+      },
+    },
     shared: {
       fallbackName: "la contraparte",
       fallbackLabel: "Contraparte",

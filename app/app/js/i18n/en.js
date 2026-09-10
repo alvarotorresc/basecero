@@ -269,6 +269,15 @@ export const EN = {
         other: "{amount} in {period}, {n} movements",
       },
     },
+    // Closing note for the tag filter (Movimientos.dc.html:146-148): tagTotalsAll.n minus
+    // tagTotalsOfPeriod.n, only with an active tag and a positive remainder. {n} appears only in
+    // "other": the singular already says "the other movement", no numeral.
+    tag: {
+      olderNote: {
+        one: "The other {tag} movement is from an earlier period. Clear the filter to see all of {period}.",
+        other: "The other {n} {tag} movements are from earlier periods. Clear the filter to see all of {period}.",
+      },
+    },
     shared: {
       fallbackName: "the other party",
       fallbackLabel: "Other party",

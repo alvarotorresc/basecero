@@ -6,7 +6,7 @@ import {
 import { colorForCategory, iconForCategory, textColorForCategory, rootOf } from "../category-colors.js";
 import { budgetStatus } from "../category-spend.js";
 import { matchesFilter, isUncategorized } from "../movimientos-filter.js";
-import { fmtMoney, moneyPartsHtml, fmtDiaLargo, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { fmtMoney, moneyPartsHtml, fmtDiaLargo, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { metaHtml, subHeaderHtml } from "../ui.js";
@@ -297,6 +297,25 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       </div>
       ${limitHtml}
       <span style="font-size:13px;font-weight:500;color:var(--text-3);">${t("movimientos.tagCard.periodLine", { amount: fmtMoney(periodTag.spent_cents), period: escHtml(periodName), n: periodTag.n })}</span>
+    </div>`;
+  }
+
+  /** Nota de cierre del filtro de etiqueta (Movimientos.dc.html:146-148): cuántos movimientos de
+   *  la etiqueta activa quedan FUERA de este periodo — tagTotalsAll.n (de siempre) menos
+   *  tagTotalsPeriod.n (de este periodo). Solo se pinta con una etiqueta activa y resto > 0: es
+   *  el mismo dato que ya calcula tagCardHtml, sin cargar nada nuevo. */
+  function tagOlderNoteHtml() {
+    const tagId = state.filter.tagId;
+    if (!tagId) return "";
+    const tag = state.tagTotalsAll.find((tg) => tg.id === tagId);
+    if (!tag) return "";
+    const periodTag = state.tagTotalsPeriod.find((tg) => tg.id === tagId);
+    const older = tag.n - (periodTag?.n ?? 0);
+    if (older <= 0) return "";
+    const periodName = periods.find((p) => p.id === state.periodId)?.name ?? "";
+    return `
+    <div style="padding-top:22px;">
+      <span style="font:var(--t-label);color:var(--ink-3);line-height:1.45;display:block;">${t("movimientos.tag.olderNote", { n: older, tag: escHtml(tag.name), period: escHtml(periodName) })}</span>
     </div>`;
   }
 
@@ -789,7 +808,7 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
     return `<div class="card" style="display:flex;flex-direction:column;gap:16px;">
         <div style="display:flex;flex-direction:column;gap:12px;">
           ${groupByDay(visible).map((g) => `
-            <div class="day-label">${g.date === hoy ? t("common.today") : fmtDiaLargo(g.date)}</div>
+            <div class="day-label" style="font:var(--t-label);font-weight:600;color:var(--ink);">${g.date === hoy ? t("common.today") : fmtDiaCorto(g.date)}</div>
             ${g.rows.map((r) => movRowHtml(r, byId, accById, partnerName)).join("")}
           `).join("")}
         </div>
@@ -879,6 +898,7 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
       <div id="mov-list-body">${listBodyHtml()}</div>
+      ${tagOlderNoteHtml()}
     `;
     wireList();
   }
