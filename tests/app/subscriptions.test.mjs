@@ -115,6 +115,15 @@ test("nextRenewal: trimestral avanza de tres en tres meses desde due_month hasta
   assert.equal(nextRenewal(r, "2026-09-20"), "2026-12-15");
 });
 
+// Regresión: due_month=12 ancla el ciclo en dic/mar/jun/sep. Con hoy ANTES de esa ancla dentro
+// del año (due_month - todayMonth > 0), la versión ingenua que solo SUMABA desde due_month se
+// saltaba hasta 3 trimestres de más (devolvía diciembre en vez del marzo que tocaba).
+test("nextRenewal: trimestral con due_month posterior al mes de hoy cae en el trimestre correcto, no 3 de más", () => {
+  const r = rule({ frequency: "quarterly", due_day: 5, due_month: 12 }); // ciclo: dic, mar, jun, sep
+  assert.equal(nextRenewal(r, "2026-01-10"), "2026-03-05");
+  assert.equal(nextRenewal(r, "2026-04-10"), "2026-06-05");
+});
+
 test("nextRenewal: semanal siempre \"\" — el esquema no tiene ancla semanal (D5)", () => {
   const r = rule({ frequency: "weekly", due_day: 9 });
   assert.equal(nextRenewal(r, "2026-09-09"), "");

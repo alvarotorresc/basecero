@@ -75,6 +75,17 @@ export function nextRenewal(rule, todayIso) {
     if (rule.due_month == null || rule.due_month === "") return "";
     const step = rule.frequency === "yearly" ? 12 : 3;
     let monthIndex = Number(rule.due_month) - 1;
+    // Una trimestral no vive solo en due_month: repite cada 3 meses desde ahí, así que su ancla
+    // real puede caer en un mes ANTERIOR a due_month dentro del ciclo de este año (p. ej.
+    // due_month=12 con ciclo dic/mar/jun/sep — en abril lo que toca es junio, no diciembre).
+    // Se realinea el mes de ancla al mismo resto módulo 3 que due_month pero lo más cercano a
+    // hoy (puede quedar en negativo: isoFromParts lo normaliza vía el constructor de Date, que
+    // toma prestado del año anterior) — así el "while" de abajo nunca tiene que dar más de una
+    // vuelta completa de más. yearly no necesita este realineado: su step ya es 12, un único mes.
+    if (rule.frequency === "quarterly") {
+      const todayMonthIndex = todayMonth - 1;
+      monthIndex = todayMonthIndex - (((todayMonthIndex - monthIndex) % step) + step) % step;
+    }
     let year = todayYear;
     let iso = isoFromParts(year, monthIndex, day);
     while (iso < todayIso) {
