@@ -47,7 +47,8 @@ const ZIGZAG_BOTTOM = edge(false);
  *  @param {object|null} [o.badge]      Ficha de 28 (entity.js#badgeHtml): {fam, income, icon, label}.
  *  @param {Array<{label:string, value:string, fam?:string|null}>} [o.lines]  `fam` pinta la
  *                                      muestra de 10 de una cuenta delante del valor.
- *                                      `num` pone el valor en la mono tabular (importes).
+ *                                      `num` pone el valor en la mono tabular (importes);
+ *                                      `neg`, en --neg (C4: la cifra negativa que avisa).
  *  @param {Array<{label:string, value:string, num?:boolean}>} [o.periodLines]  Segundo grupo, tras otra
  *                                      perforación: «Quedan en septiembre», «Hoy puedes gastar».
  *  @param {{main:string, cents:string, suffix:string}} o.total  fmtMoneyParts.
@@ -61,7 +62,7 @@ export function ticketHtml({ dateTime, title = "", subtitle = "", badge = null, 
         <div class="recibo-line">
           <span class="recibo-label">${escHtml(l.label)}</span>
           <span class="recibo-dots"></span>
-          <span class="recibo-value${l.num ? " num" : ""}">${fc ? `<span class="recibo-swatch ${fc}" aria-hidden="true"></span>` : ""}${escHtml(l.value)}</span>
+          <span class="recibo-value${l.num ? " num" : ""}${l.neg ? " is-neg" : ""}">${fc ? `<span class="recibo-swatch ${fc}" aria-hidden="true"></span>` : ""}${escHtml(l.value)}</span>
         </div>`;
   }).join("");
   const group = (list) => {

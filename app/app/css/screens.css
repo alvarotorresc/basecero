@@ -1121,6 +1121,7 @@
 .recibo-label { flex: none; font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
 .recibo-dots { flex: 1; min-width: 12px; border-bottom: 2px dotted var(--border); transform: translateY(-4px); }
 .recibo-value { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--sp-8); font-size: var(--fs-14); font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.recibo-value.is-neg { color: var(--neg); }
 .recibo-swatch { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--fb); }
 #recibo.is-leaving { animation: bc-recibo-out 180ms ease-in forwards; }
 @keyframes bc-recibo-veil { from { opacity: 0; } }

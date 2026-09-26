@@ -49,3 +49,8 @@ test("ticketHtml B: periodLines es un segundo grupo con su perforación; vacío,
   assert.equal(count(sin, /recibo-perf/g), 1);
   assert.ok(!sin.includes("Quedan en septiembre"));
 });
+
+test("ticketHtml B: una línea con `neg` lleva is-neg (C4); sin él, no", () => {
+  const html = ticketHtml({ ...BASE, periodLines: [{ label: "Quedan en septiembre", value: "-12,00 €", num: true, neg: true }, { label: "Hoy puedes gastar", value: "0,00 €", num: true }] });
+  assert.equal(count(html, /recibo-value num is-neg/g), 1);
+});

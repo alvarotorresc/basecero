@@ -415,7 +415,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
             const row = txRowHtml({
               fam: familyForCategory(r.category_id, byId), icon: iconForCategory(r.category_id, byId),
               title, line2: done ? doneLabel : (byId[r.category_id]?.name ?? ""),
-              amountHtml: escHtml(fmtMoney(r.amount_cents)), sign: "none", data: { refundRow: r.id },
+              amountHtml: escHtml(fmtMoney(r.amount_cents)), sign: "expense", data: { refundRow: r.id },
             });
             return done ? `<div class="reg-refund-done">${row}</div>` : row;
           }).join("")}
@@ -1142,7 +1142,8 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       const monthIdx = periodMonth(period.start_date, period.end_date) - 1;
       const month = new Date(2000, monthIdx, 15).toLocaleDateString(appLocale(), { month: "long" });
       return [
-        { label: t("recibo.left", { month }), value: fmtMoney(disponible), num: true },
+        // C4: un disponible negativo es un «−» que avisa → la cifra en --neg, como el aviso de límite.
+        { label: t("recibo.left", { month }), value: fmtMoney(disponible), num: true, neg: disponible < 0 },
         // Mismo suelo que Inicio: sin margen se enseña 0, no una cifra negativa por día.
         { label: t("recibo.today"), value: fmtMoney(Math.max(0, allowance)), num: true },
       ];
