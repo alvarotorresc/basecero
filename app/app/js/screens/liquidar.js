@@ -1,4 +1,5 @@
-import { pendingSettlements, listAccounts, allCategoriesById, settleAllShared, getMetaAll } from "../repo.js";
+import { pendingSettlements, listAccounts, allCategoriesById, settleAllShared, getMetaAll, getAccountStyle, listGoals } from "../repo.js";
+import { familyForAccount } from "../account-colors.js";
 import { familyForCategory, iconForCategory } from "../category-colors.js";
 import { fmtMoney, fmtDiaCorto } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
@@ -62,10 +63,10 @@ function rowHtml(r, { byId, selected, partner, common }) {
  *  repo.settleAllShared hace el execMany atómico (o se liquidan todas las elegidas, o ninguna).
  *  onBack vuelve a Inicio (que se re-renderiza entero). */
 export async function renderLiquidar(container, onBack) {
-  let rows, accountsAll, byId, meta;
+  let rows, accountsAll, byId, meta, accountStyle, goals;
   try {
-    [rows, accountsAll, byId, meta] = await Promise.all([
-      pendingSettlements(), listAccounts(), allCategoriesById(), getMetaAll(),
+    [rows, accountsAll, byId, meta, accountStyle, goals] = await Promise.all([
+      pendingSettlements(), listAccounts(), allCategoriesById(), getMetaAll(), getAccountStyle(), listGoals(),
     ]);
   } catch (e) {
     container.innerHTML = `
@@ -147,7 +148,7 @@ export async function renderLiquidar(container, onBack) {
           <span class="liq-account-label" id="liq-account-label">${escHtml(t(net < 0 ? "liquidar.account.out" : "liquidar.account.in"))}</span>
           ${segmentedHtml({
             id: "liq-accounts", name: t(net < 0 ? "liquidar.account.out" : "liquidar.account.in"), labelledBy: "liq-account-label",
-            options: accounts.map((a) => ({ value: a.id, label: a.name })), value: state.accountId,
+            options: accounts.map((a) => ({ value: a.id, label: a.name, fam: familyForAccount(a, accountStyle, goals) })), value: state.accountId,
           })}
         </div>` : ""}
 
