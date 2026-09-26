@@ -9,7 +9,7 @@ import {
   currencySymbol, centsToRaw, parseCentsRaw,
 } from "../format.js";
 import { t } from "../i18n/index.js";
-import { PCT_STEP, stepPct } from "../share-pct.js";
+import { PCT_STEP, stepPct, normalizePct } from "../share-pct.js";
 import { inheritedBudgetsRaw, budgetMap } from "../category-spend.js";
 import { remainderCents, sweepDestinations, sweepPlan } from "../barrido.js";
 import { renderInforme } from "./informe.js";
@@ -50,7 +50,7 @@ function dayTileHtml(iso, selected) {
  *  nav() bloqueado — ver main.js), así que un simple banner sin salida deja a quien lo use
  *  atrapado. "Reintentar" vuelve a montar la pantalla entera; "Volver" (solo en modo 'next',
  *  donde SÍ hay algo a lo que volver sin haber creado nada) llama a onDone() como cancelación. */
-function renderAsistenteError(container, { mode, onDone, onBack, embed }, message) {
+function renderAsistenteError(container, { mode, onDone, onBack, embed, initialSharePct }, message) {
   container.innerHTML = `
     <div class="banner-aviso red">${escHtml(message)}</div>
     <div class="pn-error-actions">
@@ -58,7 +58,7 @@ function renderAsistenteError(container, { mode, onDone, onBack, embed }, messag
       ${mode === "next" ? buttonHtml({ id: "pn-error-back", label: t("common.goBack") }) : ""}
     </div>`;
   container.querySelector("#pn-error-retry").onclick =
-    () => renderPeriodoNuevo(container, { mode, onDone, onBack, embed });
+    () => renderPeriodoNuevo(container, { mode, onDone, onBack, embed, initialSharePct });
   const back = container.querySelector("#pn-error-back");
   if (back) back.onclick = () => (onBack ?? onDone)();
 }
@@ -68,8 +68,10 @@ function renderAsistenteError(container, { mode, onDone, onBack, embed }, messag
  *  el primero (onboarding, sin nada que cerrar). Presupuestos por categoría RAÍZ de gasto:
  *  spentByRootCategory('' ) en modo 'first' no matchea ningún period_id → devuelve todas las
  *  raíces con spent_cents=0 (mismo LEFT JOIN, sin fila cerrada de la que tirar "mes pasado").
- *  onDone() se llama tanto al abrir con éxito como al cancelar con la flecha atrás (modo 'next'). */
-export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embed = false }) {
+ *  onDone() se llama tanto al abrir con éxito como al cancelar con la flecha atrás (modo 'next').
+ *  `initialSharePct` (solo modo 'first', S13): el reparto que el onboarding ya pidió en su paso
+ *  Ajustes, para que el paso a paso de aquí arranque en él y no en el 50 de siempre. */
+export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embed = false, initialSharePct }) {
   let closingPeriod = null, closingSpent = 0, closingIncome = 0, closingCount = 0, rootRows = [], meta = {};
   let closingBudgets = [];
   // Barrido (N4): goals con progreso, cuentas vivas y la cuenta de origen por defecto — solo hace
@@ -79,7 +81,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     if (mode === "next") {
       closingPeriod = await getOpenPeriod();
       if (!closingPeriod) {
-        renderAsistenteError(container, { mode, onDone, onBack, embed }, t("periodo.error.noOpenToClose"));
+        renderAsistenteError(container, { mode, onDone, onBack, embed, initialSharePct }, t("periodo.error.noOpenToClose"));
         return;
       }
       const [spent, income, all, roots, budgetRows, metaAll, goals, accounts, defaultAccId] = await Promise.all([
@@ -101,7 +103,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
       [rootRows, meta] = await Promise.all([spentByRootCategory(""), getMetaAll()]);
     }
   } catch (e) {
-    renderAsistenteError(container, { mode, onDone, onBack, embed }, t("periodo.error.load", { error: userMessage(e) }));
+    renderAsistenteError(container, { mode, onDone, onBack, embed, initialSharePct }, t("periodo.error.load", { error: userMessage(e) }));
     return;
   }
   const partnerName = (meta.partner_name || "").trim();
@@ -143,7 +145,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
   const state = {
     startDate: hoyISO(),
     name: nombrePorDefecto(),
-    sharePct: mode === "next" ? closingPeriod.my_share_pct : 50,
+    sharePct: mode === "next" ? closingPeriod.my_share_pct : normalizePct(initialSharePct, 50),
     budgets: { ...inherited }, // rootId -> string en euros tal cual lo escribe el usuario ("" = sin límite)
     // Una raíz con límite heredado TIENE que estar visible: totalPresupuestadoCents suma todo lo
     // que haya en state.budgets, así que una fila oculta metería en el «Presupuestado» del pie un
