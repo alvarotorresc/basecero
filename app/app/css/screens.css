@@ -1112,7 +1112,8 @@
 }
 .recibo-stamp-in { display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); padding: var(--sp-4) var(--sp-12); border: 1px solid currentColor; border-radius: var(--radius-xs); }
 .recibo-stamp-label { font-family: var(--font-display); font-size: var(--fs-13); font-weight: 700; line-height: var(--lh-title); }
-.recibo-stamp-date { font-size: var(--fs-12); font-weight: 600; }
+/* C7: la fecha es una cifra y va en tinta, aunque el sello lleve el color de su familia. */
+.recibo-stamp-date { font-size: var(--fs-12); font-weight: 600; color: var(--text); }
 .recibo-badge { display: flex; }
 .recibo-perf { border-top: 1px dashed var(--border); }
 .recibo-lines { display: flex; flex-direction: column; gap: var(--sp-12); }
