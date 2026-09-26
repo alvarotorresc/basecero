@@ -727,7 +727,7 @@ export const ES = {
       open: "No se pudo abrir el periodo: {error}",
     },
     header: {
-      closing: "Cierras {name} y abres el siguiente",
+      closing: "Cierras {name} y abres {next}",
       first: "Primer periodo",
       title: "Nuevo periodo",
     },

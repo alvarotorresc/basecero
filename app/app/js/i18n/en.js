@@ -699,7 +699,7 @@ export const EN = {
       open: "Couldn’t open the period: {error}",
     },
     header: {
-      closing: "Closing {name} and opening the next one",
+      closing: "Closing {name} and opening {next}",
       first: "First period",
       title: "New period",
     },
