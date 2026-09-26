@@ -213,6 +213,18 @@ export function ruleStateKey(rule, item) {
   return item.paid ? "paid" : "pending";
 }
 
+/** Suma YA PAGADA este periodo, en céntimos: recorre los `items` de repo.previsionOfPeriod
+ *  ({rule, myCents, paid}) y suma los que ya están liquidados (item.paid), con el mismo criterio
+ *  de exclusión que monthlyCommitmentCents — sin ingresos, con transferencias (una aportación ya
+ *  hecha a la hucha es dinero resuelto igual que una factura pagada). Junto con
+ *  repo.previsionOfPeriod#comprometidoCents (lo pendiente), da el total real de ESTE periodo —
+ *  a diferencia de monthlyCommitmentCents, que promedia el anual de TODAS las reglas activas sin
+ *  mirar si aplican este mes: una trimestral que no toca este periodo cuenta en el promedio pero
+ *  nunca aparece en `items`, así que restar un promedio del otro no da una cifra real (verificado:
+ *  monthlyCommitmentCents − comprometidoCents desprecia esa diferencia; esta función no). */
+export const paidThisPeriodCents = (items) =>
+  (items ?? []).filter((it) => it.paid && it.rule.type !== "income").reduce((s, it) => s + it.myCents, 0);
+
 /** Mapa saneado {ruleId: dueIso} de meta.renewal_snoozed. Mismo criterio de defensa en
  *  profundidad que parseIgnored: JSON roto, no-objeto, o una entrada cuyo valor no es una fecha
  *  ISO con forma válida se descarta en silencio. Guard `__proto__`: `out[k]=` SÍ dispara el
