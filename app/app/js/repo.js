@@ -6,6 +6,7 @@ import { CONTRACT, insertSql } from "./contract.js";
 import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
 import { resolveAccountId, sanitizeLoanMap, parseLoanMap } from "./account-defaults.js";
 import { isFamily, isCatIcon, parseStyle, initCategoryStyle } from "./category-colors.js";
+import { parseAccountStyle, sanitizeAccountStyle } from "./account-colors.js";
 import { SEED_NAMES } from "./seeds.js";
 import { t, monthShort } from "./i18n/index.js";
 import { isValidPct } from "./share-pct.js";
@@ -927,14 +928,19 @@ export async function updateAccount(id, fields) {
  *  lanza — pero `db.js#exec` (Worker/sqlite-wasm, no es de P7 tocarlo) descarta la respuesta del
  *  Worker y no expone `changes`, así que el resultado se confirma con una lectura de vuelta: si
  *  `getAccount(id)` sigue encontrando la fila, no se borró nada.
- *  No hace falta limpiar meta: resolveAccountId ya tolera un default_account_id/import_account_id
- *  que apunte a una cuenta que no existe (account-defaults.js:2-6), y una entrada suelta de
- *  meta.account_loans nunca se lee sin su cuenta.
+ *  No hace falta limpiar meta.account_loans: resolveAccountId ya tolera un default_account_id/
+ *  import_account_id que apunte a una cuenta que no existe (account-defaults.js:2-6), y una
+ *  entrada suelta de meta.account_loans nunca se lee sin su cuenta. meta.account_style (PR-10) SÍ
+ *  se limpia abajo (el brief de la PR lo pide): sin esta llamada, la entrada huérfana no la lee
+ *  nadie (el id borrado no vuelve — bcUlid no se reutiliza), pero viaja para siempre en cada
+ *  export xlsx a partir de aquí.
  *  Solo se llama desde el paso 2 del onboarding: nadie debe cablearlo a PatrimonioCuenta y dar por
  *  hecha la feature aparcada. */
 export async function deleteEmptyAccount(id) {
   await exec(SQL.deleteEmptyAccount, [id, id, id, id, id, id]);
-  return !(await getAccount(id));
+  const deleted = !(await getAccount(id));
+  if (deleted) await setAccountFamily(id, undefined);
+  return deleted;
 }
 
 /** Cuota mensual de un pasivo (Task 6, CONFIG-IN-META — mismo patrón que setCategoryStyle, sin
@@ -965,6 +971,30 @@ export async function setAccountLoan(accountId, monthlyCents) {
 export async function getAccountLoans() {
   const meta = await getMetaAll();
   return parseLoanMap(meta.account_loans);
+}
+
+/** Familia de UNA cuenta (PR-10, D-2, DESIGN.md C8): read-modify-write de meta.account_style,
+ *  mismo patrón exacto que setAccountLoan/account_loans de arriba. `fam` ausente/null BORRA el
+ *  override (vuelve a la familia por defecto de su tipo, account-colors.js#defaultFamilyForAccount)
+ *  — mismo criterio "ausente = sin override" que setCategoryStyle. `fam` fuera de FAMILIES lanza
+ *  (viene de la UI, que solo ofrece las 12 familias cerradas); sanitizeAccountStyle se aplica
+ *  ANTES de escribir, como defensa en profundidad adicional. */
+export async function setAccountFamily(accountId, fam) {
+  if (fam !== undefined && fam !== null && !isFamily(fam)) throw new UserError(t("errors.repo.colorUnavailable"));
+  const meta = await getMetaAll();
+  const styleMap = parseAccountStyle(meta.account_style);
+  if (fam) styleMap[accountId] = { fam };
+  else delete styleMap[accountId];
+  await setMeta("account_style", JSON.stringify(sanitizeAccountStyle(styleMap)));
+}
+
+/** Mapa saneado {accountId: {fam}} de meta.account_style. Sin estado global ni boot: a diferencia
+ *  de category_style (singleton porque colorForCategory/iconForCategory se llaman desde varias
+ *  pantallas), account_style se consulta bajo demanda con familyForAccount/goalFamily
+ *  (account-colors.js), mismo criterio que getAccountLoans. */
+export async function getAccountStyle() {
+  const meta = await getMetaAll();
+  return parseAccountStyle(meta.account_style);
 }
 
 export const getGoal = async (id) => (await query(SQL.getGoal, [id]))[0] ?? null;
