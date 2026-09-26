@@ -1,318 +1,224 @@
 import { reportInputs, listPeriods } from "../repo.js";
 import { buildReport } from "../informe-logic.js";
-import { categoryBarsSvg, comparisonBarsSvg } from "../charts.js";
 import { buildPdfBytes, reportFilename } from "../informe-pdf.js";
 import { loadPdfPalette } from "../pdf-palette.js";
-import { famToken } from "../category-colors.js";
 import { loadPdfLib } from "../pdf-loader.js";
 import { download } from "../download.js";
-import { fmtMoney, fmtDiaCorto, fmtPct } from "../format.js";
-import { renderSuscripciones } from "./suscripciones.js";
-import { pushBack, goBack } from "../back.js";
+import { fmtMoney, fmtDiaCorto, fmtPct, fmtPct0 } from "../format.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
-import { subHeaderHtml } from "../ui.js";
-import { icon, catIcon as catSvg } from "../icons.js";
-
-// Color de barra de una familia para las gráficas y el --cat del dotico (puente hasta S-Informe).
-const famColor = (fam) => (fam ? `var(${famToken(fam, "b")})` : "var(--idle)");
-
+import { subHeaderHtml, buttonHtml } from "../ui.js";
+import { segmentedHtml, wireSegmented } from "../controls.js";
+import { displayHtml, dispInkHtml, bentoHtml, meterHtml, emptyStateHtml } from "../instrument.js";
+import { icon } from "../icons.js";
 import { escHtml, escAttr } from "../esc.js";
 
-const BTN_SECONDARY = "background:var(--card2);color:var(--text);border:0;"
-  + "border-radius:999px;padding:16px;flex:1;font:600 16px var(--font-ui);cursor:pointer;";
+// Pantalla del Informe del periodo, sistema B (B-Informe / BD-Informe). Lo que se ve es el
+// resumen: Segmented de periodos, Display «Ahorras de lo que ingresas», la barra Ingresado ·
+// Gastado · Ahorrado, la comparativa con el periodo anterior, el gasto por categoría y dos bloques
+// bento. El detalle (saldos por cuenta, suscripciones, la lista completa de movimientos) va en el
+// PDF, que se genera en el móvil (informe-pdf.js) con la misma estructura `report`.
+// Todo el color y la forma viven en la sección «informe» de css/screens.css; en línea solo va
+// geometría (width y flex-basis), como pide R-INLINE.
 
-// Filas de movimiento visibles antes de «y N movimientos más» (el resto solo va en el PDF, spec §8.9).
-const MOVEMENTS_PREVIEW = 3;
+// Periodos visibles en el Segmented (B-Informe: tres, el más reciente primero).
+const SEGMENTED_PERIODS = 3;
+// Categorías con nombre antes de agrupar el resto en «Resto» (B-Informe: cinco más Resto).
+const TOP_CATEGORIES = 5;
 
-/** Pantalla de error con recuperación (mismo patrón que renderAsistenteError en
- *  periodo-nuevo.js:22-32): banner + «Reintentar» + «Volver», nunca un callejón sin salida. */
+/** «Septiembre 2026» → «Septiembre» para la etiqueta corta del Segmented y de la comparativa,
+ *  solo si quitar el año deja algo. El nombre lo escribe el usuario: cualquier otro formato se
+ *  queda tal cual. */
+function shortName(name) {
+  const s = String(name ?? "").trim();
+  const m = s.match(/^(.+?)\s+\d{4}$/);
+  return m ? m[1] : s;
+}
+
+/** Los periodos del Segmented: los tres más recientes y, si el elegido es más antiguo (p. ej. al
+ *  llegar desde el cierre de un periodo viejo), ocupa el último hueco para que siempre se vea
+ *  marcado. `periods` llega ordenado por fecha de inicio descendente (sql.js#listPeriods). */
+function segmentedPeriods(periods, selectedId) {
+  const shown = periods.slice(0, SEGMENTED_PERIODS);
+  if (!shown.some((p) => p.id === selectedId)) {
+    const sel = periods.find((p) => p.id === selectedId);
+    if (sel) shown[shown.length - 1] = sel;
+  }
+  return shown;
+}
+
+/** Pantalla de error con recuperación: aviso + «Reintentar» + «Volver», nunca un callejón. */
 function renderInformeError(container, onBack, message, retry) {
   container.innerHTML = `
-    <div class="banner-aviso red" style="margin-bottom:14px;">${escHtml(message)}</div>
-    <div style="display:flex; gap:8px;">
-      <button type="button" class="btn-primary" id="informe-error-retry" style="flex:1;">${t("common.retry")}</button>
-      <button type="button" id="informe-error-back" style="${BTN_SECONDARY}">${t("common.goBack")}</button>
+    ${subHeaderHtml({ id: "informe-back", title: t("informe.title") })}
+    <div class="inf">
+      <div class="banner-aviso red">${escHtml(message)}</div>
+      ${buttonHtml({ kind: "primary", id: "informe-error-retry", label: t("common.retry") })}
+      ${buttonHtml({ kind: "secondary", id: "informe-error-leave", label: t("common.goBack") })}
     </div>`;
+  container.querySelector("#informe-back").onclick = () => onBack();
   container.querySelector("#informe-error-retry").onclick = retry;
-  container.querySelector("#informe-error-back").onclick = () => onBack();
+  container.querySelector("#informe-error-leave").onclick = () => onBack();
 }
 
-// Chevron del repertorio (icons.js#chevronRight), girado por CSS: 0deg apunta a la derecha
-// (enlace, fila plegada), 90deg apunta hacia abajo (fila desplegada) — mismo mecanismo de
-// rotación que tenía el SVG redibujado, ahora con el trazo canónico de §3.
-const chevronSvg = (deg) => `<span style="display:inline-flex;transform:rotate(${deg}deg);">${icon("chevronRight", { size: 16 })}</span>`;
-
-function headerHtml(report, periods) {
+function headerHtml(report) {
   const m = report.meta;
-  const statusHtml = m.isOpen
-    ? `<span style="color:var(--warn);">${t("informe.openPeriod", { n: m.dayIndex, m: m.expectedDays })}</span>`
-    : `<span style="color:var(--ink-3);">${t("informe.closedPeriod", { start: escHtml(fmtDiaCorto(m.startDate)), end: escHtml(fmtDiaCorto(m.endDate)) })}</span>`;
-  const now = new Date();
-  const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  return `
-  ${subHeaderHtml({ id: "informe-back", title: t("informe.title") })}
-  <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;">
-    <div style="font-size:17px;font-weight:700;">${escHtml(m.name)}</div>
-    <div style="font-size:13px;">${statusHtml}</div>
-  </div>
-  <hr class="divider">
-  <div style="font-size:11px;color:var(--text-3);margin:10px 0 16px;">${t("informe.generatedAt", { time: hhmm })}</div>
-  ${periods.length > 1 ? `
-  <label style="display:flex;flex-direction:column;gap:4px;margin-bottom:16px;">
-    <span class="section-title">${t("informe.selector.label")}</span>
-    <select id="informe-selector">
-      ${periods.map((p) => `<option value="${escAttr(p.id)}" ${p.id === report.meta.periodId ? "selected" : ""}>${escHtml(p.name)}</option>`).join("")}
-    </select>
-  </label>` : ""}`;
+  const subtitle = m.isOpen
+    ? t("informe.openPeriod", { n: m.dayIndex, m: m.expectedDays })
+    : t("informe.closedPeriod", { start: fmtDiaCorto(m.startDate), end: fmtDiaCorto(m.endDate) });
+  return subHeaderHtml({ id: "informe-back", title: t("informe.title"), subtitle });
 }
 
-function downloadHtml(state) {
-  return `
-  <div style="margin-bottom:20px;">
-    <button type="button" class="btn-primary" id="informe-download" ${state.downloading ? "disabled" : ""}>${state.downloading ? t("informe.downloading") : `<span style="display:inline-block;vertical-align:-4px;margin-right:6px;line-height:0;">${icon("download", { size: 20, width: 2 })}</span>${t("informe.download")}`}</button>
-    <div style="font-size:11px;color:var(--text-3);margin-top:8px;">${t("informe.downloadHint")}</div>
-    ${state.downloadError ? `<div class="banner-aviso red" style="margin-top:10px;">${escHtml(state.downloadError)}</div>` : ""}
-  </div>`;
+function periodsHtml(periods, selectedId) {
+  if (periods.length < 2) return "";
+  const options = segmentedPeriods(periods, selectedId).map((p) => ({ value: p.id, label: shortName(p.name) }));
+  return segmentedHtml({ id: "informe-periods", name: t("informe.selector.label"), options, value: selectedId });
 }
 
-function summaryHtml(report, prevPeriodName) {
+/** Display l (F-12): la tasa de ahorro manda. Con gasto por encima del ingreso la tasa sería
+ *  negativa («−146 %» no dice nada): la etiqueta lo dice y la cifra es lo que falta. Sin ingresos
+ *  no hay tasa: la cifra es lo ahorrado. El pie compara con el periodo anterior solo si su tasa
+ *  existe, no es negativa y hay nombre — nunca «el null %». */
+function displayBlockHtml(report, prevName) {
   const s = report.summary;
-  // Gastos > ingresos -> savingsRatePct negativo ("Ahorras el −146 %" no dice nada): mismo
-  // criterio que Inicio (inicio-logic.js#savingsSentence), reutilizando su misma clave. Segunda
-  // mitad («En agosto, el 43 %.») solo si hay tasa del periodo anterior, ES POSITIVA (no hay "el
-  // -12 %" con el que comparar tampoco) Y nombre de ese periodo — sin alguno de los tres, se
-  // queda solo la primera frase, nunca "el X% / null%".
-  let sentence = s.savedCents < 0 ? t("inicio.savings.negative")
-    : s.savingsRatePct != null ? t("informe.summary.savingsRate", { pct: s.savingsRatePct })
-    : "";
-  if (sentence && s.prevSavingsRatePct != null && s.prevSavingsRatePct >= 0 && prevPeriodName) {
-    sentence += t("informe.summary.savingsRateVsPrev", { name: escHtml(prevPeriodName), pct: s.prevSavingsRatePct });
+  if (s.savedCents < 0) {
+    return displayHtml({ label: t("informe.display.overspent"), value: fmtMoney(s.savedCents) });
   }
-  // "Disponible" es presupuestado − gastado (D2 arriba, buildSummary): sin ningún límite puesto
-  // eso es 0 − gastado, un número negativo sin sentido ("Disponible −245,60 €"). Mismo criterio
-  // que Inicio (screens/inicio.js:605, `budgetTotal ? disponibleHtml(...) : ""`): la celda entera
-  // se omite en vez de mostrar la resta.
-  return `
-  <div style="margin-bottom:24px;">
-    <div class="section-title" style="margin-bottom:10px;">${t("informe.summary.title")}</div>
-    <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);">
-      <div>
-        <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("informe.summary.income")}</span>
-        <span class="num" style="font:600 15px var(--font-mono);color:var(--pos);">${escHtml(fmtMoney(s.incomeCents))}</span>
-      </div>
-      <div>
-        <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("informe.summary.spent")}</span>
-        <span class="num" style="font:600 15px var(--font-mono);color:var(--ink);">${escHtml(fmtMoney(s.spentCents))}</span>
-      </div>
-      <div>
-        <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("informe.summary.saved")}</span>
-        <span class="num" style="font:600 15px var(--font-mono);color:${s.savedCents < 0 ? "var(--danger)" : "var(--ink)"};">${escHtml(fmtMoney(s.savedCents))}</span>
-      </div>
-      ${s.budgetTotalCents > 0 ? `
-      <div>
-        <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("informe.summary.available")}</span>
-        <span class="num" style="font:600 15px var(--font-mono);color:var(--ink);">${escHtml(fmtMoney(s.availableCents))}</span>
-      </div>` : ""}
-    </div>
-    ${sentence ? `<div style="padding-top:10px;font-size:13px;color:var(--ink-3);">${sentence}</div>` : ""}
-  </div>`;
-}
-
-// Tabla de tres columnas (cuenta / apertura / cierre) con la variación por cuenta debajo y a la
-// derecha, en --pos/--danger (spec §8.5, la audacia del artboard es la comparativa, no esta
-// tabla, pero sigue su forma: cabecera de fecha + fila por cuenta + total con su propia variación).
-function accountRowHtml(r, bold = false) {
-  return `
-  <div style="display:flex; flex-direction:column; gap:4px; padding:11px 0;">
-    <div style="display:flex; align-items:baseline; gap:10px;">
-      <span style="flex:1; min-width:0; font-size:14px; font-weight:${bold ? 700 : 500};">${escHtml(r.name)}</span>
-      <span class="num" style="font-size:12px; color:var(--ink-3); flex-shrink:0;">${escHtml(fmtMoney(r.startCents))}</span>
-      <span class="num" style="font-size:${bold ? 14 : 13}px; font-weight:${bold ? 700 : 600}; flex-shrink:0; min-width:64px; text-align:right;">${escHtml(fmtMoney(r.endCents))}</span>
-    </div>
-    <div style="text-align:right;">
-      <span class="num" style="font-size:11px; color:${r.deltaCents < 0 ? "var(--danger)" : "var(--pos)"};">${r.deltaCents >= 0 ? "+" : ""}${escHtml(fmtMoney(r.deltaCents))}</span>
-    </div>
-  </div>`;
-}
-
-function accountsHtml(report) {
-  const a = report.accounts;
-  const m = report.meta;
-  return `
-  <div style="margin-bottom:24px;">
-    <div style="display:flex; align-items:baseline; gap:10px; margin-bottom:6px;">
-      <span class="section-title" style="flex:1;">${t("informe.accounts.title")}</span>
-      <span style="font-size:11px; color:var(--ink-3);">${escHtml(fmtDiaCorto(m.startDate))}</span>
-      <span style="font-size:11px; color:var(--ink-3); min-width:64px; text-align:right;">${m.isOpen ? t("common.today") : escHtml(fmtDiaCorto(m.endDate))}</span>
-    </div>
-    <div style="display:flex; flex-direction:column;">
-      ${a.rows.map((r, i) => (i > 0 ? '<hr class="divider">' : "") + accountRowHtml(r)).join("")}
-    </div>
-    <hr class="divider">
-    ${accountRowHtml({ name: t("informe.accounts.total"), startCents: a.totalStartCents, endCents: a.totalEndCents, deltaCents: a.totalDeltaCents }, true)}
-  </div>`;
-}
-
-function categoriesHtml(report, prevPeriodName) {
-  const c = report.categories;
-  const maxSpent = Math.max(0, ...c.rows.map((x) => x.spentCents));
-  const rows = c.rows.map((r) => {
-    const bar = categoryBarsSvg([{ key: r.rootId, value: r.spentCents, max: maxSpent, fam: r.fam }],
-      { width: 260, rowH: 8, barH: 8 });
-    // Mini tendencia (SISTEMA §4.19): las dos barras —actual y anterior, atenuada— a la MISMA
-    // escala (comparisonBarsSvg, D3): es la garantía de que esta miniatura y la barra principal
-    // de arriba nunca puedan divergir, porque las dos salen de barRowsGeometry.
-    const miniTrend = c.hasPrev && r.prevCents != null
-      ? comparisonBarsSvg([{ key: r.rootId, value: r.spentCents, prevValue: r.prevCents, fam: r.fam }],
-        { width: 22, rowH: 14, barH: 6 })
-      : "";
-    // D4: la tendencia plana no lleva flecha, solo el porcentaje en --ink-3 — §4.19 solo define
-    // subida y bajada, así que "new"/"flat" se quedan sin icon().
-    const trendArrow = r.direction === "down" ? icon("trendDown", { size: 14, width: 2.2 })
-      : r.direction === "up" ? icon("trendUp", { size: 14, width: 2.2 })
-      : "";
-    const trend = r.direction === "new" ? "" : `
-      <span style="display:inline-flex;align-items:center;gap:3px;color:${r.direction === "down" ? "var(--pos)" : r.direction === "up" ? "var(--danger)" : "var(--ink-3)"};">
-        ${trendArrow}${r.deltaPct != null ? escHtml(fmtPct(Math.abs(r.deltaPct) / 100)) : ""}
-      </span>`;
-    return `
-    <div style="display:flex;flex-direction:column;gap:6px;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div class="dotico" style="--cat:${famColor(r.fam)};">${catSvg(r.icon, { size: "1em" })}</div>
-        <span style="flex:1;min-width:0;font-size:14px;font-weight:500;">${escHtml(r.name)}</span>
-        <span class="num" style="font-size:13px;font-weight:600;">${escHtml(fmtMoney(r.spentCents))}</span>
-      </div>
-      ${bar}
-      ${c.hasPrev && r.prevCents != null ? `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-3);">
-        <span>${escHtml(prevPeriodName ?? "")} ${escHtml(fmtMoney(r.prevCents))}</span>${miniTrend}${trend}
-      </div>` : ""}
-    </div>`;
-  }).join("");
-  const orientativo = report.meta.isOpen && c.hasPrev
-    ? `<div style="font-size:11px;color:var(--ink-3);margin-top:10px;">${t("informe.categories.orientativo", {
-      prev: escHtml(prevPeriodName ?? ""), current: escHtml(report.meta.name), day: report.meta.dayIndex, total: report.meta.expectedDays,
-    })}</div>`
+  if (s.savingsRatePct == null) {
+    return displayHtml({ label: t("informe.summary.saved"), value: fmtMoney(s.savedCents) });
+  }
+  const footHtml = s.prevSavingsRatePct != null && s.prevSavingsRatePct >= 0 && prevName
+    ? t("informe.display.vsPrev", { name: escHtml(prevName), pct: dispInkHtml(fmtPct0(s.prevSavingsRatePct / 100)) })
     : "";
-  return `
-  <div style="margin-bottom:24px;">
-    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px;">
-      <div class="section-title">${t("informe.categories.title")}</div>
-      ${c.hasPrev ? `<span style="font-size:11px;color:var(--ink-3);">${t("informe.categories.vsPrev", { name: escHtml(prevPeriodName ?? "") })}</span>` : ""}
-    </div>
-    <div style="display:flex;flex-direction:column;gap:16px;">${rows}</div>
-    <hr class="divider" style="margin:14px 0;">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-      <span style="font-size:14px;font-weight:700;">${t("informe.categories.total")}</span>
-      <span class="num" style="font-size:14px;font-weight:700;">${escHtml(fmtMoney(c.totalCents))}${c.hasPrev ? ` <span style="color:var(--ink-3);font-weight:500;">/ ${escHtml(fmtMoney(c.prevTotalCents))}</span>` : ""}</span>
-    </div>
-    ${!c.hasPrev ? `<div style="font-size:11px;color:var(--ink-3);margin-top:8px;">${t("informe.categories.noPrev")}</div>` : orientativo}
-  </div>`;
+  return displayHtml({ label: t("informe.display.rate"), value: fmtPct0(s.savingsRatePct / 100), footHtml });
 }
 
-function sharedHtml(report) {
+/** Ingresado arriba y, debajo, la barra de lo que pasó con ese ingreso (F-10): lo gastado en
+ *  --idle y lo ahorrado en --text, cada tramo con su nombre y su cifra dentro (C12). Si el gasto
+ *  supera al ingreso no hay tramo de ahorro: la barra es entera gasto. */
+function splitHtml(report) {
+  const s = report.summary;
+  const spent = Math.max(0, s.spentCents);
+  const saved = Math.max(0, s.savedCents);
+  const total = spent + saved;
+  const seg = (cls, label, cents) => `<div class="inf-split-seg ${cls}" style="flex-basis:${((cents / total) * 100).toFixed(2)}%">`
+    + `<span class="inf-split-name">${escHtml(label)}</span><span class="num inf-split-amt">${escHtml(fmtMoney(cents))}</span></div>`;
+  const aria = t("informe.split.aria", { income: fmtMoney(s.incomeCents), spent: fmtMoney(spent), saved: fmtMoney(saved) });
+  const bar = total > 0
+    ? `<div class="inf-split" role="img" aria-label="${escAttr(aria)}">${[
+      spent > 0 ? seg("is-spent", t("informe.summary.spent"), spent) : "",
+      saved > 0 ? seg("is-saved", t("informe.summary.saved"), saved) : "",
+    ].join("")}</div>`
+    : "";
+  return `<section class="box box-chart">
+    <div class="inf-line">
+      <span class="inf-line-label">${t("informe.split.income")}</span>
+      <span class="num inf-income">${escHtml(fmtMoney(s.incomeCents))}</span>
+    </div>
+    ${bar}
+  </section>`;
+}
+
+/** Flecha y porcentaje de una variación de gasto: subir es la señal que avisa (--neg), bajar la
+ *  buena (--pos); C4, cifras con señal. La dirección va también en texto para el lector (§11: el
+ *  color nunca es la única señal). Sin variación o sin base, nada. */
+function deltaHtml(direction, pct) {
+  if (pct == null || (direction !== "up" && direction !== "down")) return "";
+  const up = direction === "up";
+  return `<span class="num inf-delta ${up ? "is-up" : "is-down"}">${icon(up ? "trendUp" : "trendDown", { size: 12, width: 2.4 })}`
+    + `<span class="inf-sr">${escHtml(t(up ? "informe.compare.up" : "informe.compare.down"))} </span>${escHtml(fmtPct(Math.abs(pct) / 100))}</span>`;
+}
+
+/** «Frente a agosto» (C12): el gasto de este periodo y el del anterior, cada barra con el nombre
+ *  del periodo al lado y a la misma escala. Sin periodo anterior no hay comparativa. */
+function compareHtml(report, curName, prevName) {
+  const c = report.categories;
+  if (!c.hasPrev || !prevName) return "";
+  const max = Math.max(c.totalCents, c.prevTotalCents, 0);
+  const w = (v) => (max > 0 ? ((Math.max(0, v) / max) * 100).toFixed(2) : "0");
+  const direction = c.totalDeltaPct == null ? "flat" : c.totalDeltaPct > 0 ? "up" : c.totalDeltaPct < 0 ? "down" : "flat";
+  return `<section class="box box-chart inf-gap-16">
+    <h2 class="box-title">${escHtml(t("informe.compare.title", { name: prevName }))}</h2>
+    <div class="inf-cmp">
+      <div class="inf-line">
+        <span class="inf-line-label">${t("informe.summary.spent")}</span>
+        ${deltaHtml(direction, c.totalDeltaPct)}
+      </div>
+      <div class="inf-cmp-grid">
+        <span class="inf-cmp-name">${escHtml(curName)}</span>
+        <div class="inf-cmp-track"><span class="inf-cmp-fill is-cur" style="width:${w(c.totalCents)}%"></span></div>
+        <span class="num inf-cmp-amt">${escHtml(fmtMoney(c.totalCents))}</span>
+        <span class="inf-cmp-name is-prev">${escHtml(prevName)}</span>
+        <div class="inf-cmp-track"><span class="inf-cmp-fill is-prev" style="width:${w(c.prevTotalCents)}%"></span></div>
+        <span class="num inf-cmp-amt is-prev">${escHtml(fmtMoney(c.prevTotalCents))}</span>
+      </div>
+    </div>
+  </section>`;
+}
+
+/** «Por categoría»: las cinco raíces que más gastan, cada una con su medidor en la barra de su
+ *  familia (-b, C6) y su variación frente al periodo anterior; el resto sumado en «Resto», en
+ *  --idle (C11). El nombre va siempre junto a la barra (C12); la cifra, en tinta (C7). */
+function categoriesHtml(report, prevName) {
+  const rows = report.categories.rows.filter((r) => r.spentCents > 0).sort((a, b) => b.spentCents - a.spentCents);
+  if (!rows.length) return "";
+  const top = rows.slice(0, TOP_CATEGORIES);
+  const rest = rows.slice(TOP_CATEGORIES).reduce((sum, r) => sum + r.spentCents, 0);
+  const max = rows[0].spentCents;
+  const row = ({ name, fam = null, spentCents, direction, deltaPct }, isRest = false) => `
+    <div class="inf-cat${isRest ? " is-rest" : ""}">
+      <div class="inf-cat-line">
+        <span class="inf-cat-name">${escHtml(name)}</span>
+        <span class="num inf-cat-amt">${escHtml(fmtMoney(spentCents))}</span>
+        <span class="inf-cat-delta">${isRest ? "" : deltaHtml(direction, deltaPct)}</span>
+      </div>
+      <div class="inf-cat-meter">${meterHtml({ fam: isRest ? null : fam, value: spentCents, max })}</div>
+    </div>`;
+  return `<section class="box box-chart inf-gap-16">
+    <div class="box-head">
+      <h2 class="box-title">${t("informe.categories.byCategory")}</h2>
+      ${report.categories.hasPrev && prevName ? `<span class="inf-vs">${escHtml(t("informe.categories.vsPrev", { name: prevName }))}</span>` : ""}
+    </div>
+    <div class="inf-cats">
+      ${top.map((r) => row(r)).join("")}
+      ${rest > 0 ? row({ name: t("informe.categories.rest"), spentCents: rest }, true) : ""}
+    </div>
+  </section>`;
+}
+
+/** Bento: lo que queda con la contraparte (si hay compartidos en el periodo) y cuántos
+ *  movimientos tiene. Cifras en tinta (C3, C7). */
+function bentosHtml(report) {
   const s = report.shared;
-  if (!s) return "";
-  const labelKey = s.direction === "partner_owes" ? "informe.shared.net.theyOwe" : s.direction === "i_owe" ? "informe.shared.net.youOwe" : "informe.shared.net.even";
-  const color = s.direction === "partner_owes" ? "var(--pos)" : s.direction === "i_owe" ? "var(--danger)" : "var(--ink)";
-  return `
-  <div style="margin-bottom:24px;">
-    <div class="section-title" style="margin-bottom:10px;">${t("informe.shared.title", { name: escHtml(s.partnerName) })}</div>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-      <span style="font-size:14px;font-weight:500;">${t("informe.shared.periodTotal")}</span>
-      <span class="num" style="font-size:14px;font-weight:600;">${escHtml(fmtMoney(s.periodTotalCents))}</span>
-    </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px;">
-      <span style="font-size:14px;font-weight:500;">${t("informe.shared.myPart")}</span>
-      <span class="num" style="font-size:14px;font-weight:600;">${escHtml(fmtMoney(s.myPartCents))}</span>
-    </div>
-    <hr class="divider" style="margin:10px 0;">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-      <span style="font-size:14px;font-weight:600;">${t(labelKey, { name: escHtml(s.partnerName) })}</span>
-      <span class="num" style="font-size:15px;font-weight:700;color:${color};">${escHtml(fmtMoney(Math.abs(s.netCents)))}</span>
-    </div>
+  const shared = s
+    ? bentoHtml({
+      label: s.direction === "partner_owes" ? t("informe.shared.net.theyOwe", { name: s.partnerName })
+        : s.direction === "i_owe" ? t("informe.shared.net.youOwe", { name: s.partnerName })
+        : t("informe.shared.net.even"),
+      value: fmtMoney(Math.abs(s.netCents)),
+    })
+    : "";
+  const movements = bentoHtml({ label: t("informe.bento.movements"), value: String(report.movements.count) });
+  return `<div class="inf-bento${shared ? "" : " is-single"}">${shared}${movements}</div>`;
+}
+
+/** El primario (uno por pantalla, C1) con UNA nota debajo (F-11). */
+function downloadHtml(state, report) {
+  return `<div class="inf-download">
+    ${buttonHtml({
+      kind: "primary", id: "informe-download", icon: state.downloading ? "" : "download",
+      label: state.downloading ? t("informe.downloading") : t("informe.download"),
+      note: t("informe.downloadNote", { n: report.movements.count }),
+      disabled: state.downloading,
+    })}
+    ${state.downloadError ? `<div class="banner-aviso red">${escHtml(state.downloadError)}</div>` : ""}
   </div>`;
 }
 
-function subscriptionsHtml(report) {
-  const s = report.subscriptions;
-  if (!s) return "";
-  return `
-  <div style="margin-bottom:24px;">
-    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px;">
-      <span class="section-title">${t("informe.subscriptions.title")}</span>
-      <button type="button" id="informe-suscripciones-link" class="link-btn" style="display:flex;align-items:center;gap:4px;">${t("informe.subscriptions.link")}${chevronSvg(0)}</button>
-    </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-      <span style="font-size:14px;font-weight:500;">${t("informe.subscriptions.active", { n: s.activeCount })}</span>
-      <span class="num" style="font-size:14px;font-weight:600;color:var(--warn);">${escHtml(fmtMoney(s.monthlyCents))}</span>
-    </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px;">
-      <span style="font-size:14px;font-weight:500;">${t("informe.subscriptions.yearly")}</span>
-      <span class="num" style="font-size:14px;font-weight:600;color:var(--warn);">${escHtml(fmtMoney(s.annualCents))}</span>
-    </div>
-  </div>`;
-}
-
-/** Cabecera de grupo pulsable = un <button> HERMANO del bloque desplegable, nunca envolviéndolo
- *  (criterio de gasto-por-categoria.js:34-38: un botón dentro de otro es HTML inválido). */
-function movementGroupHtml(g, expanded) {
-  const rowsHtml = g.items.slice(0, MOVEMENTS_PREVIEW).map((it) => `
-    <div style="display:flex;flex-direction:column;gap:1px;padding:6px 0;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span style="flex:1;min-width:0;font-size:13px;color:var(--ink-2);">${escHtml(it.merchant || "")}</span>
-        <span class="num" style="font-size:12px;color:var(--ink-3);">${escHtml(fmtDiaCorto(it.date))}</span>
-        <span class="num" style="font-size:13px;font-weight:600;">${escHtml(fmtMoney(it.cents))}</span>
-      </div>
-      ${it.tag ? `<div style="font-size:11px;color:var(--ink-3);">${escHtml(t("informe.movements.tag", { name: it.tag }))}</div>` : ""}
-    </div>`).join("");
-  const more = g.items.length > MOVEMENTS_PREVIEW
-    ? `<div style="font-size:11px;color:var(--ink-3);padding-top:4px;">${t("informe.movements.andMore", { n: g.items.length - MOVEMENTS_PREVIEW })}</div>` : "";
-  return `
-  <div style="display:flex;flex-direction:column;gap:6px;">
-    <button type="button" data-group="${escAttr(g.rootId)}" aria-expanded="${expanded ? "true" : "false"}"
-      style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:0;margin:0;
-      color:inherit;font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-      <div class="dotico" style="--cat:${famColor(g.fam)};">${catSvg(g.icon, { size: "1em" })}</div>
-      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;">
-        <span style="font-size:14px;font-weight:600;">${escHtml(g.name)}</span>
-        <span class="num" style="font-size:11px;color:var(--ink-3);">${t("informe.movements.groupCount", { n: g.count ?? g.items.length })}</span>
-      </div>
-      <span class="num" style="font-size:13px;font-weight:600;">${escHtml(fmtMoney(g.totalCents))}</span>
-      <span style="width:28px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--ink-3);">${chevronSvg(expanded ? 90 : 0)}</span>
-    </button>
-    ${expanded ? `<div style="padding-left:46px;">${rowsHtml}${more}</div>` : ""}
-  </div>`;
-}
-
-function movementsHtml(report, expandedGroup) {
-  const m = report.movements;
-  return `
-  <div style="margin-bottom:24px;">
-    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px;">
-      <div class="section-title">${t("informe.movements.title")}</div>
-      <span style="font-size:11px;color:var(--ink-3);">${t("informe.movements.count", { n: m.count })}</span>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:14px;">
-      ${m.groups.map((g) => movementGroupHtml(g, g.rootId === expandedGroup)).join("")}
-      ${m.others.items.length ? movementGroupHtml({
-        rootId: "__others__", name: t("informe.movements.others"), color: "var(--ink-3)", icon: "•",
-        totalCents: m.others.items.reduce((s, it) => s + it.cents, 0), items: m.others.items,
-      }, expandedGroup === "__others__") : ""}
-    </div>
-  </div>`;
-}
-
-function footerHtml(report) {
-  return `<div style="font-size:11px;color:var(--ink-3);padding-bottom:24px;">${t("informe.footer", { n: report.movements.count })}</div>`;
-}
-
-/** Pantalla del Informe del periodo (F1): resumen, saldos de cuenta al inicio/fin, gasto por
- *  categoría con comparativa (N3), movimientos por categoría, compartidos y suscripciones — y la
- *  descarga del PDF, generado en el propio móvil con las mismas gráficas (informe-pdf.js).
- *  Sin `periodId`, el periodo abierto (o el más reciente si no hay ninguno abierto). */
+/** Pantalla del Informe del periodo (F1). Sin `periodId`, el periodo abierto (o el más reciente
+ *  si no hay ninguno abierto). */
 export async function renderInforme(container, onBack, { periodId } = {}) {
-  const state = { periodId, downloading: false, downloadError: "", expandedGroup: null, periods: [], report: null };
+  const state = { periodId, downloading: false, downloadError: "", periods: [], report: null, prevPeriodName: "" };
 
   async function load() {
     const [inputs, periods] = await Promise.all([reportInputs(state.periodId), listPeriods()]);
@@ -320,10 +226,6 @@ export async function renderInforme(container, onBack, { periodId } = {}) {
     state.periods = periods;
     state.report = buildReport(inputs);
     state.prevPeriodName = inputs.prevPeriod?.name ?? "";
-    if (state.expandedGroup == null) {
-      state.expandedGroup = state.report.movements.groups[0]?.rootId
-        ?? (state.report.movements.others.items.length ? "__others__" : null);
-    }
   }
 
   async function boot() {
@@ -338,27 +240,34 @@ export async function renderInforme(container, onBack, { periodId } = {}) {
 
   function render() {
     const report = state.report;
+    const curName = shortName(report.meta.name);
+    const prevName = shortName(state.prevPeriodName);
+    // Periodo sin movimientos: estado vacío (§9) en vez de un Display a cero y un PDF en blanco.
+    const body = report.movements.count === 0
+      ? emptyStateHtml({ title: t("informe.empty.title"), text: t("informe.empty.text") })
+      : `${displayBlockHtml(report, prevName)}
+        ${splitHtml(report)}
+        ${compareHtml(report, curName, prevName)}
+        ${categoriesHtml(report, prevName)}
+        ${bentosHtml(report)}
+        ${downloadHtml(state, report)}`;
     container.innerHTML = `
-      ${headerHtml(report, state.periods)}
-      ${downloadHtml(state)}
-      ${summaryHtml(report, state.prevPeriodName)}
-      ${accountsHtml(report)}
-      ${categoriesHtml(report, state.prevPeriodName)}
-      ${sharedHtml(report)}
-      ${subscriptionsHtml(report)}
-      ${movementsHtml(report, state.expandedGroup)}
-      ${footerHtml(report)}
-    `;
+      ${headerHtml(report)}
+      <div class="inf">
+        ${periodsHtml(state.periods, state.periodId)}
+        ${body}
+      </div>`;
     wire();
   }
 
   function wire() {
     container.querySelector("#informe-back").onclick = () => onBack();
 
-    const selector = container.querySelector("#informe-selector");
-    if (selector) selector.onchange = async (e) => {
-      state.periodId = e.target.value;
-      state.expandedGroup = null;
+    const seg = container.querySelector("#informe-periods");
+    if (seg) wireSegmented(seg, async (value) => {
+      if (value === state.periodId) return;
+      state.periodId = value;
+      state.downloadError = "";
       try {
         await load();
       } catch (err) {
@@ -366,9 +275,12 @@ export async function renderInforme(container, onBack, { periodId } = {}) {
         return;
       }
       render();
-    };
+      // El render rehace el Segmented: el foco vuelve al periodo elegido (K12, flechas seguidas).
+      [...container.querySelectorAll("#informe-periods [role=\"radio\"]")].find((b) => b.dataset.value === state.periodId)?.focus();
+    });
 
-    container.querySelector("#informe-download").onclick = async () => {
+    const dl = container.querySelector("#informe-download");
+    if (dl) dl.onclick = async () => {
       state.downloading = true; state.downloadError = ""; render();
       try {
         const [PDFLib, palette] = await Promise.all([loadPdfLib(), loadPdfPalette()]);
@@ -379,20 +291,6 @@ export async function renderInforme(container, onBack, { periodId } = {}) {
       } finally {
         state.downloading = false; render();
       }
-    };
-
-    container.querySelectorAll("[data-group]").forEach((el) => {
-      el.onclick = () => {
-        const id = el.dataset.group;
-        state.expandedGroup = state.expandedGroup === id ? null : id;
-        render();
-      };
-    });
-
-    const susLink = container.querySelector("#informe-suscripciones-link");
-    if (susLink) susLink.onclick = () => {
-      pushBack(() => render());
-      renderSuscripciones(container, goBack);
     };
   }
 

@@ -16,6 +16,96 @@
 /* === fin: gasto-por-categoria === */
 
 /* === pantalla: informe === */
+/* B-Informe / BD-Informe. Pila de bloques a 12 (§8). */
+.inf { display: flex; flex-direction: column; gap: var(--sp-12); padding-bottom: var(--sp-24); }
+/* Texto solo para el lector (la dirección de una variación, §11: el color nunca es la única señal). */
+.inf-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* Segmented de periodos: el nombre lo escribe el usuario, se recorta en vez de desbordar. */
+.inf .ctl-segmented [role="radio"] { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.inf-gap-16 { gap: var(--sp-16); }
+
+.inf-line { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
+.inf-line-label { font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.inf-income { font-size: var(--fs-20); font-weight: 600; line-height: var(--lh-title); color: var(--pos); }
+
+/* Ingresado · Gastado · Ahorrado (F-10): pozo con el filete de abajo en --idle (gastado) o en
+   --text (ahorrado); el nombre y la cifra van dentro de cada tramo (C12). */
+.inf-split { display: flex; gap: var(--sp-2); height: 64px; }
+.inf-split-seg {
+  flex-grow: 0;
+  flex-shrink: 1;
+  min-width: 96px;
+  box-sizing: border-box;
+  padding: var(--sp-8) var(--sp-12);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  overflow: hidden;
+  background: var(--well);
+}
+.inf-split-seg:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.inf-split-seg:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+.inf-split-seg:only-child { border-radius: var(--radius); }
+.inf-split-seg.is-spent { box-shadow: inset 0 -6px 0 var(--idle); }
+.inf-split-seg.is-saved { box-shadow: inset 0 -6px 0 var(--text); }
+.inf-split-name { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.inf-split-seg.is-saved .inf-split-name { color: var(--text); }
+.inf-split-amt { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
+
+/* Variación de gasto: subir avisa (--neg), bajar es buena (--pos). C4: señal en la cifra. */
+.inf-delta { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-13); font-weight: 600; white-space: nowrap; }
+.inf-delta.is-up { color: var(--neg); }
+.inf-delta.is-down { color: var(--pos); }
+
+/* Frente al periodo anterior: este en --text, el anterior en --idle, cada uno con su nombre (C11, C12). */
+.inf-cmp { display: flex; flex-direction: column; gap: var(--sp-8); }
+.inf-cmp-grid { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp-8); }
+.inf-cmp-name {
+  max-width: 96px;
+  font-size: var(--fs-12);
+  font-weight: 700;
+  line-height: var(--lh-title);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.inf-cmp-name.is-prev { font-weight: 600; color: var(--text-dim); }
+.inf-cmp-track { height: 8px; border-radius: var(--radius-pill); background: var(--well); }
+.inf-cmp-fill { display: block; height: 100%; border-radius: var(--radius-pill); }
+.inf-cmp-fill.is-cur { background: var(--text); }
+.inf-cmp-fill.is-prev { background: var(--idle); }
+.inf-cmp-amt { font-size: var(--fs-14); font-weight: 600; text-align: right; color: var(--text); white-space: nowrap; }
+.inf-cmp-amt.is-prev { font-weight: 500; color: var(--text-dim); }
+
+/* Por categoría: nombre, cifra en tinta (C7), variación y medidor -b; «Resto» en dim e --idle (C11). */
+.inf-vs { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.inf-cats { display: flex; flex-direction: column; gap: var(--sp-16); }
+.inf-cat { display: flex; flex-direction: column; gap: var(--sp-4); }
+.inf-cat-line { display: flex; align-items: baseline; gap: var(--sp-8); }
+.inf-cat-name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-15);
+  font-weight: 500;
+  line-height: var(--lh-title);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.inf-cat-amt { font-size: var(--fs-14); font-weight: 500; color: var(--text); white-space: nowrap; }
+.inf-cat-delta { flex: none; width: 64px; display: flex; justify-content: flex-end; }
+.inf-cat-delta .inf-delta { font-size: var(--fs-12); }
+.inf-cat-meter { margin-right: 72px; }
+.inf-cat.is-rest .inf-cat-name,
+.inf-cat.is-rest .inf-cat-amt { color: var(--text-dim); }
+
+.inf-bento { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-12); }
+.inf-bento.is-single { grid-template-columns: minmax(0, 1fr); }
+
+.inf-download { display: flex; flex-direction: column; gap: var(--sp-12); padding-top: var(--sp-12); }
+.inf-download .btn-note { text-align: center; }
 /* === fin: informe === */
 
 /* === pantalla: inicio === */
