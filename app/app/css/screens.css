@@ -102,6 +102,117 @@
 /* === fin: ajustes === */
 
 /* === pantalla: categorias === */
+/* S10 · B-Categorias / B-Categorias-Nueva: Segmented Gasto · Ingreso con su número, un bloque por
+   categoría en el tinte de su familia (C6) con baldosa sobre --chip, «+» y asa de 44; subcategorías
+   como chips neutros (F-43), la archivada con borde discontinuo -b. Pila de 12 (§8). */
+.cat { display: flex; flex-direction: column; gap: var(--sp-12); }
+.cat > .sub-header { margin-bottom: 0; }
+.cat-hint { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+.cat-list { display: flex; flex-direction: column; gap: var(--sp-8); }
+.cat-empty { margin: 0; padding: var(--sp-16); font-size: var(--fs-13); font-weight: 500; text-align: center; color: var(--text-dim); }
+
+/* Bloque: tinte sin borde, relleno 8. Un ingreso no tiene familia (C9): --well. La archivada se
+   queda sin fondo, con el borde discontinuo en la barra de su familia (C6). */
+.cat-block { padding: var(--sp-8); border-radius: var(--radius-lg); background: var(--ft); display: flex; flex-direction: column; gap: var(--sp-8); }
+.cat-block.is-plain { background: var(--well); }
+.cat-block.is-archived { background: transparent; border: 1.5px dashed var(--fb); }
+.cat-block.is-plain.is-archived { border-color: var(--border-strong); }
+.cat-head { display: flex; align-items: center; gap: var(--sp-4); min-height: 44px; }
+.cat-name-btn {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.cat-nm { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.cat-name { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); overflow-wrap: anywhere; }
+.cat-sub { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--fx); }
+.cat-block.is-plain .cat-sub { color: var(--text-dim); }
+.cat-ib {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--fx);
+  cursor: pointer;
+}
+.cat-block.is-plain .cat-ib { color: var(--text-dim); }
+.cat-grip { cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; }
+.cat-name-btn:focus-visible,
+.cat-ib:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+.cat-kids { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+.cat-kid { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.cat-kid.is-archived { background: transparent; border: 1.5px dashed var(--fb); color: var(--fx); }
+.cat-block.is-plain .cat-kid.is-archived { border-color: var(--border-strong); color: var(--text-dim); }
+
+/* Arrastre: lo que se mueve sube con la sombra del aviso; el destino, filete discontinuo en tinta
+   dim (no es foco ni selección: ni --focus ni naranja). Solo el transform va en línea (JS). */
+.cat-block.is-dragging,
+.cat-kid.is-dragging { position: relative; z-index: 5; box-shadow: var(--sh-alert); }
+.cat-block.is-drop-target,
+.cat-kid.is-drop-target { outline: 2px dashed var(--text-dim); outline-offset: 2px; }
+
+/* Hoja «Nueva / Editar categoría»: pila de 16; etiquetas 13/600 dim y una nota por sección. El
+   relleno de 4 deja ver el anillo de foco dentro del scroll de .sheet-body. */
+.cat-form { display: flex; flex-direction: column; gap: var(--sp-16); padding: 0 var(--sp-4) var(--sp-4); }
+.cat-style { display: flex; flex-direction: column; gap: var(--sp-16); }
+.cat-style:empty { display: none; }
+.cat-sec { display: flex; flex-direction: column; gap: var(--sp-8); }
+.cat-label { padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.cat-note { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+.cat-note-fam { font-weight: 700; color: var(--fx); }
+.cat-parents { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+
+/* Selector de icono: rejilla de 6, 44 de alto, --raised con borde e icono dim; el elegido, en el
+   tinte de la familia con el icono -x y --ring-sel (F-17). */
+.cat-icons { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sp-8); }
+.cat-icon-pick {
+  min-width: 0;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--raised);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.cat-icon-pick[aria-pressed="true"] { border-color: var(--ft); background: var(--ft); color: var(--fx); box-shadow: var(--ring-sel); }
+.cat-icon-pick:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+
+/* Error: neutro en --raised con el icono de aviso (C4: nada de rojo fuera de cifras). */
+.cat-error {
+  margin: 0;
+  padding: var(--sp-12);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--raised);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  line-height: var(--lh-body);
+  color: var(--text);
+}
+.cat-error svg { flex: none; }
 /* === fin: categorias === */
 
 /* === pantalla: etiquetas === */
