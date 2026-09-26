@@ -605,38 +605,7 @@ body.subscreen main#screen {
 /* ===== accesibilidad (Task 2 P2) ===== */
 /* foco visible global: components.css (sección Chrome, PR-05), con var(--focus). */
 
-/* ===== toast de confirmación (toast.js) ===== */
-/* Un solo nodo, colgado de <body>: por encima de la tabbar (z-index 20) y por debajo de la franja
-   de aviso de almacenamiento (30). Centrado y anclado justo encima de la tabbar, cuyo alto es
-   84px + el safe-area del dispositivo. pointer-events:none — es un acuse de recibo, no un control:
-   no debe interceptar el toque siguiente. */
-#toast {
-  position: fixed;
-  left: 50%;
-  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 84px);
-  z-index: 25;
-  width: calc(100% - 2 * var(--pad-screen));
-  max-width: 440px;
-  min-height: 52px;
-  display: flex;
-  align-items: center;
-  padding: 10px 16px;
-  border-radius: var(--r-0);
-  background: var(--surface);
-  border: 1px solid var(--hairline-strong);
-  color: var(--ink);
-  font: var(--t-body);
-  text-align: left;
-  box-shadow: var(--shadow-float);
-  pointer-events: none;
-  opacity: 0;
-  transform: translateX(-50%) translateY(8px);
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-#toast.is-visible {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
+/* toast de confirmación (toast.js): components.css (sección Hoja inferior, aviso y toast, PR-09) */
 
 /* ===== esqueleto de carga (skeleton.js) ===== */
 /* Misma tinta y mismo radio que las tarjetas para que la silueta prometa lo que va a llegar. */
@@ -655,39 +624,9 @@ body.subscreen main#screen {
   .shake { animation: none; }
   .toggle-track, .toggle-knob { transition: none; }
   .skeleton { animation: none; }
-  #toast { transition: none; }
 }
 
-/* ===== modal de confirmación (modal.js) ===== */
-/* <dialog> abierto con showModal(): el navegador lo pinta en la top layer, por encima de la tabbar
-   (z-index 20), el toast (25) y la franja de aviso (30) sin participar en esa escalera.
-   TRAMPA: tokens.css:11 es `* { margin: 0 }` y mata el `margin:auto` con el que el UA centra un
-   diálogo modal — sin la primera línea, el modal aparece pegado arriba a la izquierda. */
-.modal {
-  margin: auto;                 /* NO borrar: tokens.css (* { margin: 0 }) mata el centrado del UA */
-  width: min(360px, calc(100% - 44px));
-  padding: 24px 20px 20px;
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--r-0);
-  background: var(--surface);
-  color: var(--ink);
-  font-family: var(--font-sans);
-  box-shadow: var(--shadow-float);
-}
-.modal::backdrop { background: var(--scrim); }
-.modal-title { font: var(--t-section); font-size: 17px; }
-.modal-text { margin-top: 8px; font: var(--t-body); color: var(--ink-2); }
-/* destructivo ARRIBA, cancelar debajo, ambos a ancho completo (SISTEMA.md §4.12). column-reverse
-   y no reordenar el DOM: modal.test.mjs fija que Cancelar va primero en la tabulación y en el
-   foco inicial, que es la salida segura. */
-.modal-actions { display: flex; flex-direction: column-reverse; gap: 10px; margin-top: 18px; }
-.modal-actions button { flex: none; width: 100%; }
-.modal-danger {
-  height: 52px; border-radius: var(--r-pill);
-  background: var(--danger-tint); color: var(--danger);
-  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
-  font: 600 16px var(--font-sans); cursor: pointer;
-}
+/* modal de confirmación (modal.js): components.css (sección Hoja inferior, aviso y toast, PR-09) */
 
 /* ===== Inicio v2: héroe de cuenta y la hucha (plan 2026-09-10-inicio-v2, Task 7) ===== */
 

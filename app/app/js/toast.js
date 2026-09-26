@@ -1,4 +1,5 @@
-/** Toast de confirmación: un único nodo fijo sobre la tabbar que aparece 3 s y se va.
+/** Toast de confirmación (PR-09, restilado): un único nodo fijo sobre la tabbar que aparece 3 s y
+ *  se va.
  *
  *  Para qué: varios guardados de la app escriben en la base y vuelven a pintar la misma pantalla,
  *  así que desde fuera no se distinguen de no haber hecho nada. Esto es el acuse de recibo.
