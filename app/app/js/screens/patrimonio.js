@@ -5,7 +5,7 @@ import {
   getAccountStyle, setAccountFamily,
 } from "../repo.js";
 import { familyForCategory, famClass, FAMILIES } from "../category-colors.js";
-import { familyForAccount, defaultFamilyForAccount, goalFamily, isDebt } from "../account-colors.js";
+import { familyForAccount, defaultFamilyForAccount, goalFamily } from "../account-colors.js";
 import { fmtMoney, hoyISO, fmtDec1, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { sparklineSvg } from "../charts.js";
 import { t } from "../i18n/index.js";
@@ -14,7 +14,7 @@ import { userMessage } from "../errors.js";
 import { showConfirm } from "../modal.js";
 import { rootHeaderHtml, subHeaderHtml, buttonHtml } from "../ui.js";
 import { segmentedHtml, wireSegmented, switchHtml, stepperHtml, fieldHtml } from "../controls.js";
-import { tileHtml, filterChipHtml, settingRowHtml, sectionHeaderHtml, familySwatchesHtml } from "../entity.js";
+import { tileHtml, filterChipHtml, settingRowHtml, sectionHeaderHtml, familySwatchesHtml, famNumHtml } from "../entity.js";
 import { displayHtml, ledHtml, stackedBarHtml, meterHtml, containerHtml, emptyStateHtml } from "../instrument.js";
 import { icon } from "../icons.js";
 import { escHtml, escAttr } from "../esc.js";
@@ -45,7 +45,10 @@ function tNums(key, nums, vars = {}) {
 
 // ---- Display «Patrimonio neto» ------------------------------------------------------------------
 
-/** Display xl (B-Patrimonio): cifra neta, LED «Sube»/«Baja», delta del periodo en el pie y la línea
+// Cifra del Display a 44, la de B-Patrimonio (escala de tres RETIRADA, Álvaro 2026-09-27).
+const DISPLAY_PX = 44;
+
+/** Display (B-Patrimonio): cifra neta, LED «Sube»/«Baja», delta del periodo en el pie y la línea
  *  de los últimos ≤6 puntos de netWorthSeries (cerrados + hoy) con su eje de meses. La variación
  *  es el último punto (hoy) contra el penúltimo (el último cierre). Sin ningún cierre (menos de 2
  *  puntos) no hay con qué comparar: ni LED, ni delta, ni línea. El delta positivo va en --ok (C4:
@@ -55,7 +58,7 @@ function netWorthDisplayHtml(netWorthCents, series) {
   const pts = series.slice(-6);
   const n = pts.length;
   if (n < 2) {
-    return displayHtml({ label: t("patrimonio.netWorth.title"), value: fmtMoney(netWorthCents), size: "xl" });
+    return displayHtml({ label: t("patrimonio.netWorth.title"), value: fmtMoney(netWorthCents), size: DISPLAY_PX });
   }
   const variation = pts[n - 1].cents - pts[n - 2].cents;
   const up = variation >= 0;
@@ -63,7 +66,7 @@ function netWorthDisplayHtml(netWorthCents, series) {
   return displayHtml({
     label: t("patrimonio.netWorth.title"),
     value: fmtMoney(netWorthCents),
-    size: "xl",
+    size: DISPLAY_PX,
     led: { state: up ? "ok" : "idle", text: t(up ? "patrimonio.netWorth.up" : "patrimonio.netWorth.down") },
     footHtml,
     slot: sparklineSvg(pts.map((p) => p.cents), { labels: pts.map((p) => cap(String(p.label))), dots: true }),
@@ -93,10 +96,14 @@ function compositionHtml(accounts, famOf) {
   const have = accounts.reduce((s, a) => s + Math.max(0, a.balance_cents), 0);
   const owe = accounts.reduce((s, a) => s + Math.min(0, a.balance_cents), 0);
   const operational = accounts.filter((a) => a.type === "checking").reduce((s, a) => s + a.balance_cents, 0);
+  // «Debes» en el -x de la familia de la deuda, como el original (C7 retirada ahí). Con deudas de
+  // familias distintas no hay un color que las nombre a todas: tinta.
+  const debtFams = [...new Set(accounts.filter((a) => a.balance_cents < 0).map((a) => famOf(a)))];
+  const oweFam = debtFams.length === 1 ? debtFams[0] : null;
   const body = `${bar}
     <div class="pat-split">
-      <div class="pat-split-col"><span class="pat-split-label">${escHtml(t("patrimonio.composition.have"))}</span><span class="num pat-split-fig">${escHtml(fmtMoney(have))}</span></div>
-      <div class="pat-split-col is-end"><span class="pat-split-label">${escHtml(t("patrimonio.composition.owe"))}</span><span class="num pat-split-fig">${escHtml(signedMoney(owe))}</span></div>
+      <div class="pat-split-col"><span class="pat-split-label">${escHtml(t("patrimonio.composition.have"))}</span><span class="pat-split-fig num">${escHtml(fmtMoney(have))}</span></div>
+      <div class="pat-split-col is-end"><span class="pat-split-label">${escHtml(t("patrimonio.composition.owe"))}</span><span class="pat-split-fig">${famNumHtml(signedMoney(owe), oweFam)}</span></div>
     </div>
     <div class="pat-oper"><span class="pat-oper-label">${escHtml(t("patrimonio.composition.operational"))}</span><span class="num pat-oper-fig">${escHtml(signedMoney(operational))}</span></div>`;
   return containerHtml({ kind: "chart", label: t("patrimonio.composition.label"), body });
@@ -121,7 +128,7 @@ function accountIcon(a, linkedGoal) {
   return "card";
 }
 
-/** Línea 2 de la tarjeta, en HTML (texto en --fx; la cifra de la cuota, en tinta dim — C7):
+/** Línea 2 de la tarjeta, en HTML (en --fx, también la cifra de la cuota, como el original):
  *  corriente → «Corriente» / «Corriente, por defecto»; hucha → el objetivo al que sirve; pasivo con
  *  cuota y saldo pendiente → «215,00 €/mes, quedan 20 cuotas»; el resto, su tipo. Un pasivo ya
  *  pagado (saldo ≥ 0) no cuenta cuotas: «quedan 0 cuotas» se leería como un error. */
@@ -133,29 +140,30 @@ function accountLineHtml(a, { isDefault, linkedGoal, accountLoans }) {
   const monthly = Object.hasOwn(accountLoans, a.id) ? accountLoans[a.id]?.monthlyCents : 0;
   if (monthly > 0 && a.balance_cents < 0) {
     const n = Math.ceil(Math.abs(a.balance_cents) / monthly);
-    return tNums("patrimonio.accountLine.installments", { amount: fmtMoney(monthly) }, { n });
+    // Todo en el cuerpo y en -x, cifras incluidas, como el «215 €/mes, quedan 20 cuotas» original.
+    return escHtml(t("patrimonio.accountLine.installments", { amount: fmtMoney(monthly), n }));
   }
   return escHtml(typeLabel(a.type));
 }
 
-/** Tarjeta de cuenta (B-Patrimonio): tinte de su familia, baldosa 40 sobre --chip (la deuda, con
- *  la trama), nombre 15/600, línea 2 y saldo mono 17/600 en tinta (la deuda con «−», también en
- *  tinta: F-16). Ancha (fila) o media (apilada), según la rejilla. Toda la tarjeta abre la edición. */
+/** Tarjeta de cuenta (B-Patrimonio): tinte de su familia, baldosa 40 sobre --chip (también la de
+ *  la deuda: la trama va en la barra), nombre 15/600, línea 2 en -x y saldo mono 17/600 en tinta; la
+ *  deuda, con «−» y en el -x de su familia, como el original (F-16 retirada, Álvaro 2026-09-27).
+ *  Ancha (fila) o media (apilada), según la rejilla. Toda la tarjeta abre la edición. */
 function accountCardHtml(a, { fam, wide, isDefault, linkedGoal, accountLoans }) {
   const key = accountIcon(a, linkedGoal);
   // Sin línea 2 cuando solo repetiría el nombre (una cuenta «Ahorro» de tipo Ahorro, B-Patrimonio).
   const lineRaw = accountLineHtml(a, { isDefault, linkedGoal, accountLoans });
   const line = lineRaw.trim().toLowerCase() === escHtml(a.name).trim().toLowerCase() ? "" : lineRaw;
-  const tile = isDebt(a)
-    ? `<span class="ent-tile ${famClass(fam)} acc-debt">${icon(key)}</span>`
-    : tileHtml({ fam, icon: key, onTint: true });
+  const tile = tileHtml({ fam, icon: key, onTint: true });
+  const fig = a.balance_cents < 0 ? famNumHtml(signedMoney(a.balance_cents), fam) : escHtml(signedMoney(a.balance_cents));
   return `<button type="button" class="pat-acc ${famClass(fam) || "no-fam"}${wide ? " is-wide" : ""}" data-acc="${escAttr(a.id)}">
       ${tile}
       <span class="pat-acc-body">
         <span class="pat-acc-name">${escHtml(a.name)}</span>
         ${line ? `<span class="pat-acc-line">${line}</span>` : ""}
       </span>
-      <span class="num pat-acc-fig">${escHtml(signedMoney(a.balance_cents))}</span>
+      <span class="num pat-acc-fig">${fig}</span>
     </button>`;
 }
 
@@ -199,20 +207,44 @@ function fmtGoalAmount(goal, cents) {
   return goal.type === "savings_rate" ? `${fmtDec1(cents)} %` : fmtMoney(cents);
 }
 
-/** Tarjeta de objetivo (B-Patrimonio, con medidor en vez de anillo según el brief de S3): tinte de
- *  la familia de su cuenta (C8) o, sin cuenta (techo de gasto, tasa de ahorro), --raised con borde
- *  y medidor --idle (C11). Nombre, medidor, «actual de objetivo» en --fx con las cifras en tinta y
- *  el porcentaje a la derecha; un techo de gasto sobrepasado lo marca en --neg (C4). */
-function goalCardHtml(g, { fam, wide }) {
+// Anillo de 56 de B-Patrimonio: radio 22 y trazo 6 (circunferencia 2π·22).
+const RING_R = 22;
+const RING_LEN = 2 * Math.PI * RING_R;
+
+/** Anillo de progreso de la tarjeta de objetivo (B-Patrimonio): pista --raised sobre el tinte (sin
+ *  familia, --well), arco del sólido de la familia (-b) y el porcentaje 13/600 en su -x en el
+ *  centro. Un techo sobrepasado pinta el porcentaje en --neg (C4). Es un role="img" con el
+ *  progreso escrito; el SVG es decorativo. Local a Patrimonio: candidato a pieza compartida si
+ *  Inicio (B-Home) dibuja los mismos anillos. */
+function goalRingHtml({ fam, pct, over, label }) {
+  const ratio = Math.min(1, Math.max(0, pct / 100));
+  const arc = Number((RING_LEN * ratio).toFixed(1));
+  const pctText = `${Math.round(pct)}%`;
+  const pctHtml = over || !fam
+    ? `<span class="num pat-ring-pct${over ? " is-over" : ""}">${escHtml(pctText)}</span>`
+    : `<span class="pat-ring-pct">${famNumHtml(pctText, fam)}</span>`;
+  return `<span class="pat-ring" role="img" aria-label="${escAttr(label)}">
+      <svg class="pat-ring-svg" width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">
+        <circle class="pat-ring-track" cx="28" cy="28" r="${RING_R}" fill="none" stroke-width="6"></circle>
+        ${arc > 0 ? `<circle class="pat-ring-arc" cx="28" cy="28" r="${RING_R}" fill="none" stroke-width="6" stroke-linecap="round" stroke-dasharray="${arc} ${Number(RING_LEN.toFixed(1))}"></circle>` : ""}
+      </svg>
+      ${pctHtml}
+    </span>`;
+}
+
+/** Tarjeta de objetivo (B-Patrimonio): tinte de la familia de su cuenta (C8) o, sin cuenta (techo
+ *  de gasto, tasa de ahorro), --raised con borde (C11). Anillo con el porcentaje, nombre 15/600 y
+ *  «actual de objetivo» 13/500 en el -x de la familia, con la cifra actual a 600. Media anchura
+ *  siempre, como en el original. */
+function goalCardHtml(g, { fam }) {
   const { goal, currentCents, targetCents, pct, level } = g;
   const pctRound = Math.round(pct);
   const line = tNums("patrimonio.goals.ofTarget", { current: fmtGoalAmount(goal, currentCents), target: fmtGoalAmount(goal, targetCents) });
-  return `<button type="button" class="pat-goal ${famClass(fam) || "no-fam"}${wide ? " is-wide" : ""}" data-goal="${escAttr(goal.id)}">
-      <span class="pat-goal-name">${escHtml(goal.name)}</span>
-      ${meterHtml({ fam, value: Math.max(0, pct), max: 100, onTint: Boolean(fam), label: t("patrimonio.goals.progress", { name: goal.name, pct: pctRound }) })}
-      <span class="pat-goal-foot">
+  return `<button type="button" class="pat-goal ${famClass(fam) || "no-fam"}" data-goal="${escAttr(goal.id)}">
+      ${goalRingHtml({ fam, pct: Math.max(0, pct), over: level === "over", label: t("patrimonio.goals.progress", { name: goal.name, pct: pctRound }) })}
+      <span class="pat-goal-body">
+        <span class="pat-goal-name">${escHtml(goal.name)}</span>
         <span class="pat-goal-line">${line}</span>
-        <span class="num pat-goal-pct${level === "over" ? " is-over" : ""}">${pctRound} %</span>
       </span>
     </button>`;
 }
@@ -220,8 +252,7 @@ function goalCardHtml(g, { fam, wide }) {
 function objetivosHtml(goals, goalFamOf) {
   const header = sectionWithAddHtml({ title: t("patrimonio.goals.title"), btnId: "btn-nuevo-objetivo", btnLabel: t("patrimonio.goals.new") });
   if (goals.length === 0) return `${header}${emptyStateHtml({ title: t("patrimonio.goals.empty"), rows: 1 })}`;
-  const odd = goals.length % 2 === 1;
-  const cards = goals.map((g, i) => goalCardHtml(g, { fam: goalFamOf(g.goal), wide: odd && i === goals.length - 1 })).join("");
+  const cards = goals.map((g) => goalCardHtml(g, { fam: goalFamOf(g.goal) })).join("");
   return `${header}<div class="pat-grid">${cards}</div>`;
 }
 

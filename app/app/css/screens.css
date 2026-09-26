@@ -1374,7 +1374,8 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 /* === pantalla: patrimonio === */
 /* S3 (B-Patrimonio, BD-Patrimonio; formularios con la anatomía de B-Cuenta y B-Objetivo). La
    familia llega como .fam-<k> (cuentas: account-colors.js, C8) y aquí solo se leen --ft/--fb/--fx.
-   Las cifras, siempre en tinta (C7). */
+   Las cifras van en tinta salvo donde el original las pinta con su familia (la deuda, el anillo y
+   la línea del objetivo: famNumHtml / herencia de --fx; C7 retirada ahí, Álvaro 2026-09-27). */
 .pat,
 .pat-form { display: flex; flex-direction: column; gap: var(--sp-12); }
 .pat-form { gap: var(--sp-16); }
@@ -1385,12 +1386,15 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 .pat-delta.is-up { color: var(--ok); }
 .pat-delta.is-down { color: var(--disp-ink); }
 
-/* Composición: Tienes / Debes a los lados de la barra y el operativo tras el separador. */
+/* Composición: Tienes / Debes a los lados de la barra y el operativo tras el separador. La barra
+   del original: 3 de separación y la deuda un poco más apartada. */
+.pat .sbar { gap: 3px; }
+.pat .sbar-seg.is-debt { margin-left: 5px; }
 .pat-split { display: flex; justify-content: space-between; gap: var(--sp-12); }
 .pat-split-col { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
 .pat-split-col.is-end { align-items: flex-end; text-align: right; }
 .pat-split-label { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
-.pat-split-fig { font-size: var(--fs-17); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
+.pat-split-fig { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--fs-17); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
 .pat-oper {
   display: flex;
   align-items: center;
@@ -1426,10 +1430,15 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .pat-acc.no-fam { background: var(--raised); border: 1px solid var(--border); }
 .pat-acc.is-wide { grid-column: span 2; flex-direction: row; align-items: center; }
+/* Media (apilada, B-Patrimonio): baldosa, 14, y debajo nombre, línea y saldo seguidos (2 entre
+   ellos), arriba; si la vecina es más alta, el hueco queda abajo. */
+.pat-acc:not(.is-wide) { gap: 0; }
+.pat-acc:not(.is-wide) > .ent-tile { margin-bottom: 14px; }
+.pat-acc:not(.is-wide) .pat-acc-body { flex: none; }
+.pat-acc:not(.is-wide) .pat-acc-fig { margin-top: var(--sp-2); }
 .pat-acc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
 .pat-acc-name { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); overflow-wrap: anywhere; }
 .pat-acc-line { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--fx, var(--text-dim)); }
-.pat-acc-line .num { color: var(--text-dim); }
 .pat-acc-fig { flex: none; font-size: var(--fs-17); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
 
 /* Tarjeta de objetivo: tinte de la familia de su cuenta, o --raised con borde sin cuenta (C11). */
@@ -1449,13 +1458,30 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   cursor: pointer;
 }
 .pat-goal.no-fam { background: var(--raised); border: 1px solid var(--border); }
-.pat-goal.is-wide { grid-column: span 2; }
+.pat-goal-body { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
 .pat-goal-name { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); overflow-wrap: anywhere; }
-.pat-goal-foot { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
 .pat-goal-line { min-width: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--fx, var(--text-dim)); }
-.pat-goal-line .num { color: var(--text); }
-.pat-goal-pct { flex: none; font-size: var(--fs-13); font-weight: 600; color: var(--text); }
-.pat-goal-pct.is-over { color: var(--neg); }
+.pat-goal-line .num:first-child { font-weight: 600; }
+/* Anillo de 56 (B-Patrimonio): pista --raised sobre el tinte (--well sin familia), arco -b (sin
+   familia, --idle) que arranca arriba; el porcentaje 13/600 en el centro. */
+.pat-ring { position: relative; flex: none; width: 56px; height: 56px; }
+.pat-ring-svg { display: block; transform: rotate(-90deg); }
+.pat-ring-track { stroke: var(--raised); }
+.pat-goal.no-fam .pat-ring-track { stroke: var(--well); }
+.pat-ring-arc { stroke: var(--fb, var(--idle)); }
+.pat-ring-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--text);
+}
+.pat-ring-pct.is-over { color: var(--neg); }
 
 /* Formularios (anatomía de «Ajustes de la cuenta» / «Ajustes del objetivo»): encabezado de grupo
    13/600 dim, bloque teñido con la familia (o --surface con borde sin ella, C11) y una línea de
