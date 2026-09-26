@@ -1017,12 +1017,15 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
 @keyframes bc-sheet-in { from { transform: translateY(100%); } }
 @keyframes bc-sheet-out { to { transform: translateY(100%); } }
 
-/* flex:1;min-height:0 (no height:100%, ver el comentario de .sheet[open]): se reparte el alto que
-   el <dialog> ya tenga (intrínseco si el contenido cabe, recortado a max-height si no), y dentro,
-   .sheet-body es quien hace scroll — el asa y la cabecera (flex:none) se quedan fijos arriba. */
+/* flex:1 1 auto (no height:100%, ver el comentario de .sheet[open]): se reparte el alto que el
+   <dialog> ya tenga (intrínseco si el contenido cabe, recortado a max-height si no), y dentro,
+   .sheet-body es quien hace scroll — el asa y la cabecera (flex:none) se quedan fijos arriba.
+   Base "auto" (el alto del contenido), no "0%" (el atajo `flex:1`): con un alto de partida
+   indefinido (el del <dialog>, intrínseco salvo que max-height recorte), una base 0% deja más
+   margen a que un motor la resuelva distinto — "auto" es el contenido, y luego encoge si no cabe. */
 .sheet-content {
   box-sizing: border-box;
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   padding: var(--sp-8) var(--sp-16) calc(var(--sp-24) + env(safe-area-inset-bottom, 0px));
   display: flex;
