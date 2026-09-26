@@ -3,7 +3,7 @@ import {
   weekRange, daysWithCategories, maxDayPositive, dayPositiveCents, weekTotals, categoryTotals, movementsOfDay,
   rangeLabelParts,
 } from "../semana-logic.js";
-import { familyForCategory, iconForCategory } from "../category-colors.js";
+import { familyForCategory, iconForCategory, famClass } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, moneyPartsHtml, fmtDiaIni, hoyISO } from "../format.js";
 import { t, monthLong } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
@@ -32,7 +32,7 @@ function movRowHtml(r, byId, partnerName) {
     return txRowHtml({
       fam: null, icon: "pencil", title: t("common.type.adjustment"), line2: r.merchant || r.note || "",
       amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)), sign: r.amount_cents < 0 ? "expense" : "income",
-      data: { tx: r.id },
+      data: { tx: r.id }, amountWeight: 500,
     });
   }
   const cat = r.category_id ? byId[r.category_id] : null;
@@ -53,6 +53,8 @@ function movRowHtml(r, byId, partnerName) {
     // La nota va debajo de la cifra: sin el separador de prosa con el que se concatenaba al nombre.
     amountNote: shareNote.replace(/^,\s*/, ""),
     data: { tx: r.id },
+    // B-Semana: cifra 500 (F-34 retirada, Álvaro 2026-09-27); el alto de 56 lo pone screens.css.
+    amountWeight: 500,
   });
 }
 
@@ -165,12 +167,14 @@ export async function renderSemana(container, onBack, { openDay } = {}) {
   }
 
   /** «Dónde se ha ido»: neto por raíz de la semana como medidores con nombre, relativos a la que
-   *  más se llevó. Es la leyenda de las columnas apiladas: mismo color de familia y su nombre. */
+   *  más se llevó. Es la leyenda de las columnas apiladas: mismo color de familia y su nombre. La
+   *  fila lleva la clase de su familia para que la pista del medidor vaya en su tinte (B-Semana;
+   *  F-45 retirada, Álvaro 2026-09-27). */
   function whereHtml() {
     if (!chips.length) return "";
     const top = chips[0].cents;
     const body = `<div class="sem-where">${chips.map((c) => `
-      <div class="sem-where-row">
+      <div class="sem-where-row${famClass(rootFam(c.rootId)) ? ` ${famClass(rootFam(c.rootId))}` : ""}">
         <div class="sem-where-head">
           <span class="sem-where-name">${escHtml(rootName(c.rootId))}</span>
           <span class="num sem-where-amt">${escHtml(fmtMoney(c.cents))}</span>

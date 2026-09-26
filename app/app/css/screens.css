@@ -2112,6 +2112,8 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
    Todo en pila de 12 (§8). */
 .sem { display: flex; flex-direction: column; gap: var(--sp-12); }
 .sem > .sub-header { margin-bottom: 0; }
+/* Display de B-Semana: relleno 18 20 16 y pila a 6. */
+.sem .disp { padding: 18px var(--sp-20) var(--sp-16); gap: 6px; }
 
 /* Pie del Display: la media al día, etiqueta dim y cifra secundaria en --disp-ink (C2). */
 .sem-avg {
@@ -2166,7 +2168,8 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 :root[data-theme="dark"] .sem-avg-line { opacity: .75; }
 
-/* Días pulsables: 48 de alto; el elegido, relleno --accent + --on-accent 700 SIN --sh-key (F-19). */
+/* Días pulsables: 48 de alto; el elegido, relleno --accent + --on-accent 700 con la sombra de tecla
+   (F-19 retirada, Álvaro 2026-09-27: igual que B-Semana). */
 .sem-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--sp-4); }
 .sem-daybtn {
   height: 48px;
@@ -2186,7 +2189,7 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   cursor: pointer;
 }
 .sem-daybtn .num { font-size: var(--fs-12); font-weight: 500; }
-.sem-daybtn[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+.sem-daybtn[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 700; box-shadow: var(--sh-key); }
 .sem-daybtn[aria-pressed="true"] .num { font-weight: 600; }
 
 /* Día elegido: --raised con borde y una muesca que apunta a su columna (--i, índice 0-6). La
@@ -2224,6 +2227,8 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .sem-day-total { font-size: var(--fs-17); font-weight: 600; color: var(--text); white-space: nowrap; }
 .sem-day-rows { display: flex; flex-direction: column; margin: 0 calc(-1 * var(--sp-12)); }
+/* Filas de 56 en B-Semana. */
+.sem-day-rows .ent-row { min-height: 56px; padding-top: var(--sp-4); padding-bottom: var(--sp-4); }
 .sem-day-div { height: 1px; margin-left: 64px; background: var(--border); }
 .sem-day-empty { margin: 0; padding: var(--sp-8) 0; font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
 
@@ -2233,6 +2238,10 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 .sem-where-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
 .sem-where-name { min-width: 0; font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-title); color: var(--text); }
 .sem-where-amt { flex: none; font-size: var(--fs-14); font-weight: 500; color: var(--text); }
+/* Medidor de B-Semana (F-45 retirada): 10 de alto, radio 4, pista en el tinte de su familia (la
+   clase de familia va en la fila); sin familia, --well. */
+.sem-where .meter { height: 10px; border-radius: var(--radius-xs); background: var(--ft, var(--well)); }
+.sem-where .meter-fill { border-radius: var(--radius-xs); }
 /* === fin: semana === */
 
 /* === pantalla: suscripciones === */
