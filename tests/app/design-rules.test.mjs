@@ -1,6 +1,7 @@
 // Reglas de diseño del sistema B (design/DESIGN.md §5, §7, §8, §11 y §13) comprobadas solas.
 // Cubre las casillas K1 (C13), K3 (C1), K4 (C2), K6 (C7), K9 (escala de letra) y K10 (radios) del
-// checklist de PR, más foco, emoji, estilos en línea y el «atrás».
+// checklist de PR, más foco, emoji, estilos en línea, el «atrás» y que no vuelvan los alias de
+// legacy.css (R-LEGACY, PR-99).
 //
 // Escanea el TEXTO de app/app/css/*.css (salvo tokens.css) y de app/app/js/**/*.js, plantillas
 // incluidas: el naranja y los estilos en línea viven sobre todo en los template strings de las
@@ -41,11 +42,9 @@ const FICHEROS = [
   ...listar(APP + "js").filter((f) => f.endsWith(".js")),
 ].map((abs) => ({ rel: relative(APP, abs), text: readFileSync(abs, "utf8") }));
 
-// legacy.css es su propia desviación (DESIGN §Desviaciones: alias var() de «Neto», se retira en la
-// PR-99): sus alias leen --accent por diseño. Solo pasa por C13; legacy.test.mjs ata sus valores.
-const SOLO_C13 = new Set(["css/legacy.css"]);
-
 const sinComentariosCss = (css) => css.replace(/\/\*[\s\S]*?\*\//g, "");
+/** Sin comentarios de bloque ni de línea (JS): los comentarios pueden citar nombres retirados. */
+const sinComentarios = (txt) => sinComentariosCss(txt).replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
 
 /** Reglas CSS {sel, decls:[{prop, value}]}. La regex coge solo los bloques más internos, así que
  *  las reglas dentro de @media salen con su selector limpio. No es un parser: basta para el repo. */
@@ -223,10 +222,45 @@ export function rBACK(rel, text) {
   return errs;
 }
 
-const REGLAS = { rC13, rC1, rC2, rC7, rFS, rRAD, rFOCUS, rEMOJI, rINLINE, rBACK };
-const aplicables = (rel) => (SOLO_C13.has(rel) ? { rC13 } : REGLAS);
+// R-LEGACY · DESIGN §4 («sin alias»): legacy.css (los alias var() de «Neto») se borró en la PR-99.
+// Ningún fichero lee ni declara uno de sus nombres: foto fija de la lista, tomada del fichero antes
+// de borrarlo (más --surface-1 y --r-1, que ya se usaban sin definir). Se comprueban las lecturas y
+// también las declaraciones, para que un `--ink:` local no reabra la puerta. Que toda lectura
+// var(--x) esté definida en algún sitio lo mira aparte el test de huérfanas de más abajo.
+export const NOMBRES_LEGACY = new Set([
+  "--ink", "--ink-2", "--ink-3", "--text-2", "--text-3", "--surface-1", "--surface-2", "--card2", "--card",
+  "--hairline", "--rule", "--hairline-strong", "--accent-ink", "--danger", "--red", "--green", "--warn",
+  "--amber", "--accent-tint", "--pos-tint", "--danger-tint", "--warn-tint", "--shadow-float", "--paper",
+  "--paper-ink", "--paper-dim", "--stamp", "--r-0", "--r-1", "--radius-sm", "--r-pill", "--r-circle",
+  "--s-1", "--s-2", "--s-3", "--s-4", "--s-5", "--s-6", "--s-7", "--s-8", "--s-9", "--pad-screen",
+  "--gap-section", "--tabbar-h", "--font-sans", "--font-ui", "--font-num", "--t-hero", "--t-figure-xl",
+  "--t-figure-l", "--t-figure-m", "--t-figure-s", "--t-title", "--t-section", "--t-body", "--t-label",
+  "--t-micro",
+]);
+const NOMBRE_PROP = /--[a-zA-Z0-9-]*[a-zA-Z0-9]/g;
+export function rLEGACY(rel, text) {
+  const errs = [];
+  for (const [i, l] of sinComentarios(text).split("\n").entries()) {
+    for (const [n] of l.matchAll(NOMBRE_PROP)) {
+      if (NOMBRES_LEGACY.has(n)) errs.push(`${rel}:${i + 1} nombre de legacy.css: ${n}`);
+    }
+  }
+  return errs;
+}
+
+/** Lecturas var(--x) que nadie declara: ni tokens.css (`tokens`, un Set) ni el propio código de la
+ *  app (una declaración `--x:` en CSS o en un style="--x:…" de plantilla). Sin definir, la propiedad
+ *  cae a su valor inicial en silencio (color negro, radio 0…) y ningún otro test lo pinta. */
+export function huerfanas(textos, tokens) {
+  const limpios = textos.map(sinComentarios);
+  const locales = new Set(limpios.flatMap((s) => [...s.matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)].map((m) => m[1])));
+  const leidas = new Set(limpios.flatMap((s) => [...s.matchAll(/var\((--[a-zA-Z0-9-]+)/g)].map((m) => m[1])));
+  return [...leidas].filter((n) => !tokens.has(n) && !locales.has(n)).sort();
+}
+
+const REGLAS = { rC13, rC1, rC2, rC7, rFS, rRAD, rFOCUS, rEMOJI, rINLINE, rBACK, rLEGACY };
 const migrados = FICHEROS.filter((f) => !PENDIENTES.has(f.rel));
-const incumple = (regla) => migrados.flatMap((f) => (aplicables(f.rel)[regla] ? aplicables(f.rel)[regla](f.rel, f.text) : []));
+const incumple = (regla) => migrados.flatMap((f) => REGLAS[regla](f.rel, f.text));
 
 // ---------- las reglas, sobre los ficheros migrados ----------
 
@@ -250,6 +284,17 @@ test("R-EMOJI: cero emoji en los valores de i18n (es y en)", () => {
   }
 });
 test("R-INLINE: style=\"…\" solo con geometría dinámica", () => assert.deepEqual(incumple("rINLINE"), []));
+test("R-LEGACY: ningún fichero lee ni declara un nombre de legacy.css (tampoco index.html)", () => {
+  // Sobre TODOS los ficheros, también los de PENDIENTES: legacy.css ya no existe para nadie.
+  const html = readFileSync(APP + "index.html", "utf8");
+  assert.deepEqual([...FICHEROS.flatMap((f) => rLEGACY(f.rel, f.text)), ...rLEGACY("index.html", html)], []);
+});
+test("R-LEGACY: cada var(--x) que se lee lo declara tokens.css o el propio código", () => {
+  const tokensCss = readFileSync(APP + "css/tokens.css", "utf8");
+  const tokens = new Set([...sinComentariosCss(tokensCss).matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)].map((m) => m[1]));
+  assert.ok(tokens.size > 50, "tokens.css no se ha leído");
+  assert.deepEqual(huerfanas([...FICHEROS.map((f) => f.text), readFileSync(APP + "index.html", "utf8")], tokens), []);
+});
 test("R-BACK: el atrás lleva aria-label t(\"common.back\") y vale «Atrás»", () => {
   assert.equal(es.common.back, "Atrás");
   assert.deepEqual(incumple("rBACK"), []);
@@ -328,6 +373,17 @@ test("detectores: cazan lo que prohíben y dejan pasar lo permitido", () => {
   assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"backBtn\" aria-label=\"Volver\">x</button>`").length, 1, "id camelCase delante");
   assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"goBack\" aria-label=\"${t(\"common.back\")}\">x</button>`").length, 0);
   assert.equal(rBACK("x.js", "`<button type=\"button\" class=\"background feedback\">x</button>`").length, 0, "back dentro de otra palabra no es atrás");
+
+  assert.equal(rLEGACY("x.css", ".a{color:var(--ink-3)}").length, 1, "lectura de un alias retirado");
+  assert.equal(rLEGACY("x.css", ".a{--ink:red}").length, 1, "declararlo en local tampoco vale");
+  assert.equal(rLEGACY("x.js", "`<b style=\"--gap-section:4px\"></b>`").length, 1);
+  assert.equal(rLEGACY("x.css", ".a{color:var(--text-dim);border-radius:var(--radius-pill)}").length, 0);
+  assert.equal(rLEGACY("x.css", "/* antes --ink-3 */ .a{color:var(--text-dim)}").length, 0, "un comentario no cuenta");
+  assert.equal(rLEGACY("x.css", ".a{color:var(--ink-30)}").length, 0, "solo el nombre exacto");
+  assert.deepEqual(huerfanas([".a{color:var(--nada)}"], new Set(["--text"])), ["--nada"]);
+  assert.deepEqual(huerfanas([".a{color:var(--text)}"], new Set(["--text"])), []);
+  assert.deepEqual(huerfanas([".a{--cat:x}", "`<b style=\"color:var(--cat)\">`"], new Set()), [], "declarada en el código");
+  assert.deepEqual(huerfanas(["/* var(--vieja) */ .a{}"], new Set()), [], "un comentario no cuenta");
 
 });
 

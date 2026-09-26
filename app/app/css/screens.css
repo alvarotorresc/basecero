@@ -1483,7 +1483,7 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 
 /* === pantalla: periodo-nuevo === */
 /* S11 (B-PeriodoNuevo, BD-PeriodoNuevo). Bloques verticales de la pantalla (.pn-blocks: el 16 del
-   mockup, no el --gap-section=24 de legacy.css) y piezas propias sin componente canónico: día
+   mockup, no el 24 entre secciones del sistema «Neto») y piezas propias sin componente canónico: día
    seleccionable, fila de reparto compartido, importe hundido reutilizado en límite/ingresos
    previstos/barrido, y el resumen de "Presupuestado". */
 .pn-blocks { display: flex; flex-direction: column; gap: var(--sp-16); }

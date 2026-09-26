@@ -39,7 +39,7 @@ export const remainingAfterRecurringCents = (availableCents, pendingRecurringCen
  *  ÚLTIMO día (daysLeft=0) y en un periodo que se alarga (daysLeft negativo) el divisor cae
  *  igualmente a 1 — mismo resultado que antes en esos dos casos límite, el usuario ve que puede
  *  gastar TODO lo que queda, no una división por cero. Sin margen (remaining ≤ 0) el resultado
- *  sale negativo a propósito: la pantalla lo pinta en --danger con 0,00 €, esta función no lo capa. */
+ *  sale negativo a propósito: la pantalla lo pinta en --neg con 0,00 €, esta función no lo capa. */
 export function dailyAllowanceCents(availableCents, pendingRecurringCents, startDateIso, todayIso) {
   const remaining = remainingAfterRecurringCents(availableCents, pendingRecurringCents);
   const daysLeft = daysLeftOfPeriod(startDateIso, todayIso);

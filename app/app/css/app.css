@@ -23,7 +23,7 @@ body {
   line-height: 1.4;
 }
 button { font: inherit; color: inherit; }
-::selection { background: var(--accent); color: var(--accent-ink); }
+::selection { background: var(--accent); color: var(--on-accent); }
 
 main#screen {
   display: block;
@@ -41,25 +41,25 @@ main#screen {
   gap: 10px;
   min-height: 44px;
   padding: 12px 14px;
-  border-radius: var(--r-0);
-  background: var(--warn-tint);
+  border-radius: var(--radius);
+  background: var(--well);
   border: 0;
   font-size: 12px;
   line-height: 1.5;
-  color: var(--warn);
+  color: var(--text);
 }
 .banner-aviso svg {
   flex-shrink: 0;
   width: 18px;
   height: 18px;
   margin-top: 1px;
-  color: var(--warn);
+  color: var(--text);
 }
 .banner-aviso.red {
-  background: var(--danger-tint);
-  color: var(--danger);
+  background: color-mix(in srgb, var(--neg) 14%, transparent);
+  color: var(--neg);
 }
-.banner-aviso.red svg { color: var(--danger); }
+.banner-aviso.red svg { color: var(--neg); }
 
 /* el aviso de almacenamiento no persistente se antepone a body (fuera de #screen):
    franja roja tenue fija arriba, a todo lo ancho del layout */
@@ -72,8 +72,8 @@ body > .banner-aviso {
   max-width: 480px;
   z-index: 30;
   border-radius: 0;
-  background: color-mix(in srgb, var(--red) 14%, var(--card));
-  border: 1px solid color-mix(in srgb, var(--red) 35%, var(--rule));
+  background: color-mix(in srgb, var(--neg) 14%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--neg) 35%, var(--border));
   border-top: 0;
 }
 body:has(> .banner-aviso) main#screen { margin-top: 46px; }
@@ -89,13 +89,13 @@ body.onboarding .tabbar { display: none; }
    los formularios no queden pegados al borde de la pantalla, respetando el notch inferior. */
 body.subscreen .tabbar { display: none; }
 body.subscreen main#screen {
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--s-6));
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--sp-24));
 }
 
 /* Anatomía del importe (SISTEMA.md §2.3). En `em`: la MISMA pareja sirve al héroe de 56px, al
    total de 34 y a la fila de 16 sin una sola medida absoluta. */
-.money-cents { font-size: 0.56em; color: var(--ink-2); }
-.money-cur { font-size: 0.42em; font-weight: 500; color: var(--ink-3); margin-left: .06em; }
+.money-cents { font-size: 0.56em; color: var(--text-dim); }
+.money-cur { font-size: 0.42em; font-weight: 500; color: var(--text-dim); margin-left: .06em; }
 
 /* ===== animación de aviso (importe/categoría inválidos al guardar) ===== */
 @keyframes bc-shake {
@@ -110,8 +110,8 @@ body.subscreen main#screen {
 /* Misma tinta y mismo radio que las tarjetas para que la silueta prometa lo que va a llegar. */
 .skeleton-stack { display: flex; flex-direction: column; gap: var(--sp-16); }
 .skeleton {
-  background: var(--surface-2);
-  border-radius: var(--r-0);
+  background: var(--raised);
+  border-radius: var(--radius);
   animation: bc-skeleton 1.2s ease-in-out infinite;
 }
 @keyframes bc-skeleton {
@@ -128,5 +128,5 @@ body.subscreen main#screen {
 /* Sustituye al punto medio, que §1 prohíbe explícitamente. La altura del divisor es la del
    artboard (11px en fila de lista, 12px en cabecera de sección): 11px es el caso mayoritario y
    la diferencia no se ve, así que hay un solo valor. */
-.meta-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font: var(--t-label); color: var(--ink-3); }
-.meta-sep { width: 1px; height: 11px; background: var(--hairline-strong); flex-shrink: 0; }
+.meta-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font: 500 var(--fs-13)/var(--lh-body) var(--font-body); color: var(--text-dim); }
+.meta-sep { width: 1px; height: 11px; background: var(--border-strong); flex-shrink: 0; }

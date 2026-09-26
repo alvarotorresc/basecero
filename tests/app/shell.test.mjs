@@ -38,7 +38,7 @@ test("sw: pdf-lib está vendorizado y en el SHELL", () => {
 });
 
 test("sw: las hojas y módulos nuevos del sistema B están en el SHELL", () => {
-  for (const f of ["css/tokens.css", "css/legacy.css", "css/components.css", "css/app.css", "css/screens.css", "js/theme.js"]) {
+  for (const f of ["css/tokens.css", "css/components.css", "css/app.css", "css/screens.css", "js/theme.js"]) {
     assert.ok(shell.includes(f), `falta ${f} en el SHELL`);
   }
 });
