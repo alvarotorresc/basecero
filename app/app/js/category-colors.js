@@ -33,20 +33,21 @@ export const POOL_TO_FAMILY = {
   "2bd9c9": "sal", "ff7a45": "reg", "2fc4e0": "sal", "de5fa8": "oci", "5b9bff": "tra", "e85f72": "reg",
 };
 
-// Emoji antiguos (CATEGORY_ICONS y CURATED_ICONS de v2) → clave de icono SVG, o null si no hay
-// equivalente (la entrada se descarta y la categoría cae al icono de su familia). La clave es la
+// Emoji antiguos (CATEGORY_ICONS y CURATED_ICONS de v2) → clave de icono SVG. Todos tienen
+// equivalente (los que no lo tenían en B salen de Lucide, ver icons.js); un emoji ajeno a estas
+// listas se descarta y la categoría cae al icono de su familia. La clave es la
 // secuencia de code points en hex sin el selector de variación FE0F (ver emojiKey): así el
 // módulo no lleva ningún emoji literal (R-EMOJI) y un emoji con o sin FE0F resuelve igual.
 //   casa 1f3e0 · ali 1f6d2 · res 1f37d · tra 1f68c · coc 1f697 · sal 2764+200d+1fa79 · sus 1f4fa
-//   oci 1f389 · rop 1f455 · reg 1f381 · imp 1f9fe · otr 25ab · ingreso 1f4b6 (sin equivalente)
-//   curados: huella 1f43e · libro 1f393 · avion 2708 · hoja 1f331; sin equivalente: 1f476 1f4bb
-//   1f3ae 1f4e6.
+//   oci 1f389 · rop 1f455 · reg 1f381 · imp 1f9fe · otr 25ab · billete 1f4b6
+//   curados: huella 1f43e · birrete 1f393 · avion 2708 · bebe 1f476 · portatil 1f4bb
+//   mando 1f3ae · hoja 1f331 · paquete 1f4e6.
 export const LEGACY_EMOJI = {
   "1f3e0": "casa", "1f6d2": "ali", "1f37d": "res", "1f68c": "tra", "1f697": "coc",
   "2764-200d-1fa79": "sal", "1f4fa": "sus", "1f389": "oci", "1f455": "rop", "1f381": "reg",
-  "1f9fe": "imp", "25ab": "otr", "1f4b6": null,
-  "1f43e": "huella", "1f393": "libro", "2708": "avion", "1f476": null, "1f4bb": null,
-  "1f3ae": null, "1f331": "hoja", "1f4e6": null,
+  "1f9fe": "imp", "25ab": "otr", "1f4b6": "billete",
+  "1f43e": "huella", "1f393": "birrete", "2708": "avion", "1f476": "bebe", "1f4bb": "portatil",
+  "1f3ae": "mando", "1f331": "hoja", "1f4e6": "paquete",
 };
 
 /** Code points en hex, sin FE0F, unidos por «-» (el corazón vendado da "2764-200d-1fa79"). */
@@ -62,7 +63,10 @@ export function emojiKey(str) {
 // Iconos elegibles para una categoría (los mismos que ofrece el selector: icons.js#CAT_ICONS).
 // Se repite la lista de claves en vez de importar icons.js para que este módulo siga sin
 // dependencias; tests/app/category-colors.test.mjs comprueba que coinciden.
-export const CAT_ICON_KEYS = [...FAMILIES, "huella", "hoja", "libro", "nota", "avion", "estrella"];
+export const CAT_ICON_KEYS = [
+  ...FAMILIES, "huella", "hoja", "libro", "nota", "avion", "estrella",
+  "billete", "bebe", "portatil", "mando", "paquete", "birrete",
+];
 const ICON_SET = new Set(CAT_ICON_KEYS);
 
 export const isFamily = (fam) => typeof fam === "string" && FAMILY_SET.has(fam);
@@ -71,7 +75,8 @@ export const isCatIcon = (key) => typeof key === "string" && ICON_SET.has(key);
 function legacyColorToFamily(color) {
   if (typeof color !== "string") return null;
   const hex = color.trim().replace(/^#/, "").toLowerCase();
-  return POOL_TO_FAMILY[LEGACY_COLORS[hex] ?? hex] ?? null;
+  const v2 = Object.hasOwn(LEGACY_COLORS, hex) ? LEGACY_COLORS[hex] : hex;
+  return Object.hasOwn(POOL_TO_FAMILY, v2) ? POOL_TO_FAMILY[v2] : null;
 }
 
 function toIconKey(icon) {
@@ -130,16 +135,19 @@ export function parseStyle(raw) {
 
 // Un ciclo de parent_id (xlsx importado a mano) no debe colgar la pestaña: Set de visitados.
 export function rootOf(catId, byId) {
-  let c = byId[catId];
+  let c = own(byId, catId);
   const seen = new Set();
   while (c && c.parent_id && !seen.has(c.id)) {
     seen.add(c.id);
-    c = byId[c.parent_id];
+    c = own(byId, c.parent_id);
   }
   return c ? c.id : catId;
 }
 
-const isIncomeRoot = (root, byId) => byId?.[root]?.flow === "income" || INCOME_SEEDS.has(root);
+// Búsquedas por clave con Object.hasOwn: un id como "toString" o "constructor" no debe resolver a
+// lo que hereda de Object.prototype (style, ROOT_FAMILY y byId son objetos planos).
+const own = (obj, k) => (obj && Object.hasOwn(obj, k) ? obj[k] : undefined);
+const isIncomeRoot = (root, byId) => own(byId, root)?.flow === "income" || INCOME_SEEDS.has(root);
 
 /** Familia de una categoría (la de su raíz: una subcategoría nunca tiene color propio, §6).
  *  null para «sin categoría» ("") y para los ingresos (C9): ambos se pintan neutros en --well.
@@ -148,7 +156,7 @@ export function familyForCategory(catId, byId) {
   if (!catId) return null;
   const root = rootOf(catId, byId ?? {});
   if (!root || isIncomeRoot(root, byId)) return null;
-  return style[root]?.fam ?? ROOT_FAMILY[root] ?? FAMILIES[hashIndex(root)];
+  return own(style, root)?.fam ?? own(ROOT_FAMILY, root) ?? FAMILIES[hashIndex(root)];
 }
 
 /** Clave de icono (icons.js#catIcon), nunca un emoji. Ingresos → "income"; «sin categoría» → "otr".
@@ -158,7 +166,7 @@ export function iconForCategory(catId, byId) {
   if (!catId) return "otr";
   const root = rootOf(catId, byId ?? {});
   if (isIncomeRoot(root, byId)) return "income";
-  return style[root]?.icon ?? ROOT_FAMILY[root] ?? familyForCategory(catId, byId) ?? "otr";
+  return own(style, root)?.icon ?? own(ROOT_FAMILY, root) ?? familyForCategory(catId, byId) ?? "otr";
 }
 
 /** "fam-casa"; cadena vacía para null o una clave desconocida (nunca una clase inventada). */

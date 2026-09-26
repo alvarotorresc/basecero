@@ -565,7 +565,7 @@ export const EN = {
       colorSectionTitle: "Color",
       colorHint: "Twelve color families. We suggest one; if you repeat another category’s, the icon tells them apart.",
       iconSectionTitle: "Icon",
-      iconHint: "The system icons: the twelve family ones and six more.",
+      iconHint: "The system icons: the twelve family ones and twelve more.",
       colorIconSectionTitle: "Color and icon",
       create: "Create category",
       previewTitle: "Preview",
@@ -1154,6 +1154,7 @@ export const EN = {
       casa: "House", ali: "Shopping basket", res: "Cup", tra: "Bus", coc: "Car", sal: "Pulse",
       sus: "Renewal", oci: "Ticket", rop: "T-shirt", reg: "Gift", imp: "Receipt", otr: "Dots",
       huella: "Paw print", hoja: "Leaf", libro: "Book", nota: "Musical note", avion: "Plane", estrella: "Star",
+      billete: "Banknote", bebe: "Baby", portatil: "Laptop", mando: "Game controller", paquete: "Package", birrete: "Graduation cap",
     },
   },
 };

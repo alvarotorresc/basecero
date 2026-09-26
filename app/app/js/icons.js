@@ -60,7 +60,10 @@ export function icon(name, { size = 20, width = 1.75, stroke = "currentColor", c
 // repo.setCategoryStyle. Los 12 primeros son los de las familias (B-Gasto.dc.html, rejilla de
 // baldosas; la clave coincide con la de la familia) y los 6 siguientes, los del selector de
 // B-Categorias-Nueva.dc.html. Los `d` están copiados TAL CUAL de esos ficheros (solo cambia el
-// cierre `></path>` por `/>`). El ORDEN es el del selector de la pantalla de edición.
+// cierre `></path>` por `/>`). Los 6 últimos vienen de Lucide (lucide-static 1.48.0, licencia ISC,
+// ver THIRD_PARTY_NOTICES.md): cubren los emoji curados de v2 que no tenían equivalente. Sus
+// elementos se copian tal cual; el grosor de trazo es el de la casa (1.75, lo pone catIcon), no
+// el 2 de Lucide, para que no pesen más que el resto. El ORDEN es el del selector.
 export const CAT_ICONS = {
   casa:     '<path d="M4 11l8-6.5 8 6.5v8.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/>',
   ali:      '<path d="M4 9.5h16l-1.6 9.5H5.6z"/><path d="M8.5 9.5l3-5.5M15.5 9.5l-3-5.5"/>',
@@ -80,6 +83,13 @@ export const CAT_ICONS = {
   nota:     '<path d="M9 17.5V5.5l10-2v12"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/>',
   avion:    '<path d="M3 13.5l18-7-5 14-3.5-5.5z"/><path d="M12.5 15L21 6.5"/>',
   estrella: '<path d="M12 4l2.5 5.2 5.5.7-4 3.9 1 5.6-5-2.7-5 2.7 1-5.6-4-3.9 5.5-.7z"/>',
+  // Lucide (ISC): banknote, baby, laptop, gamepad-2, package, graduation-cap.
+  billete:  '<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
+  bebe:     '<path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5"/><path d="M15 12h.01"/><path d="M19.38 6.813A9 9 0 0 1 20.8 10.2a2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1"/><path d="M9 12h.01"/>',
+  portatil: '<path d="M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z"/><path d="M20.054 15.987H3.946"/>',
+  mando:    '<line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/>',
+  paquete:  '<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/>',
+  birrete:  '<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>',
 };
 
 // Ingreso (ficha en --well, C9: B-Importar.dc.html, «Intereses de ahorro») y etiqueta (B-Gasto /
@@ -95,7 +105,8 @@ const ENTITY_ICONS = {
  *  heredaba el font-size). Con `label` el SVG deja de ser decorativo (role img + aria-label).
  *  Una clave desconocida pinta el icono de Otros: una fila nunca se queda sin icono. */
 export function catIcon(key, { size = 20, width = 1.75, cls = "", label = "" } = {}) {
-  const d = CAT_ICONS[key] ?? ENTITY_ICONS[key] ?? CAT_ICONS.otr;
+  // Object.hasOwn: una clave como "toString" no debe resolver a lo heredado de Object.prototype.
+  const d = Object.hasOwn(CAT_ICONS, key) ? CAT_ICONS[key] : Object.hasOwn(ENTITY_ICONS, key) ? ENTITY_ICONS[key] : CAT_ICONS.otr;
   const a11y = label ? `role="img" aria-label="${escAttr(label)}"` : 'aria-hidden="true"';
   return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor"`
     + ` stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" ${a11y}`

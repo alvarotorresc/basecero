@@ -591,7 +591,7 @@ export const ES = {
       colorSectionTitle: "Color",
       colorHint: "Doce familias de color. Te sugerimos una; si repites la de otra categoría, el icono las distingue.",
       iconSectionTitle: "Icono",
-      iconHint: "Los iconos del sistema: los doce de las familias y seis más.",
+      iconHint: "Los iconos del sistema: los doce de las familias y doce más.",
       colorIconSectionTitle: "Color e icono",
       create: "Crear categoría",
       previewTitle: "Vista previa",
@@ -1225,6 +1225,7 @@ export const ES = {
       casa: "Casa", ali: "Cesta de la compra", res: "Taza", tra: "Autobús", coc: "Coche", sal: "Pulso",
       sus: "Renovación", oci: "Entrada", rop: "Camiseta", reg: "Regalo", imp: "Recibo", otr: "Puntos",
       huella: "Huella", hoja: "Hoja", libro: "Libro", nota: "Nota musical", avion: "Avión", estrella: "Estrella",
+      billete: "Billete", bebe: "Bebé", portatil: "Portátil", mando: "Mando de juego", paquete: "Paquete", birrete: "Birrete",
     },
   },
 };

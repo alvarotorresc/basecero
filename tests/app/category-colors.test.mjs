@@ -205,12 +205,12 @@ test("compat: tabla hex → familia fijada (la que ve Álvaro en la PR)", () => 
 const OLD_CATEGORY_ICONS = ["🏠", "🛒", "🍽️", "🚌", "🚗", "❤️‍🩹", "📺", "🎉", "👕", "🎁", "🧾", "▫️", "💶"];
 const OLD_CURATED_ICONS = ["🐾", "🎓", "✈️", "👶", "💻", "🎮", "🌱", "📦"];
 
-test("compat: cada emoji de CATEGORY_ICONS y CURATED_ICONS tiene entrada y da una clave válida o nada", () => {
+test("compat: cada emoji de CATEGORY_ICONS y CURATED_ICONS tiene entrada y da una clave válida", () => {
   for (const e of [...OLD_CATEGORY_ICONS, ...OLD_CURATED_ICONS]) {
     const k = emojiKey(e);
     assert.ok(k in LEGACY_EMOJI, `${e} (${k}) sin entrada en LEGACY_EMOJI`);
     const target = LEGACY_EMOJI[k];
-    assert.ok(target === null || CAT_ICONS[target], `${e} → ${target}`);
+    assert.ok(Object.hasOwn(CAT_ICONS, target), `${e} → ${target}`);
   }
 });
 
@@ -218,9 +218,11 @@ test("compat: los emojis con equivalente se traducen; los que no, se descartan y
   assert.deepEqual(parseStyle(JSON.stringify({ "cat-x": { icon: "🐾" } })), { "cat-x": { icon: "huella" } });
   assert.deepEqual(parseStyle(JSON.stringify({ "cat-x": { icon: "🏠" } })), { "cat-x": { icon: "casa" } });
   assert.deepEqual(parseStyle(JSON.stringify({ "cat-x": { icon: "❤️‍🩹" } })), { "cat-x": { icon: "sal" } });
-  assert.deepEqual(parseStyle(JSON.stringify({ "cat-x": { icon: "🎮" } })), {});
+  assert.deepEqual(parseStyle(JSON.stringify({ "cat-x": { icon: "🎮" } })), { "cat-x": { icon: "mando" } });
+  // Sin equivalente (un emoji que nunca estuvo en las listas): se descarta y cae a su familia.
+  assert.deepEqual(parseStyle(JSON.stringify({ "cat-x": { icon: "🦄" } })), {});
   const byId = { "cat-x": { id: "cat-x", parent_id: "", flow: "expense" } };
-  initCategoryStyle(parseStyle(JSON.stringify({ "cat-x": { color: "#E85F72", icon: "🎮" } })));
+  initCategoryStyle(parseStyle(JSON.stringify({ "cat-x": { color: "#E85F72", icon: "🦄" } })));
   assert.equal(familyForCategory("cat-x", byId), "reg");
   assert.equal(iconForCategory("cat-x", byId), "reg", "sin equivalente: icono de su familia");
 });
@@ -306,4 +308,26 @@ test("components.css: una regla .fam-<k> por familia que expone --ft/--fb/--fx d
     for (const p of ["t", "b", "x"]) assert.ok(tokens.includes(`--f-${k}-${p}:`), `tokens.css sin --f-${k}-${p}`);
   }
   assert.equal([...css.matchAll(/\.fam-[a-z]+\s*\{/g)].length, 12, "ni una familia de más");
+});
+
+test("compat: tabla emoji → icono fijada (Lucide para los que no tenían equivalente)", () => {
+  const expect = {
+    "🏠": "casa", "🛒": "ali", "🍽️": "res", "🚌": "tra", "🚗": "coc", "❤️‍🩹": "sal", "📺": "sus", "🎉": "oci",
+    "👕": "rop", "🎁": "reg", "🧾": "imp", "▫️": "otr", "💶": "billete",
+    "🐾": "huella", "🎓": "birrete", "✈️": "avion", "👶": "bebe", "💻": "portatil", "🎮": "mando", "🌱": "hoja", "📦": "paquete",
+  };
+  for (const [e, key] of Object.entries(expect)) assert.equal(LEGACY_EMOJI[emojiKey(e)], key, e);
+});
+
+test("búsquedas por clave: nombres heredados de Object.prototype no se toman por datos", () => {
+  const byId = {
+    toString: { id: "toString", parent_id: "", flow: "expense" },
+    constructor: { id: "constructor", parent_id: "", flow: "expense" },
+  };
+  for (const id of ["toString", "constructor"]) {
+    assert.ok(FAMILIES.includes(familyForCategory(id, byId)), `${id} → ${familyForCategory(id, byId)}`);
+    assert.ok(Object.hasOwn(CAT_ICONS, iconForCategory(id, byId)), `${id} → ${iconForCategory(id, byId)}`);
+  }
+  assert.deepEqual(parseStyle(JSON.stringify({ "cat-x": { icon: "toString", fam: "constructor", color: "#toString" } })), {});
+  assert.equal(emojiKey("toString") in LEGACY_EMOJI, false);
 });

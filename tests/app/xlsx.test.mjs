@@ -1090,6 +1090,6 @@ test("import: replaceAllStmts escribe category_style ya normalizado; el resto de
     accounts: [], categories: [], periods: [], transactions: [], recurring_rules: [], goals: [], budgets: [], tags: [],
   };
   const binds = Object.fromEntries(replaceAllStmts(data).filter((s) => s.bind?.length === 2).map((s) => s.bind));
-  assert.deepEqual(JSON.parse(binds.category_style), { "cat-a": { fam: "reg" }, "cat-b": { fam: "oci", icon: "libro" } });
+  assert.deepEqual(JSON.parse(binds.category_style), { "cat-a": { fam: "reg", icon: "mando" }, "cat-b": { fam: "oci", icon: "libro" } });
   assert.equal(binds.currency, "USD");
 });

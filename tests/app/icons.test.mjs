@@ -55,11 +55,22 @@ test("icon(): un nombre inexistente devuelve cadena vacía y no lanza", () => {
 // ---- Iconos de categoría (PR-04): 12 de familia + 6 del selector de B-Categorias-Nueva ----------
 import { CAT_ICONS, catIcon } from "../../app/app/js/icons.js";
 
-test("CAT_ICONS: los 12 de familia y los 6 del selector, en ese orden", () => {
+test("CAT_ICONS: los 12 de familia, los 6 del selector y los 6 de Lucide, en ese orden", () => {
   assert.deepEqual(Object.keys(CAT_ICONS), [
     "casa", "ali", "res", "tra", "coc", "sal", "sus", "oci", "rop", "reg", "imp", "otr",
     "huella", "hoja", "libro", "nota", "avion", "estrella",
+    "billete", "bebe", "portatil", "mando", "paquete", "birrete",
   ]);
+});
+
+test("CAT_ICONS: los 6 de Lucide (ISC) se copian tal cual de lucide-static 1.48.0", () => {
+  assert.equal(CAT_ICONS.billete, '<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>');
+  assert.equal(CAT_ICONS.birrete, '<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>');
+  for (const k of ["billete", "bebe", "portatil", "mando", "paquete", "birrete"]) assert.match(CAT_ICONS[k], /^<(path|rect|line|circle|polyline)/, k);
+});
+
+test("catIcon(): una clave heredada de Object.prototype no se toma por icono", () => {
+  for (const k of ["toString", "constructor", "__proto__", "hasOwnProperty"]) assert.equal(catIcon(k), catIcon("otr"), k);
 });
 
 test("CAT_ICONS: los d se copian tal cual de B-Gasto y B-Categorias-Nueva", () => {

@@ -600,7 +600,7 @@ test("setCategoryStyle (reproducido): familia + icono se guardan en formato nuev
   assert.equal(familyForCategory("cat-casa", { "cat-casa": { id: "cat-casa", parent_id: "", flow: "expense" } }), "oci");
 });
 
-test("setCategoryStyle (reproducido): las 12 familias y los 18 iconos del selector son válidos", () => {
+test("setCategoryStyle (reproducido): las 12 familias y los 24 iconos del selector son válidos", () => {
   const db = openDb();
   seedMinimal(db);
   for (const fam of FAMILIES) assert.doesNotThrow(() => setCategoryStyleReproduced(db, "cat-casa", { fam }));
@@ -627,7 +627,7 @@ test("setCategoryStyle (reproducido): una entrada antigua de OTRA raíz se reesc
   db.prepare(SQL.upsertMeta).run("category_style", JSON.stringify({ "cat-ocio": { color: "#6B61C2", icon: "🎓" } }));
   setCategoryStyleReproduced(db, "cat-casa", { fam: "ali" });
   const raw = JSON.parse(db.prepare("SELECT value FROM meta WHERE key='category_style'").get().value);
-  assert.deepEqual(raw, { "cat-ocio": { fam: "sus", icon: "libro" }, "cat-casa": { fam: "ali" } });
+  assert.deepEqual(raw, { "cat-ocio": { fam: "sus", icon: "birrete" }, "cat-casa": { fam: "ali" } });
 });
 
 test("setCategoryStyle (reproducido): entrada vacía ({} sin familia ni icono) elimina la clave del JSON", () => {

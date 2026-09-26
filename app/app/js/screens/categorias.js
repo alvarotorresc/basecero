@@ -183,7 +183,7 @@ export async function renderCategorias(container, onBack) {
   // Task 6: subvista de formulario (crear/editar categoría + estilo)
   // ========================================================================
 
-  /** Los 18 iconos de CAT_ICONS con el actual/sugerido primero. Se calcula UNA VEZ al abrir el
+  /** Los 24 iconos de CAT_ICONS con el actual/sugerido primero. Se calcula UNA VEZ al abrir el
    *  formulario (no en cada render): reordenar en cada pintado haría saltar la rejilla cada vez
    *  que el usuario toca un icono distinto; el orden queda fijo durante toda la edición. */
   function buildIconOrder(current) {
