@@ -21,8 +21,9 @@ import { showToast } from "../toast.js";
 import { attachments } from "../attachments.js";
 import { packBundle, unpackRestore } from "../bundle.js";
 import { download } from "../download.js";
-import { subHeaderHtml, metaHtml, themeSegmentedHtml, radioKeyIndex } from "../ui.js";
-import { applyTheme, readPref, writePref, getStorage, systemDarkQuery } from "../theme.js";
+import { subHeaderHtml, metaHtml } from "../ui.js";
+import { segmentedHtml, wireSegmented } from "../controls.js";
+import { applyTheme, readPref, writePref, getStorage, systemDarkQuery, THEME_PREFS } from "../theme.js";
 import { icon } from "../icons.js";
 
 import { escHtml, escAttr } from "../esc.js";
@@ -425,7 +426,10 @@ export async function renderAjustes(container) {
 
       <section style="margin-bottom:var(--gap-section)">
         <div class="section-title" style="margin-bottom:20px">${t("ajustes.prefs.title")}</div>
-        ${themeSegmentedHtml(readPref(getStorage(window)))}
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--sp-12);min-height:56px;margin-bottom:var(--sp-4);">
+          <span style="font-size:var(--fs-15);font-weight:600;">${t("theme.label")}</span>
+          ${segmentedHtml({ id: "theme-seg", name: t("theme.label"), options: THEME_PREFS.map((p) => ({ value: p, label: t("theme." + p) })), value: readPref(getStorage(window)) })}
+        </div>
         <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;cursor:pointer;margin-bottom:4px;">
           <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
             <span style="font-size:15px;font-weight:600;">${t("ajustes.prefs.quickRegisterLabel")}</span>
@@ -730,27 +734,10 @@ export async function renderAjustes(container) {
     // Tema: igual que el interruptor, se aplica AL INSTANTE y sin recargar ni repintar la pantalla
     // (repintar se llevaría el foco del radio). Va a localStorage, no a la BD: el script en línea
     // del <head> lo tiene que leer antes de que exista la BD.
-    const themeRadios = [...container.querySelectorAll(".theme-seg [role=radio]")];
-    const chooseTheme = (btn) => {
-      const pref = btn.dataset.themePref;
+    wireSegmented(container.querySelector("#theme-seg"), (pref) => {
       writePref(getStorage(window), pref);
       applyTheme(document, pref, systemDarkQuery(window));
-      for (const r of themeRadios) {
-        const on = r === btn;
-        r.setAttribute("aria-checked", String(on));
-        r.tabIndex = on ? 0 : -1;
-      }
-    };
-    for (const r of themeRadios) {
-      r.onclick = () => chooseTheme(r);
-      r.onkeydown = (e) => {
-        const i = radioKeyIndex(e.key, themeRadios.indexOf(r), themeRadios.length);
-        if (i < 0) return;
-        e.preventDefault();
-        chooseTheme(themeRadios[i]);
-        themeRadios[i].focus();
-      };
-    }
+    });
 
     // Un interruptor no es un formulario: guarda AL INSTANTE con setMeta, sin esperar al botón
     // «Guardar preferencias» de la tarjeta (mismo criterio que el toggle de compartido de
