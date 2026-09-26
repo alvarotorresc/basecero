@@ -80,22 +80,27 @@ export function wireSegmented(root, onChange) {
 }
 
 /** Interruptor (§9): 44×26 con pomo de 20. Apagado: pista `--well` + `--sh-well`, pomo `--idle`.
- *  Encendido: pista `--text`, pomo `--raised` — tinta, nunca naranja (F-04, K3). Componente mínimo:
- *  sin icono ni etiqueta visible (eso es la «Fila de ajuste» que lo envuelve, de otra PR); `label`
- *  es su aria-label. */
-export function switchHtml({ id, checked, label }) {
-  return `<button type="button" class="ctl-switch" id="${escAttr(id)}" role="switch" aria-checked="${checked ? "true" : "false"}" aria-label="${escAttr(label)}">
+ *  Encendido: pista `--text`, pomo `--raised`. Componente mínimo: sin icono ni etiqueta visible (eso
+ *  es la «Fila de ajuste» que lo envuelve); `label` es su aria-label.
+ *  `accent` (por defecto false): encendido en naranja (`--accent`, pomo `--raised`), como el
+ *  interruptor de B-Movimientos-Filtros (F-04 retirada, Álvaro 2026-09-27: igual que el mockup).
+ *  Apagado se ve igual con o sin `accent`. */
+export function switchHtml({ id, checked, label, accent = false }) {
+  return `<button type="button" class="ctl-switch${accent ? " is-accent" : ""}" id="${escAttr(id)}" role="switch" aria-checked="${checked ? "true" : "false"}" aria-label="${escAttr(label)}">
     <span class="ctl-switch-knob"></span>
   </button>`;
 }
 
 /** Casilla (§9): 24 de radio 7 dentro de un área de toque de 44 (K10). Marcada: `--text` con el
- *  check en `--raised`. Vacía: `--raised` con borde interior `--idle` (F-22) — tinta, nunca naranja
- *  (F-05, K3). `label` es su aria-label completo (p.ej. «Incluir Mercadona en la liquidación», como
- *  en B-Liquidar), no una etiqueta corta: el botón no lleva texto visible propio. */
-export function checkboxHtml({ id, checked, label }) {
+ *  check en `--raised`. Vacía: `--raised` con borde interior `--idle` (F-22). `label` es su
+ *  aria-label completo (p.ej. «Incluir Mercadona en la liquidación», como en B-Liquidar), no una
+ *  etiqueta corta: el botón no lleva texto visible propio.
+ *  `accent` (por defecto false): marcada en naranja (`--accent` con el check en `--on-accent`), como
+ *  las casillas de B-Liquidar (F-05 retirada, Álvaro 2026-09-27: igual que el mockup). La de
+ *  B-Onb-Categorias va en tinta: ahí, sin `accent`. */
+export function checkboxHtml({ id, checked, label, accent = false }) {
   const mark = checked ? icon("check", { size: 16, width: 2.6 }) : "";
-  return `<button type="button" class="ctl-checkbox" id="${escAttr(id)}" role="checkbox" aria-checked="${checked ? "true" : "false"}" aria-label="${escAttr(label)}">
+  return `<button type="button" class="ctl-checkbox${accent ? " is-accent" : ""}" id="${escAttr(id)}" role="checkbox" aria-checked="${checked ? "true" : "false"}" aria-label="${escAttr(label)}">
     <span class="ctl-checkbox-box">${mark}</span>
   </button>`;
 }
@@ -139,13 +144,17 @@ export function stepsHtml({ total, current, ariaLabel = "", labels = null }) {
  *  Gasto por categoría) para inputs numéricos. `lead` (S10, B-Categorias-Nueva: la baldosa de 32 que
  *  hace de vista previa): HTML YA RENDERIZADO (entity.js#tileHtml) que va dentro del pozo, delante
  *  del input, envuelto en `.ctl-field-lead` (quien llama lo repinta por ahí). Sin ellos, el marcado
- *  es el de siempre. */
-export function fieldHtml({ id, label, type = "text", value = "", inputmode = "", placeholder = "", num = false, suffix = "", min = "", step = "", lead = "" }) {
+ *  es el de siempre.
+ *  `pill` (por defecto false): el pozo en píldora (`--radius-pill`) en vez de radio 10, como la
+ *  búsqueda y los importes de B-Movimientos / B-Movimientos-Filtros (F-29 retirada). `label` sigue
+ *  siendo obligatorio; con `hideLabel` no se ve (queda como texto para el lector de pantalla), para
+ *  los campos del original que no llevan etiqueta encima. */
+export function fieldHtml({ id, label, type = "text", value = "", inputmode = "", placeholder = "", num = false, suffix = "", min = "", step = "", lead = "", pill = false, hideLabel = false }) {
   const extra = `${inputmode ? ` inputmode="${escAttr(inputmode)}"` : ""}${placeholder ? ` placeholder="${escAttr(placeholder)}"` : ""}`
     + `${min !== "" ? ` min="${escAttr(min)}"` : ""}${step !== "" ? ` step="${escAttr(step)}"` : ""}`;
   return `<label class="ctl-field-wrap" for="${escAttr(id)}">
-    <span class="ctl-field-label">${escHtml(label)}</span>
-    <span class="ctl-field${lead ? " has-lead" : ""}">${lead ? `<span class="ctl-field-lead" aria-hidden="true">${lead}</span>` : ""}<input class="ctl-field-input${num ? " is-num" : ""}" id="${escAttr(id)}" type="${escAttr(type)}" value="${escAttr(value)}"${extra}>${suffix ? `<span class="ctl-field-suffix" aria-hidden="true">${escHtml(suffix)}</span>` : ""}</span>
+    <span class="ctl-field-label${hideLabel ? " is-hidden" : ""}">${escHtml(label)}</span>
+    <span class="ctl-field${lead ? " has-lead" : ""}${pill ? " is-pill" : ""}">${lead ? `<span class="ctl-field-lead" aria-hidden="true">${lead}</span>` : ""}<input class="ctl-field-input${num ? " is-num" : ""}" id="${escAttr(id)}" type="${escAttr(type)}" value="${escAttr(value)}"${extra}>${suffix ? `<span class="ctl-field-suffix" aria-hidden="true">${escHtml(suffix)}</span>` : ""}</span>
   </label>`;
 }
 

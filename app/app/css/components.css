@@ -340,6 +340,9 @@
   transform: translateX(18px);
 }
 .ctl-switch:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+/* Variante naranja (switchHtml `accent`, B-Movimientos-Filtros): encendido en --accent. F-04
+   retirada (Álvaro 2026-09-27: igual que el mockup); apagado, igual que el de tinta. */
+.ctl-switch.is-accent[aria-checked="true"] { background: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .ctl-switch-knob { transition: none; } }
 
 /* Casilla (§9): 24 de radio 7 (única excepción al radio de tokens, K10) dentro de un área de toque
@@ -371,6 +374,9 @@
   box-shadow: none;
 }
 .ctl-checkbox:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+/* Variante naranja (checkboxHtml `accent`, B-Liquidar): marcada en --accent con el check en
+   --on-accent. F-05 retirada (Álvaro 2026-09-27: igual que el mockup). */
+.ctl-checkbox.is-accent[aria-checked="true"] .ctl-checkbox-box { background: var(--accent); color: var(--on-accent); }
 
 /* Paso a paso (§9): pozo píldora con relleno 4, teclas de 44 en --raised + --sh-thumb, valor mono
    17/600. */
@@ -475,6 +481,18 @@
   font-weight: 600;
 }
 .ctl-field-input.is-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+/* En píldora (fieldHtml `pill`, B-Movimientos búsqueda e importes de Filtros; F-29 retirada). */
+.ctl-field.is-pill { border-radius: var(--radius-pill); }
+/* Etiqueta solo para el lector de pantalla (fieldHtml `hideLabel`): el original no la pinta. */
+.ctl-field-label.is-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 /* Con baldosa delante (opción `lead`, B-Categorias-Nueva): relleno 8 a la izquierda, hueco 12. */
 .ctl-field.has-lead { padding: 0 var(--sp-12) 0 var(--sp-8); gap: var(--sp-12); }
 .ctl-field-lead { flex: none; display: flex; }
