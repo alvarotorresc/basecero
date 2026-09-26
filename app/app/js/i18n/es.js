@@ -681,7 +681,7 @@ export const ES = {
       needSectionTitle: "¿Necesario o prescindible?",
       parentSectionTitle: "Dentro de",
       rootLockedNote: "Una categoría con subcategorías no puede colgarse de otra.",
-      inheritNote: "Una subcategoría hereda el color y el icono de su categoría.",
+      inheritNote: "Las subcategorías heredan color e icono de la suya.",
       famLabel: "Familia de color",
       famUsedBy: "{fam}, la usa {name}",
       famShared: ", la misma que {name}. El icono las distingue.",
@@ -694,7 +694,7 @@ export const ES = {
   },
   etiquetas: {
     title: "Etiquetas de proyecto",
-    hint: "Cruzan categorías: un viaje, una reforma, un cumple.",
+    hint: "Cruzan las categorías: juntan un viaje, una reforma o un cumple caiga donde caiga cada gasto.",
     empty: "Todavía no hay etiquetas.",
     open: "Abiertas",
     archived: "Archivadas",
@@ -732,7 +732,7 @@ export const ES = {
       open: "No se pudo abrir el periodo: {error}",
     },
     header: {
-      closing: "Cierras {name} y abres el siguiente",
+      closing: "Cierras {name} y abres {next}",
       first: "Primer periodo",
       title: "Nuevo periodo",
     },

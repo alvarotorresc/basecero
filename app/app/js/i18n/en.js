@@ -651,7 +651,7 @@ export const EN = {
       needSectionTitle: "Essential or discretionary?",
       parentSectionTitle: "Inside",
       rootLockedNote: "A category with subcategories can’t be nested under another one.",
-      inheritNote: "A subcategory inherits its category’s color and icon.",
+      inheritNote: "Subcategories inherit their category’s color and icon.",
       famLabel: "Color family",
       famUsedBy: "{fam}, used by {name}",
       famShared: ", the same as {name}. The icon tells them apart.",
@@ -664,7 +664,7 @@ export const EN = {
   },
   etiquetas: {
     title: "Project tags",
-    hint: "They cross categories: a trip, a renovation, a birthday.",
+    hint: "They cross categories: they group a trip, a renovation or a birthday no matter which category each expense falls under.",
     empty: "No tags yet.",
     open: "Open",
     archived: "Archived",
@@ -702,7 +702,7 @@ export const EN = {
       open: "Couldn’t open the period: {error}",
     },
     header: {
-      closing: "Closing {name} and opening the next one",
+      closing: "Closing {name} and opening {next}",
       first: "First period",
       title: "New period",
     },
