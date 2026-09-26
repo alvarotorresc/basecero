@@ -241,7 +241,7 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
     const sign = d.type === "adjustment"
       ? `<button type="button" class="mdet-sign" id="mdet-sign" aria-label="${escAttr(t("common.changeSign"))}"${amountLocked ? " disabled" : ""}>${d.sign === "-" ? MINUS : "+"}</button>`
       : "";
-    return `<section class="disp mdet-disp" id="mdet-disp-edit" tabindex="-1" aria-label="${escAttr(t("movimientos.detail.edit"))}">
+    return `<section class="disp mdet-disp" id="mdet-disp-edit" tabindex="-1">
       <input type="text" id="mdet-merchant" class="mdet-merchant-input" value="${escAttr(d.merchant)}"
         placeholder="${escAttr(t("common.merchant"))}" aria-label="${escAttr(t("common.merchant"))}" autocomplete="off">
       <div class="num disp-value disp-value-l mdet-amount${amountLocked ? " is-locked" : ""}">
@@ -523,7 +523,11 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
       b.onclick = () => { picked = b.dataset.pickCat; goBack(); };
     });
     dlg.addEventListener("close", () => {
-      if (picked) { state.detail.categoryId = picked; errorMsg = ""; }
+      // Sin elegir, nada que repintar: la hoja ya devuelve el foco a la tarjeta. Y si un salto de
+      // varias entradas de «atrás» ya pintó otra pantalla en `container`, no se pisa.
+      if (!picked || !container.querySelector(".mdet")) return;
+      state.detail.categoryId = picked;
+      errorMsg = "";
       render("#mdet-cat");
     });
   }
