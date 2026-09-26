@@ -57,6 +57,19 @@
   color: var(--text);
 }
 .root-header-sub { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+/* Subtítulo pulsable (rootHeaderHtml subtitleAction): alto de toque 44 (§8) sin mover la cabecera;
+   el margen negativo devuelve lo que el alto mínimo añade alrededor de la línea de 13. */
+.root-header-sub-btn {
+  align-self: flex-start;
+  min-height: 44px;
+  margin-block: calc((44px - var(--lh-title) * 1em) / -2);
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
 
 /* --- Cabecera con atrás (§9, B-Categorias · ui.js#subHeaderHtml): atrás 44 · h1 20 a la
    izquierda con subtítulo opcional · acción 44 opcional. Alto mínimo 48. --- */
@@ -504,7 +517,7 @@
   color: var(--disp-ink);
 }
 .disp-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); min-width: 0; }
-.disp-label { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--disp-dim); }
+.disp-label { display: inline-flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--disp-dim); }
 /* C2: la cifra que manda es la única en ámbar; K9: solo 52/44/34. */
 .disp-value {
   font-weight: 500;
@@ -528,6 +541,10 @@
 .disp-chart-line.is-area,
 .disp-chart-line.is-dot { fill: var(--disp-text); stroke: none; }
 circle.disp-today { fill: var(--disp-text); stroke: var(--disp); }
+/* Línea del periodo (charts.js#periodChartSvg, B-Home/B-Inicio-Vacio): la guía discontinua del
+   ritmo parejo y los rótulos «hoy» / «día 30» en --disp-dim; la línea y el punto, en ámbar (C2). */
+.disp-chart-guide { stroke: var(--disp-dim); stroke-opacity: .5; stroke-dasharray: 3 5; }
+.disp-chart-label { fill: var(--disp-dim); font-family: var(--font-mono); font-size: var(--fs-12); }
 /* Eje de meses: cada etiqueta centrada bajo su punto (los puntos van de PAD=--sp-4 a ancho−PAD). */
 .disp-chart-axis {
   display: grid;

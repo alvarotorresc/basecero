@@ -28,6 +28,12 @@ const count = (html, re) => (html.match(re) || []).length;
 
 // ---- Display ----------------------------------------------------------------------------------
 
+test("displayHtml: labelAfter va tal cual detrás de la etiqueta escapada", () => {
+  const html = displayHtml({ label: "A&B", value: "1 €", labelAfter: '<svg class="chev"></svg>' });
+  assert.match(html, /<span class="disp-label">A&amp;B<svg class="chev"><\/svg><\/span>/);
+  assert.match(displayHtml({ label: "x", value: "1" }), /<span class="disp-label">x<\/span>/);
+});
+
 test("displayHtml: exactamente un .disp-value por Display (K4), con pie, LED e instrumento", () => {
   const html = displayHtml({
     label: "Hoy puedes gastar", value: "32,84 €", size: "xl",
@@ -117,6 +123,14 @@ test("containerHtml: gráfico con relleno 16 y lista con 4; cabecera con título
   assert.match(containerHtml({ body: "", kind: "list", label: "Movimientos" }), /class="box box-list" aria-label="Movimientos"/);
   assert.equal(decl(".box-chart", "padding"), "var(--sp-16)");
   assert.equal(decl(".box-list", "padding"), "var(--sp-4)");
+});
+
+test("containerHtml: `aside` pone la acción a la derecha de la cabecera, tal cual y en lugar del total", () => {
+  const btn = '<button type="button" class="btn-tertiary" id="ver">Ver todos</button>';
+  const html = containerHtml({ title: "Últimos movimientos", total: "9,00 €", aside: btn, body: "", kind: "list" });
+  assert.match(html, /<div class="box-head"><h2 class="box-title">Últimos movimientos<\/h2><button type="button" class="btn-tertiary" id="ver">Ver todos<\/button><\/div>/);
+  assert.ok(!html.includes("box-total"), "con aside no hay total");
+  assert.match(containerHtml({ aside: btn, body: "" }), /<div class="box-head"><span><\/span><button/, "sin título la acción sigue a la derecha");
 });
 
 // ---- Barra apilada ---------------------------------------------------------------------------
