@@ -883,7 +883,6 @@ export const ES = {
       partnerNone: "Nadie",
       partnerField: "Nombre de la otra persona",
       informeSub: "{name}, abierto el {date}",
-      quickRegisterSub: "Solo importe y categoría",
       enc: "Copia cifrada",
       sheet: "Hoja de cálculo",
       sheetNote: "Importar sustituye los datos actuales y también abre una copia cifrada (.bce).",

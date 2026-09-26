@@ -840,7 +840,6 @@ export const EN = {
       partnerNone: "No one",
       partnerField: "The other person’s name",
       informeSub: "{name}, opened {date}",
-      quickRegisterSub: "Just amount and category",
       enc: "Encrypted backup",
       sheet: "Spreadsheet",
       sheetNote: "Importing replaces your current data and also opens an encrypted backup (.bce).",

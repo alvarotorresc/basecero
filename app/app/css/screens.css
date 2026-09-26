@@ -4,9 +4,10 @@
    comprueba colores, radios, tamaños de letra y naranja igual que en components.css. */
 
 /* === pantalla: ajustes === */
-/* S4 · B-Ajustes: grupos neutros (F-08, C11) con etiqueta 13/600 dim (sectionHeaderHtml "group")
-   y tarjeta --surface con borde; filas de ajuste de entity.js; paneles que se despliegan en su
-   sitio bajo su fila (sin hoja inferior todavía). Sin tinte de familia en nada. */
+/* S4 · B-Ajustes con la excepción aprobada (Álvaro 2026-09-27): tarjeta de grupo NEUTRA --surface
+   con borde; lo demás como el original: encabezado en Unbounded 13 con el -x de la familia del
+   grupo (sectionHeaderHtml `fam`), baldosas rellenas del sólido con icono claro y valores en -x
+   (settingRowHtml `tileFilled`/`valueInFam`). Paneles que se despliegan en su sitio bajo su fila. */
 .aj-screen { display: flex; flex-direction: column; gap: var(--sp-12); }
 .aj-group { display: flex; flex-direction: column; gap: var(--sp-8); }
 .aj-card {
@@ -18,8 +19,11 @@
 /* Filete con la sangría de la baldosa: relleno 8 + baldosa 32 + hueco 12. */
 .aj-sep { height: 1px; margin: 0 var(--sp-8) 0 calc(var(--sp-8) + 32px + var(--sp-12)); background: var(--border); }
 
-/* Fila Tema: el Segmented mide 52, así que la fila sube a 60 con menos relleno a la derecha. */
-#theme-row { min-height: 60px; padding-right: var(--sp-4); }
+/* Fila Tema (B-Ajustes): 64 de alto, con menos relleno a la derecha para el Segmented. */
+#theme-row { min-height: 64px; padding-right: var(--sp-4); }
+/* Muestras de «Categorías» (B-Ajustes): barritas de 8×14 del sólido de cada familia. */
+.aj-cat-swatches { flex: none; display: flex; gap: 3px; }
+.aj-cat-swatch { width: 8px; height: 14px; border-radius: 3px; background: var(--fb); }
 #theme-row .ctl-segmented { flex: none; }
 #aj-quick { cursor: pointer; }
 /* Fila que despliega: el chevron apunta abajo mientras su panel está abierto (sin animación). */
