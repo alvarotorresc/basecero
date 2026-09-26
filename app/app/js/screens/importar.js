@@ -1,10 +1,14 @@
-// Asistente de mapeo CSV genérico (Task 6, PR E): subvista de Ajustes que se abre cuando
-// importCsv() (router de n26.js, Task 5) devuelve needsMapping — banco sin soporte dedicado.
-// Vive aparte de ajustes.js desde S4 (rediseño B): Ajustes ya está migrado al sistema B y el
-// asistente se rediseña en S12, así que este fichero sigue en PENDIENTES hasta entonces.
-// Mismo comportamiento que antes: se pinta en el contenedor de Ajustes, su «atrás» es la entrada
-// de historial que Ajustes apunta con pushBack antes de abrirlo, y el resultado del import vuelve
-// a Ajustes por onImported(texto) — que pinta el banner y hace goBack().
+// Importar extracto (S12, B-Importar): subvista de Ajustes con cabecera con atrás y progreso por
+// pasos (Fichero, Columnas, Resultado). Se abre desde la fila «Importar del banco» de Ajustes en
+// dos casos:
+//  - importCsv() (router de n26.js) devuelve needsMapping, banco sin soporte dedicado: paso
+//    «Columnas», el asistente de mapeo; al pulsar el primario guarda el perfil, importa y pasa a
+//    «Resultado».
+//  - importCsv() ya ha importado solo (N26 o perfil guardado): directamente en «Resultado».
+// Se pinta en el contenedor de Ajustes; su «atrás» (y el «Listo» del resultado) es la entrada de
+// historial que Ajustes apunta con pushBack antes de abrirlo.
+// El paso de revisión del mockup (B-3/P3: lista editable antes de importar) es lógica nueva y no
+// está: el tercer segmento se llama como el paso que existe de verdad.
 import { setMeta } from "../repo.js";
 import { fmtMoney } from "../format.js";
 import { goBack } from "../back.js";
@@ -13,37 +17,30 @@ import { buildProfile, applyProfile, detectDateFormat, detectDecimal, parseDateI
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 import { showToast } from "../toast.js";
-import { subHeaderHtml, metaHtml } from "../ui.js";
+import { subHeaderHtml, buttonHtml } from "../ui.js";
+import { segmentedHtml, wireSegmented, stepsHtml } from "../controls.js";
+import { filterChipHtml } from "../entity.js";
+import { ledHtml } from "../instrument.js";
 import { icon } from "../icons.js";
-import { escHtml, escAttr } from "../esc.js";
+import { escHtml } from "../esc.js";
 
-// Pastilla de asignación de cabecera: NO reutiliza .chip/.chips de app.css (esas asumen un
-// .chip-icon circular a la izquierda que este selector no lleva) — mismo criterio que el
-// chipStyle() local de categorias.js (Task 6 PR D); no hay módulo de UI compartido entre
-// pantallas para esta variante de pastilla de solo texto.
-function assistChipStyle(active) {
-  return `display:inline-flex;align-items:center;font-size:13px;font-weight:${active ? 600 : 500};
-    background:${active ? "var(--accent)" : "var(--surface-2)"};color:${active ? "var(--accent-ink)" : "var(--ink-2)"};
-    border:0;border-radius:999px;padding:12px 14px;white-space:nowrap;cursor:pointer;
-    -webkit-tap-highlight-color:transparent;`;
-}
+const MINUS = "−"; // «−» tipográfico, el mismo que usan las filas de movimiento (entity.js)
 
-// Fila de chips de asignación de un bloque. `options`: [{value,label}] — value=null representa
-// "sin columna" (solo Contraparte lo ofrece). Las cabeceras son texto del CSV del usuario, así
-// que value/label van SIEMPRE escapados (escAttr/escHtml), nunca confiar en su contenido.
-function chipsRowHtml(field, options, selected) {
-  return `<div style="display:flex;gap:7px;flex-wrap:wrap;">${options.map(({ value, label }) => {
-    const active = value === selected;
-    const valueAttr = value === null ? "" : escAttr(value);
-    const noneAttr = value === null ? ` data-assist-none="1"` : "";
-    return `<button type="button" data-assist-field="${field}" data-assist-value="${valueAttr}"${noneAttr}
-      style="${assistChipStyle(active)}">${escHtml(label)}</button>`;
-  }).join("")}</div>`;
+// Fila de chips de asignación de un bloque: chips neutros de filtro (entity.js), el elegido en
+// --accent. `options`: [{value,label}] — value=null representa "sin columna" (solo Contraparte lo
+// ofrece). Las cabeceras son texto del CSV del usuario: filterChipHtml escapa la etiqueta y
+// attrs() los data-*, nunca se confía en su contenido.
+function chipsRowHtml(field, options, selected, labelledBy) {
+  return `<div class="imp-chips" role="group" aria-labelledby="${labelledBy}">${options.map(({ value, label }) => filterChipHtml({
+    label,
+    selected: value === selected,
+    data: { assistField: field, assistValue: value === null ? "" : value, assistNone: value === null ? "1" : null },
+  })).join("")}</div>`;
 }
 
 // Nº de filas de datos del CSV completo (cabecera aparte, líneas en blanco fuera) — mismo
 // criterio de troceo que nonEmptyLines de csv-generic.js (no exportada de allí: ese módulo es
-// CERO-imports a propósito y esta cuenta es puramente de presentación de Ajustes).
+// CERO-imports a propósito y esta cuenta es puramente de presentación).
 export function csvDataRowCount(text) {
   const lines = String(text ?? "").split(/\r?\n/).filter((l) => l.trim() !== "");
   return Math.max(0, lines.length - 1);
@@ -63,12 +60,11 @@ const DATE_FORMAT_LABEL_KEY = {
   "dmy-dash": "ajustes.assist.dateFormat.dmy",
 };
 
-/** Nota bajo el bloque Fecha: verde con la conversión de ejemplo si TODA la muestra parsea con
- *  algún formato ("12/09/2026 → 2026-09-12 · formato día/mes/año detectado", copy del artboard);
- *  roja con el motivo si la columna no reconoce ningún formato; null (sin nota) si aún no hay
- *  columna elegida. Recibe los valores YA extraídos de la muestra para esa columna, no el
- *  profile completo: buildProfile agrega fecha+concepto+contraparte+importe en un único {error},
- *  y esta nota tiene que poder mostrarse aunque otro bloque no esté resuelto todavía.
+/** Nota bajo el bloque Fecha: de éxito con la conversión de ejemplo si TODA la muestra parsea con
+ *  algún formato; de aviso con el motivo si la columna no reconoce ningún formato; null (sin nota)
+ *  si aún no hay columna elegida. Recibe los valores YA extraídos de la muestra para esa columna,
+ *  no el profile completo: buildProfile agrega fecha+concepto+contraparte+importe en un único
+ *  {error}, y esta nota tiene que poder mostrarse aunque otro bloque no esté resuelto todavía.
  *  OJO orden: detectDateFormat ANTES de leer el ejemplo — con muestra vacía devuelve null y
  *  firstNonEmpty también sería undefined, así que decidir primero evita un "undefined → …". */
 function dateNoteFor(values) {
@@ -116,64 +112,54 @@ function amountNoteFor(spec) {
   return amountNoteOk(raw, isDebit ? -Math.abs(parsed) : Math.abs(parsed), decimal);
 }
 
-/** Banner de resultado tras CUALQUIER import (directo por el router o vía el asistente): el
- *  texto de siempre + «· N filas ilegibles omitidas» si se descartó alguna fila — applyProfile
- *  (fecha/importe irreconocibles, solo via:"profile") o el propio pipeline (M4: fila de 0,00 o
- *  importe no numérico, cualquier via) + la frase de Bizum SOLO con contraparte configurada Y
- *  via:"n26" — un CSV genérico no tiene forma de distinguir un Bizum de cualquier otro abono. */
-export function importResultText(res, partnerName) {
-  let text = t("ajustes.importResult.summary", { created: res.created, reconciled: res.reconciled, skipped: res.skipped });
-  if (res.omitted) {
-    text += t("ajustes.importResult.omitted", { n: res.omitted });
-  }
-  // Registro v2 §5.5: solo cuenta las filas CREADAS que la memoria de comercios pudo categorizar
-  // (n26.js#runImportPipeline); una conciliación nunca toca la categoría de la fila existente.
-  if (res.categorized) {
-    text += t("ajustes.importResult.categorized", { n: res.categorized });
-  }
-  text += t("ajustes.importResult.tail");
-  if (partnerName && res.via === "n26") {
-    text += t("ajustes.importResult.bizumHint");
-  }
-  return text;
+/** Nota de una línea: éxito con el check en --pos; aviso con el icono de aviso y el texto neutro
+ *  (C4/C5: el rojo es para cifras negativas y lo destructivo, no para un aviso). */
+function noteHtml(note) {
+  if (!note) return "";
+  return `<p class="imp-note${note.ok ? " is-ok" : ""}">${icon(note.ok ? "check" : "warn", { size: 16 })}<span>${escHtml(note.text)}</span></p>`;
 }
 
-/** Estado inicial del asistente para un CSV que importCsv() no supo leer solo. */
+/** Estado inicial para un CSV que importCsv() no supo leer solo: paso «Columnas». */
 export function newAssistantState(fileName, text, needsMapping) {
   return {
-    fileName, text, headers: needsMapping.headers, sample: needsMapping.sample,
+    step: "columns", fileName, text, headers: needsMapping.headers, sample: needsMapping.sample,
     totalRows: csvDataRowCount(text),
     date: null, concept: null, counterparty: null,
     amountKind: "single", amountCol: null, debitCol: null, creditCol: null,
     saveBusy: false, saveError: null,
+    result: null, fromAssistant: false,
   };
 }
 
-/** Pinta el asistente en `container` y se repinta solo en cada toque. `a` es el estado de
- *  newAssistantState; `onImported(texto)` recibe el resumen del import ya hecho. */
-export function renderImportAssistant(container, a, { partnerName = "", onImported }) {
-  const state = { assistant: a };
-  const render = () => renderAssistant();
+/** Estado para un CSV que importCsv() ya importó solo (N26 o perfil guardado): paso «Resultado».
+ *  `res` es lo que devuelve importCsv, con su `via`. */
+export function newResultState(fileName, text, res) {
+  return { step: "result", fileName, text, totalRows: csvDataRowCount(text), result: res, fromAssistant: false };
+}
 
-  /** Nota de detección (fecha/importe), ya con el icono fuera del copy (spec §7.2 bloque 3, D14):
-   *  la de éxito lleva icon("check") + metaHtml (un solo segmento — el helper no exige más de
-   *  uno); la de error se queda como texto plano en --danger, sin icono (no hay «check» que
-   *  poner delante de un fallo). */
-  function detectionNoteHtml(note) {
-    if (!note) return "";
-    if (note.ok) {
-      return `<div style="display:flex;align-items:flex-start;gap:6px;margin-top:5px;">`
-        + icon("check", { size: 16, stroke: "var(--pos)" }) + metaHtml([note.text], { cls: "pos" }) + `</div>`;
-    }
-    return `<div style="font-size:11px;color:var(--red);margin-top:5px;">${escHtml(note.text)}</div>`;
+/** Pinta el importador en `container` y se repinta solo en cada toque. `a` es el estado de
+ *  newAssistantState o newResultState; `partnerName` decide la frase de Bizum del resultado. */
+export function renderImportAssistant(container, a, { partnerName = "" } = {}) {
+  // Qué enfocar tras el repintado (K12): el chip o la opción que se acaba de pulsar, o el título
+  // al llegar al resultado. Un repintado sustituye el DOM y, sin esto, el foco caería al body.
+  let refocus = null;
+
+  function fileCardHtml() {
+    let led;
+    if (a.step === "columns") led = ledHtml({ state: "idle", text: t("importar.led.unknown"), onDisplay: false });
+    else if (a.result.via === "n26") led = ledHtml({ state: "ok", text: t("importar.led.n26"), onDisplay: false });
+    else led = ledHtml({ state: "ok", text: t(a.fromAssistant ? "importar.led.saved" : "importar.led.profile"), onDisplay: false });
+    return `<div class="imp-file">
+      <span class="imp-file-tile" aria-hidden="true">${icon("file", { size: 20 })}</span>
+      <div class="imp-file-body"><span class="imp-file-name">${escHtml(a.fileName)}</span>${led}</div>
+      <span class="imp-file-rows num">${escHtml(t("ajustes.assist.rowCount", { n: a.totalRows }))}</span>
+    </div>`;
   }
 
-  /** Subvista "asistente de mapeo" (Task 6, PR E): se abre cuando importCsv() devuelve
-   *  needsMapping. Recalcula notas/preview/contador/CTA en cada render a partir de
-   *  state.assistant — no hay estado derivado guardado aparte, así que un solo render() tras
-   *  cualquier click de chip basta para que todo quede consistente. */
-  function renderAssistant() {
-    const a = state.assistant;
+  /** Paso «Columnas» (el asistente de mapeo). Recalcula notas/preview/contador/CTA en cada render
+   *  a partir de `a` — no hay estado derivado guardado aparte, así que un solo render() tras
+   *  cualquier toque basta para que todo quede consistente. */
+  function columnsHtml() {
     const colIdx = (h) => a.headers.indexOf(h);
     const headerOptions = a.headers.map((h) => ({ value: h, label: h }));
 
@@ -190,172 +176,192 @@ export function renderImportAssistant(container, a, { partnerName = "", onImport
         })
         : null);
 
-    // Perfil completo: gate único del CTA (brief: "deshabilitado hasta que buildProfile
-    // devuelva perfil válido") y fuente de la preview/contador — NUNCA de los notas de
-    // fecha/importe de arriba, que tienen que poder mostrarse aunque otro bloque distinto
+    // Perfil completo: gate único del primario y fuente de la preview/contador — NUNCA de las
+    // notas de fecha/importe de arriba, que tienen que poder mostrarse aunque otro bloque distinto
     // (concepto/contraparte) siga sin resolver.
-    const profile = buildProfile({
-      headers: a.headers, date: a.date, concept: a.concept, counterparty: a.counterparty,
-      amountKind: a.amountKind, amountCol: a.amountCol, debitCol: a.debitCol, creditCol: a.creditCol,
-      sample: a.sample,
-    });
+    const profile = currentProfile();
     const profileValid = !profile.error;
 
     let previewHtml = "";
     let readableCount = 0;
     if (profileValid) {
-      // Sobre el CSV COMPLETO (a.text), no solo la muestra de 5 filas: el contador "N de M" y el
-      // nº de filas de la card de arriba tienen que coincidir con lo que de verdad se va a
-      // importar al pulsar Guardar (mismo cálculo que hará importWithProfile).
+      // Sobre el CSV COMPLETO (a.text), no solo la muestra de 5 filas: el contador "N de M" y la
+      // cifra del primario tienen que coincidir con lo que de verdad se manda a importar (mismo
+      // cálculo que hará importWithProfile; el dedupe puede saltar luego alguna ya importada).
       const { rows, errors } = applyProfile(a.text, profile, bcParseCsvLine);
       readableCount = rows.length;
       const total = rows.length + errors.length;
-      const previewRows = rows.slice(0, 3);
-      // La primera línea es --pos salvo el caso extremo de "nada legible" (rows.length === 0):
-      // el CTA ya lo bloquea, pero el color lo remarca — decisión tomada al migrar, el artboard
-      // solo dibuja el caso feliz. La segunda línea (--warn, con los motivos de summarizeReasons)
-      // solo aparece cuando hay algún error (spec §7.2 bloque 5).
-      const line1Color = rows.length > 0 ? "var(--green)" : "var(--red)";
-      const line1 = t("ajustes.assist.counterOk", { readable: rows.length, total });
+      const line1 = { ok: rows.length > 0, text: t("ajustes.assist.counterOk", { readable: rows.length, total }) };
       const line2 = errors.length > 0
-        ? `${t("ajustes.assist.counterWarnLine", { n: errors.length })}: `
-          + t("ajustes.assist.counterReasons", { reasons: summarizeReasons(errors).join(", ") })
-        : "";
+        ? { ok: false, text: `${t("ajustes.assist.counterWarnLine", { n: errors.length })}: `
+          + t("ajustes.assist.counterReasons", { reasons: summarizeReasons(errors).join(", ") }) }
+        : null;
 
       previewHtml = `
-      <div style="display:flex;flex-direction:column;gap:2px;">
-        <div class="section-title" style="margin-bottom:8px;">${t("ajustes.assist.previewTitle")}</div>
-        ${previewRows.map((r) => {
-          // merchant||note, mismo criterio que movimientos.js (líneas 53/65/76): la contraparte
-          // manda como etiqueta reconocible; si no hay columna de contraparte asignada, cae al
-          // concepto — ningún campo mapeado queda sin sitio donde mostrarse.
+      <section class="imp-block" aria-labelledby="imp-l-preview">
+        <h2 class="imp-label" id="imp-l-preview">${escHtml(t("ajustes.assist.previewTitle"))}</h2>
+        <div class="imp-preview">${rows.slice(0, 3).map((r) => {
+          // merchant||note, mismo criterio que movimientos.js: la contraparte manda como etiqueta
+          // reconocible; si no hay columna de contraparte asignada, cae al concepto.
           const label = r.partnerName || r.paymentReference || t("ajustes.assist.noConcept");
           const income = r.amountCents >= 0;
-          return `
-          <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule);">
-            <div style="width:20px;height:20px;border-radius:var(--r-circle);background:var(--pos-tint);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-              ${icon("check", { size: 14, stroke: "var(--pos)" })}
-            </div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:14px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(label)}</div>
-              <div class="num" style="font-size:11px;color:var(--ink-3);">${escHtml(r.bookingDate)}</div>
-            </div>
-            <div class="num" style="font-size:15px;font-weight:600;${income ? "color:var(--green);" : ""}">${escHtml(fmtMoney(r.amountCents))}</div>
+          return `<div class="imp-prev-row">
+            <span class="imp-prev-body"><span class="imp-prev-name">${escHtml(label)}</span><span class="imp-prev-date num">${escHtml(r.bookingDate)}</span></span>
+            <span class="imp-prev-amount num${income ? " is-pos" : ""}">${income ? "+" : MINUS}${escHtml(fmtMoney(Math.abs(r.amountCents)))}</span>
           </div>`;
-        }).join("")}
-        <div style="display:flex;flex-direction:column;gap:4px;padding-top:10px;">
-          <span style="font-size:12px;font-weight:600;color:${line1Color};">${escHtml(line1)}</span>
-          ${line2 ? `<span style="font-size:12px;font-weight:500;color:var(--warn);line-height:1.5;">${escHtml(line2)}</span>` : ""}
-        </div>
-      </div>`;
+        }).join("")}</div>
+        ${noteHtml(line1)}${noteHtml(line2)}
+      </section>`;
     }
 
-    // 0 filas legibles (rows.length === 0 con profile válido) no debe dejar guardar un perfil que
-    // no importaría nada. Si !profileValid ni siquiera se ejecuta el bloque de arriba y
+    // 0 filas legibles no debe dejar guardar un perfil que no importaría nada. Si !profileValid
     // readableCount se queda en 0, así que el OR es correcto sin condición extra.
     const ctaDisabled = !profileValid || a.saveBusy || readableCount === 0;
+    const ctaLabel = readableCount > 0 ? t("importar.cta", { n: readableCount }) : t("importar.ctaIdle");
 
-    container.innerHTML = `
-      ${subHeaderHtml({ id: "assist-close", title: t("ajustes.assist.title") })}
+    const amountKindSeg = segmentedHtml({
+      id: "imp-kind", name: t("ajustes.assist.amountTitle"), labelledBy: "imp-l-amount", value: a.amountKind,
+      options: [
+        { value: "single", label: t("ajustes.assist.amountSingleBtn") },
+        { value: "split", label: t("ajustes.assist.amountSplitBtn") },
+      ],
+    });
 
-      <div style="display:flex;flex-direction:column;gap:26px;">
+    return `
+      <section class="imp-block" aria-labelledby="imp-l-date">
+        <h2 class="imp-label" id="imp-l-date">${escHtml(t("ajustes.assist.dateTitle"))}</h2>
+        ${chipsRowHtml("date", headerOptions, a.date, "imp-l-date")}
+        ${noteHtml(dateNote)}
+      </section>
 
-        <div style="display:flex;align-items:center;gap:12px;">
-          <div style="width:44px;height:44px;border-radius:var(--r-0);background:var(--surface-2);border:1px solid var(--hairline-strong);box-sizing:border-box;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            ${icon("file", { stroke: "var(--ink-2)" })}
-          </div>
-          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;">
-            <span style="font-size:15px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(a.fileName)}</span>
-            ${metaHtml([t("ajustes.assist.rowCount", { n: a.totalRows }), t("ajustes.assist.unknownFormat")])}
-          </div>
-        </div>
+      <section class="imp-block" aria-labelledby="imp-l-concept">
+        <h2 class="imp-label" id="imp-l-concept">${escHtml(t("ajustes.assist.conceptTitle"))}</h2>
+        ${chipsRowHtml("concept", headerOptions, a.concept, "imp-l-concept")}
+      </section>
 
-        <div>
-          <span class="field-label" style="display:block;margin-bottom:7px;">${t("ajustes.assist.dateTitle")}</span>
-          ${chipsRowHtml("date", headerOptions, a.date)}
-          ${detectionNoteHtml(dateNote)}
-        </div>
+      <section class="imp-block" aria-labelledby="imp-l-cp">
+        <h2 class="imp-label" id="imp-l-cp">${escHtml(t("ajustes.assist.counterpartyTitle"))} <span class="imp-optional">${escHtml(t("common.optional"))}</span></h2>
+        ${chipsRowHtml("counterparty", [...headerOptions, { value: null, label: t("ajustes.assist.noColumn") }], a.counterparty, "imp-l-cp")}
+      </section>
 
-        <div>
-          <span class="field-label" style="display:block;margin-bottom:7px;">${t("ajustes.assist.conceptTitle")}</span>
-          ${chipsRowHtml("concept", headerOptions, a.concept)}
-        </div>
+      <section class="imp-block" aria-labelledby="imp-l-amount">
+        <h2 class="imp-label" id="imp-l-amount">${escHtml(t("ajustes.assist.amountTitle"))}</h2>
+        ${amountKindSeg}
+        ${a.amountKind === "single" ? chipsRowHtml("amountCol", headerOptions, a.amountCol, "imp-l-amount") : `
+        <h3 class="imp-sublabel" id="imp-l-debit">${escHtml(t("ajustes.assist.debitTitle"))}</h3>
+        ${chipsRowHtml("debitCol", headerOptions, a.debitCol, "imp-l-debit")}
+        <h3 class="imp-sublabel" id="imp-l-credit">${escHtml(t("ajustes.assist.creditTitle"))}</h3>
+        ${chipsRowHtml("creditCol", headerOptions, a.creditCol, "imp-l-credit")}`}
+        ${noteHtml(amountNote)}
+      </section>
 
-        <div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
-            <span class="field-label">${t("ajustes.assist.counterpartyTitle")}</span>
-            <span class="state-pill">${t("common.optional")}</span>
-          </div>
-          ${chipsRowHtml("counterparty", [...headerOptions, { value: null, label: t("ajustes.assist.noColumn") }], a.counterparty)}
-        </div>
+      ${previewHtml}
 
-        <div>
-          <span class="field-label" style="display:block;margin-bottom:7px;">${t("ajustes.assist.amountTitle")}</span>
-          <div class="segmented" style="border-radius:999px;margin-bottom:8px;">
-            <button type="button" data-assist-kind="single" class="${a.amountKind === "single" ? "active" : ""}"
-              style="border-radius:999px;${a.amountKind === "single" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("ajustes.assist.amountSingleBtn")}</button>
-            <button type="button" data-assist-kind="split" class="${a.amountKind === "split" ? "active" : ""}"
-              style="border-radius:999px;${a.amountKind === "split" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("ajustes.assist.amountSplitBtn")}</button>
-          </div>
-          ${a.amountKind === "single" ? chipsRowHtml("amountCol", headerOptions, a.amountCol) : `
-          <span class="field-label" style="display:block;margin:0 0 6px;">${t("ajustes.assist.debitTitle")}</span>
-          ${chipsRowHtml("debitCol", headerOptions, a.debitCol)}
-          <span class="field-label" style="display:block;margin:10px 0 6px;">${t("ajustes.assist.creditTitle")}</span>
-          ${chipsRowHtml("creditCol", headerOptions, a.creditCol)}`}
-          ${detectionNoteHtml(amountNote)}
-        </div>
+      ${a.saveError ? `<div class="imp-msg" role="alert">${icon("warn", { size: 18 })}<p>${escHtml(a.saveError)}</p></div>` : ""}
 
-        ${previewHtml}
-
-        ${a.saveError ? `<div class="banner-aviso red" style="display:block"><p>${escHtml(a.saveError)}</p></div>` : ""}
-
-        <button type="button" class="btn-primary" id="assist-save" style="width:100%;${ctaDisabled ? "opacity:0.45;" : ""}" ${ctaDisabled ? "disabled" : ""}>${t("ajustes.assist.saveBtn")}</button>
-
-        <p style="font-size:12px;color:var(--ink-3);line-height:1.5;margin:0;">${t("ajustes.assist.footNote")}</p>
-      </div>
-    `;
-    wireAssistant(profile, profileValid);
+      ${buttonHtml({ kind: "primary", id: "assist-save", label: ctaLabel, note: t("ajustes.assist.footNote"), disabled: ctaDisabled })}`;
   }
 
-  function wireAssistant(profile, profileValid) {
-    const a = state.assistant;
+  function currentProfile() {
+    return buildProfile({
+      headers: a.headers, date: a.date, concept: a.concept, counterparty: a.counterparty,
+      amountKind: a.amountKind, amountCol: a.amountCol, debitCol: a.debitCol, creditCol: a.creditCol,
+      sample: a.sample,
+    });
+  }
 
-    container.querySelector("#assist-close").disabled = a.saveBusy;
-    container.querySelector("#assist-close").onclick = () => goBack();
+  /** Paso «Resultado»: los contadores del import ya hecho. Sin lista (la revisión es B-3). */
+  function resultHtml() {
+    const r = a.result;
+    const tile = (n, key, dim = false) => `<div class="imp-tile">
+      <span class="imp-tile-value num${dim ? " is-dim" : ""}">${escHtml(String(n))}</span>
+      <span class="imp-tile-label">${escHtml(t(key, { n }))}</span>
+    </div>`;
+    const uncategorized = Math.max(0, r.created - (r.categorized || 0));
+    let note;
+    if (r.created === 0) note = t("importar.nothingNew");
+    else if (uncategorized > 0) note = t("importar.inbox", { n: uncategorized });
+    else note = t("importar.allCategorized");
+    // Solo con contraparte configurada Y via N26: un CSV genérico no distingue un Bizum de
+    // cualquier otro abono (misma regla que el viejo banner de Ajustes).
+    const bizum = partnerName && r.via === "n26";
+    return `
+      <section class="imp-tiles" aria-label="${escHtml(t("importar.summaryAria"))}">
+        ${tile(r.created, "importar.tiles.created")}
+        ${tile(r.reconciled, "importar.tiles.reconciled")}
+        ${tile(r.skipped, "importar.tiles.skipped", true)}
+      </section>
+      ${r.omitted ? noteHtml({ ok: false, text: t("importar.omitted", { n: r.omitted }) }) : ""}
+      ${bizum ? `<p class="imp-help">${escHtml(t("importar.bizumHint"))}</p>` : ""}
+      ${buttonHtml({ kind: "primary", id: "imp-done", label: t("importar.done"), note })}`;
+  }
+
+  function render() {
+    const stepNo = a.step === "columns" ? 2 : 3;
+    container.innerHTML = `<div class="imp-screen">
+      ${subHeaderHtml({ id: "assist-close", title: t("importar.title") })}
+      ${stepsHtml({ total: 3, current: stepNo, ariaLabel: t("importar.steps.aria"), labels: [t("importar.steps.file"), t("importar.steps.columns"), t("importar.steps.result")] })}
+      ${fileCardHtml()}
+      ${a.step === "columns" ? columnsHtml() : resultHtml()}
+    </div>`;
+    wire();
+    if (refocus) {
+      const el = refocus(container);
+      refocus = null;
+      if (el) el.focus();
+    }
+  }
+
+  function wire() {
+    const back = container.querySelector("#assist-close");
+    back.disabled = Boolean(a.saveBusy);
+    back.onclick = () => goBack();
+
+    if (a.step === "result") {
+      container.querySelector("#imp-done").onclick = () => goBack();
+      return;
+    }
 
     // Delegación uniforme para las 6 filas de chips (fecha/concepto/contraparte/importe-única/
-    // cargo/abono): el nombre del campo viaja en el propio data-attribute, así que un único
-    // handler basta — nada de repetir el mismo cableado 6 veces.
+    // cargo/abono): el nombre del campo viaja en el propio data-attribute.
     container.querySelectorAll("[data-assist-field]").forEach((b) => {
       b.onclick = () => {
-        a[b.dataset.assistField] = b.dataset.assistNone === "1" ? null : b.dataset.assistValue;
+        const { assistField: field, assistValue: value, assistNone: none } = b.dataset;
+        a[field] = none === "1" ? null : value;
+        refocus = (root) => [...root.querySelectorAll("[data-assist-field]")]
+          .find((x) => x.dataset.assistField === field && x.dataset.assistValue === value && x.dataset.assistNone === none);
         render();
       };
     });
 
-    container.querySelectorAll("[data-assist-kind]").forEach((b) => {
-      b.onclick = () => {
-        a.amountKind = b.dataset.assistKind;
-        // Resetea la selección de importe al cambiar de modo (brief): una columna elegida en
-        // "una columna con signo" no tiene sentido como cargo o abono, y viceversa.
-        a.amountCol = null; a.debitCol = null; a.creditCol = null;
-        render();
-      };
+    wireSegmented(container.querySelector("#imp-kind"), (kind) => {
+      if (kind === a.amountKind) return;
+      a.amountKind = kind;
+      // Resetea la selección de importe al cambiar de modo: una columna elegida en "una columna
+      // con signo" no tiene sentido como cargo o abono, y viceversa.
+      a.amountCol = null; a.debitCol = null; a.creditCol = null;
+      refocus = (root) => root.querySelector('#imp-kind [aria-checked="true"]');
+      render();
     });
 
     container.querySelector("#assist-save").onclick = async () => {
-      if (!profileValid || a.saveBusy) return;
+      const profile = currentProfile();
+      if (profile.error || a.saveBusy) return;
       a.saveBusy = true; a.saveError = null; render();
       try {
         await setMeta("csv_profile", JSON.stringify(profile));
-        // El banner que sale al volver cuenta el IMPORT («N movimientos importados»); que el perfil
-        // quede guardado para la próxima vez —lo que el usuario acaba de configurar, y que ya no
-        // vuelve a ver— no lo dice nadie. Ese es este toast.
+        // El resultado cuenta el IMPORT; que el perfil quede guardado para la próxima vez —lo que
+        // el usuario acaba de configurar, y que ya no vuelve a ver— lo dice este toast.
         showToast(t("toast.profileSaved"));
         const res = await importWithProfile(a.text, profile);
-        // onImported deja el resultado en el estado de Ajustes ANTES de su goBack(): backToMain
-        // corre luego en el popstate y renderMain() ya lo encuentra puesto.
-        onImported(importResultText({ ...res, via: "profile" }, partnerName));
+        a.saveBusy = false;
+        a.step = "result"; a.result = { ...res, via: "profile" }; a.fromAssistant = true;
+        refocus = (root) => {
+          const h = root.querySelector(".sub-header-title");
+          if (h) h.tabIndex = -1;
+          return h;
+        };
+        render();
       } catch (err) {
         a.saveBusy = false;
         a.saveError = userMessage(err);
