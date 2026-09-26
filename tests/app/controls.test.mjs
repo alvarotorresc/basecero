@@ -298,3 +298,15 @@ test("segmentedHtml: allowNone con un valor fuera del grupo no marca ninguno y d
   // Con allowNone y un valor que SÍ está, marca ese.
   assert.match(segmentedHtml({ name: "Tipo", options: opts, value: "income", allowNone: true }), /aria-checked="true" tabindex="0" data-value="income"/);
 });
+
+test("neutralChipHtml: data-*, aria-label, icono y clase extra opcionales (S10, subcategorías)", () => {
+  const html = neutralChipHtml({ label: "Gas", data: { cat: "cat-gas", dragKid: "x\"y" }, ariaLabel: "Gas, archivada", icon: "archive", cls: "cat-kid is-archived" });
+  assert.match(html, /class="ctl-chip cat-kid is-archived"/);
+  assert.match(html, /data-cat="cat-gas"/);
+  assert.match(html, /data-drag-kid="x&quot;y"/);
+  assert.match(html, /aria-label="Gas, archivada"/);
+  assert.match(html, /<svg/);
+  const plain = neutralChipHtml({ label: "Luz", data: { cat: null } });
+  assert.ok(!plain.includes("data-"));
+  assert.ok(!plain.includes("aria-label"));
+});

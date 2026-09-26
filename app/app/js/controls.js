@@ -146,7 +146,22 @@ export function fieldHtml({ id, label, type = "text", value = "", inputmode = ""
 
 /** Chip neutro (§9): 44 píldora, `--raised`, 14/500 — subcategoría o etiqueta, nunca color propio
  *  (eso es el chip de filtro con tinte de familia, de otra PR). Con `tag:true` añade borde e icono
- *  de etiqueta, como en B-Movimientos-Filtros. */
-export function neutralChipHtml({ id = "", label, tag = false }) {
-  return `<button type="button" class="ctl-chip${tag ? " is-tag" : ""}"${id ? ` id="${escAttr(id)}"` : ""}>${tag ? icon("tag", { size: 16 }) : ""}${escHtml(label)}</button>`;
+ *  de etiqueta, como en B-Movimientos-Filtros.
+ *  Opcionales (S10, B-Categorias: subcategorías como chips): `data` (objeto → atributos data-*, el
+ *  gancho del cableado), `ariaLabel` (nombre accesible completo, p. ej. «Gas, archivada»), `icon`
+ *  (clave de icons.js, 16, delante del texto) y `cls` (clase extra de la pantalla, p. ej. el chip
+ *  archivado de borde discontinuo). Sin ellos, el marcado es el de siempre. */
+export function neutralChipHtml({ id = "", label, tag = false, data = null, ariaLabel = "", icon: iconName = "", cls = "" }) {
+  const classes = ["ctl-chip", tag && "is-tag", cls].filter(Boolean).join(" ");
+  let extra = id ? ` id="${escAttr(id)}"` : "";
+  if (data && typeof data === "object") {
+    for (const [k, v] of Object.entries(data)) {
+      if (v == null) continue;
+      const name = String(k).replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()).replace(/[^a-z0-9-]/g, "");
+      if (name) extra += ` data-${name}="${escAttr(v)}"`;
+    }
+  }
+  if (ariaLabel) extra += ` aria-label="${escAttr(ariaLabel)}"`;
+  const lead = tag ? icon("tag", { size: 16 }) : iconName ? icon(iconName, { size: 16 }) : "";
+  return `<button type="button" class="${classes}"${extra}>${lead}${escHtml(label)}</button>`;
 }

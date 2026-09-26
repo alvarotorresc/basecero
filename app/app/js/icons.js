@@ -63,6 +63,8 @@ export const ICON_PATHS = {
   undo:         '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
   // (B-Gasto) nota del movimiento
   note:         '<path d="M5 4h14v16H5z"/><path d="M8.5 9h7M8.5 12.5h7M8.5 16h4"/>',
+  // (B-Categorias, B-Etiquetas) archivada: la caja de archivo del chip y de la fila discontinuos
+  archive:      '<path d="M4 5h16v4H4zM5.5 9v10h13V9M10 13h4"/>',
 };
 
 /** SVG listo para pegar. `size` en px (20 dentro de fila o botón, 24 en cabecera, 16 dentro de la

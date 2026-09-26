@@ -109,3 +109,7 @@ test("icons: los cuatro de cuenta son los de B-Patrimonio y B-Onb-Cuentas, verba
   assert.equal(ICON_PATHS.piggy, '<path d="M5 11a7 6 0 0 1 13-2h2v4l-2 1v3h-3v-2H9v2H6v-3a6 6 0 0 1-1-3z"/><path d="M10 7.5h3"/>');
   assert.equal(ICON_PATHS.debt, '<path d="M6 4h12v16l-3-2-3 2-3-2-3 2z"/><path d="M9 9h6M9 12.5h4"/>');
 });
+
+test("ICON_PATHS.archive: la caja de archivo de B-Categorias y B-Etiquetas", () => {
+  assert.equal(ICON_PATHS.archive, '<path d="M4 5h16v4H4zM5.5 9v10h13V9M10 13h4"/>');
+});
