@@ -711,10 +711,6 @@ circle.disp-today { fill: var(--disp-text); stroke: var(--disp); }
 .col-seg:first-child { border-radius: var(--radius-xs) var(--radius-xs) 0 0; }
 .col.is-selected { border-radius: var(--radius) var(--radius) 0 0; background: var(--well); box-shadow: var(--sh-well); }
 
-/* Barras SVG de charts.js (Informe, Gasto por categoría): la familia (-b) o --idle (C11). */
-.chart-bar { fill: var(--fb); }
-.chart-bar.is-idle { fill: var(--idle); }
-
 /* --- Estado vacío (§9, B-Inicio-Vacio · instrument.js#emptyStateHtml): filas fantasma en pozo,
    15/600 + 13/500 dim, flecha discontinua hacia el botón de añadir. --- */
 .empty { display: flex; flex-direction: column; align-items: center; gap: var(--sp-12); }

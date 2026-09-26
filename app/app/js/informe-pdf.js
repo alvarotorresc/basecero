@@ -94,8 +94,7 @@ const BAR_H = 6;
 // hacerle sitio (BADGE_SIZE + el hueco).
 const BADGE_SIZE = 6;
 const BADGE_INDENT = BADGE_SIZE + 6;
-// La barra atenuada del periodo anterior (mismo color, menos opacidad): mismo 0.35 que
-// charts.js#comparisonBarsSvg, para que pantalla y PDF lean la misma comparativa.
+// La barra atenuada del periodo anterior (mismo color, menos opacidad, 0.35).
 const COMPARISON_OPACITY = 0.35;
 
 // Color de barra/insignia de una categoría: el NOMBRE del token (--f-<fam>-b), que buildPdfBytes
@@ -141,8 +140,7 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
     page().blocks.push({ kind: "rule", section, x: margin, y, w: contentW });
   }
   // `opacity` (Task: comparativa por categoría): la barra atenuada del periodo anterior reutiliza
-  // el color de la categoría con menos opacidad, mismo criterio que charts.js#comparisonBarsSvg
-  // (fill-opacity 0.35) — nunca un gris nuevo que la pantalla y el PDF no comparten.
+  // el color de la categoría con menos opacidad (0.35), nunca un gris nuevo.
   function bar(section, { value, max, color, opacity = 1 }) {
     ensure(BAR_ROW_H);
     y -= BAR_ROW_H;

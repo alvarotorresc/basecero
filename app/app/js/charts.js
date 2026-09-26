@@ -1,23 +1,19 @@
 // Módulo PURO (sin DOM ni imports de db/repo): construye y devuelve strings SVG/HTML para las
 // gráficas. Los tests de node lo importan directamente (tests/app/charts.test.mjs).
 //
-// Sistema B (DESIGN.md C6, C11, C12, PR-07): aquí NO vive ningún color. Cada marca lleva una clase
-// y components.css (sección «Instrumento») la pinta: `.chart-bar.fam-<k>` con la barra de su familia
-// (fill:var(--fb)), `.chart-bar.is-idle` con el gris neutro --idle (nunca `otr`, C11/I-56), y la
-// línea del Display con `.disp-chart-line`. Ni el atributo fill con var() ni un estilo en línea de relleno:
+// Sistema B (DESIGN.md C2, PR-07): aquí NO vive ningún color. Cada marca lleva una clase y
+// components.css (sección «Instrumento») la pinta: la línea del Display con `.disp-chart-line`, el
+// punto de hoy con `.disp-today`. Ni el atributo fill con var() ni un estilo en línea de relleno:
 // var() en un atributo de presentación SVG no es fiable y R-INLINE solo deja geometría en línea.
 //
-// `barChartSvg` y `donutSvg` se borraron en el plan Inicio v2 (Task 10) y `netWorthBarsHtml` con la
-// migración de Patrimonio (S3): sin consumidor.
-import { famClass, isFamily } from "./category-colors.js";
+// `barChartSvg` y `donutSvg` se borraron en el plan Inicio v2 (Task 10), `netWorthBarsHtml` con la
+// migración de Patrimonio (S3) y `categoryBarsSvg`, `comparisonBarsSvg`, `trendOf` y `trendSvg` en la
+// PR-99: sin consumidor. `barRowsGeometry` se queda: la usa el PDF del Informe (informe-pdf.js).
 import { escHtml } from "./esc.js";
-
-/** Clase de relleno de una marca: la familia si es válida; si no, el gris neutro. */
-const markCls = (fam) => (isFamily(fam) ? famClass(fam) : "is-idle");
 
 // ---- sparklineSvg (la línea del Display) --------------------------------------------------
 
-export const SPARK_W = 318, SPARK_H = 72, SPARK_PAD = 4; // PAD = --sp-4: el eje (components.css) lo usa para alinearse
+const SPARK_W = 318, SPARK_H = 72, SPARK_PAD = 4; // PAD = --sp-4: el eje (components.css) lo usa para alinearse
 
 /** Línea del Display (B-Home, B-Patrimonio): área al 12 % + línea de 2,25 en el ámbar del Display
  *  (.disp-chart-line) y el punto de hoy/último (.disp-today) con aro --disp. Filete de base en
@@ -138,9 +134,7 @@ export function periodChartSvg({ days, today, values = null, max = 0, todayLabel
     + `</svg></div>`;
 }
 
-// ---- barRowsGeometry / categoryBarsSvg / comparisonBarsSvg (Informe del periodo) --------------
-// LA garantía de que el PDF y la pantalla no divergen: los dos presentadores del informe
-// (screens/informe.js con <svg>, informe-pdf.js con drawRectangle) consumen la MISMA geometría.
+// ---- barRowsGeometry (PDF del Informe del periodo) ---------------------------------------------
 
 /** Geometría pura de una lista de barras horizontales, en coordenadas de un lienzo
  *  w×(n·rowH). NO devuelve SVG ni HTML: devuelve números.
@@ -166,81 +160,4 @@ export function barRowsGeometry(rows, { width, rowH, barH, trackFill = true }) {
       trackW: trackFill ? width : 0,
     };
   });
-}
-
-/** Barras horizontales por categoría, listas para innerHTML: un <rect> por fila con la barra de
- *  su familia (`.chart-bar.fam-<k>`, C6) o --idle sin familia. `rows`: el shape de barRowsGeometry
- *  con `fam` (clave de category-colors.js) en vez de color. */
-export function categoryBarsSvg(rows, opts) {
-  const geo = barRowsGeometry(rows, opts);
-  const height = geo.length ? Math.max(...geo.map((g) => g.y + g.h)) : 0;
-  const rects = geo.map((g) => `<rect class="chart-bar ${markCls(g.fam)}" x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="3"></rect>`).join("");
-  return `<svg width="${opts.width}" height="${height}" viewBox="0 0 ${opts.width} ${height}" aria-hidden="true">${rects}</svg>`;
-}
-
-/** Comparativa de dos periodos: por fila, la barra del periodo actual en su familia y, debajo y
- *  más fina, la del anterior en --idle (C11: las comparativas van en gris neutro) — a la MISMA
- *  escala (el máximo de LOS DOS valores de esa fila, nunca dos escalas distintas).
- *  `rows`: [{ key, value, prevValue, fam }]. Sin `prevValue` (null/undefined) no se emite la
- *  segunda barra: es el caso de "sin periodo anterior" (spec §5.5). */
-export function comparisonBarsSvg(rows, { width, rowH, barH, gap = 0 }) {
-  const height = (rows ?? []).length * rowH;
-  const prevBarH = Math.max(2, Math.round(barH * 0.4));
-  const body = (rows ?? []).map((r, i) => {
-    const hasPrev = r.prevValue !== null && r.prevValue !== undefined;
-    const max = Math.max(r.value, hasPrev ? r.prevValue : 0);
-    const ratio = (v) => (max > 0 ? Math.min(1, Math.max(0, v / max)) : 0);
-    const y = i * rowH;
-    let svg = `<rect class="chart-bar ${markCls(r.fam)}" x="0" y="${y}" width="${width * ratio(r.value)}" height="${barH}" rx="3"></rect>`;
-    if (hasPrev) {
-      const prevY = y + barH + gap;
-      svg += `<rect class="chart-bar is-idle" x="0" y="${prevY}" width="${width * ratio(r.prevValue)}" height="${prevBarH}" rx="2"></rect>`;
-    }
-    return svg;
-  }).join("");
-  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-hidden="true">${body}</svg>`;
-}
-
-// ---- trendOf / trendSvg (Etiquetas, N3: mini tendencia de 3 periodos, SISTEMA §4.19) ----------
-
-export const TREND_H = 18, TREND_W = 4, TREND_GAP = 3, TREND_MIN_H = 2;
-
-/** Alturas en px de la mini tendencia de 3 periodos. PURA: devuelve números, no SVG.
- *  values: céntimos del MÁS ANTIGUO al MÁS RECIENTE (jul, ago, sep).
- *  null cuando no hay nada que dibujar: menos de 2 valores, o max <= 0 (una raíz con más
- *  devoluciones que gasto existe — el mismo caso que documenta relativeWidth, category-spend.js).
- *  Escala: h = round(v / max * 18), con max = el MAYOR de la serie (no el actual) — Alimentación
- *  (etiquetas-design §8.2) es la fila que lo demuestra: su barra de 18px es la de AGOSTO. */
-export function trendOf(values) {
-  const vals = values ?? [];
-  if (vals.length < 2) return null;
-  const max = Math.max(...vals);
-  if (!(max > 0)) return null;
-  const heights = vals.map((v) => {
-    const h = Math.round((v / max) * TREND_H);
-    // Una barra invisible se lee como "no hay dato" en vez de "casi nada" (TREND_MIN_H).
-    return v > 0 && h <= 0 ? TREND_MIN_H : Math.max(0, h);
-  });
-  return { heights, max };
-}
-
-/** Las barras de trendOf: las anteriores al 45 % de opacidad y la ÚLTIMA (la actual) a opacidad
- *  plena, en la barra de la familia de la categoría (o --idle sin familia). Devuelve "" cuando
- *  trendOf da null: quien llama interpola sin condicional.
- *  @param {number[]} values
- *  @param {string|null} fam   Clave de familia (category-colors.js#familyForCategory). */
-export function trendSvg(values, fam) {
-  const t = trendOf(values);
-  if (!t) return "";
-  const n = t.heights.length;
-  const width = n * TREND_W + (n - 1) * TREND_GAP;
-  const cls = markCls(fam);
-  const bars = t.heights.map((h, i) => {
-    const x = i * (TREND_W + TREND_GAP);
-    const y = TREND_H - h;
-    const isLast = i === n - 1;
-    const opacityAttr = isLast ? "" : ` fill-opacity="0.45"`;
-    return `<rect class="chart-bar ${cls}" x="${x}" y="${y}" width="${TREND_W}" height="${h}"${opacityAttr}></rect>`;
-  }).join("");
-  return `<svg width="${width}" height="${TREND_H}" viewBox="0 0 ${width} ${TREND_H}" aria-hidden="true">${bars}</svg>`;
 }
