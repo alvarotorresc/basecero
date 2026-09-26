@@ -586,8 +586,13 @@ export const ES = {
     hero: {
       pending: "Pendiente este periodo",
       perMonth: "al mes",
+      pendingCount: { one: "{n} pendiente", other: "{n} pendientes" },
+      allSettled: "Todo pagado",
+      remaining: "Te quedarán {amount}",
+      paidLabel: "Pagado",
+      meterAria: "Pendiente {pending} de {total} este periodo",
     },
-    section: { all: "Todas" },
+    section: { all: "Todas", pending: "Pendiente", paidPeriod: "Pagado este periodo", other: "Otras reglas" },
     state: {
       paid: "pagado",
       pending: "pendiente",
@@ -595,7 +600,7 @@ export const ES = {
     },
     newRule: "Nueva regla recurrente",
     toggle: { aria: "Activar {name}" },
-    footNote: "El toggle pausa la regla sin borrarla: no se generará el próximo cargo hasta que la vuelvas a activar.",
+    footNote: "El interruptor pausa la regla sin borrarla.",
     type: { transfer: "Transfer." },
     freq: {
       weekly: "Semanal",
@@ -1066,15 +1071,17 @@ export const ES = {
       label: "Te cuestan al año",
       perMonth: "al mes",
       activeCount: { one: "{n} activa", other: "{n} activas" },
+      chartLabel: "Renovaciones de los próximos 30 días",
     },
     notice: {
-      question: "{name} se renueva el {when} por {amount}. ¿Lo sigues usando?",
+      title: "{name} se renueva el {when}",
+      question: "¿Lo sigues usando?",
       keep: "Lo sigo usando",
       cancel: "Voy a cancelarlo",
     },
     section: {
       active: "Activas",
-      activeHint: "por fecha de renovación",
+      activeHint: "Por fecha de renovación",
       candidates: "Puede que sea una suscripción",
       cancelled: "Canceladas",
     },
@@ -1100,7 +1107,6 @@ export const ES = {
       message: "{name}. Dejará de contar como pendiente y empezaremos a contar lo que te ahorras. Puedes volver a activarla cuando quieras.",
       confirm: "Cancelar",
     },
-    footer: "Salen de tus recurrentes marcados como suscripción y de los cargos que se repiten con el mismo importe. Cancelar una aquí desactiva su recurrente y empieza a contar lo que te ahorras.",
   },
   // Task 5 (PR i18n): errores de capas no-UI (repo/n26/xlsx/csv-generic/backup-crypto/db-worker) —
   // el string ES es el mensaje literal que ya lanzaban esas capas (byte-exacto, lo pinnean los

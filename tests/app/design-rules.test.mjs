@@ -23,8 +23,6 @@ export const PENDIENTES = new Set([
   // Las 15 pantallas (cada S* saca las suyas). Una por línea para que las uniones no choquen.
   "js/screens/categorias.js",
   "js/screens/etiquetas.js",
-  "js/screens/recurrentes.js",
-  "js/screens/suscripciones.js",
   "js/screens/movimiento-detalle.js", // detalle, borrar y visor; lo migra S6
   // Módulos con plantilla o paleta propia, que migran con su pantalla o con su PR de fundación.
   "css/app.css",         // estilos «Neto»; cada PR de fundación y cada S* le quita lo suyo

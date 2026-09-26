@@ -558,8 +558,13 @@ export const EN = {
     hero: {
       pending: "Pending this period",
       perMonth: "per month",
+      pendingCount: { one: "{n} pending", other: "{n} pending" },
+      allSettled: "All paid",
+      remaining: "You'll have {amount} left",
+      paidLabel: "Paid",
+      meterAria: "Pending {pending} of {total} this period",
     },
-    section: { all: "All" },
+    section: { all: "All", pending: "Pending", paidPeriod: "Paid this period", other: "Other rules" },
     state: {
       paid: "paid",
       pending: "pending",
@@ -567,7 +572,7 @@ export const EN = {
     },
     newRule: "New recurring rule",
     toggle: { aria: "Enable {name}" },
-    footNote: "The toggle pauses the rule without deleting it: the next charge will not be generated until you turn it back on.",
+    footNote: "The switch pauses the rule without deleting it.",
     type: { transfer: "Transfer" },
     freq: {
       weekly: "Weekly",
@@ -1006,15 +1011,17 @@ export const EN = {
       label: "They cost you a year",
       perMonth: "a month",
       activeCount: { one: "{n} active", other: "{n} active" },
+      chartLabel: "Renewals in the next 30 days",
     },
     notice: {
-      question: "{name} renews on {when} for {amount}. Still using it?",
+      title: "{name} renews on {when}",
+      question: "Still using it?",
       keep: "Still using it",
       cancel: "I'll cancel it",
     },
     section: {
       active: "Active",
-      activeHint: "by renewal date",
+      activeHint: "By renewal date",
       candidates: "This might be a subscription",
       cancelled: "Cancelled",
     },
@@ -1040,7 +1047,6 @@ export const EN = {
       message: "{name}. It will stop counting as pending and we'll start counting what you save. You can turn it back on whenever you want.",
       confirm: "Cancel",
     },
-    footer: "These come from your recurring rules marked as subscriptions and from charges that repeat with the same amount. Cancelling one here turns off its recurring rule and starts counting what you save.",
   },
   errors: {
     generic: "Something went wrong. Try again.",

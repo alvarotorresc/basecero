@@ -95,12 +95,23 @@ const BUTTON_CLASS = {
  *  @param {string}  [o.note]    Solo primario. Se escapa aquí.
  *  @param {string}  [o.icon]    Nombre de icons.js, 18 px, delante del texto.
  *  @param {boolean} [o.disabled]
+ *  @param {object}  [o.data]    data-* para el wire() de la pantalla (patrón entity.js#attrs):
+ *                               claves en kebab o camel; se pasan a kebab. Para una lista de
+ *                               botones sin id fijo (candidatas de S9, una por comercio).
  *  @returns {string} HTML */
-export function buttonHtml({ kind = "secondary", size = "m", id = "", label, note = "", icon: iconName = "", disabled = false }) {
+export function buttonHtml({ kind = "secondary", size = "m", id = "", label, note = "", icon: iconName = "", disabled = false, data = null }) {
   const base = BUTTON_CLASS[kind] ?? BUTTON_CLASS.secondary;
   const small = size === "s" && (base === "btn-secondary" || base === "btn-danger");
   const cls = small ? `${base} btn-s` : base;
-  const btn = `<button type="button" class="${cls}"${id ? ` id="${escAttr(id)}"` : ""}${disabled ? " disabled" : ""}>`
+  let attrs = id ? ` id="${escAttr(id)}"` : "";
+  if (data && typeof data === "object") {
+    for (const [k, v] of Object.entries(data)) {
+      if (v == null) continue;
+      const name = String(k).replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()).replace(/[^a-z0-9-]/g, "");
+      if (name) attrs += ` data-${name}="${escAttr(v)}"`;
+    }
+  }
+  const btn = `<button type="button" class="${cls}"${attrs}${disabled ? " disabled" : ""}>`
     + `${iconName ? icon(iconName, { size: 18 }) : ""}<span>${escHtml(label)}</span></button>`;
   if (base !== "btn-primary" || !note) return btn;
   return `<div class="btn-stack">${btn}<span class="btn-note">${escHtml(note)}</span></div>`;

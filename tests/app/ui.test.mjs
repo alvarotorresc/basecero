@@ -138,6 +138,13 @@ test("buttonHtml: icono opcional delante del texto, sin id vacío, y disabled", 
   assert.ok(!buttonHtml({ label: "X", icon: "nope" }).includes("<svg"), "un icono desconocido no pinta nada");
 });
 
+test("buttonHtml: data-* para una lista de botones sin id fijo (S9, candidatas)", () => {
+  const html = buttonHtml({ kind: "secondary", size: "s", label: "Sí, añádela", data: { add: 'mer"chant' } });
+  assert.match(html, /data-add="mer&quot;chant"/);
+  assert.ok(!buttonHtml({ label: "X" }).includes("data-"), "sin data, ningún atributo data-*");
+  assert.ok(!buttonHtml({ label: "X", data: { add: null } }).includes("data-"), "un valor null no pinta el atributo");
+});
+
 test("metaHtml: un divisor MENOS que segmentos, y los vacíos no dejan divisor huérfano", () => {
   assert.equal((metaHtml(["a", "b", "c"]).match(/meta-sep/g) ?? []).length, 2);
   assert.equal((metaHtml(["a", "", null]).match(/meta-sep/g) ?? []).length, 0);

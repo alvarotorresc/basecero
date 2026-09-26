@@ -970,6 +970,11 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
 .ent-day-total .money-cents,
 .ent-day-total .money-cur { font-size: inherit; color: inherit; margin-left: 0; }
 
+/* --- Divisor entre filas de una lista con baldosa (§9, B-Suscripciones, B-Recurrentes): 1px
+   alineado tras la baldosa 40 (12 relleno + 40 + 12 gap), para no repetir el borde de cada fila
+   dentro de un box-list. Sin familia (C6): siempre --border. --- */
+.ent-divider { height: 1px; margin: 0 var(--sp-8) 0 64px; background: var(--border); }
+
 /* --- Encabezado de sección (§9, I-42): ttl 15 --text + contador 13 dim, o 13/600 dim sobre un
    grupo. Nunca en color de familia (C6). --- */
 .ent-sec { display: flex; align-items: baseline; gap: var(--sp-8); }
