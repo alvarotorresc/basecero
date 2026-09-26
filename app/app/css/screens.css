@@ -742,6 +742,150 @@
 /* === fin: patrimonio === */
 
 /* === pantalla: periodo-nuevo === */
+/* S11 (B-PeriodoNuevo, BD-PeriodoNuevo). Bloques verticales de la pantalla (.pn-blocks: el 16 del
+   mockup, no el --gap-section=24 de legacy.css) y piezas propias sin componente canónico: día
+   seleccionable, fila de reparto compartido, importe hundido reutilizado en límite/ingresos
+   previstos/barrido, y el resumen de "Presupuestado". */
+.pn-blocks { display: flex; flex-direction: column; gap: var(--sp-16); }
+.pn-section { display: flex; flex-direction: column; gap: var(--sp-12); }
+.pn-section-head { display: flex; flex-direction: column; gap: var(--sp-4); }
+/* K14: una línea de ayuda como mucho por sección. */
+.pn-hint { margin: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+
+/* --- Resumen del cierre (bloqueDisplay): rejilla de 3 datos en el pie del Display, en --disp-ink
+   (F-13). Reemplaza la tarjeta de rejilla 2×2 que antes vivía fuera del Display. --- */
+.pn-closing-grid {
+  margin-top: var(--sp-8);
+  padding-top: var(--sp-12);
+  border-top: 1px solid var(--disp-line);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-8);
+}
+.pn-closing-item { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.pn-closing-label { font-size: var(--fs-12); font-weight: 500; color: var(--disp-dim); }
+.pn-closing-value { font-size: var(--fs-15); font-weight: 500; }
+
+/* --- Día seleccionable (B-PeriodoNuevo): sin sombra, relleno --accent cuando está elegido (K3:
+   solo vía [aria-pressed="true"], el mismo criterio que entity.js#pickTileHtml). --- */
+.pn-day-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--sp-8); }
+.pn-day {
+  height: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  border-radius: var(--radius);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.pn-day-dow { font-size: var(--fs-12); font-weight: 600; color: var(--text-dim); }
+.pn-day-num { font-size: var(--fs-17); font-weight: 600; }
+.pn-day[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.pn-day[aria-pressed="true"] .pn-day-dow { color: var(--on-accent); }
+
+/* --- "Pagas de lo compartido": fila --surface con el paso a paso del reparto. --- */
+.pn-share {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-8) var(--sp-8) var(--sp-8) var(--sp-16);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.pn-share-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.pn-share-label { font-size: var(--fs-15); font-weight: 600; }
+.pn-share-sub { font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
+
+/* --- Importe hundido reutilizado (límite de categoría, ingresos previstos, cantidad a barrear):
+   44 sobre --well, mono 16 (--fs-input, K9: el 16 solo en inputs). Vacío: centrado y en el peso
+   del placeholder; con valor: a la derecha con el símbolo de moneda superpuesto. --- */
+.pn-amount-wrap { position: relative; flex: none; display: flex; align-items: center; }
+.pn-amount-input {
+  /* width, no min-width: sin ancho fijo, un <input> sin size= cae al ancho intrínseco del
+     navegador (~20 caracteres) y su hermano (entity.js#settingRowHtml body, flex:1 min-width:0)
+     se queda sin sitio — el nombre de la categoría larga se parte en 3 líneas. */
+  width: 96px;
+  height: 44px;
+  padding: 0 var(--sp-12);
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--well);
+  box-shadow: var(--sh-well);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-input);
+  font-weight: 600;
+  text-align: right;
+}
+.pn-amount-input-lg { width: 140px; }
+.pn-amount-input.is-empty { text-align: center; font-family: var(--font-body); font-weight: 500; color: var(--text-dim); }
+.pn-amount-input::placeholder { color: var(--text-dim); font-family: var(--font-body); font-size: var(--fs-13); font-weight: 500; }
+.pn-amount-suffix {
+  position: absolute;
+  right: var(--sp-12);
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: var(--fs-12);
+  font-weight: 500;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+.pn-amount-wrap:not(.has-value) .pn-amount-suffix { display: none; }
+
+/* --- Lista de límites por categoría (entity.js#settingRowHtml, F-35): contenedor --surface con
+   borde y un divisor de 1px entre filas. --- */
+.pn-row-list { display: flex; flex-direction: column; border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--border); padding: var(--sp-4); }
+.pn-row-sep { height: 1px; margin: 0 var(--sp-8); border: 0; background: var(--border); }
+.pn-add-list { display: flex; flex-direction: column; }
+.pn-empty-cats { padding: var(--sp-16); text-align: center; color: var(--text-dim); border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--border); }
+
+/* --- "Presupuestado" (F-14: 20, no 28; C3: nada fuera del Display pasa de 20). --- */
+.pn-total-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-12); }
+.pn-total-figure { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.pn-total-label { font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }
+.pn-total-amount { font-size: var(--fs-20); font-weight: 600; color: var(--text); }
+.pn-total-amount .money-cents,
+.pn-total-amount .money-cur { font-size: inherit; color: inherit; margin-left: 0; }
+.pn-total-income { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-4); text-align: right; }
+.pn-total-income-line { font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
+.pn-total-income-value { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+.pn-total-bar { display: none; }
+.pn-total-bar.is-visible { display: block; }
+.pn-total-note { display: none; margin: 0; font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); line-height: var(--lh-body); }
+.pn-total-note.is-visible { display: block; }
+.pn-note-amount { font-weight: 600; color: var(--text); }
+.pn-note-amount.is-over { color: var(--neg); }
+
+/* --- Barrido (N4, fuera del brief S11: sin mockup propio, se retoca con tokens). --- */
+.pn-sweep-list { display: flex; flex-direction: column; }
+.pn-sweep-row { display: flex; align-items: center; gap: var(--sp-12); padding: var(--sp-8) 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.pn-sweep-radio { flex: none; width: 20px; height: 20px; }
+.pn-sweep-tile { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-4); padding: var(--sp-8); border-radius: var(--radius); border: 1.5px solid transparent; }
+/* K3/R-C1: el naranja solo puede pintarse detrás de :checked (con "tile" en el selector, la
+   excepción que exige R-C1 para no confundirlo con cualquier :checked). */
+.pn-sweep-radio:checked + .pn-sweep-tile { border-color: var(--accent); }
+.pn-sweep-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
+.pn-sweep-name { font-size: var(--fs-14); font-weight: 600; }
+.pn-sweep-amt,
+.pn-sweep-after { font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
+.pn-sweep-keep { font-size: var(--fs-14); font-weight: 600; }
+.pn-sweep-amount { display: flex; flex-direction: column; gap: var(--sp-8); margin-top: var(--sp-8); }
+.pn-sweep-amount.is-disabled { opacity: .5; }
+.pn-sweep-capped { display: none; }
+.pn-sweep-capped.is-visible { display: block; }
+
+/* --- CTA final: primario con nota (§9 "Primario") y el enlace terciario al informe. --- */
+.pn-cta { display: flex; flex-direction: column; gap: var(--sp-16); }
+.pn-cta-link { display: flex; justify-content: center; }
+
+/* --- Paneles de error y de cierre completado. --- */
+.pn-error-actions { display: flex; flex-direction: column; gap: var(--sp-8); margin-top: var(--sp-16); }
+.pn-closed-panel { display: flex; flex-direction: column; gap: var(--sp-16); padding-top: var(--sp-24); }
 /* === fin: periodo-nuevo === */
 
 /* === pantalla: recurrentes === */

@@ -2,12 +2,28 @@
 // prueba sin Worker ni DOM. Nombres de comercio inventados.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   tileHtml, pickTileHtml, badgeHtml, chosenCategoryHtml, filterChipHtml,
   txRowHtml, settingRowHtml, dayHeaderHtml, sectionHeaderHtml, familySwatchesHtml,
 } from "../../app/app/js/entity.js";
 
 const AMOUNT = '12,50<span class="money-cents"></span><span class="money-cur"> €</span>';
+
+const CSS = readFileSync(new URL("../../app/app/css/components.css", import.meta.url), "utf8");
+/** Misma lectura mínima que design-rules.test.mjs#reglasCss/instrument.test.mjs (no se importa de
+ *  ninguno de los dos: importar un .test.mjs registraría también sus tests en este proceso). */
+function reglasCss(css) {
+  return [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({
+    sel: m[1].trim(),
+    decls: m[2].split(";").map((d) => d.trim()).filter(Boolean).map((d) => {
+      const i = d.indexOf(":");
+      return { prop: d.slice(0, i).trim(), value: d.slice(i + 1).trim() };
+    }),
+  }));
+}
+const decl = (sel, prop) => reglasCss(CSS).filter((r) => r.sel.split(",").map((s) => s.trim()).includes(sel))
+  .flatMap((r) => r.decls).find((d) => d.prop === prop)?.value;
 
 test("tileHtml: tinte por familia, 32 compacta, --chip sobre tinte y neutra sin familia", () => {
   assert.match(tileHtml({ fam: "res" }), /class="ent-tile fam-res"/);
@@ -96,6 +112,17 @@ test("settingRowHtml: desplegable (aria-expanded/aria-controls) y desactivada; s
   assert.match(settingRowHtml({ label: "Banco", disabled: true }), /^<button type="button" class="ent-set" disabled>/);
   const conControl = settingRowHtml({ label: "Avisos", controlHtml: "<i></i>", expanded: true, disabled: true });
   assert.ok(!conControl.includes("aria-expanded") && !conControl.includes("disabled"), "un div no se despliega ni se desactiva");
+});
+
+test("settingRowHtml: la etiqueta y la segunda línea truncan en una sola línea (S11, categorías largas)", () => {
+  // Sin white-space:nowrap, text-overflow:ellipsis no hace nada (MDN): el nombre envuelve en su
+  // lugar y, con un control ancho al lado (B-PeriodoNuevo), parte «Impuestos y tasas» en 2-3
+  // líneas y estira la fila entera. Bug real visto en captura; no un caso sintético.
+  for (const sel of [".ent-set-label", ".ent-set-sub"]) {
+    assert.equal(decl(sel, "white-space"), "nowrap", sel);
+    assert.equal(decl(sel, "overflow"), "hidden", sel);
+    assert.equal(decl(sel, "text-overflow"), "ellipsis", sel);
+  }
 });
 
 test("pickTileHtml: seleccionado → aria-pressed=\"true\"; si no, \"false\"", () => {

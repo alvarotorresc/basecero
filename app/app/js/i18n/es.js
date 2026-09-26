@@ -704,15 +704,22 @@ export const ES = {
       first: "Primer periodo",
       title: "Nuevo periodo",
     },
+    // El Display del cierre (F-13, F-02): la etiqueta y el pie de esta pantalla, con el desglose
+    // de 3 datos que antes vivía en una tarjeta aparte.
     closing: {
-      title: "Cierras {name}",
-      movementCount: { one: "{n} movimiento", other: "{n} movimientos" },
+      saved: "{name} ahorró",
+      savedPct: "El {pct} de lo que ingresaste",
       income: "Ingresos",
       spent: "Gastado",
-      saved: "Ahorrado",
-      savingsSentence: "Ahorras el {pct} de lo que ingresas",
+      count: "Movimientos",
     },
-    date: { title: "Empieza el" },
+    date: {
+      title: "{name} empieza el",
+      other: "Otra fecha",
+      quickPick: "Elegir un día cercano",
+      customLabel: "Fecha de inicio",
+      groupAria: "Día de inicio",
+    },
     share: {
       title: "Gastos compartidos",
       youPay: "Pagas de lo compartido",
@@ -721,17 +728,18 @@ export const ES = {
       increaseAria: "Subir porcentaje",
     },
     budget: {
-      lastMonth: "Mes pasado: {amount}",
+      lastMonth: "{name} {amount}",
       noLimitPlaceholder: "Sin límite",
       noCategories: "No hay categorías de gasto configuradas.",
-      question: "¿Cuánto quieres gastar este periodo?",
-      hint: "Pon un límite solo donde te sirva. Si lo dejas vacío, esa categoría irá sin presupuesto.",
+      question: "¿Cuánto quieres gastar?",
+      hint: "Límite solo donde te sirva.",
       addAnother: "Añadir límite a otra categoría",
     },
     total: {
       budgetedTitle: "Presupuestado",
       expectedIncome: "Ingresos previstos",
-      remaining: "Quedan {amount} sin asignar: de ahí salen la cuota del coche, las provisiones y lo que ahorres.",
+      unassigned: "Sin asignar",
+      remaining: "Quedan {amount} sin asignar.",
       over: "Te pasas por {amount} de los ingresos previstos.",
     },
     // Primer periodo (D11): campo efímero de "Ingresos previstos" que solo existe mientras el

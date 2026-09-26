@@ -36,12 +36,15 @@ export function dispInkHtml(text) {
  *  @param {string} [o.foot]           Pie en texto plano. Se escapa.
  *  @param {string} [o.footHtml]       Pie con HTML de confianza (gana a `foot`).
  *  @param {{state:string,text:string}|null} [o.led]  LED dentro del Display (ledHtml).
+ *  @param {string} [o.aside]          Texto plano 12/500 --disp-dim junto al label (p. ej. un rango
+ *                                     de fechas, B-PeriodoNuevo). Se escapa. Ignorado si hay `led`
+ *                                     (el LED ya ocupa ese hueco).
  *  @param {string} [o.slot]           HTML de confianza debajo de la cifra: gráfico, medidor…
  *  @param {string} [o.id]             id de la cifra, para que la pantalla la actualice.
  *  @param {string} [o.labelAfter]     HTML de confianza justo detrás de la etiqueta (un chevron que
  *                                     avisa de que el Display cambia de cuenta, en Inicio).
  *  @returns {string} HTML */
-export function displayHtml({ label, value, size = "l", foot = "", footHtml = "", led = null, slot = "", id = "", labelAfter = "" }) {
+export function displayHtml({ label, value, size = "l", foot = "", footHtml = "", led = null, aside = "", slot = "", id = "", labelAfter = "" }) {
   if (!DISPLAY_SIZES.includes(size)) throw new Error(`displayHtml: size «${size}» no es xl, l ni m (K9)`);
   if (/\bdisp-value\b/.test(footHtml) || /\bdisp-value\b/.test(slot)) {
     throw new Error("displayHtml: una sola cifra .disp-value por Display (K4); las secundarias van con dispInkHtml");
@@ -50,7 +53,7 @@ export function displayHtml({ label, value, size = "l", foot = "", footHtml = ""
   return `<section class="disp">
     <div class="disp-head">
       <span class="disp-label">${escHtml(label)}${labelAfter}</span>
-      ${led ? ledHtml({ ...led, onDisplay: true }) : ""}
+      ${led ? ledHtml({ ...led, onDisplay: true }) : aside ? `<span class="num disp-aside">${escHtml(aside)}</span>` : ""}
     </div>
     <span class="num disp-value disp-value-${size}"${id ? ` id="${escAttr(id)}"` : ""}>${escHtml(value)}</span>
     ${pie ? `<span class="disp-foot">${pie}</span>` : ""}

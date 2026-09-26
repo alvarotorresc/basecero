@@ -25,7 +25,6 @@ export const PENDIENTES = new Set([
   "js/screens/etiquetas.js",
   "js/screens/movimientos.js",
   "js/screens/onboarding.js",
-  "js/screens/periodo-nuevo.js",
   "js/screens/recurrentes.js",
   "js/screens/suscripciones.js",
   // Módulos con plantilla o paleta propia, que migran con su pantalla o con su PR de fundación.
