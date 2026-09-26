@@ -63,6 +63,12 @@ export const ICON_PATHS = {
   undo:         '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
   // (B-Gasto) nota del movimiento
   note:         '<path d="M5 4h14v16H5z"/><path d="M8.5 9h7M8.5 12.5h7M8.5 16h4"/>',
+  // (B-Movimientos) periodo anterior: espejo de chevronRight. No es «atrás» (back): el ‹ de la
+  // cabecera de Movimientos cambia de periodo, no sale de la pantalla.
+  chevronLeft:  '<path d="M14.5 5 8 12l6.5 7"/>',
+  // (B-Movimientos) lupa del buscador y embudo de líneas de «Filtrar»
+  search:       '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+  filterLines:  '<path d="M4 6.5h16M7 12h10M10 17.5h4"/>',
 };
 
 /** SVG listo para pegar. `size` en px (20 dentro de fila o botón, 24 en cabecera, 16 dentro de la

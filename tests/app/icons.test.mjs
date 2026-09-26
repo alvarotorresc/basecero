@@ -109,3 +109,11 @@ test("icons: los cuatro de cuenta son los de B-Patrimonio y B-Onb-Cuentas, verba
   assert.equal(ICON_PATHS.piggy, '<path d="M5 11a7 6 0 0 1 13-2h2v4l-2 1v3h-3v-2H9v2H6v-3a6 6 0 0 1-1-3z"/><path d="M10 7.5h3"/>');
   assert.equal(ICON_PATHS.debt, '<path d="M6 4h12v16l-3-2-3 2-3-2-3 2z"/><path d="M9 9h6M9 12.5h4"/>');
 });
+
+test("icons: los tres de B-Movimientos (‹ de periodo, lupa y filtrar), verbatim", () => {
+  // Espejo exacto de chevronRight: el ‹ de periodo NO puede ser `back` (R-BACK lo trataría como
+  // un «Atrás» y exigiría ese aria-label).
+  assert.equal(ICON_PATHS.chevronLeft, '<path d="M14.5 5 8 12l6.5 7"/>');
+  assert.equal(ICON_PATHS.search, '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>');
+  assert.equal(ICON_PATHS.filterLines, '<path d="M4 6.5h16M7 12h10M10 17.5h4"/>');
+});
