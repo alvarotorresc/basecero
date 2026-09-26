@@ -11,7 +11,7 @@ import { renderEtiquetas } from "./etiquetas.js";
 import { renderInforme } from "./informe.js";
 import { pushBack, goBack } from "../back.js";
 import { importCsv } from "../n26.js";
-import { renderImportAssistant, newAssistantState, importResultText } from "./importar.js";
+import { renderImportAssistant, newAssistantState, newResultState } from "./importar.js";
 import { encryptBackup, decryptBackup, isEncryptedBackup, WrongPassphraseError, MIN_PASSPHRASE } from "../backup-crypto.js";
 import { t, LANGS, activeLang } from "../i18n/index.js";
 import { loadXlsx } from "../xlsx-loader.js";
@@ -91,7 +91,7 @@ const msgHtml = (html, { error = false, id = "", hidden = false } = {}) =>
 /** Pantalla de Ajustes (S4, B-Ajustes): grupos «Periodo y reparto», «Preferencias», «Organizar» y
  *  «Tus datos», y los enlaces de «¿No funciona?». Las filas que editan algo sin salir de Ajustes
  *  (contraparte, reparto, copia cifrada, hoja) despliegan su panel en su sitio: la hoja inferior
- *  llega con PR-09. El asistente de mapeo CSV vive en importar.js (S12). */
+ *  llega con PR-09. El importador de extractos (asistente y resultado) vive en importar.js (S12). */
 export async function renderAjustes(container) {
   let openPeriod = null;
   try { openPeriod = await getOpenPeriod(); } catch { openPeriod = null; }
@@ -101,12 +101,12 @@ export async function renderAjustes(container) {
   const partnerName = (metaCfg.partner_name || "").trim();
 
   const state = {
-    errors: null, pending: null, busy: false, n26Result: null, n26Error: null,
+    errors: null, pending: null, busy: false, n26Error: null,
     encImport: null, periodError: "", prefsError: "",
     // Panel desplegado: "partner" | "share" | "enc" | "sheet" | null. Vive en el estado, no en el
     // DOM: cada cambio de `busy` repinta, y el panel no debe plegarse a mitad de una exportación.
     open: null,
-    view: "main", assistant: null, // subvista del asistente de mapeo (needsMapping), importar.js
+    view: "main", assistant: null, // subvista del importador (asistente o resultado), importar.js
   };
 
   async function processImportBuffer(buf) {
@@ -136,19 +136,16 @@ export async function renderAjustes(container) {
   }
 
   // render() es el despachador de subvista (mismo patrón que categorias.js state.view):
-  // renderMain() es Ajustes y el asistente de mapeo se pinta desde importar.js.
+  // renderMain() es Ajustes y el importador (asistente de mapeo y resultado) se pinta desde importar.js.
   function render() {
     if (state.view === "assistant") {
-      renderImportAssistant(container, state.assistant, {
-        partnerName,
-        onImported: (text) => { state.n26Result = text; state.n26Error = null; goBack(); },
-      });
+      renderImportAssistant(container, state.assistant, { partnerName });
       return;
     }
     renderMain();
   }
 
-  // Vuelta del asistente de mapeo a Ajustes: es el callback que apunta la entrada de historial
+  // Vuelta del importador a Ajustes: es el callback que apunta la entrada de historial
   // (pushBack más abajo), así que el gesto «atrás» del sistema y el ✕ hacen lo mismo.
   function backToMain() {
     state.view = "main";
@@ -310,7 +307,6 @@ export async function renderAjustes(container) {
     const after = `
       <p class="aj-help">${t("ajustes.backup.body")}</p>
       ${errors}
-      ${state.n26Result ? msgHtml(`<p>${escHtml(state.n26Result)}</p>`) : ""}
       ${state.n26Error ? msgHtml(`<p>${escHtml(state.n26Error)}</p>`, { error: true }) : ""}
       <input type="file" id="xlsx-file-input" accept=".xlsx,.bce" hidden>
       <input type="file" id="n26-file-input" accept=".csv" hidden>`;
@@ -626,7 +622,7 @@ export async function renderAjustes(container) {
       const file = e.target.files[0];
       e.target.value = ""; // permite re-seleccionar el MISMO fichero (p.ej. para probar el dedupe)
       if (!file) return;
-      state.busy = true; state.n26Result = null; state.n26Error = null; render();
+      state.busy = true; state.n26Error = null; render();
       try {
         const text = await file.text();
         const res = await importCsv(text);
@@ -638,9 +634,11 @@ export async function renderAjustes(container) {
           state.view = "assistant";
           state.assistant = newAssistantState(file.name, text, res.needsMapping);
         } else {
-          // texto plano: se escapa una única vez al pintarlo (escHtml en el render de más abajo),
-          // así que importResultText/partnerName van SIN escapar aquí para no escaparlos dos veces.
-          state.n26Result = importResultText(res, partnerName);
+          // Ya importado solo (N26 o perfil guardado): el importador abre directamente en su paso
+          // «Resultado», con el mismo «atrás» que el asistente.
+          pushBack(backToMain);
+          state.view = "assistant";
+          state.assistant = newResultState(file.name, text, res);
         }
       } catch (err) {
         state.n26Error = userMessage(err);

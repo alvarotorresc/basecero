@@ -26,7 +26,6 @@ export const PENDIENTES = new Set([
   "js/screens/liquidar.js", "js/screens/movimientos.js", "js/screens/onboarding.js",
   "js/screens/patrimonio.js", "js/screens/periodo-nuevo.js", "js/screens/recurrentes.js",
   "js/screens/registro.js", "js/screens/semana.js", "js/screens/suscripciones.js",
-  "js/screens/importar.js", // asistente de importación, separado de ajustes.js en S4; lo migra S12
   // Módulos con plantilla o paleta propia, que migran con su pantalla o con su PR de fundación.
   "js/recibo.js",        // S2
   "js/informe-pdf.js",   // S8 (paleta de PDF-lib, D-impl-3)

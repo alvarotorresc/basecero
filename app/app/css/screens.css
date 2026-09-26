@@ -111,6 +111,147 @@
 /* === fin: gasto-por-categoria === */
 
 /* === pantalla: importar === */
+/* S12 · B-Importar: cabecera con atrás, progreso por pasos con etiqueta (controls.js), ficha del
+   fichero en --surface con LED fuera del Display (F-02), bloques de columnas con chips neutros de
+   filtro y, en el resultado, tres cifras en --raised. Sin familia en nada: no hay categorías que
+   pintar hasta el paso de revisión (B-3). */
+.imp-screen { display: flex; flex-direction: column; gap: var(--sp-16); }
+
+.imp-file {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.imp-file-tile {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  background: var(--well);
+  box-shadow: var(--sh-well);
+  color: var(--text);
+}
+.imp-file-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.imp-file-name {
+  font-size: var(--fs-14);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.imp-file-rows { flex: none; font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+
+.imp-block { display: flex; flex-direction: column; gap: var(--sp-8); }
+.imp-label,
+.imp-sublabel {
+  margin: 0;
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  color: var(--text-dim);
+}
+.imp-label { color: var(--text); }
+.imp-sublabel { margin-top: var(--sp-4); }
+.imp-optional { font-weight: 500; color: var(--text-dim); }
+.imp-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+.imp-chips .ent-chip { max-width: 100%; }
+.imp-chips .ent-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Nota de una línea: check en --pos si se lee bien; aviso neutro con su icono si no (C4/C5). */
+.imp-note {
+  margin: 0;
+  padding: 0 var(--sp-4);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  font-size: var(--fs-12);
+  font-weight: 500;
+  line-height: var(--lh-body);
+  color: var(--text-dim);
+}
+.imp-note > svg { flex: none; margin-top: var(--sp-2); color: var(--text); }
+.imp-note.is-ok > svg { color: var(--pos); }
+.imp-note span { min-width: 0; overflow-wrap: anywhere; }
+
+/* Vista previa: bloque --surface con filas de 48, filete entre ellas. */
+.imp-preview {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--sp-12);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.imp-prev-row {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-8) 0;
+}
+.imp-prev-row + .imp-prev-row { border-top: 1px solid var(--border); }
+.imp-prev-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.imp-prev-name {
+  font-size: var(--fs-15);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.imp-prev-date { font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
+.imp-prev-amount { flex: none; font-size: var(--fs-15); font-weight: 600; }
+.imp-prev-amount.is-pos { color: var(--pos); }
+
+/* Resultado: tres cifras mono 20/600 (C3) en --raised; la de duplicadas, en dim. */
+.imp-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-8); }
+.imp-tile {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-12);
+  border-radius: var(--radius);
+  background: var(--raised);
+  border: 1px solid var(--border);
+}
+.imp-tile-value { font-size: var(--fs-20); font-weight: 600; line-height: var(--lh-title); }
+.imp-tile-value.is-dim { color: var(--text-dim); }
+.imp-tile-label { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+
+.imp-help {
+  margin: 0;
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-12);
+  font-weight: 500;
+  line-height: var(--lh-body);
+  color: var(--text-dim);
+}
+
+/* Error al guardar: aviso neutro en --raised con el icono de aviso (como el de Ajustes). */
+.imp-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  padding: var(--sp-12);
+  border-radius: var(--radius);
+  background: var(--raised);
+  border: 1px solid var(--border-strong);
+  font-size: var(--fs-13);
+  font-weight: 500;
+  line-height: var(--lh-body);
+}
+.imp-msg > svg { flex: none; margin-top: var(--sp-2); }
+.imp-msg p { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 /* === fin: importar === */
 
 /* === pantalla: informe === */
