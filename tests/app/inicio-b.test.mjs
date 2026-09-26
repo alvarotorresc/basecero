@@ -119,3 +119,13 @@ test("periodChartSvg: ningún color en el HTML y los rótulos escapados", () => 
   assert.match(html, /&lt;hoy>|&lt;hoy&gt;/);
   assert.match(html, /a&amp;b/);
 });
+
+test("periodChartSvg: con el punto de hoy en el suelo, el rótulo «hoy» no baja del cero (línea a sangre)", () => {
+  const html = periodChartSvg({ days: 30, today: 2, values: [100, 50, -400], max: 100, todayLabel: "hoy" });
+  const y = Number(html.match(/<text class="disp-chart-label" x="[\d.]+" y="([\d.]+)"[^>]*>hoy<\/text>/)[1]);
+  assert.equal(y, 86);
+  const alto = periodChartSvg({ days: 30, today: 2, values: [100, 80, 60], max: 100, todayLabel: "hoy" });
+  const cy = Number(alto.match(/<circle class="disp-today" cx="[\d.]+" cy="([\d.]+)"/)[1]);
+  const y2 = Number(alto.match(/y="([\d.]+)"[^>]*>hoy<\/text>/)[1]);
+  assert.equal(y2, Number((cy + 4).toFixed(2)), "más arriba, a la altura del punto como siempre");
+});
