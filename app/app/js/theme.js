@@ -48,19 +48,25 @@ function paint(doc, theme) {
 // poner con "system", así elegir Claro u Oscuro deja de seguir al sistema operativo.
 const watchers = new WeakMap();
 
+// Safari < 14 solo tiene addListener/removeListener en MediaQueryList.
+const listen = (mql, fn) => (typeof mql.addEventListener === "function"
+  ? mql.addEventListener("change", fn) : mql.addListener(fn));
+const unlisten = (mql, fn) => (typeof mql.removeEventListener === "function"
+  ? mql.removeEventListener("change", fn) : mql.removeListener(fn));
+
 /** Aplica la preferencia y devuelve el tema resuelto ("light" | "dark"). `mql` es
  *  matchMedia("(prefers-color-scheme: dark)"), o null si el navegador no lo tiene. */
 export function applyTheme(doc, pref, mql) {
   const prev = watchers.get(doc);
   if (prev) {
-    prev.mql.removeEventListener("change", prev.onChange);
+    unlisten(prev.mql, prev.onChange);
     watchers.delete(doc);
   }
   const theme = resolveTheme(pref, Boolean(mql?.matches));
   paint(doc, theme);
   if (normalize(pref) === "system" && mql) {
     const onChange = (e) => paint(doc, e.matches ? "dark" : "light");
-    mql.addEventListener("change", onChange);
+    listen(mql, onChange);
     watchers.set(doc, { mql, onChange });
   }
   return theme;

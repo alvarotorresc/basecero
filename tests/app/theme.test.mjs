@@ -170,3 +170,26 @@ test("systemDarkQuery: pide prefers-color-scheme: dark, o null si no hay matchMe
   assert.equal(mql.matches, true);
   assert.equal(systemDarkQuery({}), null);
 });
+
+// Safari < 14: MediaQueryList solo tiene addListener/removeListener. Sin esta alternativa, main.js
+// lanzaría en el arranque con «Sistema» y la app no llegaría a pintar.
+function legacyMql(matches) {
+  const listeners = [];
+  return {
+    matches, listeners,
+    addListener(fn) { listeners.push(fn); },
+    removeListener(fn) { const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); },
+    fire(m) { this.matches = m; for (const fn of [...listeners]) fn({ matches: m }); },
+  };
+}
+
+test("applyTheme: con un MediaQueryList sin addEventListener usa addListener y no lanza", () => {
+  const doc = fakeDoc();
+  const mql = legacyMql(false);
+  assert.equal(applyTheme(doc, "system", mql), "light");
+  assert.equal(mql.listeners.length, 1);
+  mql.fire(true);
+  assert.equal(doc.attrs["data-theme"], "dark");
+  applyTheme(doc, "light", mql);
+  assert.equal(mql.listeners.length, 0);
+});
