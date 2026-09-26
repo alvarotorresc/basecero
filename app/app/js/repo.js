@@ -1292,6 +1292,10 @@ const getTag = async (id) => (await query(SQL.getTag, [id]))[0] ?? null;
  *  un periodo) y cuántos movimientos la llevan. Pantalla Etiquetas. */
 export const tagTotals = () => query(SQL.tagTotals);
 
+/** Gasto de cada etiqueta por categoría del movimiento, de siempre (S10, barras de Etiquetas). Filas
+ *  {tag_id, category_id, spent_cents}; category_id '' si el movimiento no tiene categoría. */
+export const tagSpendByCategory = () => query(SQL.tagSpendByCategory);
+
 /** Total de un periodo concreto por etiqueta (incluye archivadas: un movimiento del periodo puede
  *  llevar una que ya se archivó). Segunda línea de la tarjeta de Movimientos y qué chips pintar. */
 export const tagTotalsOfPeriod = (periodId) => query(SQL.tagTotalsOfPeriod, [periodId]);

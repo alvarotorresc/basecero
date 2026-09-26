@@ -481,6 +481,15 @@ export const SQL = {
     LEFT JOIN periods p ON p.id=t.period_id
     WHERE tg.deleted=0
     GROUP BY tg.id ORDER BY tg.is_archived, spent_cents DESC, tg.name`,
+  // Desglose de cada etiqueta por categoría (S10, B-Etiquetas: la barra por familia, C10/C12). MISMO
+  // TAG_SPENT y mismos filtros que tagTotals: la suma por etiqueta de estas filas es su spent_cents.
+  // Agrupa por la categoría del movimiento (hoja o raíz); la familia la pone la pantalla por su raíz.
+  tagSpendByCategory: `SELECT t.tag_id, t.category_id, ${TAG_SPENT} AS spent_cents
+    FROM transactions t
+    JOIN tags tg ON tg.id=t.tag_id AND tg.deleted=0
+    LEFT JOIN periods p ON p.id=t.period_id
+    WHERE t.deleted=0
+    GROUP BY t.tag_id, t.category_id`,
   // La segunda línea de la tarjeta de Movimientos y qué chips se pintan. NO filtra is_archived: un
   // movimiento del periodo puede llevar una etiqueta archivada y su chip tiene que seguir estando.
   tagTotalsOfPeriod: `SELECT tg.id, ${TAG_SPENT} AS spent_cents, COUNT(t.id) AS n
