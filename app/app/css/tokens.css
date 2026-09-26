@@ -112,9 +112,10 @@
   --disp-glow:0 0 12px rgba(255,194,102,.25);
 
   /* Familias, oscuro: tintes con L +0,085 y croma ×1,7 y textos con croma ×1,5 sobre su tono (V3);
-     barras sin cambios. Casa y Coche parten de sus valores de antes del retoque; el texto de
+     barras sin cambios. Casa sigue retocada (pareja Casa~Alimentación, aprobada por daltonismo); Coche
+     parte de su valor de antes del retoque; el texto de
      Restauración no cambia (V3 lo deja quieto para no acercarlo al ámbar). */
-  --f-casa-t:#4C3826;--f-casa-b:#AE8A69;--f-casa-x:#ECCBA6;
+  --f-casa-t:#4B382A;--f-casa-b:#C0A389;--f-casa-x:#E9CBAB;
   --f-ali-t:#2F4333;--f-ali-b:#628D6C;--f-ali-x:#ACE0B3;
   --f-res-t:#473C1B;--f-res-b:#BA9B39;--f-res-x:#DAD3A6;
   --f-tra-t:#2D3D5A;--f-tra-b:#799EE3;--f-tra-x:#BAD1FF;
