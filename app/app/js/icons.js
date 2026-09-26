@@ -22,7 +22,8 @@ export const ICON_PATHS = {
   minus:        '<path d="M5 12h14"/>',
   check:        '<path d="M5 12.5 10 17.5 19 7"/>',
   warn:         '<path d="M12 4.5 21 19.5H3z"/><path d="M12 10v4"/><path d="M12 17h.01"/>',
-  tag:          '<path d="M4 11V4h7l9 9-7 7z"/><circle cx="8" cy="8" r="1.2"/>',
+  // Glifo de los mockups B (B-Gasto, B-Borrar, B-Movimiento-Detalle…); ENTITY_ICONS.tag es este mismo.
+  tag:          '<path d="M3.5 12.5V4.5h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.3"/>',
   calendar:     '<rect x="3.5" y="5" width="17" height="15.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
   download:     '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M4.5 19.5h15"/>',
   trash:        '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/>',
@@ -130,7 +131,8 @@ export const CAT_ICONS = {
 // etiqueta no es una categoría—, por eso no están en CAT_ICONS, pero se pintan con catIcon().
 const ENTITY_ICONS = {
   income: '<path d="M12 19V5M6 11l6-6 6 6"/>',
-  tag:    '<path d="M3.5 12.5V4.5h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.3"/>',
+  // El mismo glifo que ICON_PATHS.tag: una etiqueta lleva el mismo icono en toda la app.
+  tag:    ICON_PATHS.tag,
 };
 
 /** SVG de un icono de categoría, de ingreso o de etiqueta. Mismo trazo que icon(). `size` en px o

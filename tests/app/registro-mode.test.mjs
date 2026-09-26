@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { quickRegisterEnabled, detailsOpen, foldedSummaryParts, visibleCategories } from "../../app/app/js/registro-mode.js";
+import { quickRegisterEnabled, detailsOpen, foldedSummaryParts, visibleCategories, createScreenLife } from "../../app/app/js/registro-mode.js";
 
 test("quickRegisterEnabled: ausente, vacío, \"1\" y basura son ON (default de producto)", () => {
   assert.equal(quickRegisterEnabled(undefined), true);
@@ -98,4 +98,38 @@ test("visibleCategories: la seleccionada fuera de las primeras `limit` entra igu
   assert.equal(shown.length, 8);
   assert.equal(hidden, 2);
   assert.ok(shown.some((c) => c.id === "c9"));
+});
+
+// ---- Vida de Registro (revisión final B): el atrás del sistema no pasa por ✕ ni por guardar ----
+// Contenedor falso: solo querySelector, que encuentra #reg-save mientras Registro está pintado.
+function fakeContainer() {
+  const c = { registro: true, querySelector: (sel) => (c.registro && sel === "#reg-save" ? {} : null) };
+  return c;
+}
+
+test("createScreenLife: viva mientras Registro sigue en el DOM", () => {
+  let ends = 0;
+  const life = createScreenLife(fakeContainer(), "#reg-save", () => { ends++; });
+  assert.equal(life.isAlive(), true);
+  assert.equal(life.isAlive(), true);
+  assert.equal(ends, 0);
+});
+
+test("createScreenLife: el atrás del sistema repinta otra pantalla → muere y para la voz una sola vez", () => {
+  let ends = 0;
+  const c = fakeContainer();
+  const life = createScreenLife(c, "#reg-save", () => { ends++; });
+  c.registro = false; // back.js pintó Inicio en el mismo contenedor
+  assert.equal(life.isAlive(), false);
+  assert.equal(life.isAlive(), false);
+  assert.equal(ends, 1);
+});
+
+test("createScreenLife: ✕ o guardar (end) la apagan aunque el DOM siga, sin repetir onEnd", () => {
+  let ends = 0;
+  const life = createScreenLife(fakeContainer(), "#reg-save", () => { ends++; });
+  life.end();
+  life.end();
+  assert.equal(life.isAlive(), false);
+  assert.equal(ends, 1);
 });

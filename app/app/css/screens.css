@@ -801,6 +801,8 @@
 .liq-account { display: flex; flex-direction: column; gap: var(--sp-8); }
 .liq-account-label { padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
 .liq .ctl-segmented [role="radio"] { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Tres cuentas o más: chips con la muestra de la familia, que envuelven de línea. */
+.liq-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
 
 /* Un solo contenedor --surface con los dos grupos; filas de 60 con filete que empieza tras la baldosa. */
 .liq-list {
@@ -820,7 +822,6 @@
 /* 44 de casilla + 8 + 40 de baldosa + 8. */
 .liq-sep { height: 1px; margin-left: 100px; background: var(--border); }
 
-.liq-primary .num { font-weight: 600; }
 /* === fin: liquidar === */
 
 /* === pantalla: movimiento-detalle === */
@@ -1824,9 +1825,6 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 .reg-subs .ent-chip.ent-neutral { position: relative; }
 .reg-subs .ent-chip.ent-neutral[aria-pressed="false"] { background: var(--lift); box-shadow: inset 0 0 0 1px var(--border); }
 :root[data-theme="dark"] .reg-subs .ent-chip.ent-neutral[aria-pressed="false"] { box-shadow: inset 0 0 0 1px var(--border-strong); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .reg-subs .ent-chip.ent-neutral[aria-pressed="false"] { box-shadow: inset 0 0 0 1px var(--border-strong); }
-}
 
 /* Aviso de límite (Registro v2 §6.2), igual que en Gasto por categoría (S7): texto con el icono de
    aviso, en tinta cuando avisa, y SOLO la cifra excedida en --neg (C4). La clase y el texto los

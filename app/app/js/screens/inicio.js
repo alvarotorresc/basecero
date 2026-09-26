@@ -289,17 +289,20 @@ function movementRowHtml(r, byId, partnerName) {
   const cat = byId[r.category_id];
   const parent = cat?.parent_id ? byId[cat.parent_id] : null;
   const path = cat ? (parent ? `${parent.name} › ${cat.name}` : cat.name) : "";
-  const shareSuffix = !r.is_shared ? ""
+  const shareNote = !r.is_shared ? ""
     : r.paid_by === "partner"
       ? t("movimientos.row.partnerPaid", { name: partnerName || t("movimientos.shared.fallbackName"), amount: fmtMoney(r.my_amount_cents) })
       : t("common.myPartSuffix", { amount: fmtMoney(r.my_amount_cents) });
   return txRowHtml({
     fam: familyForCategory(r.category_id, byId),
     icon: iconForCategory(r.category_id, byId),
-    title: r.merchant || cat?.name || "",
-    line2: path + shareSuffix,
+    // Sin comercio ni categoría, el mismo «Sin categorizar» que Movimientos: la fila nunca sin nombre.
+    title: r.merchant || cat?.name || t("movimientos.uncategorized"),
+    line2: path,
     amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)),
     sign: r.type === "expense" ? "expense" : "income",
+    // La nota de compartido va debajo de la cifra, como en Movimientos y Semana.
+    amountNote: shareNote.replace(/^,\s*/, ""),
     data: { tx: r.id },
   });
 }

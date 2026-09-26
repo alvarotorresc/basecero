@@ -5,9 +5,9 @@ import { fmtMoney, fmtDiaCorto } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
-import { subHeaderHtml } from "../ui.js";
+import { subHeaderHtml, buttonHtml } from "../ui.js";
 import { segmentedHtml, wireSegmented, checkboxHtml } from "../controls.js";
-import { tileHtml } from "../entity.js";
+import { tileHtml, filterChipHtml } from "../entity.js";
 import { displayHtml, dispInkHtml, emptyStateHtml } from "../instrument.js";
 import { netOfSelected } from "../share-pct.js";
 import { escHtml } from "../esc.js";
@@ -89,6 +89,29 @@ export async function renderLiquidar(container, onBack) {
   };
   let errorMsg = "";
 
+  /** «Entra en» / «Sale de»: con una o dos cuentas, el Segmented de B-Liquidar; a partir de tres
+   *  los segmentos se quedaban en «Cuen…» ilegibles, así que pasan a chips de filtro con la muestra
+   *  de la familia de cada cuenta (C8), que envuelven de línea. Selección única en los dos casos:
+   *  radiogroup en el Segmented, grupo de botones con aria-pressed (uno solo a true) en los chips. */
+  function accountPickerHtml(net) {
+    const fam = (a) => familyForAccount(a, accountStyle, goals);
+    if (accounts.length >= 3) {
+      return `<div class="liq-chips" id="liq-accounts" role="group" aria-labelledby="liq-account-label">${accounts
+        .map((a) => filterChipHtml({ label: a.name, fam: fam(a), selected: a.id === state.accountId, data: { acc: a.id } })).join("")}</div>`;
+    }
+    return segmentedHtml({
+      id: "liq-accounts", name: t(net < 0 ? "liquidar.account.out" : "liquidar.account.in"), labelledBy: "liq-account-label",
+      options: accounts.map((a) => ({ value: a.id, label: a.name, fam: fam(a) })), value: state.accountId,
+    });
+  }
+
+  /** Elegir cuenta invalida la confirmación en curso: el segundo toque confirmaría algo distinto
+   *  de lo que se ve. `refocus` devuelve el foco al control elegido tras repintar. */
+  function chooseAccount(value, refocus) {
+    state.accountId = value;
+    if (state.confirm) { state.confirm = false; render(); refocus(); }
+  }
+
   function render() {
     // Neto de lo SELECCIONADO (share-pct.js#netOfSelected): 'i_owe' resta, 'partner_owes' suma.
     const net = netOfSelected(state.rows, state.selected);
@@ -146,10 +169,7 @@ export async function renderLiquidar(container, onBack) {
         ${accounts.length ? `
         <div class="liq-account">
           <span class="liq-account-label" id="liq-account-label">${escHtml(t(net < 0 ? "liquidar.account.out" : "liquidar.account.in"))}</span>
-          ${segmentedHtml({
-            id: "liq-accounts", name: t(net < 0 ? "liquidar.account.out" : "liquidar.account.in"), labelledBy: "liq-account-label",
-            options: accounts.map((a) => ({ value: a.id, label: a.name, fam: familyForAccount(a, accountStyle, goals) })), value: state.accountId,
-          })}
+          ${accountPickerHtml(net)}
         </div>` : ""}
 
         ${errorMsg ? `<div class="banner-aviso is-error">${escHtml(errorMsg)}</div>` : ""}
@@ -159,9 +179,7 @@ export async function renderLiquidar(container, onBack) {
           ${section("liquidar.balance.against", iOwe, against, true)}
         </section>
 
-        <button type="button" class="btn-primary liq-primary" id="liq-settle-all"${state.busy || nothingSelected ? " disabled" : ""}>
-          <span>${escHtml(label)}</span>${withAmount ? ` <span class="num">${escHtml(amount)}</span>` : ""}
-        </button>
+        ${buttonHtml({ kind: "primary", id: "liq-settle-all", label, amount: withAmount ? amount : "", disabled: state.busy || nothingSelected })}
       </div>`;
     wire();
   }
@@ -171,16 +189,21 @@ export async function renderLiquidar(container, onBack) {
 
     // Sin cuenta elegida (o si la elegida ya no existe), el Segmented marca la primera: se alinea
     // el estado con lo que se ve, como hacían los chips con resolveAccountId.
-    const seg = container.querySelector("#liq-accounts");
+    const seg = container.querySelector("#liq-accounts.ctl-segmented");
     if (seg) {
       const shown = seg.querySelector('[aria-checked="true"]')?.dataset.value;
       if (shown && shown !== state.accountId) state.accountId = shown;
-      wireSegmented(seg, (value) => {
-        state.accountId = value;
-        // Cambiar de cuenta invalida la confirmación en curso: el segundo toque confirmaría algo
-        // distinto de lo que se ve.
-        if (state.confirm) { state.confirm = false; render(); container.querySelector(`#liq-accounts [aria-checked="true"]`)?.focus(); }
-      });
+      wireSegmented(seg, (value) => chooseAccount(value,
+        () => container.querySelector('#liq-accounts [aria-checked="true"]')?.focus()));
+    }
+    // Chips (tres cuentas o más): un solo aria-pressed a true, el de la cuenta elegida.
+    const chips = [...container.querySelectorAll("#liq-accounts.liq-chips [data-acc]")];
+    for (const chip of chips) {
+      chip.onclick = () => {
+        for (const c of chips) c.setAttribute("aria-pressed", String(c === chip));
+        chooseAccount(chip.dataset.acc,
+          () => container.querySelector(`#liq-accounts [data-acc="${CSS.escape(chip.dataset.acc)}"]`)?.focus());
+      };
     }
 
     // Casilla por fila (§9): cambiar la selección invalida la confirmación en curso, igual que

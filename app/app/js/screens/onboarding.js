@@ -147,6 +147,8 @@ export async function renderOnboarding(container, { onDone }) {
   // ---------- Cuentas ----------
 
   function accountRowHtml(a, firstCheckingId) {
+    // Sin objetivos a propósito: en el onboarding todavía no existe ninguno, y la Hucha que se crea
+    // aquí lleva imp como override guardado (setAccountFamily en #onb-acc-add), no por un objetivo.
     const fam = familyForAccount(a, state.accountStyle, []);
     const kindId = accountKindOf(a, fam);
     const kind = ACCOUNT_KINDS.find((k) => k.id === kindId) ?? ACCOUNT_KINDS[0];

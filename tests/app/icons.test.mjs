@@ -93,6 +93,12 @@ test("catIcon(): SVG de trazo con currentColor; income y tag también se resuelv
   assert.match(catIcon("tag"), /M3.5 12.5V4.5h8l9 9-8 8z/);
 });
 
+test("etiqueta: icon(\"tag\") y catIcon(\"tag\") pintan el mismo glifo, el de los mockups B", () => {
+  const inner = (svg) => svg.slice(svg.indexOf(">") + 1, svg.lastIndexOf("</svg>"));
+  assert.equal(inner(icon("tag")), inner(catIcon("tag")));
+  assert.equal(ICON_PATHS.tag, '<path d="M3.5 12.5V4.5h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.3"/>');
+});
+
 test("catIcon(): con label deja de ser decorativo (role img + aria-label escapado)", () => {
   const svg = catIcon("libro", { label: 'Li"bro' });
   assert.match(svg, /role="img" aria-label="Li&quot;bro"/);

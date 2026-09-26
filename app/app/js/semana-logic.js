@@ -63,9 +63,14 @@ export function daysWithCategories(rows, dates) {
   });
 }
 
-/** Día de mayor gasto de la semana, para `relativeWidth(seg.cents, maxDayTotal)` — nunca negativo
- *  (una semana entera en negativo/cero no debe dejar ninguna barra con anchura). */
-export const maxDayTotal = (days) => days.reduce((m, d) => Math.max(m, d.totalCents), 0);
+/** Alto de la columna de un día: la suma de sus tramos POSITIVOS (`segments`), no `totalCents` —
+ *  una devolución resta del total pero no hunde la columna. */
+export const dayPositiveCents = (d) => d.segments.reduce((s, x) => s + x.cents, 0);
+
+/** Columna más alta de la semana, con los mismos tramos positivos que pinta cada columna: la línea
+ *  de la media se dibuja a esta escala, así que tiene que ser la misma que usa columnsHtml. Nunca
+ *  negativo (una semana sin gasto da 0). */
+export const maxDayPositive = (days) => days.reduce((m, d) => Math.max(m, dayPositiveCents(d)), 0);
 
 /** { totalCents, avgCents } de la semana — avgCents = total / nº de días, redondeado. */
 export function weekTotals(days) {

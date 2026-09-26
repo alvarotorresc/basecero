@@ -23,7 +23,7 @@ import { userMessage } from "../errors.js";
 import { focusInput } from "../viewport.js";
 import { showReceipt } from "../recibo.js";
 import { showToast } from "../toast.js";
-import { quickRegisterEnabled, detailsOpen, foldedSummaryParts, visibleCategories } from "../registro-mode.js";
+import { quickRegisterEnabled, detailsOpen, foldedSummaryParts, visibleCategories, createScreenLife } from "../registro-mode.js";
 import { normalizeMerchant, memoryPatch } from "../merchant-memory.js";
 import { parseNaturalExpense } from "../natural.js";
 import { speech } from "../speech.js";
@@ -77,6 +77,9 @@ function saveLabelHtml(tipo, cents) {
     ? t("registro.save.expenseWithAmount", { amount: `<span class="num">${escHtml(fmtMoney(cents))}</span>` })
     : escHtml(t(SAVE_KEY[tipo]));
 }
+
+// Número de apertura de Registro, para su vida por DOM (createScreenLife).
+let registroOpenings = 0;
 
 /** Monta la pantalla completa de registro rápido de un movimiento (5 tipos).
  *  onDone() se llama tanto al cerrar (✕) como tras guardar con éxito.
@@ -192,11 +195,15 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
   // (crear una nueva en cada repintado filtraría memoria) y la revoca en cuanto state.photo
   // cambia de referencia o se vacía.
   let photoObjectUrl = null;
-  // D-3/D-4 (revisión de código): vida de la pantalla. Un callback async que resuelve DESPUÉS de
-  // cerrar Registro (voz tardía, foto que tarda en comprimirse) no debe repintar `container` encima
-  // de la pantalla que `nav()` ya puso detrás. Se apaga en los dos puntos de salida (✕ y guardar).
-  let alive = true;
   const releasePhotoUrl = () => { if (photoObjectUrl) { URL.revokeObjectURL(photoObjectUrl); photoObjectUrl = null; } };
+  // D-3/D-4 (revisión de código): vida de la pantalla (registro-mode.js#createScreenLife). Se apaga
+  // en ✕ y guardar, y también sola si el atrás del sistema ya quitó Registro del DOM: entonces para
+  // la voz y suelta la foto, como las otras dos salidas.
+  // El selector lleva el número de ESTA apertura: si el atrás del sistema cierra Registro y se
+  // vuelve a abrir enseguida, un callback tardío de la apertura vieja no confunde el #reg-save nuevo
+  // con el suyo.
+  const lifeId = String(++registroOpenings);
+  const life = createScreenLife(container, `#reg-save[data-life="${lifeId}"]`, () => { speech?.stop(); releasePhotoUrl(); });
   // D-5 (revisión de código): último texto ya interpretado por Enter/blur/voz — un blur sobre un
   // texto sin cambios desde la última interpretación no repinta.
   let lastInterpreted = null;
@@ -689,7 +696,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
 
       ${errorMsg ? `<div class="reg-error" role="alert">${icon("warn", { size: 18 })}<span>${escHtml(errorMsg)}</span></div>` : ""}
 
-      <button type="button" class="btn-primary reg-save" id="reg-save">${saveLabelHtml(state.tipo, state.cents)}</button>
+      <button type="button" class="btn-primary reg-save" id="reg-save" data-life="${lifeId}">${saveLabelHtml(state.tipo, state.cents)}</button>
     </div>`;
 
     wire();
@@ -720,9 +727,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
 
   function wire() {
     container.querySelector("#reg-close").onclick = () => {
-      alive = false;
-      speech?.stop();
-      releasePhotoUrl();
+      life.end();
       onDone();
     };
 
@@ -755,7 +760,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         const value = natInput.value;
         if (!value.trim() || value === lastInterpreted) return;
         setTimeout(() => {
-          if (!alive) return;
+          if (!life.isAlive()) return;
           lastInterpreted = value;
           applyNatural(value);
         }, 0);
@@ -772,14 +777,14 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       speech.start(
         // D-4: guard de vida — un resultado que llega después de cerrar Registro no repinta.
         (resultText) => {
-          if (!alive) return;
+          if (!life.isAlive()) return;
           state.natural.listening = false;
           lastInterpreted = resultText;
           applyNatural(resultText);
           focusInput(container.querySelector("#reg-raw"));
         },
         () => {
-          if (!alive) return;
+          if (!life.isAlive()) return;
           state.natural.listening = false;
           state.natural.micOff = true;
           render();
@@ -983,13 +988,13 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       try {
         const compressed = await compressImage(file);
         // D-4: compressImage es async — si Registro se cerró mientras comprimía, no repintar.
-        if (!alive) return;
+        if (!life.isAlive()) return;
         // Reemplazar una foto ya elegida: la URL vieja apunta al Blob viejo.
         if (photoObjectUrl) { URL.revokeObjectURL(photoObjectUrl); photoObjectUrl = null; }
         state.photo = compressed;
         render();
       } catch (err) {
-        if (!alive) return;
+        if (!life.isAlive()) return;
         // El formulario NO pierde nada: state.photo se queda como estaba.
         showToast(t("errors.attachments.writeFailed", { error: userMessage(err) }));
       }
@@ -1107,11 +1112,9 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         const periodLines = await receiptPeriodLines();
         // Si se cerró Registro mientras se leían las cifras del periodo, no se toca `container`
         // (ya es otra pantalla): el gasto está guardado igual.
-        if (!alive) return;
+        if (!life.isAlive()) return;
         // D-3/D-4: guardar con éxito es el otro punto de salida de la pantalla.
-        alive = false;
-        speech?.stop();
-        releasePhotoUrl();
+        life.end();
         onDone();   // primero: el ticket cae sobre la pantalla ya repintada
         showReceipt({ ...receiptData(newId, withCategory, effectiveIsShared, effectiveAccountId), periodLines });
       } catch (e) {

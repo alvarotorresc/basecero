@@ -12,7 +12,6 @@ import {
   iconForCategory,
   famClass,
   colorForCategory,
-  textColorForCategory,
   initCategoryStyle,
   parseStyle,
   hashIndex,
@@ -270,15 +269,13 @@ test("initCategoryStyle(undefined) no rompe — vuelve a {}", () => {
 
 // ---- Puente para las pantallas que aún no están migradas (PENDIENTES) ----------------------
 
-test("colorForCategory / textColorForCategory: devuelven var() de la familia, nunca un hex", () => {
+test("colorForCategory: devuelve var() de la familia, nunca un hex", () => {
   assert.equal(colorForCategory("cat-casa", SEED_BYID), "var(--f-casa-b)");
-  assert.equal(textColorForCategory("cat-casa", SEED_BYID), "var(--f-casa-x)");
   assert.equal(colorForCategory("cat-casa-luz", SEED_BYID), "var(--f-casa-b)");
   // Neutro del puente: --idle, el gris que las pantallas viejas mezclan al 16 % para el tinte (el
   // --well de C9 es el fondo de la ficha nueva, no un color para mezclar).
   assert.equal(colorForCategory("", SEED_BYID), "var(--idle)");
   assert.equal(colorForCategory("cat-nomina", SEED_BYID), "var(--idle)");
-  assert.equal(textColorForCategory("", SEED_BYID), "var(--text)");
 });
 
 // ---- C13 en el propio módulo -----------------------------------------------------------------

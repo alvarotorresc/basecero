@@ -475,10 +475,13 @@ export async function renderPatrimonio(container) {
         }
         await setAccountLoan(accountId, monthlyCents);
         // Familia (C8): solo se escribe si se eligió a mano. Si coincide con la de su tipo, se
-        // borra el override para que siga al tipo.
+        // borra el override para que siga al tipo. Solo cuando coincide con y sin objetivos: el
+        // defecto de una cuenta de ahorro depende de si su objetivo está activo (listGoals no trae
+        // los pausados), así que en ella la familia elegida se guarda siempre como override.
         if (f.famTouched) {
-          const byDefault = defaultFamilyForAccount({ id: accountId, type: f.type }, rawGoals());
-          await setAccountFamily(accountId, f.fam === byDefault ? null : f.fam);
+          const acc = { id: accountId, type: f.type };
+          const byDefault = f.fam === defaultFamilyForAccount(acc, rawGoals()) && f.fam === defaultFamilyForAccount(acc, []);
+          await setAccountFamily(accountId, byDefault ? null : f.fam);
         }
         await loadData();
         goBack();

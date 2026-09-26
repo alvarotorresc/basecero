@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  WEEK_DAYS, weekDates, weekRange, fillDays, daysWithCategories, maxDayTotal, weekTotals,
+  WEEK_DAYS, weekDates, weekRange, fillDays, daysWithCategories, maxDayPositive, dayPositiveCents, weekTotals,
   categoryTotals, movementsOfDay, rangeLabelParts,
 } from "../../app/app/js/semana-logic.js";
 
@@ -56,11 +56,29 @@ test("daysWithCategories: un día con más devolución que gasto queda negativo 
   assert.equal(dia.dominantRootId, null);
 });
 
-test("maxDayTotal: el mayor total, nunca negativo (una semana toda a 0/negativa da 0)", () => {
-  const days = [{ totalCents: 4120 }, { totalCents: 6790 }, { totalCents: 0 }];
-  assert.equal(maxDayTotal(days), 6790);
-  assert.equal(maxDayTotal([{ totalCents: -300 }, { totalCents: -50 }]), 0);
-  assert.equal(maxDayTotal([]), 0);
+test("maxDayPositive: la columna más alta por sus tramos positivos, nunca negativo", () => {
+  const days = [
+    { totalCents: 4120, segments: [{ cents: 4120 }] },
+    { totalCents: 6790, segments: [{ cents: 5000 }, { cents: 1790 }] },
+    { totalCents: 0, segments: [] },
+  ];
+  assert.equal(maxDayPositive(days), 6790);
+  assert.equal(maxDayPositive([{ totalCents: -300, segments: [] }, { totalCents: -50, segments: [] }]), 0);
+  assert.equal(maxDayPositive([]), 0);
+});
+
+test("maxDayPositive: una devolución baja el total del día pero no la altura de su columna", () => {
+  // 80 € de gasto y 50 € devueltos el mismo día: total 30 €, columna de 80 €.
+  const rows = [
+    { date: "2026-09-21", root_id: "cat-a", cents: 8000 },
+    { date: "2026-09-21", root_id: "cat-b", cents: -5000 },
+    { date: "2026-09-22", root_id: "cat-a", cents: 6000 },
+  ];
+  const days = daysWithCategories(rows, ["2026-09-21", "2026-09-22"]);
+  assert.equal(days[0].totalCents, 3000);
+  assert.equal(dayPositiveCents(days[0]), 8000);
+  // La escala de la media es la de las columnas (8000), no la del mayor total (6000).
+  assert.equal(maxDayPositive(days), 8000);
 });
 
 test("weekTotals: 231,05 € y 33,01 € de media (los números del artboard)", () => {
