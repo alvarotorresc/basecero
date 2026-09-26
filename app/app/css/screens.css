@@ -1833,7 +1833,7 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   transform: rotate(45deg);
 }
 .reg-subs .ent-chip.ent-neutral { position: relative; }
-.reg-subs .ent-chip.ent-neutral[aria-pressed="false"] { background: var(--lift); box-shadow: inset 0 0 0 1px var(--border); }
+.reg-subs .ent-chip.ent-neutral[aria-pressed="false"] { background: var(--lift); box-shadow: inset 0 0 0 1px var(--border); font-weight: 600; }
 :root[data-theme="dark"] .reg-subs .ent-chip.ent-neutral[aria-pressed="false"] { box-shadow: inset 0 0 0 1px var(--border-strong); }
 
 /* Aviso de límite (Registro v2 §6.2), igual que en Gasto por categoría (S7): texto con el icono de
