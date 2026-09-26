@@ -3,7 +3,9 @@ import {
   archiveCategory, unarchiveCategory, setCategoryStyle, reorderCategories, computeReorder,
   getOpenPeriod, spentByRootCategory, budgetsOfPeriod,
 } from "../repo.js";
-import { colorForCategory, iconForCategory, POOL, CURATED_ICONS, hashIndex } from "../category-colors.js";
+import {
+  colorForCategory, familyForCategory, iconForCategory, FAMILIES, CAT_ICON_KEYS, hashIndex, famClass, famToken,
+} from "../category-colors.js";
 import { budgetMap } from "../category-spend.js";
 import { fmtMoney } from "../format.js";
 import { t } from "../i18n/index.js";
@@ -11,7 +13,7 @@ import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { showConfirm } from "../modal.js";
 import { subHeaderHtml } from "../ui.js";
-import { icon } from "../icons.js";
+import { icon, catIcon as catSvg } from "../icons.js";
 
 import { escHtml, escAttr } from "../esc.js";
 
@@ -148,19 +150,44 @@ export async function renderCategorias(container, onBack) {
   const rootsOfFlow = (flow) => roots.filter((r) => r.flow === flow);
 
   // Color del dotico: si la categoría está archivada pierde su color propio (gris neutro
-  // --card2, como el "Gas" archivado del artboard) — el icono (emoji) se mantiene igual.
+  // --card2, como el "Gas" archivado del artboard) — el icono se mantiene igual.
   const dotColor = (cat) => (cat.is_archived ? "var(--card2)" : colorForCategory(cat.id, byId));
+
+  // Color de familia para el --cat del dotico (puente hasta S10): el token de barra, o gris neutro.
+  const famColor = (fam) => (fam ? `var(${famToken(fam, "b")})` : "var(--idle)");
+
+  // Muestra de familia (B-Categorias-Nueva): tinte de fondo con la barra dentro; la elegida lleva
+  // el anillo de seleccionado y el check en el tono de texto de la familia. Lee solo --ft/--fb/--fx
+  // a través de la clase .fam-<k> (C6). aria-label = el NOMBRE del color (families.*).
+  function familySwatchHtml(k, active) {
+    return `<button type="button" class="${famClass(k)}" data-cf-fam="${k}" role="radio" aria-checked="${active}" aria-label="${t(`families.${k}`)}"
+      style="aspect-ratio:1;min-width:0;border-radius:var(--r-circle);border:0;padding:0;background:var(--ft);
+      display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;
+      ${active ? "box-shadow:var(--ring-sel);color:var(--fx);" : ""}">${
+        active ? icon("check", { size: 20, width: 2.25 })
+          : `<i aria-hidden="true" style="display:block;width:44%;height:44%;border-radius:var(--r-circle);background:var(--fb);"></i>`
+      }</button>`;
+  }
+
+  // Icono elegible: neutro en reposo; el elegido, sobre el tinte de la familia actual con el trazo
+  // en su tono de texto y el anillo de seleccionado.
+  function iconPickHtml(key, active, fam) {
+    return `<button type="button" class="${active ? famClass(fam) : ""}" data-cf-icon="${key}" role="radio" aria-checked="${active}" aria-label="${t(`icons.cat.${key}`)}"
+      style="aspect-ratio:1;min-width:0;border-radius:var(--r-circle);border:0;padding:0;
+      background:${active ? "var(--ft)" : "var(--card2)"};color:${active ? "var(--fx)" : "var(--text)"};
+      display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;
+      ${active ? "box-shadow:var(--ring-sel);" : ""}">${catSvg(key, { size: 22 })}</button>`;
+  }
 
   // ========================================================================
   // Task 6: subvista de formulario (crear/editar categoría + estilo)
   // ========================================================================
 
-  /** 8 curados + el actual/sugerido primero (brief: "el heredado/sugerido primero"). Se calcula
-   *  UNA VEZ al abrir el formulario (no en cada render) — reordenar en cada pintado haría saltar
-   *  el grid cada vez que el usuario toca un icono distinto, mala UX; la selección se refleja
-   *  solo con el outline, el orden queda fijo durante toda la sesión de edición. */
+  /** Los 18 iconos de CAT_ICONS con el actual/sugerido primero. Se calcula UNA VEZ al abrir el
+   *  formulario (no en cada render): reordenar en cada pintado haría saltar la rejilla cada vez
+   *  que el usuario toca un icono distinto; el orden queda fijo durante toda la edición. */
   function buildIconOrder(current) {
-    const list = [...CURATED_ICONS];
+    const list = [...CAT_ICON_KEYS];
     const idx = list.indexOf(current);
     if (idx > 0) { list.splice(idx, 1); list.unshift(current); }
     else if (idx === -1 && current) list.unshift(current);
@@ -178,8 +205,11 @@ export async function renderCategorias(container, onBack) {
     // decisión documentada en el informe de la task).
     const wasRoot = mode === "edit" && category.parent_id === "";
     const initialName = mode === "edit" ? category.name : "";
-    const initialColor = wasRoot ? colorForCategory(category.id, byId) : POOL[hashIndex(slug(initialName))];
-    const initialIcon = wasRoot ? iconForCategory(category.id, byId) : CURATED_ICONS[0];
+    // Familia (PR-04): la resuelta si ya era raíz; si no, la sugerida por el nombre (misma ranura
+    // djb2 que antes usaba el POOL). Una categoría nueva estrena el icono de su familia sugerida y
+    // lo sigue mientras no se toque (iconTouched).
+    const initialFam = (wasRoot ? familyForCategory(category.id, byId) : null) ?? FAMILIES[hashIndex(slug(initialName))];
+    const initialIcon = wasRoot ? iconForCategory(category.id, byId) : initialFam;
 
     state.form = {
       mode,
@@ -204,9 +234,10 @@ export async function renderCategorias(container, onBack) {
       childrenCount: mode === "edit" ? (childrenByParent.get(category.id) ?? []).length : 0,
       wasRoot,
       colorTouched: wasRoot,
-      color: initialColor,
+      iconTouched: wasRoot,
+      fam: initialFam,
       icon: initialIcon,
-      initialColor,
+      initialFam,
       initialIcon,
       iconOrder: buildIconOrder(initialIcon),
       titleKey: mode === "edit" ? "categorias.form.title.edit" : (parentId ? "categorias.form.title.newChild" : "categorias.form.title.new"),
@@ -225,10 +256,10 @@ export async function renderCategorias(container, onBack) {
   // Círculo de la preview: si es raíz, el color/icono elegidos en el propio formulario; si es
   // hija, el HEREDADO de la raíz elegida en "Dentro de" (se recalcula en vivo al cambiar de chip).
   function previewStyle(form) {
-    if (!form.parentId) return { color: form.color, icon: form.icon };
+    if (!form.parentId) return { color: famColor(form.flow === "expense" ? form.fam : null), icon: form.flow === "expense" ? form.icon : "income" };
     const parent = byId[form.parentId];
     if (parent) return { color: colorForCategory(parent.id, byId), icon: iconForCategory(parent.id, byId) };
-    return { color: "var(--text-2)", icon: "▫️" };
+    return { color: "var(--text-2)", icon: "otr" };
   }
 
   // Copy propio del botón (decisión 2: sigue archivando, con el patrón destructivo §4.7) —
@@ -284,37 +315,23 @@ export async function renderCategorias(container, onBack) {
           <input type="text" id="cf-name" value="${escAttr(form.name)}" placeholder="${t("categorias.form.namePlaceholder")}">
         </label>
 
-        ${isRoot ? `
-        <div>
-          <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.iconSectionTitle")}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:10px;">
-            ${form.iconOrder.map((catIcon) => {
-              const active = form.icon === catIcon;
-              return `<button type="button" data-cf-icon="${escAttr(catIcon)}" aria-label="${t("categorias.form.pickIconAria")}" aria-pressed="${active}"
-                style="width:44px;height:44px;border-radius:var(--r-circle);box-sizing:border-box;
-                border:2px solid ${active ? "var(--accent)" : "transparent"};background:var(--card2);font-size:19px;
-                display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;
-                -webkit-tap-highlight-color:transparent;">${catIcon}</button>`;
-            }).join("")}
-          </div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:8px;">${t("categorias.form.iconHint")}</div>
-        </div>
-
+        ${isRoot && form.flow === "expense" ? `
         <div>
           <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.colorSectionTitle")}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:10px;">
-            ${POOL.map((c) => {
-              const active = form.color === c;
-              return `<button type="button" data-cf-color="${c}" aria-label="${t("categorias.form.pickColorAria")}" aria-pressed="${active}"
-                style="width:44px;height:44px;border-radius:var(--r-circle);border:0;padding:0;background:${c};
-                display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;">${
-                  active ? icon("check", { size: 20, width: 2.25, stroke: "var(--accent-ink)" }) : ""
-                }</button>`;
-            }).join("")}
+          <div role="radiogroup" aria-label="${t("categorias.form.colorSectionTitle")}" style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;">
+            ${FAMILIES.map((k) => familySwatchHtml(k, form.fam === k)).join("")}
           </div>
           <div style="font-size:11px;color:var(--text-3);margin-top:8px;">${t("categorias.form.colorHint")}</div>
         </div>
-        ` : `
+
+        <div>
+          <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.iconSectionTitle")}</div>
+          <div role="radiogroup" aria-label="${t("categorias.form.iconSectionTitle")}" style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;">
+            ${form.iconOrder.map((key) => iconPickHtml(key, form.icon === key, form.fam)).join("")}
+          </div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:8px;">${t("categorias.form.iconHint")}</div>
+        </div>
+        ` : isRoot ? "" : `
         <div>
           <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.colorIconSectionTitle")}</div>
           <div style="font-size:11px;color:var(--text-3);">${t("categorias.form.inheritNote")}</div>
@@ -330,7 +347,7 @@ export async function renderCategorias(container, onBack) {
           <div style="display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;">
             <button type="button" data-cf-parent="" style="${chipStyle(!form.parentId)}">${t("categorias.form.newRootChip")}</button>
             ${parents.map((r) => {
-              const parentIcon = iconForCategory(r.id, byId);
+              const parentIcon = catSvg(iconForCategory(r.id, byId), { size: "1em" });
               return `<button type="button" data-cf-parent="${escAttr(r.id)}" style="${chipStyle(form.parentId === r.id)}">${parentIcon} ${escHtml(r.name)}</button>`;
             }).join("")}
           </div>
@@ -365,7 +382,7 @@ export async function renderCategorias(container, onBack) {
         <div>
           <div class="section-title" style="margin-bottom:8px;">${t("categorias.form.previewTitle")}</div>
           <div style="display:flex;align-items:center;gap:14px;">
-            <div id="cf-preview-dot" class="dotico lg" style="--cat:${preview.color};flex-shrink:0;">${preview.icon}</div>
+            <div id="cf-preview-dot" class="dotico lg" style="--cat:${preview.color};flex-shrink:0;">${catSvg(preview.icon, { size: "1em" })}</div>
             <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
               <span id="cf-preview-name" style="font-size:17px;font-weight:600;color:var(--text);">${escHtml(form.name)}</span>
               <span style="font-size:13px;font-weight:500;color:var(--text-3);">${previewKindText(form)}</span>
@@ -436,17 +453,18 @@ export async function renderCategorias(container, onBack) {
       // (por qué "resuelto por defecto" se compara contra el valor resuelto AL ABRIR el
       // formulario, no contra un "sin override" que no es reconstruible desde fuera de
       // category-colors.js) en el informe de esta task.
-      if (isRootFinal) {
+      // Un ingreso no tiene familia (C9) ni selector: no se escribe estilo.
+      if (isRootFinal && form.flow === "expense") {
         if (form.wasRoot) {
-          if (form.color !== form.initialColor || form.icon !== form.initialIcon) {
-            await setCategoryStyle(id, { color: form.color, icon: form.icon });
+          if (form.fam !== form.initialFam || form.icon !== form.initialIcon) {
+            await setCategoryStyle(id, { fam: form.fam, icon: form.icon });
           }
         } else {
           // Recién creada, o recién ascendida de hija a raíz durante esta edición: no había un
           // estilo propio previo que comparar — se persiste directamente lo elegido/sugerido.
-          await setCategoryStyle(id, { color: form.color, icon: form.icon });
+          await setCategoryStyle(id, { fam: form.fam, icon: form.icon });
         }
-      } else if (form.mode === "edit" && form.wasRoot) {
+      } else if (!isRootFinal && form.mode === "edit" && form.wasRoot) {
         // Raíz que pasa a ser hija de otra: limpia cualquier override propio que quedaría
         // huérfano (ya no es raíz, no vuelve a resolverse por su propio id).
         await setCategoryStyle(id, {});
@@ -532,22 +550,26 @@ export async function renderCategorias(container, onBack) {
       state.formError = "";
       const previewName = container.querySelector("#cf-preview-name");
       if (previewName) previewName.textContent = form.name;
-      if (form.colorTouched || form.parentId) return; // hija: el circulito no depende del nombre
-      const nextColor = POOL[hashIndex(slug(form.name))];
-      if (nextColor === form.color) return;
-      form.color = nextColor;
+      if (form.colorTouched || form.parentId || form.flow !== "expense") return; // hija: el circulito no depende del nombre
+      const nextFam = FAMILIES[hashIndex(slug(form.name))];
+      if (nextFam === form.fam) return;
+      form.fam = nextFam;
+      if (!form.iconTouched) form.icon = nextFam;
+      // Se parchean nodos existentes (nunca el innerHTML del formulario entero): muestras y
+      // rejilla de iconos por atributos/clase, y el circulito de la vista previa.
       const dot = container.querySelector("#cf-preview-dot");
-      if (dot) dot.style.setProperty("--cat", form.color);
-      // Rejilla circular (Task 6.2): el activo se marca con el check DENTRO, no con un outline —
-      // se repinta el innerHTML del botón que gana/pierde el check (dos nodos), nunca el DOM
-      // entero.
-      container.querySelectorAll("[data-cf-color]").forEach((b) => {
-        const active = b.dataset.cfColor === form.color;
-        b.setAttribute("aria-pressed", String(active));
-        b.innerHTML = active ? icon("check", { size: 20, width: 2.25, stroke: "var(--accent-ink)" }) : "";
+      if (dot) {
+        dot.style.setProperty("--cat", famColor(form.fam));
+        dot.innerHTML = catSvg(form.icon, { size: "1em" });
+      }
+      container.querySelectorAll("[data-cf-fam]").forEach((b) => {
+        const active = b.dataset.cfFam === form.fam;
+        b.outerHTML = familySwatchHtml(b.dataset.cfFam, active);
       });
-      const saveBtn = container.querySelector("#cf-save");
-      if (saveBtn) saveBtn.style.background = form.color;
+      container.querySelectorAll("[data-cf-icon]").forEach((b) => {
+        b.outerHTML = iconPickHtml(b.dataset.cfIcon, b.dataset.cfIcon === form.icon, form.fam);
+      });
+      wirePickers();
     };
 
     container.querySelectorAll("[data-cf-flow]").forEach((b) => {
@@ -575,20 +597,23 @@ export async function renderCategorias(container, onBack) {
       };
     });
 
-    container.querySelectorAll("[data-cf-color]").forEach((b) => {
-      b.onclick = () => {
-        form.color = b.dataset.cfColor;
-        form.colorTouched = true; // fija la elección: deja de seguir al nombre mientras se teclea
-        renderForm();
-      };
-    });
-
-    container.querySelectorAll("[data-cf-icon]").forEach((b) => {
-      b.onclick = () => {
-        form.icon = b.dataset.cfIcon;
-        renderForm();
-      };
-    });
+    function wirePickers() {
+      container.querySelectorAll("[data-cf-fam]").forEach((b) => {
+        b.onclick = () => {
+          form.fam = b.dataset.cfFam;
+          form.colorTouched = true; // fija la elección: deja de seguir al nombre mientras se teclea
+          renderForm();
+        };
+      });
+      container.querySelectorAll("[data-cf-icon]").forEach((b) => {
+        b.onclick = () => {
+          form.icon = b.dataset.cfIcon;
+          form.iconTouched = true;
+          renderForm();
+        };
+      });
+    }
+    wirePickers();
 
     container.querySelector("#cf-save").onclick = () => save();
 
@@ -610,7 +635,7 @@ export async function renderCategorias(container, onBack) {
   // último root, se queda sin él).
   function childRowHtml(child, isLastRow) {
     const color = dotColor(child);
-    const ic = iconForCategory(child.id, byId);
+    const ic = catSvg(iconForCategory(child.id, byId), { size: "1em" });
     return `
     <div data-child-row="${escAttr(child.id)}" style="display:flex;align-items:center;min-height:56px;
       padding-left:58px;${child.is_archived ? "opacity:0.5;" : ""}${isLastRow ? "" : "border-bottom:1px solid var(--rule);"}">
@@ -652,7 +677,7 @@ export async function renderCategorias(container, onBack) {
   // groupHtml() se pintan siempre justo debajo, nunca condicionadas a un estado de expansión.
   function rootRowHtml(root, lastId) {
     const color = dotColor(root);
-    const ic = iconForCategory(root.id, byId);
+    const ic = catSvg(iconForCategory(root.id, byId), { size: "1em" });
     const kids = childrenByParent.get(root.id) ?? [];
     const isLastRow = root.id === lastId;
     return `

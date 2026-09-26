@@ -102,11 +102,13 @@ export function barRowsGeometry(rows, { width, rowH, barH, trackFill = true }) {
 }
 
 /** Barras horizontales por categoría, listas para innerHTML: un <rect> por fila, con el color
- *  de esa categoría. `rows`: el mismo shape que barRowsGeometry. */
+ *  de esa categoría. `rows`: el mismo shape que barRowsGeometry. El color va en `style="fill:…"`
+ *  y no en el atributo `fill`: desde PR-04 llega como un var() del token de su familia, y var() en un atributo de
+ *  presentación SVG no es fiable en todos los navegadores. */
 export function categoryBarsSvg(rows, opts) {
   const geo = barRowsGeometry(rows, opts);
   const height = geo.length ? Math.max(...geo.map((g) => g.y + g.h)) : 0;
-  const rects = geo.map((g) => `<rect x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="3" fill="${g.color}"></rect>`).join("");
+  const rects = geo.map((g) => `<rect x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="3" style="fill:${g.color}"></rect>`).join("");
   return `<svg width="${opts.width}" height="${height}" viewBox="0 0 ${opts.width} ${height}">${rects}</svg>`;
 }
 
@@ -122,10 +124,10 @@ export function comparisonBarsSvg(rows, { width, rowH, barH, gap = 0 }) {
     const max = Math.max(r.value, hasPrev ? r.prevValue : 0);
     const ratio = (v) => (max > 0 ? Math.min(1, Math.max(0, v / max)) : 0);
     const y = i * rowH;
-    let svg = `<rect x="0" y="${y}" width="${width * ratio(r.value)}" height="${barH}" rx="3" fill="${r.color}"></rect>`;
+    let svg = `<rect x="0" y="${y}" width="${width * ratio(r.value)}" height="${barH}" rx="3" style="fill:${r.color}"></rect>`;
     if (hasPrev) {
       const prevY = y + barH + gap;
-      svg += `<rect x="0" y="${prevY}" width="${width * ratio(r.prevValue)}" height="${prevBarH}" rx="2" fill="${r.color}" fill-opacity="0.35"></rect>`;
+      svg += `<rect x="0" y="${prevY}" width="${width * ratio(r.prevValue)}" height="${prevBarH}" rx="2" style="fill:${r.color}" fill-opacity="0.35"></rect>`;
     }
     return svg;
   }).join("");
@@ -169,7 +171,7 @@ export function trendSvg(values, color) {
     const y = TREND_H - h;
     const isLast = i === n - 1;
     const opacityAttr = isLast ? "" : ` fill-opacity="0.45"`;
-    return `<rect x="${x}" y="${y}" width="${TREND_W}" height="${h}" fill="${color}"${opacityAttr}></rect>`;
+    return `<rect x="${x}" y="${y}" width="${TREND_W}" height="${h}" style="fill:${color}"${opacityAttr}></rect>`;
   }).join("");
   return `<svg width="${width}" height="${TREND_H}" viewBox="0 0 ${width} ${TREND_H}">${bars}</svg>`;
 }

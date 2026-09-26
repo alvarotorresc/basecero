@@ -13,7 +13,7 @@ import { showConfirm } from "../modal.js";
 import { showToast } from "../toast.js";
 import { renderSuscripciones } from "./suscripciones.js";
 import { subHeaderHtml, metaHtml } from "../ui.js";
-import { icon } from "../icons.js";
+import { icon, catIcon as catSvg } from "../icons.js";
 
 import { escHtml, escAttr } from "../esc.js";
 
@@ -81,7 +81,7 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
       return `<div class="dotico" style="background:var(--surface-2);">${icon("transfer", { stroke: "var(--ink-2)" })}</div>`;
     }
     const color = colorForCategory(r.category_id, byId);
-    return `<div class="dotico" style="--cat:${color};">${iconForCategory(r.category_id, byId)}</div>`;
+    return `<div class="dotico" style="--cat:${color};">${catSvg(iconForCategory(r.category_id, byId), { size: "1em" })}</div>`;
   }
 
   // Sub de cada fila: frecuencia + día SIEMPRE visibles (la lista queda plana, sin agrupar por
@@ -357,7 +357,7 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
         <div class="chips-grid">
           ${cats.map((c) => {
             const color = colorForCategory(c.id, byId);
-            const catIcon = iconForCategory(c.id, byId);
+            const catIcon = catSvg(iconForCategory(c.id, byId), { size: "1em" });
             const active = f.categoryId === c.id;
             return `<button type="button" class="chip-v${active ? " active" : ""}" data-cat="${c.id}" style="--cat:${color};">
               <span class="chip-icon">${catIcon}</span><span>${escHtml(c.name)}</span>

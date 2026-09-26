@@ -5,7 +5,7 @@ import { nowIso, hoyISO, prevDayIso, fmtMoney, fmtDec1, appLocale } from "./form
 import { CONTRACT, insertSql } from "./contract.js";
 import { periodMonth, ruleApplies, myAmountOfRule } from "./prevision.js";
 import { resolveAccountId, sanitizeLoanMap, parseLoanMap } from "./account-defaults.js";
-import { POOL, CURATED_ICONS, CATEGORY_ICONS, parseStyle, initCategoryStyle } from "./category-colors.js";
+import { isFamily, isCatIcon, parseStyle, initCategoryStyle } from "./category-colors.js";
 import { SEED_NAMES } from "./seeds.js";
 import { t, monthShort } from "./i18n/index.js";
 import { isValidPct } from "./share-pct.js";
@@ -1188,24 +1188,23 @@ export async function reorderCategories(orderedIds) {
 // que las pantallas tengan un único punto de import para todo lo de categorías.
 export { computeReorder } from "./category-order.js";
 
-/** Color/icono de override de UNA categoría raíz (las hijas heredan el estilo de su raíz — ver
- *  category-colors.js#rootOf, no tiene sentido un estilo propio de hija). Read-modify-write de
- *  meta.category_style: lee el JSON completo, toca SOLO la clave `rootId`, reescribe entero.
- *  REEMPLAZA la entrada de `rootId` por completo (no fusiona con lo que hubiera antes de la
- *  llamada): la pantalla de edición siempre manda el estado final deseado (color+icono elegidos,
- *  o ninguno de los dos si el usuario quiere volver al color/icono por defecto) — así "si la
- *  entrada queda vacía, se elimina la clave" tiene sentido como la acción de "quitar el
- *  override". `color`/`icon` ausentes o `undefined` son válidos (sin override para ese campo);
- *  cualquier otro valor fuera de POOL / CURATED_ICONS+CATEGORY_ICONS lanza. */
-export async function setCategoryStyle(rootId, { color, icon } = {}) {
-  if (color !== undefined && !POOL.includes(color)) throw new UserError(t("errors.repo.colorUnavailable"));
-  const iconValid = icon === undefined || CURATED_ICONS.includes(icon) || Object.values(CATEGORY_ICONS).includes(icon);
-  if (!iconValid) throw new UserError(t("errors.repo.iconUnavailable"));
+/** Familia/icono de override de UNA categoría raíz (las hijas heredan el estilo de su raíz — ver
+ *  category-colors.js#rootOf; una subcategoría nunca tiene color propio, §6). Read-modify-write de
+ *  meta.category_style: lee el JSON completo (parseStyle lo devuelve ya en formato nuevo aunque
+ *  estuviera guardado en el antiguo {color, icon-emoji}), toca SOLO la clave `rootId` y reescribe
+ *  entero, así que tras cualquier llamada todo el JSON queda en formato nuevo {fam, icon}.
+ *  REEMPLAZA la entrada de `rootId` por completo (no fusiona): la pantalla de edición manda siempre
+ *  el estado final deseado, y una entrada vacía borra la clave («quitar el override»).
+ *  `fam`/`icon` ausentes o `undefined` son válidos (sin override para ese campo); `fam` fuera de
+ *  FAMILIES o `icon` fuera de CAT_ICONS lanzan. */
+export async function setCategoryStyle(rootId, { fam, icon } = {}) {
+  if (fam !== undefined && !isFamily(fam)) throw new UserError(t("errors.repo.colorUnavailable"));
+  if (icon !== undefined && !isCatIcon(icon)) throw new UserError(t("errors.repo.iconUnavailable"));
 
   const meta = await getMetaAll();
   const styleMap = parseStyle(meta.category_style);
   const entry = {};
-  if (color) entry.color = color;
+  if (fam) entry.fam = fam;
   if (icon) entry.icon = icon;
   if (Object.keys(entry).length === 0) delete styleMap[rootId];
   else styleMap[rootId] = entry;
@@ -1239,7 +1238,13 @@ export function replaceAllStmts(data) {
   // migraciones al arrancar, ver migrations.js), no de la hoja. Sin este filtro, importar una hoja
   // v1 en una BD ya migrada dejaría meta.schema_version='1' con la columna paid_by presente, y el
   // siguiente export produciría una hoja que se declara v1 llevando ya una columna v2.
-  for (const row of data.meta) if (row.key !== "schema_version") stmts.push({ sql: SQL.upsertMeta, bind: [row.key, row.value] });
+  // category_style se escribe SIEMPRE en formato nuevo {fam, icon} (PR-04): una hoja antigua trae
+  // {color:hex, icon:emoji}, que parseStyle traduce (y sanea) igual que al leerlo en el arranque.
+  for (const row of data.meta) {
+    if (row.key === "schema_version") continue;
+    const value = row.key === "category_style" ? JSON.stringify(parseStyle(row.value)) : row.value;
+    stmts.push({ sql: SQL.upsertMeta, bind: [row.key, value] });
+  }
   for (const t of tables)
     for (const row of data[t]) stmts.push({ sql: insertSql(t), bind: CONTRACT[t].cols.map((c) => row[c]) });
   return stmts;

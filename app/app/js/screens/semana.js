@@ -3,7 +3,8 @@ import {
   weekRange, daysWithCategories, maxDayTotal, weekTotals, categoryTotals, movementsOfDay,
   rangeLabelParts,
 } from "../semana-logic.js";
-import { colorForCategory, iconForCategory, DEFAULT_COLOR } from "../category-colors.js";
+import { colorForCategory, iconForCategory } from "../category-colors.js";
+import { catIcon as catSvg } from "../icons.js";
 import { relativeWidth } from "../category-spend.js";
 import { fmtMoney, moneyPartsHtml, fmtDiaCorto, hoyISO } from "../format.js";
 import { t, monthLong } from "../i18n/index.js";
@@ -36,8 +37,8 @@ function movRowHtml(r, byId, partnerName) {
   }
   const catName = byId[r.category_id]?.name ?? "";
   const uncategorized = !r.category_id;
-  const color = uncategorized ? DEFAULT_COLOR : colorForCategory(r.category_id, byId);
-  const icon = uncategorized ? "▫️" : iconForCategory(r.category_id, byId);
+  const color = uncategorized ? "var(--idle)" : colorForCategory(r.category_id, byId);
+  const icon = uncategorized ? catSvg("otr", { size: "1em" }) : catSvg(iconForCategory(r.category_id, byId), { size: "1em" });
   const title = r.merchant || catName || t("semana.uncategorized");
   const sub = uncategorized ? t("semana.uncategorized") : catName;
   const shareSuffix = !r.is_shared ? ""
@@ -60,8 +61,8 @@ function movRowHtml(r, byId, partnerName) {
 
 function chipHtml(chip, byId) {
   const catName = chip.rootId ? (byId[chip.rootId]?.name ?? "") : t("semana.uncategorized");
-  const color = chip.rootId ? colorForCategory(chip.rootId, byId) : DEFAULT_COLOR;
-  const icon = chip.rootId ? iconForCategory(chip.rootId, byId) : "▫️";
+  const color = chip.rootId ? colorForCategory(chip.rootId, byId) : "var(--idle)";
+  const icon = chip.rootId ? catSvg(iconForCategory(chip.rootId, byId), { size: "1em" }) : catSvg("otr", { size: "1em" });
   return `
     <div class="week-chip" style="--cat:${color};">
       <span>${icon}</span>

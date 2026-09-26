@@ -5,7 +5,7 @@ import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 import { metaHtml, subHeaderHtml } from "../ui.js";
-import { icon } from "../icons.js";
+import { icon, catIcon as catSvg } from "../icons.js";
 import { netOfSelected } from "../share-pct.js";
 
 import { escHtml, escAttr } from "../esc.js";
@@ -38,7 +38,7 @@ function rowHtml(r, byId, selected) {
   const cat = byId[r.category_id];
   const catName = cat?.name ?? "";
   const color = colorForCategory(r.category_id, byId);
-  const catIcon = iconForCategory(r.category_id, byId);
+  const catIcon = catSvg(iconForCategory(r.category_id, byId), { size: "1em" });
   const title = r.merchant || catName || t("common.type.expense");
   const pct = r.amount_cents ? Math.round((r.settle_cents / r.amount_cents) * 100) : 0;
   const pctKey = r.direction === "i_owe" ? "liquidar.row.myPct" : "liquidar.row.theirPct";

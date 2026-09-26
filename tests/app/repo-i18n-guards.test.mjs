@@ -51,9 +51,9 @@ test("updateCategory con flow: lanza el mensaje localizado, no ReferenceError (r
 // en esa ruta) — nunca tuvo el bug. Si esto pasa mientras los dos de arriba fallan (antes del
 // fix), confirma que el problema es el shadowing en createCategory/updateCategory, no que i18n
 // no resuelva en Node.
-test("setCategoryStyle con color inválido: ya devuelve el mensaje localizado hoy (sin `const t` local, control positivo)", async () => {
+test("setCategoryStyle con familia inválida: ya devuelve el mensaje localizado hoy (sin `const t` local, control positivo)", async () => {
   await assert.rejects(
-    () => setCategoryStyle("cualquier-id", { color: "#no-existe" }),
+    () => setCategoryStyle("cualquier-id", { fam: "no-existe" }),
     (e) => {
       assert.equal(e.message, t("errors.repo.colorUnavailable"));
       return true;
@@ -164,4 +164,16 @@ test("ningún fichero que importa el `t` de i18n declara un `const t`/`let t` lo
     if (importsI18nT(src) && localTDecl.test(src)) offenders.push(rel);
   }
   assert.deepEqual(offenders, []);
+});
+
+test("setCategoryStyle con un icono fuera de CAT_ICONS (un emoji viejo incluido): mensaje localizado antes de tocar la BD", async () => {
+  for (const icon of ["🐾", "income", "<svg>"]) {
+    await assert.rejects(
+      () => setCategoryStyle("cualquier-id", { icon }),
+      (e) => {
+        assert.equal(e.message, t("errors.repo.iconUnavailable"));
+        return true;
+      },
+    );
+  }
 });

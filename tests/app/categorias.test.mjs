@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { SQL } from "../../app/app/js/sql.js";
 import { computeReorder } from "../../app/app/js/category-order.js";
-import { POOL, CURATED_ICONS, CATEGORY_ICONS, parseStyle, initCategoryStyle } from "../../app/app/js/category-colors.js";
+import { FAMILIES, isFamily, isCatIcon, parseStyle, initCategoryStyle, familyForCategory } from "../../app/app/js/category-colors.js";
+import { CAT_ICONS } from "../../app/app/js/icons.js";
 import { t } from "../../app/app/js/i18n/index.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
@@ -359,20 +360,18 @@ function reorderCategoriesReproduced(db, orderedIds, now = T2) {
   execManyRaw(db, orderedIds.map((catId, i) => ({ sql: SQL.updateCategoryOrder, bind: [i + 1, now, catId] })));
 }
 
-/** Reproduce repo.setCategoryStyle: valida, read-modify-write de meta.category_style,
- *  reemplaza la entrada de rootId por completo, refresca initCategoryStyle. */
-function setCategoryStyleReproduced(db, rootId, { color, icon } = {}) {
-  if (color !== undefined && !POOL.includes(color)) throw new Error(t("errors.repo.colorUnavailable"));
-  const iconValid = icon === undefined || CURATED_ICONS.includes(icon) || Object.values(CATEGORY_ICONS).includes(icon);
-  if (!iconValid) throw new Error(t("errors.repo.iconUnavailable"));
+/** Reproduce repo.setCategoryStyle: valida {fam, icon} contra las listas cerradas, read-modify-write
+ *  de meta.category_style (siempre en formato nuevo), reemplaza la entrada de rootId por completo,
+ *  refresca initCategoryStyle. */
+function setCategoryStyleReproduced(db, rootId, { fam, icon } = {}) {
+  if (fam !== undefined && !isFamily(fam)) throw new Error(t("errors.repo.colorUnavailable"));
+  if (icon !== undefined && !isCatIcon(icon)) throw new Error(t("errors.repo.iconUnavailable"));
 
-  // getMetaAll()/setMeta() reales, no un SELECT/UPDATE ad-hoc: SQL.allMeta + SQL.upsertMeta,
-  // fieles al repo (aunque aquí solo haga falta la clave category_style).
   const metaRows = db.prepare(SQL.allMeta).all();
   const meta = Object.fromEntries(metaRows.map((r) => [r.key, r.value]));
   const styleMap = parseStyle(meta.category_style);
   const entry = {};
-  if (color) entry.color = color;
+  if (fam) entry.fam = fam;
   if (icon) entry.icon = icon;
   if (Object.keys(entry).length === 0) delete styleMap[rootId];
   else styleMap[rootId] = entry;
@@ -590,40 +589,51 @@ test("reorderCategories (reproducido): persiste display_order 1..n según la pos
   assert.equal(getCategoryRow(db, b).display_order, 3);
 });
 
-test("setCategoryStyle (reproducido): color en POOL + icono CURATED se guardan y refrescan initCategoryStyle", () => {
+test("setCategoryStyle (reproducido): familia + icono se guardan en formato nuevo y refrescan initCategoryStyle", () => {
   const db = openDb();
   seedMinimal(db);
-  const styleMap = setCategoryStyleReproduced(db, "cat-casa", { color: POOL[0], icon: CURATED_ICONS[0] });
+  const styleMap = setCategoryStyleReproduced(db, "cat-casa", { fam: "oci", icon: "huella" });
 
-  assert.deepEqual(styleMap["cat-casa"], { color: POOL[0], icon: CURATED_ICONS[0] });
+  assert.deepEqual(styleMap["cat-casa"], { fam: "oci", icon: "huella" });
   const raw = db.prepare("SELECT value FROM meta WHERE key='category_style'").get().value;
-  assert.deepEqual(JSON.parse(raw), { "cat-casa": { color: POOL[0], icon: CURATED_ICONS[0] } });
+  assert.deepEqual(JSON.parse(raw), { "cat-casa": { fam: "oci", icon: "huella" } });
+  assert.equal(familyForCategory("cat-casa", { "cat-casa": { id: "cat-casa", parent_id: "", flow: "expense" } }), "oci");
 });
 
-test("setCategoryStyle (reproducido): un icono ya usado como seed (CATEGORY_ICONS) también es válido, no solo los CURATED", () => {
+test("setCategoryStyle (reproducido): las 12 familias y los 18 iconos del selector son válidos", () => {
   const db = openDb();
   seedMinimal(db);
-  const seedIcon = Object.values(CATEGORY_ICONS)[0];
-  const styleMap = setCategoryStyleReproduced(db, "cat-casa", { icon: seedIcon });
-  assert.equal(styleMap["cat-casa"].icon, seedIcon);
+  for (const fam of FAMILIES) assert.doesNotThrow(() => setCategoryStyleReproduced(db, "cat-casa", { fam }));
+  for (const icon of Object.keys(CAT_ICONS)) assert.doesNotThrow(() => setCategoryStyleReproduced(db, "cat-casa", { icon }));
 });
 
-test("setCategoryStyle (reproducido): rechaza un color fuera del POOL", () => {
+test("setCategoryStyle (reproducido): rechaza una familia fuera de lista (un hex viejo tampoco vale)", () => {
   const db = openDb();
   seedMinimal(db);
-  assert.throws(() => setCategoryStyleReproduced(db, "cat-casa", { color: "#000000" }), /color/i);
+  assert.throws(() => setCategoryStyleReproduced(db, "cat-casa", { fam: "#5B9BFF" }), /color/i);
+  assert.throws(() => setCategoryStyleReproduced(db, "cat-casa", { fam: "azul" }), /color/i);
 });
 
-test("setCategoryStyle (reproducido): rechaza un icono no permitido", () => {
+test("setCategoryStyle (reproducido): rechaza un icono fuera de CAT_ICONS (un emoji viejo tampoco vale)", () => {
   const db = openDb();
   seedMinimal(db);
-  assert.throws(() => setCategoryStyleReproduced(db, "cat-casa", { icon: "🚫" }), /icono/i);
+  assert.throws(() => setCategoryStyleReproduced(db, "cat-casa", { icon: "🐾" }), /icono/i);
+  assert.throws(() => setCategoryStyleReproduced(db, "cat-casa", { icon: "income" }), /icono/i);
 });
 
-test("setCategoryStyle (reproducido): entrada vacía ({} sin color ni icono) elimina la clave del JSON", () => {
+test("setCategoryStyle (reproducido): una entrada antigua de OTRA raíz se reescribe en formato nuevo", () => {
   const db = openDb();
   seedMinimal(db);
-  setCategoryStyleReproduced(db, "cat-casa", { color: POOL[0], icon: CURATED_ICONS[0] });
+  db.prepare(SQL.upsertMeta).run("category_style", JSON.stringify({ "cat-ocio": { color: "#6B61C2", icon: "🎓" } }));
+  setCategoryStyleReproduced(db, "cat-casa", { fam: "ali" });
+  const raw = JSON.parse(db.prepare("SELECT value FROM meta WHERE key='category_style'").get().value);
+  assert.deepEqual(raw, { "cat-ocio": { fam: "sus", icon: "libro" }, "cat-casa": { fam: "ali" } });
+});
+
+test("setCategoryStyle (reproducido): entrada vacía ({} sin familia ni icono) elimina la clave del JSON", () => {
+  const db = openDb();
+  seedMinimal(db);
+  setCategoryStyleReproduced(db, "cat-casa", { fam: "ali", icon: "hoja" });
 
   const styleMap = setCategoryStyleReproduced(db, "cat-casa", {});
 
@@ -632,12 +642,12 @@ test("setCategoryStyle (reproducido): entrada vacía ({} sin color ni icono) eli
   assert.deepEqual(JSON.parse(raw), {});
 });
 
-test("setCategoryStyle (reproducido): reemplaza la entrada por completo (no fusiona con la anterior) — solo pasar icon deja el color anterior fuera", () => {
+test("setCategoryStyle (reproducido): reemplaza la entrada por completo (no fusiona con la anterior)", () => {
   const db = openDb();
   seedMinimal(db);
-  setCategoryStyleReproduced(db, "cat-casa", { color: POOL[0], icon: CURATED_ICONS[0] });
+  setCategoryStyleReproduced(db, "cat-casa", { fam: "ali", icon: "hoja" });
 
-  const styleMap = setCategoryStyleReproduced(db, "cat-casa", { icon: CURATED_ICONS[1] });
+  const styleMap = setCategoryStyleReproduced(db, "cat-casa", { icon: "libro" });
 
-  assert.deepEqual(styleMap["cat-casa"], { icon: CURATED_ICONS[1] }, "color anterior NO se conserva: la llamada manda el estado final completo");
+  assert.deepEqual(styleMap["cat-casa"], { icon: "libro" }, "la familia anterior NO se conserva: la llamada manda el estado final completo");
 });

@@ -15,7 +15,7 @@ import {
 } from "../inicio-logic.js";
 import { weekRange, daysWithCategories, maxDayTotal, weekTotals } from "../semana-logic.js";
 import { resolveAccountId } from "../account-defaults.js";
-import { icon } from "../icons.js";
+import { icon, catIcon as catSvg } from "../icons.js";
 import { t } from "../i18n/index.js";
 import { budgetMap, pctOf, relativeWidth } from "../category-spend.js";
 import { renderLiquidar } from "./liquidar.js";
@@ -79,7 +79,7 @@ function txRowHtml(r, byId, partnerName) {
   const cat = byId[r.category_id];
   const catName = cat?.name ?? "";
   const color = colorForCategory(r.category_id, byId);
-  const icon = iconForCategory(r.category_id, byId);
+  const icon = catSvg(iconForCategory(r.category_id, byId), { size: "1em" });
   const title = r.merchant || catName;
   // Un gasto que pagó la contraparte se anuncia en el sub: sin esto, en la pantalla que más se
   // mira, se lee exactamente igual que uno mío. El importe sigue siendo el ticket entero en rojo
@@ -348,7 +348,7 @@ function estaSemanaHtml(days, total, byId) {
  *  .day-seg (pista+tramos a hueso): pese al nombre no son «días», son la misma pieza genérica. */
 function categoriaRowHtml(row, byId, budgetByCategory, maxSpent) {
   const color = colorForCategory(row.root_id, byId);
-  const icon = iconForCategory(row.root_id, byId);
+  const icon = catSvg(iconForCategory(row.root_id, byId), { size: "1em" });
   const limit = budgetByCategory[row.root_id] ?? 0;
   const spent = row.spent_cents;
   const over = limit > 0 && spent > limit;

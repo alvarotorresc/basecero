@@ -3,6 +3,22 @@
    con var(); ningún valor de color, radio, sombra o tamaño de letra se escribe aquí en crudo. */
 
 /* ===== Familias de categoría: .fam-* (PR-04) ===== */
+/* La familia es un dato (category-colors.js#familyForCategory → famClass). Esta clase es el ÚNICO
+   sitio que traduce la clave a sus tokens: los componentes leen solo --ft (tinte), --fb (barra) y
+   --fx (texto sobre tinte), nunca --f-<k>-* directamente (C6). Los ingresos y «sin categoría» no
+   llevan clase: se pintan en --well (C9). */
+.fam-casa{--ft:var(--f-casa-t);--fb:var(--f-casa-b);--fx:var(--f-casa-x)} /* arena */
+.fam-ali{--ft:var(--f-ali-t);--fb:var(--f-ali-b);--fx:var(--f-ali-x)}  /* salvia */
+.fam-res{--ft:var(--f-res-t);--fb:var(--f-res-b);--fx:var(--f-res-x)}  /* mostaza */
+.fam-tra{--ft:var(--f-tra-t);--fb:var(--f-tra-b);--fx:var(--f-tra-x)}  /* cielo */
+.fam-coc{--ft:var(--f-coc-t);--fb:var(--f-coc-b);--fx:var(--f-coc-x)}  /* pizarra */
+.fam-sal{--ft:var(--f-sal-t);--fb:var(--f-sal-b);--fx:var(--f-sal-x)}  /* agua */
+.fam-sus{--ft:var(--f-sus-t);--fb:var(--f-sus-b);--fx:var(--f-sus-x)}  /* lavanda */
+.fam-oci{--ft:var(--f-oci-t);--fb:var(--f-oci-b);--fx:var(--f-oci-x)}  /* rosa */
+.fam-rop{--ft:var(--f-rop-t);--fb:var(--f-rop-b);--fx:var(--f-rop-x)}  /* ciruela */
+.fam-reg{--ft:var(--f-reg-t);--fb:var(--f-reg-b);--fx:var(--f-reg-x)}  /* arcilla */
+.fam-imp{--ft:var(--f-imp-t);--fb:var(--f-imp-b);--fx:var(--f-imp-x)}  /* oliva */
+.fam-otr{--ft:var(--f-otr-t);--fb:var(--f-otr-b);--fx:var(--f-otr-x)}  /* piedra */
 
 /* ===== Chrome: cabeceras, barra de pestañas, botones, foco y pulsación (PR-05) ===== */
 
