@@ -922,3 +922,31 @@ button.ent-set:active { transform: none; background: var(--raised); }
 /* ===== Hoja inferior, aviso y toast (PR-09) ===== */
 
 /* ===== Familias de cuenta (PR-10) ===== */
+/* Deuda (C8): la cuenta de tipo pasivo se pinta con la trama --stripe-debt (sobre ella, el icono
+   en --fx). La barra apilada ya la usa en .sbar-seg.is-debt; aquí la llevan la baldosa y lo que
+   la pantalla marque con .acc-debt. */
+.acc-debt { background: var(--stripe-debt); }
+.ent-tile.acc-debt { background: var(--stripe-debt); color: var(--fx); }
+
+/* Selector de familia (entity.js#familySwatchesHtml, B-Categorias-Nueva): 6 columnas de muestras
+   de 48, tinte con la barra de 12 abajo. Elegida: --ring-sel y check en --fx; la barra se mete 2
+   para que el anillo se vea entero. */
+.ent-fam-picker { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sp-8); }
+.ent-fam-pick {
+  position: relative;
+  min-width: 0;
+  height: 48px;
+  padding: var(--sp-8) 0 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--ft);
+  color: var(--fx);
+  cursor: pointer;
+}
+.ent-fam-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 12px; background: var(--fb); }
+.ent-fam-pick[aria-pressed="true"] { box-shadow: var(--ring-sel); }
+.ent-fam-pick[aria-pressed="true"] .ent-fam-bar { left: 2px; right: 2px; bottom: 2px; }

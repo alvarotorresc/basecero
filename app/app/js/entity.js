@@ -16,7 +16,7 @@
  *  que se inserta tal cual. format.js no se toca: su anatomía money-cents/money-cur se envuelve. */
 import { icon, catIcon, ICON_PATHS } from "./icons.js";
 import { escHtml, escAttr } from "./esc.js";
-import { famClass } from "./category-colors.js";
+import { famClass, isFamily } from "./category-colors.js";
 
 const MINUS = "−"; // «−» tipográfico: el mismo ancho que «+» en la mono tabular.
 
@@ -239,4 +239,25 @@ export function sectionHeaderHtml({ title, level = "title", count = "", tag = "h
   const lv = level === "group" ? "ent-sec-group" : "ent-sec-title";
   return `<div class="ent-sec ${lv}"><${h} class="ent-sec-text"${attrs({ id })}>${escHtml(title)}</${h}>`
     + `${count !== "" && count != null ? `<span class="ent-sec-count">${escHtml(count)}</span>` : ""}</div>`;
+}
+
+/** Selector de familia de color (§6, C8; anatomía de B-Categorias-Nueva): rejilla de 6 columnas
+ *  de muestras de 48, tinte (-t) con la barra (-b) de 12 abajo. La elegida lleva --ring-sel y el
+ *  check en --fx. Es un grupo de botones con aria-pressed (como la baldosa seleccionable): el
+ *  anillo naranja solo se permite en lo pulsado (C1). Cada muestra lleva su aria-label completo,
+ *  ya traducido por quien llama (p. ej. «Cielo, la usa Cuenta corriente»); las claves que no son
+ *  familia se descartan (nunca una clase inventada).
+ *  @param {object} o
+ *  @param {string} o.label                         aria-label del grupo. Se escapa aquí.
+ *  @param {Array<{fam:string,label:string}>} o.options
+ *  @param {string|null} [o.value]                  Familia elegida.
+ *  @param {string} [o.id]
+ *  @returns {string} HTML */
+export function familySwatchesHtml({ label, options, value = null, id = "" }) {
+  const items = (options ?? []).filter((o) => o && isFamily(o.fam)).map((o) => {
+    const on = o.fam === value;
+    return `<button type="button" class="ent-fam-pick ${famClass(o.fam)}" aria-pressed="${on ? "true" : "false"}" aria-label="${escAttr(o.label)}" data-fam="${escAttr(o.fam)}">`
+      + `${on ? icon("check", { size: 20, width: 2.2 }) : ""}<span class="ent-fam-bar" aria-hidden="true"></span></button>`;
+  }).join("");
+  return `<div class="ent-fam-picker" role="group" aria-label="${escAttr(label)}"${attrs({ id })}>${items}</div>`;
 }

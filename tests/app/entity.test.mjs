@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   tileHtml, pickTileHtml, badgeHtml, chosenCategoryHtml, filterChipHtml,
-  txRowHtml, settingRowHtml, dayHeaderHtml, sectionHeaderHtml,
+  txRowHtml, settingRowHtml, dayHeaderHtml, sectionHeaderHtml, familySwatchesHtml,
 } from "../../app/app/js/entity.js";
 
 const AMOUNT = '12,50<span class="money-cents"></span><span class="money-cur"> €</span>';
@@ -124,4 +124,26 @@ test("cabeceras de día y de sección: sin familia, sin h1, y escapan", () => {
   assert.ok(!sec.includes("fam-") && !sec.includes("<h1"));
   assert.match(sec, /<h2 class="ent-sec-text">Activas &lt;3&gt;<\/h2>/);
   assert.match(sectionHeaderHtml({ title: "Cuenta", level: "group", tag: "h3" }), /ent-sec-group"><h3/);
+});
+
+// ---------- familySwatchesHtml (selector de familia, S3) ----------
+
+test("familySwatchesHtml: grupo con aria-label y una muestra aria-pressed por familia válida", () => {
+  const html = familySwatchesHtml({
+    label: "Color de la cuenta", value: "tra", id: "fam-pick",
+    options: [{ fam: "casa", label: "Arena" }, { fam: "tra", label: "Cielo, la usa Cuenta" }, { fam: "rojo", label: "X" }],
+  });
+  assert.match(html, /role="group" aria-label="Color de la cuenta" id="fam-pick"/);
+  assert.equal((html.match(/class="ent-fam-pick /g) ?? []).length, 2, "descarta la clave que no es familia");
+  assert.doesNotMatch(html, /fam-rojo/);
+  assert.match(html, /class="ent-fam-pick fam-casa" aria-pressed="false" aria-label="Arena" data-fam="casa"/);
+  assert.match(html, /class="ent-fam-pick fam-tra" aria-pressed="true" aria-label="Cielo, la usa Cuenta" data-fam="tra"/);
+});
+
+test("familySwatchesHtml: solo la elegida lleva el check; sin radios (aria-checked) y escapa el label", () => {
+  const html = familySwatchesHtml({ label: 'A "B"', value: "casa", options: [{ fam: "casa", label: "<x>" }, { fam: "ali", label: "Salvia" }] });
+  assert.equal((html.match(/<svg/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /aria-checked|role="radio"/);
+  assert.match(html, /aria-label="A &quot;B&quot;"/);
+  assert.match(html, /aria-label="&lt;x&gt;"/);
 });
