@@ -1212,8 +1212,9 @@
 /* === fin: movimientos === */
 
 /* === pantalla: onboarding === */
-/* S13 · B-Onb-Bienvenida, B-Onb-Cuentas, B-Onb-Ajustes (y sus BD-*). Pantalla de columna con el
-   CTA abajo (margin-top:auto); tarjetas --surface con borde, como los grupos de Ajustes. */
+/* S13 · B-Onb-Bienvenida, B-Onb-Cuentas, B-Onb-Ajustes (y sus BD-*), iguales al original (Álvaro
+   2026-09-27). Pantalla de columna con el CTA abajo (margin-top:auto); tarjetas --surface con
+   borde, salvo los grupos de Ajustes, teñidos de su familia como en el original. */
 /* Sin tab bar (body.onboarding la esconde): el hueco inferior de main#screen ya no la reserva. */
 body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--sp-24)); }
 .onb-screen {
@@ -1230,8 +1231,9 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   border: 1px solid var(--border);
 }
 .onb-foot { margin-top: auto; padding-top: var(--sp-12); display: flex; flex-direction: column; }
-.onb-foot-stack { gap: var(--sp-8); }
-.onb-foot-stack .btn-secondary { width: 100%; }
+.onb-foot-stack { gap: 10px; }
+/* Importar (B-Onb-Bienvenida): secundario de 52. */
+.onb-foot-stack .btn-secondary { width: 100%; min-height: 52px; }
 .onb-hint { text-align: center; font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
 .onb-help { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 .onb-help[hidden], .onb-share[hidden], .onb-row-extra[hidden] { display: none; }
@@ -1252,15 +1254,9 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .onb-msg svg { flex: none; }
 
-/* --- Marca de Bienvenida: logo (D-impl-5) + nombre en Unbounded y la línea de producto. --- */
+/* --- Marca de Bienvenida (B-Onb-Bienvenida): el nombre en Unbounded, sin logo, y la línea de
+   producto. --- */
 .onb-brand { padding: var(--sp-12) var(--sp-4) var(--sp-8); display: flex; flex-direction: column; gap: var(--sp-8); }
-.onb-brand-row { display: flex; align-items: center; gap: var(--sp-12); }
-.onb-logo { flex: none; display: block; }
-/* Logo en tokens (D-impl-5, §Desviaciones): el fondo es el naranja de marca y la tinta la que va
-   sobre él. Excepción registrada en design-rules.test (R-C1, .onb-logo). */
-.onb-logo-bg { fill: var(--accent); }
-.onb-logo-ink { fill: var(--on-accent); }
-.onb-logo-line { fill: none; stroke: var(--on-accent); }
 .onb-wordmark {
   margin: 0;
   font-family: var(--font-display);
@@ -1270,22 +1266,22 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   letter-spacing: -.03em;
 }
 .onb-tagline { font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
-.onb-ruler { margin-top: var(--sp-8); }
+.onb-ruler { margin-top: var(--sp-8); overflow: hidden; }
 .onb-ruler-tick { stroke: var(--disp-dim); stroke-opacity: .6; }
 
-/* Promesas: tarjeta con filas de 56, baldosa hundida de 40 y filete con la sangría de la baldosa. */
+/* Promesas: tarjeta con filas de 56, baldosa hundida de 36 y filete con la sangría de la baldosa. */
 .onb-promises { list-style: none; padding: var(--sp-4) var(--sp-12); }
 .onb-promise { position: relative; min-height: 56px; display: flex; align-items: center; gap: var(--sp-12); font-size: var(--fs-15); font-weight: 600; }
 .onb-promise + .onb-promise::before {
   content: "";
   position: absolute;
   top: 0;
-  left: calc(40px + var(--sp-12));
+  left: calc(36px + var(--sp-12));
   right: 0;
   height: 1px;
   background: var(--border);
 }
-.onb-promise .ent-tile { box-shadow: var(--sh-well); }
+.onb-promise .ent-tile { width: 36px; height: 36px; box-shadow: var(--sh-well); }
 
 /* --- Barra de los pasos: atrás, progreso y «1 de 3». Cabecera del paso: título 24 + línea. --- */
 .onb-top { display: flex; align-items: center; gap: var(--sp-12); }
@@ -1302,7 +1298,7 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .onb-sub { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 
-/* --- Cuentas: tarjeta teñida por familia (C8), baldosa sobre --chip, cifra en tinta (C7). --- */
+/* --- Cuentas: tarjeta teñida por familia (C8), baldosa sobre --chip, cifra en tinta. --- */
 .onb-accs { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-8); }
 .onb-acc {
   display: flex;
@@ -1317,24 +1313,37 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 .onb-acc-line { font-size: var(--fs-12); font-weight: 500; color: var(--fx); }
 .onb-acc-amount { flex: none; font-size: var(--fs-15); font-weight: 600; color: var(--text); }
 .onb-acc-amount.is-neg { color: var(--neg); }
-/* Papelera en dim (F-23): sin fondo ni borde sobre el tinte; el rojo llega en la confirmación. */
-.onb-acc-del { background: none; border: 0; color: var(--text-dim); }
+/* Papelera: entrada destructiva en rojo (D-1, «rojo en todas partes»), sin fondo ni borde. */
+.onb-acc-del { background: none; border: 0; color: var(--neg); }
 .onb-form { padding: var(--sp-16); display: flex; flex-direction: column; gap: var(--sp-12); }
 .onb-kinds { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-8); }
-/* La deuda lleva la trama sobre su familia (C8, --stripe-debt), como en Patrimonio. */
-.onb-kinds .ent-pick[data-onb-kind="liability"] { background: var(--stripe-debt); }
+/* Baldosas de tipo de 64 (B-Onb-Cuentas). La deuda, con la trama clara del original: tinte y
+   --surface, con un filete del sólido de su familia. */
+.onb-kinds .ent-pick { min-height: 64px; }
+.onb-kinds .ent-pick[data-onb-kind="liability"] {
+  background: repeating-linear-gradient(135deg, var(--ft) 0 6px, var(--surface) 6px 9px);
+  border: 1px solid var(--fb);
+}
 .onb-form .btn-secondary { width: 100%; }
 
-/* --- Ajustes: grupos con etiqueta 13/600 dim; reparto con paso a paso y barra de dos partes. --- */
+/* --- Ajustes (B-Onb-Ajustes): grupos teñidos de su familia (Cielo y Suscripciones) con el
+   encabezado en su -x; reparto con teclas sueltas y barra de dos partes. --- */
 .onb-sec { display: flex; flex-direction: column; gap: var(--sp-8); }
+.onb-card.onb-tinted { background: var(--ft); border: 0; }
+.onb-shared .ctl-field-label { font-size: var(--fs-12); color: var(--fx); }
+.onb-shared .ctl-field { background: var(--raised); }
+.onb-share .ctl-stepper { padding: 0; gap: var(--sp-8); background: none; box-shadow: none; }
+.onb-share .ctl-stepper-btn { border: 1px solid var(--border); box-shadow: none; }
+.onb-share .ctl-stepper-value { min-width: 56px; }
 .onb-shared { padding: var(--sp-12); display: flex; flex-direction: column; gap: var(--sp-12); }
 .onb-share { display: flex; flex-direction: column; gap: var(--sp-8); }
 .onb-share-head { display: flex; align-items: center; gap: var(--sp-8); }
 .onb-share-label { flex: 1; min-width: 0; font-size: var(--fs-15); font-weight: 500; }
-.onb-share-bar { display: flex; gap: var(--sp-2); height: 8px; border-radius: var(--radius-pill); overflow: hidden; }
-.onb-share-mine { background: var(--text); }
-.onb-share-theirs { background: var(--idle); }
+.onb-share-bar { display: flex; gap: 3px; height: 10px; border-radius: var(--radius-pill); overflow: hidden; }
+.onb-share-mine { background: var(--fb); }
+.onb-share-theirs { background: var(--raised); }
 .onb-share-legend { display: flex; justify-content: space-between; gap: var(--sp-8); font-size: var(--fs-12); font-weight: 600; }
+.onb-share-you { color: var(--fx); }
 .onb-share-partner { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .onb-rows { padding: var(--sp-4); }
 .onb-row { min-height: 60px; padding: 0 var(--sp-4) 0 var(--sp-8); display: flex; align-items: center; gap: var(--sp-12); }

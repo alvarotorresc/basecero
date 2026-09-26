@@ -47,18 +47,6 @@ const PROMISES = [
 const QUICK_CURRENCIES = ["EUR", "USD", "GBP"];
 const OTHER_CURRENCY = "__other";
 
-// Logo (D-impl-5): marca, no sistema. Sin un solo color en el marcado: el fondo y la tinta los
-// pinta la sección «onboarding» de screens.css con el naranja de marca y su tinta, la única
-// lectura de naranja fuera de primario y seleccionado que admite design-rules.test (§Desviaciones).
-const LOGO_SVG = `<svg class="onb-logo" width="48" height="48" viewBox="0 0 512 512" aria-hidden="true">
-  <rect class="onb-logo-bg" width="512" height="512" rx="112"></rect>
-  <path class="onb-logo-line" d="M193.43 112.79A41 42 0 1 0 166 186A41 42 0 1 1 138.57 259.21" stroke-width="40" stroke-linecap="round"></path>
-  <rect class="onb-logo-ink" x="149" y="78" width="34" height="216" rx="17"></rect>
-  <path class="onb-logo-line" d="M373.43 112.79A41 42 0 1 0 346 186A41 42 0 1 1 318.57 259.21" stroke-width="40" stroke-linecap="round"></path>
-  <rect class="onb-logo-ink" x="329" y="78" width="34" height="216" rx="17"></rect>
-  <rect class="onb-logo-ink" x="138" y="349" width="236" height="50" rx="25"></rect>
-</svg>`;
-
 // Regla bajo la cifra del Display de Bienvenida: la aguja en el cero, marcas cada décima. Las
 // clases disp-chart-* son las del gráfico del Display (components.css); la aguja es su línea.
 const RULER_SVG = (() => {
@@ -127,11 +115,11 @@ export async function renderOnboarding(container, { onDone }) {
       + t("onboarding.welcome.importHint.mid") + `<span class="num">.bce</span>` + t("onboarding.welcome.importHint.post");
     return `
     <header class="onb-brand">
-      <div class="onb-brand-row">${LOGO_SVG}<h1 class="onb-wordmark">${escHtml(t("onboarding.welcome.brand"))}</h1></div>
+      <h1 class="onb-wordmark">${escHtml(t("onboarding.welcome.brand"))}</h1>
       <span class="onb-tagline">${escHtml(t("onboarding.welcome.tagline"))}</span>
     </header>
     ${displayHtml({
-      label: t("onboarding.welcome.displayLabel"), value: fmtMoney(0), size: "xl",
+      label: t("onboarding.welcome.displayLabel"), value: fmtMoney(0), size: 56,
       led: { state: "ok", text: t("onboarding.welcome.ready") }, slot: RULER_SVG,
     })}
     <ul class="onb-card onb-promises">
@@ -222,15 +210,15 @@ export async function renderOnboarding(container, { onDone }) {
     return `
     ${headHtml("onboarding.prefs.title", "onboarding.prefs.subtitle")}
     <section class="onb-sec">
-      ${sectionHeaderHtml({ title: t("onboarding.prefs.sharedTitle"), level: "group" })}
-      <div class="onb-card onb-shared">
+      ${sectionHeaderHtml({ title: t("onboarding.prefs.sharedTitle"), level: "group", fam: "tra" })}
+      <div class="onb-card onb-tinted onb-shared fam-tra">
         ${fieldHtml({ id: "onb-partner", label: t("onboarding.prefs.partnerLabel"), value: p.partner, placeholder: t("onboarding.prefs.partnerPlaceholder") })}
         ${shareHtml()}
       </div>
     </section>
     <section class="onb-sec">
-      ${sectionHeaderHtml({ title: t("onboarding.prefs.prefsTitle"), level: "group" })}
-      <div class="onb-card onb-rows">
+      ${sectionHeaderHtml({ title: t("onboarding.prefs.prefsTitle"), level: "group", fam: "sus" })}
+      <div class="onb-card onb-tinted onb-rows fam-sus">
         ${prefRowHtml("onb-cur-label", "onboarding.prefs.currencyLabel", segmentedHtml({
           id: "onb-cur-seg", name: t("onboarding.prefs.currencyLabel"), labelledBy: "onb-cur-label", value: curValue,
           options: [...QUICK_CURRENCIES.map((c) => ({ value: c, label: c })), { value: OTHER_CURRENCY, label: t("onboarding.prefs.currencyOther") }],
