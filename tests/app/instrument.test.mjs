@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   displayHtml, dispInkHtml, ledHtml, bentoHtml, containerHtml, stackedBarHtml, meterHtml, columnsHtml,
-  emptyStateHtml, DISPLAY_SIZES, LED_STATES,
+  emptyStateHtml, DISPLAY_SIZES, DISPLAY_PX_MIN, DISPLAY_PX_MAX, LED_STATES,
 } from "../../app/app/js/instrument.js";
 
 const CSS = readFileSync(new URL("../../app/app/css/components.css", import.meta.url), "utf8");
@@ -303,4 +303,66 @@ test("stackedBarHtml: `max` por encima de la suma deja el hueco en la pista; por
   assert.match(html, /flex-basis:8%/);
   const sin = stackedBarHtml(segs, { size: 8, legend: false, max: 1000 });
   assert.equal(sin, stackedBarHtml(segs, { size: 8, legend: false }));
+});
+
+// ---- Variantes de fidelidad al mockup (2026-09-27) ----------------------------------------
+
+test("displayHtml: size numérico pinta el px exacto del mockup con --disp-fs; fuera de rango o no entero, lanza", () => {
+  const html = displayHtml({ label: "x", value: "1 €", size: 64 });
+  assert.match(html, /class="num disp-value disp-value-free" style="--disp-fs:64px"/);
+  assert.equal(decl(".disp-value-free", "font-size"), "var(--disp-fs)");
+  assert.equal(DISPLAY_PX_MIN, 24);
+  assert.equal(DISPLAY_PX_MAX, 72);
+  assert.throws(() => displayHtml({ label: "x", value: "1", size: 12 }), /K9/);
+  assert.throws(() => displayHtml({ label: "x", value: "1", size: 48.5 }), /K9/);
+  assert.throws(() => displayHtml({ label: "x", value: "1", size: "48" }), /K9/, "un string que no es atajo sigue lanzando");
+  assert.doesNotMatch(displayHtml({ label: "x", value: "1" }), /style=/, "sin número, sin estilo en línea");
+});
+
+test("displayHtml: labelStrong pone la etiqueta a 15/600 en --disp-ink; por defecto, no", () => {
+  assert.doesNotMatch(displayHtml({ label: "x", value: "1" }), /is-strong/);
+  assert.match(displayHtml({ label: "Bar Pepe", value: "1", labelStrong: true }), /class="disp-label is-strong">Bar Pepe/);
+  assert.equal(decl(".disp-label.is-strong", "color"), "var(--disp-ink)");
+  assert.equal(decl(".disp-label.is-strong", "font-size"), "var(--fs-15)");
+});
+
+test("dispInkHtml: tone amber (--disp-text) y ok (--ok); por defecto y desconocido, --disp-ink", () => {
+  assert.equal(dispInkHtml("1 €"), '<span class="num disp-ink">1 €</span>');
+  assert.equal(dispInkHtml("1 €", { tone: "rojo" }), '<span class="num disp-ink">1 €</span>');
+  assert.equal(dispInkHtml("558,29 €", { tone: "amber" }), '<span class="num disp-ink disp-amber">558,29 €</span>');
+  assert.equal(dispInkHtml("+7 €", { tone: "ok" }), '<span class="num disp-ink disp-ok">+7 €</span>');
+  assert.equal(decl(".disp-ink.disp-amber", "color"), "var(--disp-text)");
+  assert.equal(decl(".disp-amber-fill", "background"), "var(--disp-text)");
+  assert.equal(decl(".disp-ink.disp-ok", "color"), "var(--ok)");
+  // Sigue habiendo una sola .disp-value (K4): la secundaria en ámbar no es otra cifra principal.
+  const html = displayHtml({ label: "x", value: "1", footHtml: dispInkHtml("2", { tone: "amber" }) });
+  assert.equal(count(html, /\bdisp-value\b(?!-)/g), 1);
+});
+
+test("bentoHtml: valueFam pinta la cifra en -x y valueSize:\"l\" la sube a 30; por defecto, 20 en tinta", () => {
+  const base = bentoHtml({ label: "Ahorras", value: "47 %", fam: "ali" });
+  assert.match(base, /class="num bento-figure">47 %/);
+  const html = bentoHtml({ label: "Ahorras", value: "47 %", fam: "ali", valueFam: true, valueSize: "l" });
+  assert.match(html, /class="num bento-figure is-l is-fam-ink">47 %/);
+  assert.doesNotMatch(bentoHtml({ label: "x", value: "1", valueFam: true }), /is-fam-ink/, "sin familia no hay -x que pintar");
+  assert.equal(decl(".bento-figure.is-l", "font-size"), "var(--fs-30)");
+  assert.equal(decl(".bento-figure.is-fam-ink", "color"), "var(--fx)");
+});
+
+test("stackedBarHtml: idle con fam pinta la barra de esa familia y deja la leyenda en dim («Resto», B-Home)", () => {
+  const html = stackedBarHtml([{ fam: "casa", value: 3, name: "Casa" }, { idle: true, fam: "otr", value: 1, name: "Resto" }]);
+  assert.match(html, /class="sbar-seg fam-otr"/);
+  assert.match(html, /class="sbar-key is-rest"><span class="sbar-muestra fam-otr"/);
+  const solo = stackedBarHtml([{ fam: "casa", value: 3, name: "Casa" }, { idle: true, value: 1, name: "Resto" }]);
+  assert.match(solo, /class="sbar-seg is-idle"/, "sin fam, --idle como siempre");
+});
+
+test("columnsHtml: restFam pinta los días que no son hoy en la barra de esa familia; por defecto, --idle", () => {
+  const days = [{ label: "L", value: 2 }, { label: "D", value: 5, today: true }];
+  assert.doesNotMatch(columnsHtml(days), /has-rest-fam/);
+  const html = columnsHtml(days, { restFam: "otr" });
+  assert.match(html, /class="col has-rest-fam fam-otr"/);
+  assert.match(html, /class="col is-today"/, "hoy no cambia");
+  assert.doesNotMatch(columnsHtml(days, { restFam: "nada" }), /has-rest-fam/);
+  assert.equal(decl(".col.has-rest-fam .col-bar", "background"), "var(--fb)");
 });
