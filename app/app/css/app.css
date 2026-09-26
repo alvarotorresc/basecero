@@ -826,22 +826,6 @@ body.subscreen main#screen {
 .day-bar { width: 100%; height: 8px; border-radius: var(--r-pill); background: var(--surface-2); overflow: hidden; display: flex; }
 .day-seg { height: 100%; background: var(--cat, var(--accent)); }
 
-/* Chip de categoría de «Dónde se ha ido esta semana» (Semana): tinte al 16% del color, mismo
-   patrón que .chip-icon/.chip-v.active. */
-.week-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 38px;
-  border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--cat, var(--ink-2)) 16%, transparent);
-  padding: 0 13px;
-  color: var(--cat, var(--ink-2));
-  font-size: 13px;
-  font-weight: 500;
-}
-.week-chip .num { font-weight: 600; }
-
 /* Grid de 3 columnas separadas por un filete de 1px (Inicio v2, I1: Gastado/Ingresos/Ahorrado).
    El filete es el propio fondo del grid asomando por el gap de 1px entre celdas — sin bordes. */
 .stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--hairline); margin-top: var(--gap-section); }
@@ -1020,9 +1004,6 @@ body.subscreen main#screen {
    con la elipsis de .tx-sub cuando el nombre del día es largo. El artboard deja que la línea
    quepa entera — modificador solo para esta pantalla. */
 .tx-sub.wrap { overflow: visible; text-overflow: unset; white-space: normal; }
-/* Semana (§9.2): el nombre de día sale de i18n.weekdaysLong en minúscula porque esa clave la usan
-   también frases donde el día va en medio de una oración; aquí se capitaliza en el markup. */
-.week-day-name { text-transform: capitalize; }
 /* Etiqueta de proyecto elegida (SISTEMA.md §4.16bis, Registro): una etiqueta es transversal a las
    categorías y no tiene color propio — chip neutro, nunca el lima de .chip.active. */
 .chip.is-tag {

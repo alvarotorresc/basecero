@@ -188,11 +188,18 @@ export const ES = {
       sameMonth: "Del {from} al {to} de {month}",
       crossMonth: "Del {from} de {fromMonth} al {to} de {toMonth}",
     },
-    avgPerDay: "media al día",
-    today: "Hoy",
-    noSpend: "sin gastos",
+    display: { label: "Gastado esta semana" },
+    avgPerDay: "Media al día",
+    chart: { label: "Gasto por día, apilado por categoría", avg: "media" },
+    day: {
+      name: "{weekday} {day}",
+      today: "Hoy, {day}",
+      aria: "{day}, {amount}",
+      ariaToday: "{day}, hoy, {amount}",
+    },
+    noSpend: "Sin gastos",
     uncategorized: "Sin categoría",
-    where: { title: "Dónde se ha ido esta semana" },
+    where: { title: "Dónde se ha ido" },
     empty: "Esta semana no hay nada apuntado todavía.",
     emptyPeriod: "En este periodo aún no hay nada apuntado esta semana.",
     error: { load: "No se pudo cargar la semana: {error}" },
@@ -396,7 +403,9 @@ export const ES = {
       // límite") se borren en este mismo commit: son la lectura antigua que se aparta del artboard.
       ofBudget: "de {budget} presupuestados",
       noLimits: "Ninguna categoría tiene límite este periodo",
+      dayMark: "día {day}",
     },
+    noSpend: "Sin gasto: {names}",
     byCategory: {
       title: "Por categoría",
       empty: "No tienes ninguna categoría de gasto activa.",
@@ -408,11 +417,10 @@ export const ES = {
       prev: "{name} {amount}",
     },
     row: {
-      // Swap (§9.7): el € ya es la cifra destacada de la cabecera de fila, así que este pie deja
-      // de repetirlo — de "{spent} de {limit}" a solo "de {limit}".
+      // Pie de la fila (B-GastoCategoria): el límite puesto, o el exceso si se ha pasado (sustituye
+      // a la línea del límite: no se pintan las dos a la vez).
+      limit: "límite {limit}",
       ofLimit: "de {limit}",
-      // Solo cuando se ha pasado del límite: el exceso, ya calculado, para no tener que restar de
-      // cabeza. Sustituye a la línea ofLimit entera (no se pintan las dos a la vez).
       overBy: "superado por {over}",
     },
     detail: {

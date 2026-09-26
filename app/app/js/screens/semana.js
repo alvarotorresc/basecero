@@ -3,84 +3,67 @@ import {
   weekRange, daysWithCategories, maxDayTotal, weekTotals, categoryTotals, movementsOfDay,
   rangeLabelParts,
 } from "../semana-logic.js";
-import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { catIcon as catSvg } from "../icons.js";
-import { relativeWidth } from "../category-spend.js";
-import { fmtMoney, moneyPartsHtml, fmtDiaCorto, hoyISO } from "../format.js";
+import { familyForCategory, iconForCategory } from "../category-colors.js";
+import { fmtMoney, fmtMoneyParts, moneyPartsHtml, fmtDiaIni, hoyISO } from "../format.js";
 import { t, monthLong } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 import { openTxDetail } from "../open-tx.js";
 import { subHeaderHtml } from "../ui.js";
+import { displayHtml, dispInkHtml, columnsHtml, meterHtml, containerHtml, emptyStateHtml } from "../instrument.js";
+import { txRowHtml } from "../entity.js";
 
 import { escHtml, escAttr } from "../esc.js";
 
-const chevronSvg = (open, color) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="${color}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${open ? "M19 14.5 12 8l-7 6.5" : "M5 9.5 12 16l7-6.5"}"></path></svg>`;
-
+const dayNum = (iso) => new Date(iso + "T12:00:00").getDate();
 // Nombre largo del día de semana vía i18n.weekdaysLong (mismo índice 0=domingo que getDay()).
 const weekdayLong = (iso) => t("i18n.weekdaysLong." + new Date(iso + "T12:00:00").getDay());
+const capitalize = (s) => (s ? s.charAt(0).toLocaleUpperCase() + s.slice(1) : s);
+/** «domingo 13» (con mayúscula inicial si abre la frase: «Martes 8»). */
+const dayName = (iso) => t("semana.day.name", { weekday: weekdayLong(iso), day: dayNum(iso) });
+/** Cifra de la columna elegida SIN símbolo de moneda (B-Semana: «168,90»): con él no cabe en 1/7
+ *  del ancho. main+cents de fmtMoneyParts, así no se reimplementa el locale. */
+const bareAmount = (cents) => { const p = fmtMoneyParts(cents); return p.main + p.cents; };
 
-/** Fila de movimiento dentro de un día desplegado (SISTEMA §4.4): mismo patrón visual que
- *  inicio.js#txRowHtml/movimientos.js#movRowHtml, pero SIEMPRE un <button> — aquí toda fila abre
- *  el detalle (decisión 12/§7), nunca hay una versión estática. */
+/** Fila de movimiento del día elegido (entity.js#txRowHtml, B-Semana): SIEMPRE un botón — toda
+ *  fila abre el detalle (decisión 12/§7). Importe en valor absoluto; el signo va por `sign`. */
 function movRowHtml(r, byId, partnerName) {
   if (r.type === "adjustment") {
-    const isNeg = r.amount_cents < 0;
-    return `
-    <button type="button" class="tx-row" data-tx="${escAttr(r.id)}" style="width:100%;text-align:left;background:none;border:0;padding:10px 0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-      <div class="dotico" style="--cat:var(--surface-2);">⚖️</div>
-      <div class="tx-body">
-        <div class="tx-title">${t("common.type.adjustment")}</div>
-        <div class="tx-sub">${escHtml(r.merchant || r.note || "")}</div>
-      </div>
-      <div class="tx-amount num ${isNeg ? "negative" : "positive"}">${isNeg ? "-" : "+"}${moneyPartsHtml(Math.abs(r.amount_cents))}</div>
-    </button>`;
+    // Sin familia (C11) y con un icono de UI: el ajuste no es una categoría.
+    return txRowHtml({
+      fam: null, icon: "pencil", title: t("common.type.adjustment"), line2: r.merchant || r.note || "",
+      amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)), sign: r.amount_cents < 0 ? "expense" : "income",
+      data: { tx: r.id },
+    });
   }
-  const catName = byId[r.category_id]?.name ?? "";
-  const uncategorized = !r.category_id;
-  const color = uncategorized ? "var(--idle)" : colorForCategory(r.category_id, byId);
-  const icon = uncategorized ? catSvg("otr", { size: "1em" }) : catSvg(iconForCategory(r.category_id, byId), { size: "1em" });
-  const title = r.merchant || catName || t("semana.uncategorized");
-  const sub = uncategorized ? t("semana.uncategorized") : catName;
-  const shareSuffix = !r.is_shared ? ""
+  const cat = r.category_id ? byId[r.category_id] : null;
+  const parent = cat?.parent_id ? byId[cat.parent_id] : null;
+  const path = !cat ? t("semana.uncategorized") : parent ? `${parent.name} › ${cat.name}` : cat.name;
+  const isExpense = r.type === "expense";
+  // C9: los ingresos y «sin categoría» van sin familia (--well, icono en tinta).
+  const fam = isExpense && cat ? familyForCategory(r.category_id, byId) : null;
+  const shareNote = !r.is_shared ? ""
     : r.paid_by === "partner"
       ? t("movimientos.row.partnerPaid", { name: partnerName || t("movimientos.shared.fallbackName"), amount: fmtMoney(r.my_amount_cents) })
       : t("common.myPartSuffix", { amount: fmtMoney(r.my_amount_cents) });
-  const isExpense = r.type === "expense";
-  const amountClass = isExpense ? "negative" : "positive";
-  const sign = isExpense ? "-" : "+";
-  return `
-  <button type="button" class="tx-row" data-tx="${escAttr(r.id)}" style="width:100%;text-align:left;background:none;border:0;padding:10px 0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-    <div class="dotico" style="--cat:${color};">${icon}</div>
-    <div class="tx-body">
-      <div class="tx-title">${escHtml(title)}</div>
-      <div class="tx-sub">${escHtml(sub)}${escHtml(shareSuffix)}</div>
-    </div>
-    <div class="tx-amount num ${amountClass}">${sign}${moneyPartsHtml(r.amount_cents)}</div>
-  </button>`;
+  return txRowHtml({
+    fam, icon: cat ? iconForCategory(r.category_id, byId) : (isExpense ? "otr" : ""),
+    title: r.merchant || cat?.name || t("semana.uncategorized"), line2: path,
+    amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)), sign: isExpense ? "expense" : "income",
+    // La nota va debajo de la cifra: sin el separador de prosa con el que se concatenaba al nombre.
+    amountNote: shareNote.replace(/^,\s*/, ""),
+    data: { tx: r.id },
+  });
 }
 
-function chipHtml(chip, byId) {
-  const catName = chip.rootId ? (byId[chip.rootId]?.name ?? "") : t("semana.uncategorized");
-  const color = chip.rootId ? colorForCategory(chip.rootId, byId) : "var(--idle)";
-  const icon = chip.rootId ? catSvg(iconForCategory(chip.rootId, byId), { size: "1em" }) : catSvg("otr", { size: "1em" });
-  return `
-    <div class="week-chip" style="--cat:${color};">
-      <span>${icon}</span>
-      <span>${escHtml(catName)}</span>
-      <span class="num">${escHtml(fmtMoney(chip.cents))}</span>
-    </div>`;
-}
-
-/** Pantalla «Semana»: línea de tiempo día a día de la ventana de 7 días de semana-logic.js, con el
- *  día de hoy abierto por defecto y un acordeón de uno (Semana.dc.html). Misma firma que
- *  renderGastoPorCategoria (load/render/wire + el mismo tratamiento de error y de periodo cerrado
- *  en otra pestaña) — ver spec §8 y el patrón real en gasto-por-categoria.js.
- *  `openDay` (revisión de código): el día que hay que dejar desplegado al pintar, en vez de
- *  hoyISO() por defecto — lo usa el onBack de abrir un detalle (más abajo) para que volver de un
- *  movimiento no cierre el día que el usuario tenía abierto. */
+/** Pantalla «Semana» (B-Semana): Display con el total y la media, columnas apiladas por familia
+ *  de los 7 días de semana-logic.js con los días pulsables debajo, el día elegido con sus
+ *  movimientos y «Dónde se ha ido» como medidores con nombre (la leyenda de las columnas, C12).
+ *  Misma firma que renderGastoPorCategoria (load/render/wire + el mismo tratamiento de error y de
+ *  periodo cerrado en otra pestaña).
+ *  `openDay`: el día que hay que dejar elegido al pintar, en vez de hoyISO() — lo usa el onBack de
+ *  abrir un detalle para que volver de un movimiento no cambie el día que el usuario miraba. */
 export async function renderSemana(container, onBack, { openDay } = {}) {
-  const state = { open: openDay ?? hoyISO() };
-  let period = null;
+  const state = { day: openDay ?? hoyISO(), focusDay: false };
   let days = [];
   let total = { totalCents: 0, avgCents: 0 };
   let chips = [];
@@ -91,10 +74,10 @@ export async function renderSemana(container, onBack, { openDay } = {}) {
   let hasHistory = false;
 
   async function load() {
-    period = await getOpenPeriod();
+    const period = await getOpenPeriod();
     if (!period) return false;
-    // MISMA ventana que usa Inicio (semana-logic.js#weekRange): la espina de las dos pantallas no
-    // puede leer fechas distintas.
+    // MISMA ventana que usa Inicio (semana-logic.js#weekRange): las dos pantallas no pueden leer
+    // fechas distintas.
     const week = weekRange(hoyISO());
     const [rootRows, rows, cats, meta, recentDates] = await Promise.all([
       spentByDayAndRootCategory(period.id, week.start, week.end),
@@ -110,118 +93,108 @@ export async function renderSemana(container, onBack, { openDay } = {}) {
     byId = cats;
     partnerName = (meta.partner_name || "").trim();
     // SIN filtro de periodo (mismo criterio que inicio.js#hasHistory): distingue un periodo recién
-    // abierto de un usuario que nunca ha apuntado nada, para no repetir aquí el "empty" genérico.
+    // abierto de un usuario que nunca ha apuntado nada.
     hasHistory = recentDates.length > 0;
     const parts = rangeLabelParts(week.start, week.end);
     rangeLabel = parts.sameMonth
       ? t("semana.range.sameMonth", { from: parts.fromDay, to: parts.toDay, month: monthLong(parts.fromMonth) })
       : t("semana.range.crossMonth", { from: parts.fromDay, fromMonth: monthLong(parts.fromMonth), to: parts.toDay, toMonth: monthLong(parts.toMonth) });
+    // Un día elegido fuera de la ventana (volver de un detalle al día siguiente) cae en hoy.
+    if (!days.some((d) => d.date === state.day)) state.day = days[days.length - 1]?.date ?? hoyISO();
     return true;
   }
 
-  function dayRowHtml(day, isLast) {
-    const hoy = day.date === hoyISO();
-    const dayMovs = movsByDate.get(day.date) ?? [];
-    const hasMovs = dayMovs.length > 0;
-    const hasBar = day.segments.length > 0;
-    const isOpen = state.open === day.date;
+  const rootName = (rootId) => (rootId ? byId[rootId]?.name : "") || t("semana.uncategorized");
+  const rootFam = (rootId) => (rootId ? familyForCategory(rootId, byId) : null);
+
+  /** Columnas apiladas (instrument.js#columnsHtml con `segments`) + línea discontinua de la media +
+   *  los 7 días pulsables. La columna elegida lleva su cifra encima y se hunde en un pozo. */
+  function chartHtml() {
     const max = maxDayTotal(days);
-
-    const nodeStyle = hoy
-      ? "width:12px;height:12px;background:var(--accent);box-shadow:0 0 0 4px var(--accent-tint);"
-      : hasBar
-        ? `width:10px;height:10px;background:${colorForCategory(day.dominantRootId || "", byId)};`
-        : "width:8px;height:8px;background:var(--bg);border:1px solid var(--hairline-strong);box-sizing:border-box;";
-    const railHtml = `
-      <div class="spine-rail">
-        <div class="spine-line"${isLast && !isOpen ? ' style="height:50%;"' : ""}></div>
-        <div class="spine-node" style="${nodeStyle}"></div>
-      </div>`;
-    const dayNameHtml = `
-      <span class="week-day-name" style="font-size:14px;font-weight:${hoy ? "600" : "500"};color:${hoy ? "var(--accent)" : (hasMovs ? "var(--ink)" : "var(--ink-3)")};">${hoy ? t("semana.today") : escHtml(weekdayLong(day.date))}</span>
-      <span class="num" style="font-size:12px;font-weight:500;color:var(--ink-3);">${escHtml(fmtDiaCorto(day.date))}</span>`;
-
-    // Día sin NINGÚN movimiento: no se despliega, sin barra — «sin gastos» (decisión de la spec).
-    if (!hasMovs) {
-      return `
-      <div class="spine-row" style="min-height:52px;">
-        ${railHtml}
-        <div style="flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 0;">
-          <div style="display:flex;align-items:baseline;gap:9px;">${dayNameHtml}</div>
-          <span style="font-size:13px;font-weight:500;color:var(--ink-3);">${t("semana.noSpend")}</span>
-        </div>
-      </div>`;
-    }
-
-    const barHtml = hasBar ? `
-      <div class="day-bar">
-        ${day.segments.map((seg) => `<div class="day-seg" style="width:${relativeWidth(seg.cents, max)}%;--cat:${colorForCategory(seg.rootId || "", byId)};"></div>`).join("")}
-      </div>` : "";
-    const amountHtml = `<span class="num" style="font-size:15px;font-weight:${hoy ? "600" : "500"};color:var(--ink);">${escHtml(fmtMoney(day.totalCents))}</span>`;
-
-    // Un día con movimientos SIEMPRE se puede abrir, aunque su neto categorizado sea 0 o negativo
-    // (más devuelto que gastado): esconder ese movimiento sería peor que la asimetría con la barra
-    // (decisión 11 de la spec).
-    const nestedHtml = isOpen ? `
-      <div class="spine-row">
-        <div class="spine-rail"><div class="spine-line" style="height:100%;"></div></div>
-        <div style="flex:1;min-width:0;display:flex;flex-direction:column;">
-          ${dayMovs.map((r) => movRowHtml(r, byId, partnerName)).join("")}
-        </div>
-      </div>` : "";
-
+    const cols = days.map((d) => {
+      const selected = d.date === state.day;
+      const positive = d.segments.reduce((s, x) => s + x.cents, 0);
+      return {
+        label: fmtDiaIni(d.date),
+        name: dayName(d.date),
+        value: positive,
+        selected,
+        amount: selected && d.totalCents > 0 ? bareAmount(d.totalCents) : "",
+        segments: d.segments.map((s) => ({ fam: rootFam(s.rootId), value: s.cents, name: rootName(s.rootId) })),
+      };
+    });
+    // La media se dibuja a la misma escala que las columnas (tope 76 % de columnsHtml).
+    const avgAt = max > 0 && total.avgCents > 0 ? Math.min(76, Math.round((total.avgCents / max) * 76)) : 0;
+    const today = hoyISO();
+    const dayBtns = days.map((d) => {
+      const selected = d.date === state.day;
+      const name = capitalize(dayName(d.date));
+      const amount = fmtMoney(d.totalCents);
+      const aria = d.date === today ? t("semana.day.ariaToday", { day: name, amount }) : t("semana.day.aria", { day: name, amount });
+      return `<button type="button" class="sem-daybtn" data-day="${escAttr(d.date)}" aria-pressed="${selected ? "true" : "false"}" aria-label="${escAttr(aria)}">`
+        + `${escHtml(fmtDiaIni(d.date))}<span class="num">${dayNum(d.date)}</span></button>`;
+    }).join("");
     return `
-      <button type="button" class="spine-row" data-day="${escAttr(day.date)}" style="min-height:52px;width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-        ${railHtml}
-        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px;padding:12px 0;">
-          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
-            <div style="display:flex;align-items:baseline;gap:9px;">${dayNameHtml}</div>
-            <div style="display:flex;align-items:center;gap:10px;">${amountHtml}${chevronSvg(isOpen, hoy ? "var(--accent)" : "var(--ink-3)")}</div>
-          </div>
-          ${barHtml}
+      <section class="sem-chart" aria-label="${escAttr(t("semana.chart.label"))}">
+        <div class="sem-plot"${avgAt ? ` style="--avg:${avgAt}%"` : ""}>
+          ${avgAt ? `<span class="sem-avg-line" aria-hidden="true"></span><span class="sem-avg-label" aria-hidden="true">${escHtml(t("semana.chart.avg"))}</span>` : ""}
+          ${columnsHtml(cols, { label: t("semana.chart.label"), labels: false })}
         </div>
-      </button>
-      ${nestedHtml}`;
+        <div class="sem-days">${dayBtns}</div>
+      </section>`;
+  }
+
+  /** Tarjeta del día elegido, con la muesca apuntando a su columna (--i = índice del día). */
+  function dayCardHtml() {
+    const i = Math.max(0, days.findIndex((d) => d.date === state.day));
+    const day = days[i];
+    const movs = movsByDate.get(day.date) ?? [];
+    const name = dayName(day.date);
+    const title = day.date === hoyISO() ? t("semana.day.today", { day: name }) : capitalize(name);
+    const rows = movs.map((r) => movRowHtml(r, byId, partnerName)).join('<div class="sem-day-div" aria-hidden="true"></div>');
+    return `
+      <section class="sem-day" style="--i:${i}">
+        <span class="sem-day-notch" aria-hidden="true"></span>
+        <div class="sem-day-head">
+          <h2 class="sem-day-title">${escHtml(title)}</h2>
+          ${movs.length ? `<span class="num sem-day-total">${moneyPartsHtml(day.totalCents)}</span>` : ""}
+        </div>
+        ${movs.length ? `<div class="sem-day-rows">${rows}</div>` : `<p class="sem-day-empty">${escHtml(t("semana.noSpend"))}</p>`}
+      </section>`;
+  }
+
+  /** «Dónde se ha ido»: neto por raíz de la semana como medidores con nombre, relativos a la que
+   *  más se llevó. Es la leyenda de las columnas apiladas: mismo color de familia y su nombre. */
+  function whereHtml() {
+    if (!chips.length) return "";
+    const top = chips[0].cents;
+    const body = `<div class="sem-where">${chips.map((c) => `
+      <div class="sem-where-row">
+        <div class="sem-where-head">
+          <span class="sem-where-name">${escHtml(rootName(c.rootId))}</span>
+          <span class="num sem-where-amt">${escHtml(fmtMoney(c.cents))}</span>
+        </div>
+        ${meterHtml({ fam: rootFam(c.rootId), value: c.cents, max: top })}
+      </div>`).join("")}</div>`;
+    return containerHtml({ title: t("semana.where.title"), body });
   }
 
   function render() {
-    // Sin ningún movimiento en la ventana de 7 días de ESTE periodo (día 1-2 de un periodo nuevo
-    // incluido): antes esto colapsaba la pantalla entera al banner de vacío, perdiendo la espina,
-    // el total y la media aunque hubiera historial de periodos anteriores. Ahora se pinta SIEMPRE
-    // el bloque completo (con ceros — cada día sin movimientos ya se pinta "sin gastos" vía
-    // dayRowHtml, y sin gasto categorizado los chips simplemente no aparecen) y el banner se añade
-    // ENCIMA solo para explicar el porqué: `semana.emptyPeriod` con historial en otro periodo,
-    // `semana.empty` (el genérico de siempre) para quien no ha apuntado nada nunca.
+    // Sin ningún movimiento en la ventana de 7 días de ESTE periodo se pinta igual el Display (a
+    // cero) y las columnas vacías, y el estado vacío ocupa el sitio del día: `semana.emptyPeriod`
+    // con historial en otro periodo, `semana.empty` para quien no ha apuntado nada nunca.
     const weekEmpty = [...movsByDate.values()].every((m) => m.length === 0);
-    const emptyMsg = hasHistory ? t("semana.emptyPeriod") : t("semana.empty");
     container.innerHTML = `
-      ${subHeaderHtml({ id: "semana-back", title: t("semana.title") })}
-
-      ${weekEmpty ? `<div class="banner-aviso" style="margin-bottom:20px;">${emptyMsg}</div>` : ""}
-
-      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:26px;">
-        <div style="display:flex;flex-direction:column;gap:5px;">
-          <span style="font-size:13px;font-weight:500;color:var(--ink-3);">${rangeLabel}</span>
-          <div class="num" style="font:var(--t-figure-xl);letter-spacing:-.015em;">${moneyPartsHtml(total.totalCents)}</div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;padding-bottom:2px;">
-          <span style="font-size:12px;font-weight:500;color:var(--ink-3);">${t("semana.avgPerDay")}</span>
-          <span class="num" style="font-size:15px;font-weight:600;">${escHtml(fmtMoney(total.avgCents))}</span>
-        </div>
-      </div>
-
-      <div class="spine">
-        ${days.map((d, i) => dayRowHtml(d, i === days.length - 1)).join("")}
-      </div>
-
-      ${chips.length > 0 ? `
-      <div style="margin:30px 0 12px 0;">
-        <span style="font-size:15px;font-weight:600;color:var(--ink);">${t("semana.where.title")}</span>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;">
-        ${chips.map((c) => chipHtml(c, byId)).join("")}
-      </div>` : ""}
-    `;
+      <div class="sem">
+        ${subHeaderHtml({ id: "semana-back", title: t("semana.title"), subtitle: rangeLabel })}
+        ${displayHtml({
+          label: t("semana.display.label"), value: fmtMoney(total.totalCents), size: "l",
+          slot: `<div class="sem-avg"><span>${escHtml(t("semana.avgPerDay"))}</span>${dispInkHtml(fmtMoney(total.avgCents))}</div>`,
+        })}
+        ${chartHtml()}
+        ${weekEmpty ? emptyStateHtml({ title: hasHistory ? t("semana.emptyPeriod") : t("semana.empty"), rows: 2 }) : dayCardHtml()}
+        ${whereHtml()}
+      </div>`;
     wire();
   }
 
@@ -229,13 +202,19 @@ export async function renderSemana(container, onBack, { openDay } = {}) {
     container.querySelector("#semana-back").onclick = () => onBack();
     container.querySelectorAll("[data-day]").forEach((el) => {
       el.onclick = () => {
-        state.open = state.open === el.dataset.day ? null : el.dataset.day;
+        state.day = el.dataset.day;
+        state.focusDay = true;
         render();
       };
     });
     container.querySelectorAll("[data-tx]").forEach((el) => {
-      el.onclick = () => openTxDetail(container, el.dataset.tx, () => renderSemana(container, onBack, { openDay: state.open }));
+      el.onclick = () => openTxDetail(container, el.dataset.tx, () => renderSemana(container, onBack, { openDay: state.day }));
     });
+    // K12: el innerHTML se lleva el foco al <body>; se devuelve al día que se acaba de pulsar.
+    if (state.focusDay) {
+      state.focusDay = false;
+      container.querySelector(`[data-day="${state.day}"]`)?.focus();
+    }
   }
 
   try {
