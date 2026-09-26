@@ -287,8 +287,10 @@ test("hucha creada por createGoal: con su objetivo pausado (fuera de listGoals) 
   assert.equal(familyForAccount(hucha, {}, []), "ali");
 });
 
-test("repo.createGoal guarda imp como override de la hucha que crea", () => {
+test("repo.createGoal guarda imp como override de la hucha que crea, en el mismo execMany", () => {
   const src = readFileSync(new URL("../../app/app/js/repo.js", import.meta.url), "utf8");
   const body = src.slice(src.indexOf("export async function createGoal"), src.indexOf("export async function updateGoal"));
-  assert.match(body, /setAccountFamily\(accountId, "imp"\)/);
+  assert.match(body, /styleMap\[accountId\] = \{ fam: "imp" \}/);
+  const push = body.indexOf('bind: ["account_style"');
+  assert.ok(push > 0 && push < body.indexOf("await execMany(stmts)"), "el upsert de account_style entra en stmts antes del execMany");
 });

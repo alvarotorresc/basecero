@@ -1038,11 +1038,17 @@ export async function createGoal(fields) {
       fields.targetDate ?? "", accountId, fields.categoryId ?? "", isActive, now, now,
     ],
   });
+  // La hucha nueva se guarda con la familia imp como override (el mismo dato que escribe
+  // setAccountFamily en el onboarding): listGoals solo trae objetivos activos, así que sin override
+  // una hucha cuyo objetivo se pausa volvería al ali por defecto de savings. Va en el MISMO
+  // execMany que la cuenta y el objetivo: si fallara aparte, el formulario diría «no se pudo
+  // guardar» con las dos filas ya escritas, y reintentar las duplicaría.
+  if (newHucha) {
+    const styleMap = parseAccountStyle((await getMetaAll()).account_style);
+    styleMap[accountId] = { fam: "imp" };
+    stmts.push({ sql: SQL.upsertMeta, bind: ["account_style", JSON.stringify(sanitizeAccountStyle(styleMap))] });
+  }
   await execMany(stmts);
-  // La hucha nueva se guarda con la familia imp como override (misma vía que el onboarding):
-  // listGoals solo trae objetivos activos, así que sin override una hucha cuyo objetivo se pausa
-  // volvería al ali por defecto de savings.
-  if (newHucha) await setAccountFamily(accountId, "imp");
   return goalId;
 }
 
