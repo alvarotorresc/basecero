@@ -91,6 +91,14 @@ test("buttonHtml: cada kind lleva su clase y siempre type=\"button\"", () => {
   assert.match(buttonHtml({ kind: "raro", label: "X" }), /class="btn-secondary"/, "kind desconocido → secundario");
 });
 
+test("buttonHtml: tertiary-danger es el terciario con la clase destructiva (D-1, B-Objetivo)", () => {
+  const html = buttonHtml({ kind: "tertiary-danger", id: "goal-delete", label: "Borrar objetivo", icon: "trash" });
+  assert.match(html, /^<button type="button" class="btn-tertiary btn-tertiary-danger" id="goal-delete"><svg/);
+  assert.match(html, /<span>Borrar objetivo<\/span><\/button>$/);
+  assert.match(buttonHtml({ kind: "tertiary-danger", size: "s", label: "X" }), /class="btn-tertiary btn-tertiary-danger"/, "sin talla S");
+  assert.ok(!buttonHtml({ kind: "tertiary-danger", label: "X", note: "n" }).includes("btn-note"));
+});
+
 test("buttonHtml: talla S solo en secundario y entrada destructiva", () => {
   assert.match(buttonHtml({ kind: "secondary", size: "s", label: "X" }), /class="btn-secondary btn-s"/);
   assert.match(buttonHtml({ kind: "danger-entry", size: "s", label: "X" }), /class="btn-danger btn-s"/);

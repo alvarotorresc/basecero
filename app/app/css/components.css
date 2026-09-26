@@ -155,6 +155,9 @@
   cursor: pointer;
 }
 
+/* Terciario destructivo (D-1, B-Objetivo «Borrar objetivo»): el mismo terciario en --neg. */
+.btn-tertiary-danger { color: var(--neg); }
+
 .btn-primary:disabled,
 .btn-secondary:disabled,
 .btn-danger:disabled,

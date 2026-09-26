@@ -58,9 +58,10 @@ const BUTTON_CLASS = {
   secondary: "btn-secondary",
   tertiary: "btn-tertiary",
   "danger-entry": "btn-danger",
+  "tertiary-danger": "btn-tertiary btn-tertiary-danger",
 };
 
-/** Botón del sistema (DESIGN.md §9): Primario, Secundario M/S, Terciario y entrada destructiva.
+/** Botón del sistema (DESIGN.md §9): Primario, Secundario M/S, Terciario y destructivo de entrada.
  *
  *   primary       56 píldora --accent 17/700 --sh-key, ancho completo. `note` → 12/500 dim DEBAJO
  *                 (I-67); entonces devuelve un contenedor .btn-stack con el botón y la nota.
@@ -68,9 +69,11 @@ const BUTTON_CLASS = {
  *   tertiary      Texto 13/600 dim con alto de toque 44.
  *   danger-entry  Forma de secundario con texto y borde --neg (D-1, C5). La confirmación roja
  *                 rellena vive en el aviso (PR-09), no aquí.
+ *   tertiary-danger  Terciario con texto --neg (D-1: destructivo rojo en todas partes), p. ej.
+ *                 «Borrar objetivo» de B-Objetivo.
  *
  *  @param {object} o
- *  @param {"primary"|"secondary"|"tertiary"|"danger-entry"} [o.kind]  Por defecto "secondary".
+ *  @param {"primary"|"secondary"|"tertiary"|"danger-entry"|"tertiary-danger"} [o.kind]  Por defecto "secondary".
  *  @param {"m"|"s"} [o.size]    Solo secundario y entrada destructiva. Por defecto "m".
  *  @param {string}  [o.id]
  *  @param {string}  o.label     Se escapa aquí.
