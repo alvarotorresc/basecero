@@ -12,7 +12,7 @@ import { renderPatrimonio } from "./screens/patrimonio.js";
 import { renderAjustes } from "./screens/ajustes.js";
 import { pushBack, goBack, clearBack, resetBack } from "./back.js";
 import { userMessage } from "./errors.js";
-import { scrollScreenTop } from "./viewport.js";
+import { scrollScreenTop, trackTabbarHeight } from "./viewport.js";
 import { setTabNavigator } from "./tabs.js";
 import { applyTheme, readPref, getStorage, systemDarkQuery } from "./theme.js";
 
@@ -113,6 +113,7 @@ async function boot() {
 }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => nav(b.dataset.tab)));
+trackTabbarHeight(window, document.querySelector(".tabbar"));   // hueco inferior de main#screen = alto real de la barra
 document.getElementById("btn-registro").onclick = () => {
   pushBack(() => nav("inicio"));
   renderRegistro(screen, goBack, undefined, () => nav("inicio"));

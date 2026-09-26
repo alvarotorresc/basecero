@@ -30,7 +30,8 @@ main#screen {
   min-height: 100dvh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: var(--sp-12) var(--sp-16) calc(84px + env(safe-area-inset-bottom, 0px) + var(--sp-24));
+  /* Hueco inferior = alto REAL de la barra (--tabbar-real: components.css + viewport.js). */
+  padding: var(--sp-12) var(--sp-16) calc(var(--tabbar-real) + var(--sp-24));
 }
 
 /* ===== componentes base (docs/design/final-v2/SISTEMA.md) =====

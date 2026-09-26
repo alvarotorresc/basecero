@@ -40,3 +40,31 @@ export function focusInput(el) {
 // En Node no hay window: el módulo se importa igual y esto no hace nada — mismo criterio que la
 // instancia global de back.js (back.js:77) y de toast.js (toast.js:45).
 export const scrollScreenTop = typeof window !== "undefined" ? createScrollTop(window) : () => {};
+
+/** Alto real de la barra de pestañas → custom property `--tabbar-real` en :root, que main#screen
+ *  usa como hueco inferior (app.css). La barra tiene alto MÍNIMO (components.css): con la letra
+ *  al 200 % crece, y un hueco fijo de 84 dejaría el final de la pantalla debajo de ella.
+ *
+ *  tabbarRealValue(h) es la parte pura: px enteros hacia arriba, o null si no hay que escribir
+ *  nada. Un alto 0 (barra oculta en subpantallas y asistente, display:none) no se escribe: se
+ *  conserva el último valor, y esas pantallas ya tienen su propio hueco (body.subscreen). */
+export function tabbarRealValue(height) {
+  if (!Number.isFinite(height) || height <= 0) return null;
+  return `${Math.ceil(height)}px`;
+}
+
+/** Observa `nav` con ResizeObserver y mantiene `--tabbar-real` al día. `win` inyectado para
+ *  probarlo en Node. Sin ResizeObserver o sin nav no hace nada y devuelve false: el CSS cae al
+ *  fallback de 84px + safe-area. */
+export function trackTabbarHeight(win, nav) {
+  const RO = win?.ResizeObserver;
+  const root = win?.document?.documentElement;
+  if (typeof RO !== "function" || !nav || !root) return false;
+  const write = () => {
+    const v = tabbarRealValue(nav.getBoundingClientRect().height);
+    if (v) root.style.setProperty("--tabbar-real", v);
+  };
+  new RO(write).observe(nav);
+  write();
+  return true;
+}

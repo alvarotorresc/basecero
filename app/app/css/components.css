@@ -165,6 +165,10 @@
    ítem de 56 (icono 24 + 12/600 dim); activo en --accent-text 700 (solo sobre --surface);
    añadir 60×48 píldora --accent con --sh-key en la columna central. Alturas MÍNIMAS: con la
    letra al 200 % la barra crece en vez de recortar (§11). --- */
+/* Alto real de la barra, para el hueco inferior de main#screen (app.css). Este es el valor sin JS
+   (84 + safe-area); viewport.js#trackTabbarHeight lo reescribe en línea sobre <html> con un
+   ResizeObserver cuando la barra crece (letra al 200 %). */
+:root { --tabbar-real: calc(84px + env(safe-area-inset-bottom, 0px)); }
 .tabbar {
   position: fixed;
   left: 0;
