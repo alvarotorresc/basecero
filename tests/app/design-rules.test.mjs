@@ -21,7 +21,7 @@ const APP = fileURLToPath(new URL("../../app/app/", import.meta.url));
 
 export const PENDIENTES = new Set([
   // Las 15 pantallas (cada S* saca las suyas).
-  "js/screens/ajustes.js", "js/screens/categorias.js", "js/screens/etiquetas.js",
+  "js/screens/categorias.js", "js/screens/etiquetas.js",
   "js/screens/gasto-por-categoria.js", "js/screens/informe.js", "js/screens/inicio.js",
   "js/screens/liquidar.js", "js/screens/movimientos.js", "js/screens/onboarding.js",
   "js/screens/patrimonio.js", "js/screens/periodo-nuevo.js", "js/screens/recurrentes.js",

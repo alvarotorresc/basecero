@@ -4,6 +4,101 @@
    comprueba colores, radios, tamaños de letra y naranja igual que en components.css. */
 
 /* === pantalla: ajustes === */
+/* S4 · B-Ajustes: grupos neutros (F-08, C11) con etiqueta 13/600 dim (sectionHeaderHtml "group")
+   y tarjeta --surface con borde; filas de ajuste de entity.js; paneles que se despliegan en su
+   sitio bajo su fila (sin hoja inferior todavía). Sin tinte de familia en nada. */
+.aj-screen { display: flex; flex-direction: column; gap: var(--sp-12); }
+.aj-group { display: flex; flex-direction: column; gap: var(--sp-8); }
+.aj-card {
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: var(--sp-4);
+}
+/* Filete con la sangría de la baldosa: relleno 8 + baldosa 32 + hueco 12. */
+.aj-sep { height: 1px; margin: 0 var(--sp-8) 0 calc(var(--sp-8) + 32px + var(--sp-12)); background: var(--border); }
+
+/* Fila Tema: el Segmented mide 52, así que la fila sube a 60 con menos relleno a la derecha. */
+#theme-row { min-height: 60px; padding-right: var(--sp-4); }
+#theme-row .ctl-segmented { flex: none; }
+#aj-quick { cursor: pointer; }
+/* Fila que despliega: el chevron apunta abajo mientras su panel está abierto (sin animación). */
+.aj-card .ent-set[aria-expanded="true"] .ent-chev { transform: rotate(90deg); }
+
+/* Fila con <select> nativo encima e invisible: la fila es el aspecto, el select el control. */
+.aj-select-row { position: relative; }
+.aj-select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: 0;
+  /* 16 en el select, aunque no se vea: por debajo, iOS hace zoom al enfocarlo (K9). */
+  font-size: var(--fs-input);
+}
+.aj-select:disabled { cursor: default; }
+.aj-select-row:has(.aj-select:disabled) { opacity: .5; }
+/* El foco lo recibe el select invisible: el anillo se pinta en la fila. */
+.aj-select-row:has(.aj-select:focus-visible) { outline: var(--focus); outline-offset: var(--focus-offset); }
+.aj-select-row:active { background: var(--raised); }
+
+/* Panel desplegado bajo su fila. */
+.aj-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: var(--sp-8) var(--sp-8) var(--sp-12);
+}
+.aj-panel-row { flex-direction: row; align-items: center; }
+.aj-panel-row .aj-help { flex: 1; min-width: 0; }
+.aj-actions { display: flex; flex-direction: column; gap: var(--sp-8); }
+.aj-actions .btn-secondary { width: 100%; }
+
+.aj-help {
+  margin: 0;
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-12);
+  font-weight: 500;
+  line-height: var(--lh-body);
+  color: var(--text-dim);
+}
+.aj-panel .aj-help { padding: 0; }
+.aj-help strong { font-weight: 700; color: var(--text); }
+
+/* Aviso en línea: neutro, en --raised con borde; el de error lleva el icono de aviso. */
+.aj-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  padding: var(--sp-12);
+  border-radius: var(--radius);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: var(--fs-13);
+  font-weight: 500;
+  line-height: var(--lh-body);
+}
+.aj-msg[hidden] { display: none; }
+.aj-msg > svg { flex: none; margin-top: var(--sp-2); }
+.aj-msg-body { flex: 1; min-width: 0; max-height: 200px; overflow-y: auto; }
+.aj-msg-body p { margin: 0; }
+.aj-msg-error { border-color: var(--border-strong); }
+
+/* ¿No funciona?: enlaces de texto 13/600 dim con 44 de alto de toque. */
+.aj-foot { display: flex; flex-direction: column; gap: var(--sp-4); }
+.aj-links { display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-16); padding: 0 var(--sp-4); }
+.aj-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--text-dim);
+  text-decoration: none;
+}
 /* === fin: ajustes === */
 
 /* === pantalla: categorias === */
