@@ -600,6 +600,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     container.innerHTML = `
     <div class="reg">
       <header class="reg-head">
+        <h1 class="reg-title">${escHtml(t("registro.title"))}</h1>
         <button type="button" class="icon-btn" id="reg-close" aria-label="${escAttr(t("registro.close"))}">${icon("close")}</button>
         ${segmentedHtml({ id: "reg-type", name: t("registro.type.label"), value: state.tipo, allowNone: true,
           options: TIPOS_MAIN.map((tp) => ({ value: tp.id, label: t(tp.labelKey) })) })}

@@ -754,6 +754,19 @@
 /* Cabecera propia: cerrar 44 + Segmented Gasto · Ingreso · Transferencia. */
 .reg-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); }
 .reg-head .ctl-segmented { flex: 0 1 auto; min-width: 0; }
+/* El h1 de la pantalla («Registrar») existe para el lector de pantalla y la navegación por
+   encabezados (K12), pero B-Gasto no lo pinta: se oculta a la vista, no al árbol de accesibilidad. */
+.reg-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 .reg-head .ctl-segmented [role="radio"] { flex: none; }
 
 /* Display xl de entrada (F-48): comercio arriba como etiqueta, importe, «o dicta…» en el pie. */
