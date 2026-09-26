@@ -99,9 +99,18 @@ export function stepperHtml({ id = "", value, decId = "", incId = "", decLabel, 
 /** Progreso por pasos (§9): segmentos de 6 en píldora; hecho y actual en `--text`, pendiente en el
  *  pozo (I-35/F-27). `current` se acota a `[1, total]` — un valor fuera de rango no debe dejar el
  *  progressbar sin segmentos marcados ni con más de `total`. `ariaLabel`, si llega, ya viene
- *  traducido («Paso 1 de 4»); sin él, `aria-valuemin`/`max`/`now` bastan para anunciarlo. */
-export function stepsHtml({ total, current, ariaLabel = "" }) {
+ *  traducido («Paso 1 de 4»); sin él, `aria-valuemin`/`max`/`now` bastan para anunciarlo.
+ *  Con `labels` (S12, B-Importar: un texto por paso, ya traducido) es una lista ordenada: cada
+ *  paso es su segmento con la etiqueta 12/600 dim debajo, y el actual lleva `aria-current="step"`
+ *  y la etiqueta en --text 700. */
+export function stepsHtml({ total, current, ariaLabel = "", labels = null }) {
   const cur = Math.min(Math.max(current, 1), total);
+  if (Array.isArray(labels)) {
+    const items = Array.from({ length: total }, (_, i) => `<li class="ctl-steps-step"${i + 1 === cur ? ' aria-current="step"' : ""}>`
+      + `<span class="ctl-steps-seg${i < cur ? " is-done" : ""}" aria-hidden="true"></span>`
+      + `<span class="ctl-steps-label">${escHtml(labels[i] ?? "")}</span></li>`).join("");
+    return `<ol class="ctl-steps ctl-steps-labelled"${ariaLabel ? ` aria-label="${escAttr(ariaLabel)}"` : ""}>${items}</ol>`;
+  }
   const segs = Array.from({ length: total }, (_, i) => `<span class="ctl-steps-seg${i < cur ? " is-done" : ""}"></span>`).join("");
   return `<div class="ctl-steps" role="progressbar" aria-valuemin="1" aria-valuemax="${total}" aria-valuenow="${cur}"${ariaLabel ? ` aria-label="${escAttr(ariaLabel)}"` : ""}>${segs}</div>`;
 }

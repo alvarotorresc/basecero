@@ -197,6 +197,25 @@ test("stepsHtml: ariaLabel opcional, ya traducido, se refleja; sin él no se pin
   assert.ok(!stepsHtml({ total: 4, current: 1 }).includes("aria-label"));
 });
 
+test("stepsHtml con labels: lista ordenada con una etiqueta escapada por paso y aria-current en el actual", () => {
+  const html = stepsHtml({ total: 3, current: 2, ariaLabel: "Pasos", labels: ["Fichero", "Columnas", "<b>Resultado</b>"] });
+  assert.match(html, /^<ol class="ctl-steps ctl-steps-labelled" aria-label="Pasos">/);
+  assert.equal((html.match(/<li /g) ?? []).length, 3);
+  assert.equal((html.match(/ctl-steps-seg/g) ?? []).length, 3);
+  assert.equal((html.match(/is-done/g) ?? []).length, 2);
+  assert.equal((html.match(/aria-current="step"/g) ?? []).length, 1);
+  assert.match(html, /aria-current="step"><span[^>]*><\/span><span class="ctl-steps-label">Columnas/);
+  assert.ok(!html.includes("<b>"));
+  assert.match(html, /&lt;b&gt;Resultado/);
+  assert.ok(!html.includes("progressbar"));
+});
+
+test("stepsHtml con labels: current también se acota a [1, total]", () => {
+  const html = stepsHtml({ total: 3, current: 9, labels: ["A", "B", "C"] });
+  assert.equal((html.match(/is-done/g) ?? []).length, 3);
+  assert.match(html, /aria-current="step"><span[^>]*><\/span><span class="ctl-steps-label">C<\/span><\/li><\/ol>$/);
+});
+
 // ---------- fieldHtml ----------
 
 test("fieldHtml: label-for/id emparejan, type y value se reflejan", () => {
