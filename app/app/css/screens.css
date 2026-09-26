@@ -31,6 +31,118 @@
 /* === fin: onboarding === */
 
 /* === pantalla: patrimonio === */
+/* S3 (B-Patrimonio, BD-Patrimonio; formularios con la anatomía de B-Cuenta y B-Objetivo). La
+   familia llega como .fam-<k> (cuentas: account-colors.js, C8) y aquí solo se leen --ft/--fb/--fx.
+   Las cifras, siempre en tinta (C7). */
+.pat,
+.pat-form { display: flex; flex-direction: column; gap: var(--sp-12); }
+.pat-form { gap: var(--sp-16); }
+
+/* Display: delta del periodo en el pie. Sube en --ok (C4, delta dentro del Display); baja en
+   --disp-ink con «−» (--neg no llega a 3:1 sobre el panel). */
+.pat-delta { font-weight: 500; }
+.pat-delta.is-up { color: var(--ok); }
+.pat-delta.is-down { color: var(--disp-ink); }
+
+/* Composición: Tienes / Debes a los lados de la barra y el operativo tras el separador. */
+.pat-split { display: flex; justify-content: space-between; gap: var(--sp-12); }
+.pat-split-col { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.pat-split-col.is-end { align-items: flex-end; text-align: right; }
+.pat-split-label { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.pat-split-fig { font-size: var(--fs-17); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
+.pat-oper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  padding-top: var(--sp-12);
+  border-top: 1px solid var(--border);
+}
+.pat-oper-label { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+.pat-oper-fig { font-size: var(--fs-14); font-weight: 500; color: var(--text); white-space: nowrap; }
+
+/* Cabecera de sección con el botón de añadir. */
+.pat-sec { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); padding: 0 var(--sp-4); }
+
+/* Rejilla de tarjetas: dos columnas; las anchas ocupan las dos. */
+.pat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-12); }
+
+/* Tarjeta de cuenta (B-Patrimonio): tinte de su familia, sin borde (C6). */
+.pat-acc {
+  min-width: 0;
+  padding: var(--sp-16);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-12);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--ft);
+  color: var(--text);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.pat-acc.no-fam { background: var(--raised); border: 1px solid var(--border); }
+.pat-acc.is-wide { grid-column: span 2; flex-direction: row; align-items: center; }
+.pat-acc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.pat-acc-name { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); overflow-wrap: anywhere; }
+.pat-acc-line { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--fx, var(--text-dim)); }
+.pat-acc-line .num { color: var(--text-dim); }
+.pat-acc-fig { flex: none; font-size: var(--fs-17); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
+
+/* Tarjeta de objetivo: tinte de la familia de su cuenta, o --raised con borde sin cuenta (C11). */
+.pat-goal {
+  min-width: 0;
+  padding: var(--sp-16);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--sp-12);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--ft);
+  color: var(--text);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.pat-goal.no-fam { background: var(--raised); border: 1px solid var(--border); }
+.pat-goal.is-wide { grid-column: span 2; }
+.pat-goal-name { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); overflow-wrap: anywhere; }
+.pat-goal-foot { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
+.pat-goal-line { min-width: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--fx, var(--text-dim)); }
+.pat-goal-line .num { color: var(--text); }
+.pat-goal-pct { flex: none; font-size: var(--fs-13); font-weight: 600; color: var(--text); }
+.pat-goal-pct.is-over { color: var(--neg); }
+
+/* Formularios (anatomía de «Ajustes de la cuenta» / «Ajustes del objetivo»): encabezado de grupo
+   13/600 dim, bloque teñido con la familia (o --surface con borde sin ella, C11) y una línea de
+   ayuda como mucho por sección (K14). */
+.pat-group { display: flex; flex-direction: column; gap: var(--sp-8); }
+.pat-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+  padding: var(--sp-16) var(--sp-12);
+  border-radius: var(--radius-lg);
+  background: var(--ft);
+}
+.pat-block.no-fam { background: var(--surface); border: 1px solid var(--border); }
+.pat-field { display: flex; flex-direction: column; gap: var(--sp-8); }
+.pat-help { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+.pat-hint-strong { font-weight: 700; color: var(--fx, var(--text)); }
+.pat-amount-row { display: flex; align-items: flex-end; gap: var(--sp-8); }
+.pat-amount-row .ctl-field-wrap { flex: 1; min-width: 0; }
+.pat-sign { font-family: var(--font-mono); font-size: var(--fs-17); font-weight: 600; margin-bottom: var(--sp-2); }
+.pat-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); min-height: 48px; padding: 0 var(--sp-4); }
+.pat-row-label { font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-title); color: var(--text); }
+.pat-row-value { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); text-align: right; overflow-wrap: anywhere; }
+.pat-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+.pat-progress-fig { font-size: var(--fs-20); font-weight: 600; color: var(--text); white-space: nowrap; }
+.pat-progress-pct { align-self: flex-end; font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }
+.pat-actions { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-8); }
+.pat-actions .btn-tertiary { align-self: center; }
 /* === fin: patrimonio === */
 
 /* === pantalla: periodo-nuevo === */
