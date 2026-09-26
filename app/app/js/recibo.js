@@ -44,7 +44,7 @@ const ZIGZAG_BOTTOM = edge(false);
  *  @param {string} o.dateTime          Hora (o fecha y hora) de la cabecera.
  *  @param {string} [o.title]           Comercio o concepto, 20/700.
  *  @param {string} [o.subtitle]        Tipo de movimiento, 13/500 dim.
- *  @param {object|null} [o.badge]      Ficha de 28 (entity.js#badgeHtml): {fam, income, icon, label}.
+ *  @param {object|null} [o.badge]      Ficha de 36 (entity.js#badgeHtml size 36): {fam, income, icon, label}.
  *  @param {Array<{label:string, value:string, fam?:string|null}>} [o.lines]  `fam` pinta la
  *                                      muestra de 10 de una cuenta delante del valor.
  *                                      `num` pone el valor en la mono tabular (importes);
@@ -88,11 +88,11 @@ export function ticketHtml({ dateTime, title = "", subtitle = "", badge = null, 
         <div class="recibo-stamp${stampCls ? ` ${stampCls}` : ""}">
           <div class="recibo-stamp-in">
             <span class="recibo-stamp-label">${escHtml(labels.stamp)}</span>
-            <span class="num recibo-stamp-date">${escHtml(stampDate)}</span>
+            <span class="num recibo-stamp-date is-fam-ink">${escHtml(stampDate)}</span>
           </div>
         </div>
       </div>
-      ${badge?.label ? `<div class="recibo-badge">${badgeHtml(badge)}</div>` : ""}
+      ${badge?.label ? `<div class="recibo-badge">${badgeHtml({ ...badge, size: 36 })}</div>` : ""}
       ${group(lines)}
       ${group(periodLines)}
     </div>

@@ -2029,39 +2029,44 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* B-Recibo lo cuelga a 108 de arriba en 844 (el 12,8 %): proporcional, para que «Deshacer» siga a
+     la vista en pantallas más bajas. */
+  justify-content: flex-start;
   gap: var(--sp-16);
-  padding: var(--sp-16);
-  background: var(--scrim);
+  padding: max(var(--sp-16), min(108px, 12.8vh)) var(--sp-16) var(--sp-16);
+  /* Velo y sombra de B-Recibo (.62 y 0 14 28 .4, más densos que --scrim y --sh-alert), sacados de
+     --disp (casi negro en los dos temas) para no añadir tokens. */
+  background: color-mix(in srgb, var(--disp) 62%, transparent);
   animation: bc-recibo-veil 150ms ease-out;
 }
-.recibo-ticket { width: 310px; max-width: 100%; filter: drop-shadow(var(--sh-alert)); animation: bc-recibo-in 250ms ease-out; }
+.recibo-ticket { width: 310px; max-width: 100%; filter: drop-shadow(0 14px 28px color-mix(in srgb, var(--disp) 40%, transparent)); animation: bc-recibo-in 250ms ease-out; }
 .recibo-edge { display: block; width: 100%; height: 10px; color: var(--raised); }
-.recibo-body { display: flex; flex-direction: column; gap: var(--sp-12); padding: var(--sp-16); background: var(--raised); color: var(--text); }
+.recibo-body { display: flex; flex-direction: column; gap: var(--sp-12); padding: 14px var(--sp-20) 18px; background: var(--raised); color: var(--text); }
 .recibo-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
 .recibo-brand { font-family: var(--font-display); font-size: var(--fs-13); font-weight: 700; line-height: var(--lh-title); letter-spacing: -.01em; }
 .recibo-time { font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
-.recibo-body .disp { padding: var(--sp-12) var(--sp-16); border-radius: var(--radius); }
+.recibo-body .disp { padding: var(--sp-12) var(--sp-16) 14px; border-radius: var(--radius); }
 .recibo-id { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); min-height: 60px; }
 .recibo-id-text { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
 .recibo-title { font-size: var(--fs-20); font-weight: 700; line-height: var(--lh-title); overflow-wrap: anywhere; }
 .recibo-sub { font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
 .recibo-stamp {
   flex: none;
-  padding: var(--sp-2);
+  padding: 3px;
   border: 2px solid currentColor;
   border-radius: var(--radius);
   color: var(--fx, var(--text));
   transform: rotate(-8deg);
   animation: bc-recibo-stamp 200ms ease-out 250ms backwards;
 }
-.recibo-stamp-in { display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); padding: var(--sp-4) var(--sp-12); border: 1px solid currentColor; border-radius: var(--radius-xs); }
+.recibo-stamp-in { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: var(--sp-4) var(--sp-12); border: 1px solid currentColor; border-radius: var(--radius-xs); }
 .recibo-stamp-label { font-family: var(--font-display); font-size: var(--fs-13); font-weight: 700; line-height: var(--lh-title); }
-/* C7: la fecha es una cifra y va en tinta, aunque el sello lleve el color de su familia. */
-.recibo-stamp-date { font-size: var(--fs-12); font-weight: 600; color: var(--text); }
+/* La fecha va en el color del sello, como en B-Recibo (C7 retirada ahí: .is-fam-ink). */
+.recibo-stamp-date { font-size: var(--fs-12); font-weight: 600; }
+.recibo-stamp-date.is-fam-ink { color: var(--fx, var(--text)); }
 .recibo-badge { display: flex; }
 .recibo-perf { border-top: 1px dashed var(--border); }
-.recibo-lines { display: flex; flex-direction: column; gap: var(--sp-12); }
+.recibo-lines { display: flex; flex-direction: column; gap: 10px; }
 .recibo-line { display: flex; align-items: baseline; gap: var(--sp-8); }
 .recibo-label { flex: none; font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
 .recibo-dots { flex: 1; min-width: 12px; border-bottom: 2px dotted var(--border); transform: translateY(-4px); }
