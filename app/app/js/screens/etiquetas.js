@@ -195,14 +195,15 @@ export async function renderEtiquetas(container, onBack) {
     const left = hasLimit ? row.budget_cents - row.spent_cents : 0;
     const legend = segs.map((s) => `<span class="et-key ${s.idle ? "is-idle" : famClass(s.fam)}"><span class="et-muestra" aria-hidden="true"></span>${escHtml(s.name)}</span>`).join("")
       + (hasLimit && left > 0 ? `<span class="et-key is-rest">${escHtml(t("etiquetas.row.left"))} <span class="num">${escHtml(fmtMoney(left))}</span></span>` : "")
-      + (hasLimit && left < 0 ? `<span class="et-key is-rest">${escHtml(t("etiquetas.row.over"))} <span class="num is-over">${escHtml(fmtMoney(-left))}</span></span>` : "");
+      // Pasarse del límite: «quedan −X», con la cifra y su «−» en --neg (C4: el «−» que avisa).
+      + (hasLimit && left < 0 ? `<span class="et-key is-rest">${escHtml(t("etiquetas.row.left"))} <span class="num is-over">−${escHtml(fmtMoney(-left))}</span></span>` : "");
     return `<button type="button" class="et-card" data-tag-open="${escAttr(row.id)}">
       <span class="et-hole" aria-hidden="true"></span>
       <span class="et-top">
         <span class="et-nm"><span class="et-name">${escHtml(row.name)}</span><span class="et-sub">${escHtml(sub)}</span></span>
         <span class="et-amt num">${escHtml(fmtMoney(row.spent_cents))}</span>
       </span>
-      ${bar}
+      ${bar ? `<span class="et-bar" aria-hidden="true">${bar}</span>` : ""}
       ${legend ? `<span class="et-legend">${legend}</span>` : ""}
     </button>`;
   }

@@ -588,6 +588,9 @@ export async function renderCategorias(container, onBack) {
         const parents = availableParents();
         form.parentId = parents.some((r) => r.id === form.lastParentId) ? form.lastParentId : (parents[0]?.id ?? "");
       }
+      // En alta, el título sigue a lo que se va a crear (desde el «+» de un bloque se abre como
+      // «Nueva subcategoría», pero se puede cambiar a categoría y al revés).
+      if (form.mode === "create") dlg.querySelector("#sheet-title").textContent = t(form.parentId ? "categorias.form.title.newChild" : "categorias.form.title.new");
       renderForm();
     });
 

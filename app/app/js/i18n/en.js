@@ -646,7 +646,6 @@ export const EN = {
       noLimit: "{movements}, no limit",
       ofLimit: "{movements}, of {limit}",
       left: "left",
-      over: "over by",
       seeMovements: "See its movements",
     },
     form: {

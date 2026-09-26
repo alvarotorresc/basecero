@@ -249,10 +249,11 @@
 .et-name { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); overflow-wrap: anywhere; }
 .et-sub { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
 .et-amt { flex: none; font-size: var(--fs-17); font-weight: 600; line-height: var(--lh-title); color: var(--text); }
+.et-bar { display: block; }
 .et-card .sbar { width: 100%; }
 
 /* Leyenda (C12): muestra de 10 en la barra -b y el nombre en el -x de su familia (C6); sin familia,
-   en --idle y dim. «quedan» en dim con la cifra en tinta (C7); pasarse del límite, cifra en --neg. */
+   en --idle y dim. «quedan» en dim con la cifra en tinta (C7); pasado el límite, «−X» en --neg (C4). */
 .et-legend { display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-16); font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); }
 .et-key { display: flex; align-items: center; gap: var(--sp-4); color: var(--fx); }
 .et-muestra { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--fb); }

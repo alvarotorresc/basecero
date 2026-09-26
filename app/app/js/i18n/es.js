@@ -674,7 +674,6 @@ export const ES = {
       noLimit: "{movements}, sin límite",
       ofLimit: "{movements}, de {limit}",
       left: "quedan",
-      over: "te pasas en",
       seeMovements: "Ver sus movimientos",
     },
     form: {
