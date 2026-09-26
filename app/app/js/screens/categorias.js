@@ -448,11 +448,13 @@ export async function renderCategorias(container, onBack) {
     return tileHtml({ fam: form.fam, icon: form.icon, size: 32 });
   }
 
-  /** Primera categoría de gasto (activa, que no sea la propia) que ya usa cada familia. */
+  /** Primera categoría de gasto (que no sea la propia) que ya usa cada familia. Las activas van
+   *  primero; una archivada también cuenta (si se desarchiva, vuelve con su familia), pero solo
+   *  cuando ninguna activa usa esa familia. */
   function famUsers() {
     const out = {};
-    for (const r of roots) {
-      if (r.flow !== "expense" || r.is_archived || r.id === form.id) continue;
+    const candidates = roots.filter((r) => r.flow === "expense" && r.id !== form.id);
+    for (const r of [...candidates.filter((c) => !c.is_archived), ...candidates.filter((c) => c.is_archived)]) {
       const f = familyForCategory(r.id, byId);
       if (f && !out[f]) out[f] = r.name;
     }
@@ -672,15 +674,20 @@ export async function renderCategorias(container, onBack) {
 
   async function onArchiveClick() {
     const f = form;
+    // Misma guarda que save(): con un guardado o un desarchivado en vuelo, un segundo toque no
+    // lanza otra escritura sobre la misma categoría.
+    if (!f || f.saving) return;
     const btn = dlg.querySelector("#cf-archive");
     if (f.isArchived) {
       // Desarchivar no es destructivo: sin aviso.
+      f.saving = true;
       btn.disabled = true;
       try {
         await unarchiveCategory(f.id);
         await loadData();
         doneAndClose();
       } catch (e) {
+        f.saving = false;
         if (form === f) showFormError(userMessage(e));
       }
       return;
