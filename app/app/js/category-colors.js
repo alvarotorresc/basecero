@@ -184,7 +184,3 @@ export const colorForCategory = (catId, byId) => {
   const fam = familyForCategory(catId, byId);
   return fam ? `var(${famToken(fam, "b")})` : "var(--idle)";
 };
-export const textColorForCategory = (catId, byId) => {
-  const fam = familyForCategory(catId, byId);
-  return fam ? `var(${famToken(fam, "x")})` : "var(--text)";
-};
