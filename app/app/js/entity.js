@@ -196,6 +196,9 @@ export function txRowHtml({ fam = null, icon: key = "", title, line2 = "", amoun
  *  @param {string} [o.sub]         Segunda línea 13/500 dim. Se escapa aquí.
  *  @param {string} [o.value]       Se escapa aquí.
  *  @param {boolean} [o.valueNum]   Valor en mono tabular (porcentajes, días).
+ *  @param {string|null} [o.valueFam]  Muestra de 10 en la barra de esa familia DELANTE del valor
+ *                                  (C8: la cuenta con su familia, B-Movimiento-Detalle). La clase
+ *                                  de familia va solo en la muestra, nunca en el valor (I-61).
  *  @param {boolean} [o.chevron]    Por defecto true si no hay control.
  *  @param {string} [o.controlHtml] HTML ya renderizado del control (interruptor). Tal cual.
  *  @param {boolean} [o.expanded]   Solo fila botón: la fila despliega un panel en su sitio (S4,
@@ -205,7 +208,7 @@ export function txRowHtml({ fam = null, icon: key = "", title, line2 = "", amoun
  *  @param {string} [o.id]
  *  @param {object} [o.data]
  *  @returns {string} HTML */
-export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", value = "", valueNum = false, chevron, controlHtml = "", expanded, controls = "", disabled = false, id = "", data = null }) {
+export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", value = "", valueNum = false, valueFam = null, chevron, controlHtml = "", expanded, controls = "", disabled = false, id = "", data = null }) {
   const tag = controlHtml ? "div" : "button";
   const showChev = !controlHtml && (chevron ?? true);
   const labelId = controlHtml && id ? ` id="${escAttr(id + "-label")}"` : "";
@@ -220,6 +223,7 @@ export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", va
     + `${key ? tileHtml({ fam, icon: key, size: 32 }) : ""}`
     + `<span class="ent-set-body"><span class="ent-set-label"${labelId}>${escHtml(label)}</span>`
     + `${sub ? `<span class="ent-set-sub">${escHtml(sub)}</span>` : ""}</span>`
+    + `${value !== "" && value != null && famClass(valueFam) ? `<span class="ent-swatch ${famClass(valueFam)}" aria-hidden="true"></span>` : ""}`
     + `${value !== "" && value != null ? `<span class="${cls("ent-set-value", valueNum && "num")}">${escHtml(value)}</span>` : ""}`
     + `${controlHtml}`
     + `${showChev ? `<span class="ent-chev">${icon("chevronRight", { size: 16 })}</span>` : ""}</${tag}>`;
