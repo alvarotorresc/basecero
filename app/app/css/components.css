@@ -495,7 +495,7 @@
   color: var(--disp-ink);
 }
 .disp-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); min-width: 0; }
-.disp-label { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--disp-dim); }
+.disp-label { display: inline-flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--disp-dim); }
 /* C2: la cifra que manda es la única en ámbar; K9: solo 52/44/34. */
 .disp-value {
   font-weight: 500;

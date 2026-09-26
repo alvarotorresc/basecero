@@ -28,6 +28,12 @@ const count = (html, re) => (html.match(re) || []).length;
 
 // ---- Display ----------------------------------------------------------------------------------
 
+test("displayHtml: labelAfter va tal cual detrás de la etiqueta escapada", () => {
+  const html = displayHtml({ label: "A&B", value: "1 €", labelAfter: '<svg class="chev"></svg>' });
+  assert.match(html, /<span class="disp-label">A&amp;B<svg class="chev"><\/svg><\/span>/);
+  assert.match(displayHtml({ label: "x", value: "1" }), /<span class="disp-label">x<\/span>/);
+});
+
 test("displayHtml: exactamente un .disp-value por Display (K4), con pie, LED e instrumento", () => {
   const html = displayHtml({
     label: "Hoy puedes gastar", value: "32,84 €", size: "xl",

@@ -38,8 +38,10 @@ export function dispInkHtml(text) {
  *  @param {{state:string,text:string}|null} [o.led]  LED dentro del Display (ledHtml).
  *  @param {string} [o.slot]           HTML de confianza debajo de la cifra: gráfico, medidor…
  *  @param {string} [o.id]             id de la cifra, para que la pantalla la actualice.
+ *  @param {string} [o.labelAfter]     HTML de confianza justo detrás de la etiqueta (un chevron que
+ *                                     avisa de que el Display cambia de cuenta, en Inicio).
  *  @returns {string} HTML */
-export function displayHtml({ label, value, size = "l", foot = "", footHtml = "", led = null, slot = "", id = "" }) {
+export function displayHtml({ label, value, size = "l", foot = "", footHtml = "", led = null, slot = "", id = "", labelAfter = "" }) {
   if (!DISPLAY_SIZES.includes(size)) throw new Error(`displayHtml: size «${size}» no es xl, l ni m (K9)`);
   if (/\bdisp-value\b/.test(footHtml) || /\bdisp-value\b/.test(slot)) {
     throw new Error("displayHtml: una sola cifra .disp-value por Display (K4); las secundarias van con dispInkHtml");
@@ -47,7 +49,7 @@ export function displayHtml({ label, value, size = "l", foot = "", footHtml = ""
   const pie = footHtml || (foot ? escHtml(foot) : "");
   return `<section class="disp">
     <div class="disp-head">
-      <span class="disp-label">${escHtml(label)}</span>
+      <span class="disp-label">${escHtml(label)}${labelAfter}</span>
       ${led ? ledHtml({ ...led, onDisplay: true }) : ""}
     </div>
     <span class="num disp-value disp-value-${size}"${id ? ` id="${escAttr(id)}"` : ""}>${escHtml(value)}</span>
