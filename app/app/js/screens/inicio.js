@@ -125,8 +125,13 @@ function accountBlockHtml(acc, { form, cuentas, styleMap, goals, empty, days, to
     ? overlayHtml("inicio-cuenta", t("inicio.b.switchAccount", { name: acc.name }),
       form === "bento" ? `<span class="inicio-chev">${icon("chevronDown", { size: 16 })}</span>` : "")
     : "";
+  // En el Display el LED ocupa la esquina: el chevron va pegado a la etiqueta.
+  const labelAfter = many && form !== "bento"
+    ? `<span class="inicio-chev" aria-hidden="true">${icon("chevronDown", { size: 16 })}</span>`
+    : "";
   const block = form === "bento"
     ? bentoHtml({
+      cls: acc.balance_cents < 0 ? "inicio-account-neg" : "",
       label: acc.name,
       value: fmtMoney(acc.balance_cents),
       foot: t("inicio.b.balanceToday"),
@@ -135,6 +140,7 @@ function accountBlockHtml(acc, { form, cuentas, styleMap, goals, empty, days, to
     })
     : displayHtml({
       label: acc.name,
+      labelAfter,
       value: fmtMoney(acc.balance_cents),
       size: "xl",
       foot: t(empty ? "inicio.b.balanceStart" : "inicio.b.balanceToday"),
@@ -186,13 +192,15 @@ function savingsBlockHtml(income, spent, periodName) {
   const s = savingsSentence(income, spent);
   const ahorrado = income - spent;
   const slot = `<div class="inicio-savings-foot">
-      <span class="num inicio-savings-amt${ahorrado < 0 ? " is-neg" : ""}">${escHtml(fmtMoney(ahorrado))}</span>
+      <span class="num inicio-savings-amt${ahorrado < 0 ? " is-neg" : ""}${fmtMoney(ahorrado).length > 10 ? " is-long" : ""}">${escHtml(fmtMoney(ahorrado))}</span>
       <span class="inicio-savings-of">${escHtml(t("inicio.b.savingsOf", { amount: fmtMoney(income) }))}</span>
     </div>`;
+  const value = s?.kind === "saves" ? fmtPct0(s.ratio) : "—";
   const bento = bentoHtml({
     label: t("inicio.b.savings"),
-    value: s?.kind === "saves" ? fmtPct0(s.ratio) : "—",
-    cls: "inicio-savings",
+    value,
+    // En la columna de 1/3 caben ~77 px: una cifra larga baja a 17 en vez de partirse.
+    cls: `inicio-savings${value.length > 5 ? " is-long" : ""}`,
     slot,
   });
   return `<div class="inicio-tap">${bento}${overlayHtml("inicio-informe-link", t("informe.entry.fromHome", { name: periodName }))}</div>`;
@@ -405,7 +413,7 @@ export async function renderInicio(container) {
   const today = dayIndexOfPeriod(period.start_date, hoy);
   const daysLeft = daysLeftOfPeriod(period.start_date, hoy);
   const isEmpty = recentDates.length === 0;
-  const allowanceMode = !isEmpty && budgetTotal > 0;
+  const allowanceMode = budgetTotal > 0;
   const styleMap = parseAccountStyle(meta.account_style);
 
   // -- Cuenta del bloque (decisiones 1-3): la elegida sobrevive a un repintado en la misma sesión;
@@ -446,7 +454,7 @@ export async function renderInicio(container) {
 
   // -- La línea del Display: lo que queda al cerrar cada día del periodo hasta hoy.
   const periodDays = daysWithCategories(periodRootRows, weekDates(hoy, today));
-  const series = periodRemainingSeries(budgetTotal, periodDays.map((d) => d.totalCents));
+  const series = periodRemainingSeries(budgetTotal, periodDays.map((d) => d.totalCents), spent);
 
   // -- «Te quedarán»: disponible menos lo comprometido en recurrentes (null sin límites).
   const remaining = budgetTotal ? remainingAfterRecurringCents(disponible, prevision.comprometidoCents) : null;
@@ -460,36 +468,25 @@ export async function renderInicio(container) {
   const shared = sharedBlockHtml(sharedRows, netCents, partnerName);
   const noticeBlock = noticeHtml(hucha, { byId, rules, leftAfterRenewal });
 
-  let body;
-  if (allowanceMode) {
-    const allowance = dailyAllowanceCents(disponible, prevision.comprometidoCents, period.start_date, hoy);
-    body = `
-      ${allowanceDisplayHtml({ budgetTotal, disponible, allowance, series, days, today })}
-      <div class="inicio-duo">${accountHtml}${shared}</div>
-      <div class="inicio-trio">${weekBlockHtml(semanaDias, semanaTotal, hoy)}${savingsBlockHtml(income, spent, period.name)}</div>
+  // Con límites, el Display es «Hoy puedes gastar» (también recién hecho el onboarding, sin
+  // movimientos) y la cuenta va en su bento; sin límites, el saldo de la cuenta es el Display.
+  // Sin ningún movimiento todavía, fuera Ahorras y Gasto por categoría, y los movimientos en
+  // estado vacío (B-Inicio-Vacio).
+  const displayBlock = allowanceMode
+    ? allowanceDisplayHtml({
+      budgetTotal, disponible, series, days, today,
+      allowance: dailyAllowanceCents(disponible, prevision.comprometidoCents, period.start_date, hoy),
+    })
+    : accountHtml;
+  const duo = (allowanceMode ? accountHtml : "") + shared;
+  const body = `
+      ${displayBlock}
+      ${duo ? `<div class="inicio-duo">${duo}</div>` : ""}
+      <div class="inicio-trio">${weekBlockHtml(semanaDias, semanaTotal, hoy)}${isEmpty ? "" : savingsBlockHtml(income, spent, period.name)}</div>
       ${noticeBlock}
-      ${categoriesBlockHtml(rootRows, byId)}
+      ${isEmpty ? "" : categoriesBlockHtml(rootRows, byId)}
       ${pendingHtml(prevision, remaining, byId)}
-      ${movementsBlockHtml(rows, hoy, byId, partnerName)}`;
-  } else if (isEmpty) {
-    body = `
-      ${accountHtml}
-      ${shared ? `<div class="inicio-duo">${shared}</div>` : ""}
-      ${weekBlockHtml(semanaDias, semanaTotal, hoy)}
-      ${noticeBlock}
-      ${pendingHtml(prevision, remaining, byId)}
-      ${emptyMovementsHtml()}`;
-  } else {
-    // Con movimientos pero sin límites (sin mockup): el saldo manda en el Display, como en el vacío.
-    body = `
-      ${accountHtml}
-      ${shared ? `<div class="inicio-duo">${shared}</div>` : ""}
-      <div class="inicio-trio">${weekBlockHtml(semanaDias, semanaTotal, hoy)}${savingsBlockHtml(income, spent, period.name)}</div>
-      ${noticeBlock}
-      ${categoriesBlockHtml(rootRows, byId)}
-      ${pendingHtml(prevision, remaining, byId)}
-      ${movementsBlockHtml(rows, hoy, byId, partnerName)}`;
-  }
+      ${isEmpty ? emptyMovementsHtml() : movementsBlockHtml(rows, hoy, byId, partnerName)}`;
 
   container.innerHTML = `<div class="inicio">
     ${header}
