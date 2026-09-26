@@ -2,6 +2,8 @@ import { reportInputs, listPeriods } from "../repo.js";
 import { buildReport } from "../informe-logic.js";
 import { categoryBarsSvg, comparisonBarsSvg } from "../charts.js";
 import { buildPdfBytes, reportFilename } from "../informe-pdf.js";
+import { loadPdfPalette } from "../pdf-palette.js";
+import { famToken } from "../category-colors.js";
 import { loadPdfLib } from "../pdf-loader.js";
 import { download } from "../download.js";
 import { fmtMoney, fmtDiaCorto, fmtPct } from "../format.js";
@@ -10,7 +12,10 @@ import { pushBack, goBack } from "../back.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 import { subHeaderHtml } from "../ui.js";
-import { icon } from "../icons.js";
+import { icon, catIcon as catSvg } from "../icons.js";
+
+// Color de barra de una familia para las gráficas y el --cat del dotico (puente hasta S-Informe).
+const famColor = (fam) => (fam ? `var(${famToken(fam, "b")})` : "var(--idle)");
 
 import { escHtml, escAttr } from "../esc.js";
 
@@ -153,13 +158,13 @@ function categoriesHtml(report, prevPeriodName) {
   const c = report.categories;
   const maxSpent = Math.max(0, ...c.rows.map((x) => x.spentCents));
   const rows = c.rows.map((r) => {
-    const bar = categoryBarsSvg([{ key: r.rootId, value: r.spentCents, max: maxSpent, color: r.color }],
+    const bar = categoryBarsSvg([{ key: r.rootId, value: r.spentCents, max: maxSpent, color: famColor(r.fam) }],
       { width: 260, rowH: 8, barH: 8 });
     // Mini tendencia (SISTEMA §4.19): las dos barras —actual y anterior, atenuada— a la MISMA
     // escala (comparisonBarsSvg, D3): es la garantía de que esta miniatura y la barra principal
     // de arriba nunca puedan divergir, porque las dos salen de barRowsGeometry.
     const miniTrend = c.hasPrev && r.prevCents != null
-      ? comparisonBarsSvg([{ key: r.rootId, value: r.spentCents, prevValue: r.prevCents, color: r.color }],
+      ? comparisonBarsSvg([{ key: r.rootId, value: r.spentCents, prevValue: r.prevCents, color: famColor(r.fam) }],
         { width: 22, rowH: 14, barH: 6 })
       : "";
     // D4: la tendencia plana no lleva flecha, solo el porcentaje en --ink-3 — §4.19 solo define
@@ -174,7 +179,7 @@ function categoriesHtml(report, prevPeriodName) {
     return `
     <div style="display:flex;flex-direction:column;gap:6px;">
       <div style="display:flex;align-items:center;gap:10px;">
-        <div class="dotico" style="--cat:${r.color};">${escHtml(r.icon)}</div>
+        <div class="dotico" style="--cat:${famColor(r.fam)};">${catSvg(r.icon, { size: "1em" })}</div>
         <span style="flex:1;min-width:0;font-size:14px;font-weight:500;">${escHtml(r.name)}</span>
         <span class="num" style="font-size:13px;font-weight:600;">${escHtml(fmtMoney(r.spentCents))}</span>
       </div>
@@ -268,7 +273,7 @@ function movementGroupHtml(g, expanded) {
     <button type="button" data-group="${escAttr(g.rootId)}" aria-expanded="${expanded ? "true" : "false"}"
       style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:0;margin:0;
       color:inherit;font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-      <div class="dotico" style="--cat:${g.color};">${escHtml(g.icon)}</div>
+      <div class="dotico" style="--cat:${famColor(g.fam)};">${catSvg(g.icon, { size: "1em" })}</div>
       <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;">
         <span style="font-size:14px;font-weight:600;">${escHtml(g.name)}</span>
         <span class="num" style="font-size:11px;color:var(--ink-3);">${t("informe.movements.groupCount", { n: g.count ?? g.items.length })}</span>
@@ -366,8 +371,8 @@ export async function renderInforme(container, onBack, { periodId } = {}) {
     container.querySelector("#informe-download").onclick = async () => {
       state.downloading = true; state.downloadError = ""; render();
       try {
-        const PDFLib = await loadPdfLib();
-        const bytes = await buildPdfBytes(PDFLib, state.report);
+        const [PDFLib, palette] = await Promise.all([loadPdfLib(), loadPdfPalette()]);
+        const bytes = await buildPdfBytes(PDFLib, state.report, { palette });
         download(new Blob([bytes], { type: "application/pdf" }), reportFilename(state.report));
       } catch (e) {
         state.downloadError = t("informe.error.pdf", { error: userMessage(e) });
