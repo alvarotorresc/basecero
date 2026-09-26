@@ -194,14 +194,25 @@ export function txRowHtml({ fam = null, icon: key = "", title, line2 = "", amoun
  *  @param {boolean} [o.valueNum]   Valor en mono tabular (porcentajes, días).
  *  @param {boolean} [o.chevron]    Por defecto true si no hay control.
  *  @param {string} [o.controlHtml] HTML ya renderizado del control (interruptor). Tal cual.
+ *  @param {boolean} [o.expanded]   Solo fila botón: la fila despliega un panel en su sitio (S4,
+ *                                  sin hoja todavía) → aria-expanded. Sin pasarlo, no se emite.
+ *  @param {string} [o.controls]    Con `expanded`: id del panel que despliega (aria-controls).
+ *  @param {boolean} [o.disabled]   Solo fila botón: desactivada mientras hay una tarea en curso.
  *  @param {string} [o.id]
  *  @param {object} [o.data]
  *  @returns {string} HTML */
-export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", value = "", valueNum = false, chevron, controlHtml = "", id = "", data = null }) {
+export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", value = "", valueNum = false, chevron, controlHtml = "", expanded, controls = "", disabled = false, id = "", data = null }) {
   const tag = controlHtml ? "div" : "button";
   const showChev = !controlHtml && (chevron ?? true);
   const labelId = controlHtml && id ? ` id="${escAttr(id + "-label")}"` : "";
-  return `<${tag}${tag === "button" ? ' type="button"' : ""} class="${cls("ent-set", sub && "ent-set-2")}"${attrs({ id, data })}>`
+  let btnAttrs = "";
+  if (tag === "button") {
+    if (typeof expanded === "boolean") {
+      btnAttrs += ` aria-expanded="${expanded}"${controls ? ` aria-controls="${escAttr(controls)}"` : ""}`;
+    }
+    if (disabled) btnAttrs += " disabled";
+  }
+  return `<${tag}${tag === "button" ? ' type="button"' : ""} class="${cls("ent-set", sub && "ent-set-2")}"${attrs({ id, data })}${btnAttrs}>`
     + `${key ? tileHtml({ fam, icon: key, size: 32 }) : ""}`
     + `<span class="ent-set-body"><span class="ent-set-label"${labelId}>${escHtml(label)}</span>`
     + `${sub ? `<span class="ent-set-sub">${escHtml(sub)}</span>` : ""}</span>`

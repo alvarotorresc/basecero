@@ -86,6 +86,18 @@ test("settingRowHtml: con control es un div sin chevron; sin él, botón con che
   assert.ok(enlace.includes("Moneda &lt;EUR&gt;") && enlace.includes("€ &amp; más"));
 });
 
+test("settingRowHtml: desplegable (aria-expanded/aria-controls) y desactivada; solo en la fila botón", () => {
+  const cerrada = settingRowHtml({ label: "Copia cifrada", id: "aj-enc", expanded: false, controls: "aj-enc-panel" });
+  assert.match(cerrada, /^<button type="button" class="ent-set" id="aj-enc" aria-expanded="false" aria-controls="aj-enc-panel">/);
+  const abierta = settingRowHtml({ label: "Copia cifrada", expanded: true, controls: "p\"x" });
+  assert.match(abierta, /aria-expanded="true" aria-controls="p&quot;x"/);
+  const normal = settingRowHtml({ label: "Moneda" });
+  assert.ok(!normal.includes("aria-expanded") && !normal.includes("aria-controls") && !normal.includes("disabled"));
+  assert.match(settingRowHtml({ label: "Banco", disabled: true }), /^<button type="button" class="ent-set" disabled>/);
+  const conControl = settingRowHtml({ label: "Avisos", controlHtml: "<i></i>", expanded: true, disabled: true });
+  assert.ok(!conControl.includes("aria-expanded") && !conControl.includes("disabled"), "un div no se despliega ni se desactiva");
+});
+
 test("pickTileHtml: seleccionado → aria-pressed=\"true\"; si no, \"false\"", () => {
   assert.match(pickTileHtml({ fam: "res", label: "Restauración", selected: true }), /aria-pressed="true"/);
   assert.match(pickTileHtml({ fam: "res", label: "Restauración" }), /aria-pressed="false"/);
