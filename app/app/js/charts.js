@@ -7,9 +7,9 @@
 // línea del Display con `.disp-chart-line`. Ni el atributo fill con var() ni un estilo en línea de relleno:
 // var() en un atributo de presentación SVG no es fiable y R-INLINE solo deja geometría en línea.
 //
-// `barChartSvg` y `donutSvg` se borraron en el plan Inicio v2 (Task 10): sin consumidor.
+// `barChartSvg` y `donutSvg` se borraron en el plan Inicio v2 (Task 10) y `netWorthBarsHtml` con la
+// migración de Patrimonio (S3): sin consumidor.
 import { famClass, isFamily } from "./category-colors.js";
-import { columnsHtml } from "./instrument.js";
 import { escHtml } from "./esc.js";
 
 /** Clase de relleno de una marca: la familia si es válida; si no, el gris neutro. */
@@ -63,25 +63,6 @@ export function sparklineSvg(points, { labels = [], dots = false, width = SPARK_
       .map((l, i) => `<span${i === labels.length - 1 ? ' class="disp-today"' : ""}>${escHtml(l)}</span>`).join("")}</div>`
     : "";
   return `<div class="disp-chart">${svg}${eje}</div>`;
-}
-
-// ---- netWorthBarsHtml (COMPATIBILIDAD: Patrimonio aún en PENDIENTES) ----------------------
-
-/** Evolución del patrimonio en columnas: las últimas ≤6, alturas por el valor absoluto, la actual
- *  en --text y las anteriores en --idle (columnsHtml, §9 Columnas). "" con <2 puntos. Firma de
- *  «Neto» mantenida para screens/patrimonio.js; en B, Patrimonio pinta la evolución con
- *  sparklineSvg dentro del Display, y esta función se borra con la migración de esa pantalla.
- *  Sistema B: un cierre negativo ya NO se pinta en rojo (C4: el rojo solo va en cifras).
- *  @param {Array<{label:string, cents:number}>} series */
-export function netWorthBarsHtml(series) {
-  const pts = (series ?? []).slice(-6);
-  if (pts.length < 2) return "";
-  const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
-  return columnsHtml(pts.map((p, i) => ({
-    label: cap(String(p.label)),
-    value: Math.abs(p.cents),
-    today: i === pts.length - 1,
-  })));
 }
 
 // ---- barRowsGeometry / categoryBarsSvg / comparisonBarsSvg (Informe del periodo) --------------
@@ -164,8 +145,7 @@ export function trendOf(values) {
   if (!(max > 0)) return null;
   const heights = vals.map((v) => {
     const h = Math.round((v / max) * TREND_H);
-    // Una barra invisible se lee como "no hay dato" en vez de "casi nada" (TREND_MIN_H no es una
-    // copia: precedente BAR_MIN_H/netWorthBarsHtml en este mismo módulo).
+    // Una barra invisible se lee como "no hay dato" en vez de "casi nada" (TREND_MIN_H).
     return v > 0 && h <= 0 ? TREND_MIN_H : Math.max(0, h);
   });
   return { heights, max };

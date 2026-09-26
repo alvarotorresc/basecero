@@ -437,32 +437,38 @@ export const ES = {
       openAccount: "No se pudo abrir la cuenta: {error}",
     },
     title: "Patrimonio",
-    subtitle: "Calculado con todos tus movimientos",
     netWorth: {
       title: "Patrimonio neto",
       thisPeriod: "este periodo",
+      // LED del Display (B-Patrimonio): el color nunca es la única señal, el LED lleva texto.
+      up: "Sube",
+      down: "Baja",
     },
-    operational: "Operativo, sin ahorro ni deudas: {amount}",
+    // Bloque de composición bajo el Display (B-Patrimonio): barra apilada + Tienes / Debes.
+    composition: {
+      label: "Composición del patrimonio",
+      have: "Tienes",
+      owe: "Debes",
+      operational: "Operativo, sin ahorro ni deudas",
+    },
     accountType: {
       checking: "Corriente",
       savings: "Ahorro",
       liability: "Pasivo",
     },
-    accountSubtitle: {
-      // Task 7 (P2, rediseño v2): el subtítulo de fila ya no es una frase hecha — es
-      // metaHtml([tipo, "Por defecto" | "quedan {n} cuotas"]), así que "tipo" reutiliza
-      // accountType.* (los mismos textos de los chips) y aquí solo queda lo que no está ya ahí.
-      default: "Por defecto",
-      installmentsLeft: { one: "queda {n} cuota", other: "quedan {n} cuotas" },
+    // Línea 2 de la tarjeta de cuenta (B-Patrimonio): tipo, o lo que la distingue.
+    accountLine: {
+      checkingDefault: "{type}, por defecto",
+      installments: { one: "{amount}/mes, queda {n} cuota", other: "{amount}/mes, quedan {n} cuotas" },
     },
     accounts: {
       title: "Cuentas",
-      countActive: { one: "{n} activa", other: "{n} activas" },
       new: "Nueva cuenta",
       empty: "Todavía no tienes ninguna cuenta.",
     },
     account: {
       title: { edit: "Editar cuenta" },
+      settings: "Ajustes de la cuenta",
       openingBalance: "Saldo inicial",
       note: {
         liability: "El saldo de un pasivo es lo que debes: normalmente negativo.",
@@ -471,14 +477,17 @@ export const ES = {
       create: "Crear cuenta",
       validation: { name: "Ponle un nombre a la cuenta." },
       monthlyInstallment: "Cuota mensual",
+      // Selector de familia (C8): el nombre del color sale de families.*.
+      color: "Color de la cuenta",
+      colorUsedBy: "{color}, la usa {name}",
+      colorShared: "{color}, la misma que {name}. El icono las distingue.",
     },
     goals: {
       title: "Objetivos",
-      countActive: { one: "{n} activo", other: "{n} activos" },
       new: "Nuevo objetivo",
       empty: "Todavía no tienes ningún objetivo activo.",
       ofTarget: "{current} de {target}",
-      kind: { savings: "Hucha", cap: "Límite de gasto" },
+      progress: "{name}: {pct} %",
     },
     goalType: {
       emergency_fund: "Fondo de emergencia",
@@ -489,8 +498,11 @@ export const ES = {
     },
     goal: {
       title: { edit: "Editar objetivo" },
-      monthsLabel: "Meses de gasto a cubrir",
-      pctLabel: "Objetivo de ahorro (%)",
+      settings: "Ajustes del objetivo",
+      monthsLabel: "Meses a cubrir",
+      monthLess: "Un mes menos",
+      monthMore: "Un mes más",
+      pctLabel: "Objetivo de ahorro",
       amountLabel: { annual: "Objetivo anual", default: "Importe objetivo" },
       dateLabel: "Fecha objetivo (opcional)",
       typeLockedNote: "El tipo no se puede cambiar una vez creado el objetivo. Para cambiarlo, bórralo y crea uno nuevo.",

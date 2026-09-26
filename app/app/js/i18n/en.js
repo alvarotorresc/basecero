@@ -411,32 +411,37 @@ export const EN = {
       openAccount: "Couldn’t open the account: {error}",
     },
     title: "Net worth",
-    subtitle: "Calculated from all your transactions",
     netWorth: {
-      // La card va justo bajo el H1 «Net worth»: en inglés se llama «Total» para no apilar
+      // El Display va justo bajo el H1 «Net worth»: en inglés se llama «Total» para no apilar
       // la misma frase dos veces (en español Patrimonio / Patrimonio neto ya divergen solos).
       title: "Total",
       thisPeriod: "this period",
+      up: "Rising",
+      down: "Falling",
     },
-    operational: "Operating, excluding savings and debt: {amount}",
+    composition: {
+      label: "What your net worth is made of",
+      have: "You have",
+      owe: "You owe",
+      operational: "Operating, excluding savings and debt",
+    },
     accountType: {
       checking: "Checking",
       savings: "Savings",
       liability: "Liability",
     },
-    accountSubtitle: {
-      // Task 7 (P2, redesign v2): mirrors ES — see accountSubtitle there.
-      default: "Default",
-      installmentsLeft: { one: "{n} installment left", other: "{n} installments left" },
+    accountLine: {
+      checkingDefault: "{type}, default",
+      installments: { one: "{amount}/month, {n} installment left", other: "{amount}/month, {n} installments left" },
     },
     accounts: {
       title: "Accounts",
-      countActive: { one: "{n} active", other: "{n} active" },
       new: "New account",
       empty: "You don’t have any accounts yet.",
     },
     account: {
       title: { edit: "Edit account" },
+      settings: "Account settings",
       openingBalance: "Opening balance",
       note: {
         liability: "A liability’s balance is what you owe: usually negative.",
@@ -445,14 +450,16 @@ export const EN = {
       create: "Create account",
       validation: { name: "Give the account a name." },
       monthlyInstallment: "Monthly installment",
+      color: "Account color",
+      colorUsedBy: "{color}, used by {name}",
+      colorShared: "{color}, the same as {name}. The icon tells them apart.",
     },
     goals: {
       title: "Goals",
-      countActive: { one: "{n} active", other: "{n} active" },
       new: "New goal",
       empty: "You don’t have any active goals yet.",
       ofTarget: "{current} of {target}",
-      kind: { savings: "Savings", cap: "Spending cap" },
+      progress: "{name}: {pct} %",
     },
     goalType: {
       emergency_fund: "Emergency fund",
@@ -463,8 +470,11 @@ export const EN = {
     },
     goal: {
       title: { edit: "Edit goal" },
-      monthsLabel: "Months of spending to cover",
-      pctLabel: "Savings target (%)",
+      settings: "Goal settings",
+      monthsLabel: "Months to cover",
+      monthLess: "One month less",
+      monthMore: "One month more",
+      pctLabel: "Savings target",
       amountLabel: { annual: "Annual target", default: "Target amount" },
       dateLabel: "Target date (optional)",
       typeLockedNote: "The type can’t be changed once the goal is created. To change it, delete it and create a new one.",

@@ -2,272 +2,245 @@ import {
   balancesAt, netWorthOfBalances, netWorthSeries, goalsWithProgress,
   getAccount, createAccount, updateAccount, listExpenseRootCategories, allCategoriesById,
   createGoal, updateGoal, softDeleteGoal, getAccountLoans, setAccountLoan,
+  getAccountStyle, setAccountFamily,
 } from "../repo.js";
-import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtMoneyParts, moneyPartsHtml, hoyISO, fmtDec1, currencySymbol, parseCentsRaw, centsToRaw, appLocale } from "../format.js";
-import { netWorthBarsHtml } from "../charts.js";
+import { familyForCategory, famClass, FAMILIES } from "../category-colors.js";
+import { familyForAccount, defaultFamilyForAccount, goalFamily, isDebt } from "../account-colors.js";
+import { fmtMoney, hoyISO, fmtDec1, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { sparklineSvg } from "../charts.js";
 import { t } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { showConfirm } from "../modal.js";
-import { subHeaderHtml, metaHtml } from "../ui.js";
-import { icon, catIcon as catSvg } from "../icons.js";
-
+import { rootHeaderHtml, subHeaderHtml, buttonHtml } from "../ui.js";
+import { segmentedHtml, wireSegmented, switchHtml, stepperHtml, fieldHtml } from "../controls.js";
+import { tileHtml, filterChipHtml, settingRowHtml, sectionHeaderHtml, familySwatchesHtml } from "../entity.js";
+import { displayHtml, ledHtml, stackedBarHtml, meterHtml, containerHtml, emptyStateHtml } from "../instrument.js";
+import { icon } from "../icons.js";
 import { escHtml, escAttr } from "../esc.js";
 
-// ---- tarjeta "Patrimonio neto" --------------------------------------------
+// Pantalla Patrimonio en el sistema B (S3; B-Patrimonio y BD-Patrimonio). Todo el color va por
+// clase: la familia de cada cuenta (account-colors.js, C8) entra como .fam-<k> y el CSS de la
+// sección «patrimonio» de screens.css lee --ft/--fb/--fx. En línea solo va geometría (R-INLINE).
 
-/** Tarjeta "Patrimonio neto": importe héroe (.amount-hero.lg, 56px) + variación en texto plano
- *  (sin píldora, sin flecha, §1.6) + línea de "operativo" (suma de las cuentas checking, el
- *  subconjunto que ya lee balancesAt) + evolución en barras (netWorthBarsHtml, charts.js) —
- *  réplica de Patrimonio.dc.html:24-40. La variación es el propio penúltimo vs último punto de
- *  `series` (el último es siempre "hoy"; el penúltimo, si existe, es el del último cerrado —
- *  mismos puntos que ya trae netWorthSeries, sin repetir la query, y que pinta netWorthBarsHtml).
- *  Sin ningún cerrado (series.length<2) no hay nada con qué comparar: se oculta la variación. */
-function netWorthCardHtml(netWorthCents, series, accounts) {
-  const n = series.length;
-  const variation = n >= 2 ? series[n - 1].cents - series[n - 2].cents : null;
-  const operationalCents = accounts
-    .filter((a) => a.type === "checking")
-    .reduce((sum, a) => sum + a.balance_cents, 0);
+const MINUS = "−"; // «−» tipográfico: mismo ancho que «+» en la mono tabular.
 
-  // Anatomía del importe (§2.3) a mano, no moneyPartsHtml: sus tres spans fijan su propio color
-  // (money-cents en --ink-2, money-cur en --ink-3, app.css:780-781), que aquí pisaría el verde/
-  // rojo de la variación entera — el mismo problema que resuelve .amount-hero.text-green para el
-  // héroe, pero a 20px (no es un .amount-hero), así que se construye aquí en vez de reutilizarlo.
-  const variationHtml = variation === null ? "" : (() => {
-    const up = variation >= 0;
-    const color = up ? "var(--pos)" : "var(--danger)";
-    const { main, cents, suffix } = fmtMoneyParts(variation);
-    return `
-    <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
-      <div class="num" style="display:flex;align-items:baseline;font-size:20px;font-weight:600;letter-spacing:-.01em;color:${color};">
-        ${up ? "+" : ""}${escHtml(main)}<span style="font-size:14px;">${escHtml(cents)}</span><span style="font-size:12px;font-weight:500;margin-left:2px;">${escHtml(suffix)}</span>
-      </div>
-      <span style="font-size:13px;color:var(--ink-2);">${t("patrimonio.netWorth.thisPeriod")}</span>
-    </div>`;
-  })();
-
-  const barsHtml = netWorthBarsHtml(series);
-
-  return `
-    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
-      <div class="section-title">${t("patrimonio.netWorth.title")}</div>
-      <div class="amount-hero lg num">${moneyPartsHtml(netWorthCents)}</div>
-      ${variationHtml}
-      <div style="font-size:11px;color:var(--ink-3);">${t("patrimonio.operational", { amount: escHtml(fmtMoney(operationalCents)) })}</div>
-      ${barsHtml ? `<div style="margin-top:6px;">${barsHtml}</div>` : ""}
-    </div>`;
+/** Importe con signo tipográfico: «−4.300,00 €» / «+737,51 €» / «3.374,26 €». */
+function signedMoney(cents, { plus = false } = {}) {
+  if (cents < 0) return `${MINUS}${fmtMoney(Math.abs(cents))}`;
+  return `${plus ? "+" : ""}${fmtMoney(cents)}`;
 }
 
-// ---- tarjeta "Cuentas" -----------------------------------------------------
+const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
-// SISTEMA.md §2.2 es explícito: una cuenta no tiene ni icono ni color propios — se identifica
-// por su nombre y su tipo ESCRITOS. La fila ya no lleva insignia (Task 7, P2): esto reemplaza al
-// antiguo ACCOUNT_ICON, que se borra con su único consumidor (cuentaRowHtml).
-const ACCOUNT_TYPES = [
-  { id: "checking", labelKey: "patrimonio.accountType.checking" },
-  { id: "savings", labelKey: "patrimonio.accountType.savings" },
-  { id: "liability", labelKey: "patrimonio.accountType.liability" },
-];
-const ACCOUNT_TYPE_KEY = Object.fromEntries(ACCOUNT_TYPES.map((at) => [at.id, at.labelKey]));
+/** t() escapado en el que las cifras de `nums` salen en mono (<span class="num">), sin partir la
+ *  frase traducida: cada cifra entra como marca y se sustituye ya escapada. */
+function tNums(key, nums, vars = {}) {
+  const names = Object.keys(nums);
+  const mark = (i) => `\u0001${i}\u0001`;
+  let html = escHtml(t(key, { ...vars, ...Object.fromEntries(names.map((k, i) => [k, mark(i)])) }));
+  names.forEach((k, i) => { html = html.replace(mark(i), `<span class="num">${escHtml(nums[k])}</span>`); });
+  return html;
+}
 
-/** Segmentos del sub de una fila de cuenta, para metaHtml([tipo, …]): el tipo (mismo texto que
- *  el chip del formulario) y, opcionalmente, un segundo dato — "Por defecto" en la cuenta
- *  corriente por defecto, o "quedan N cuotas" en un PASIVO con cuota mensual definida (Task 6,
- *  meta.account_loans — ver account-defaults.js#sanitizeLoanMap y repo.setAccountLoan/
- *  getAccountLoans) = techo(|balance| / monthlyCents) — balance_cents es negativo en un pasivo,
- *  de ahí el valor absoluto. Un pasivo ya pagado (saldo 0, o en positivo si se pagó de más) no
- *  tiene ninguna cuota que contar, y Math.ceil(0 / monthlyCents) daba «quedan 0 cuotas», que se
- *  lee como un error de la app — cae al tipo solo, igual que un pasivo sin cuota definida. */
-function accountSubtitleSegments(a, isDefault, accountLoans) {
-  const typeLabel = t(ACCOUNT_TYPE_KEY[a.type] ?? ACCOUNT_TYPE_KEY.checking);
-  if (a.type === "checking") return [typeLabel, isDefault ? t("patrimonio.accountSubtitle.default") : null];
-  if (a.type === "savings") return [typeLabel];
-  const monthlyCents = accountLoans[a.id]?.monthlyCents;
-  if (monthlyCents > 0 && a.balance_cents < 0) {
-    const n = Math.ceil(Math.abs(a.balance_cents) / monthlyCents);
-    return [typeLabel, t("patrimonio.accountSubtitle.installmentsLeft", { n })];
+// ---- Display «Patrimonio neto» ------------------------------------------------------------------
+
+/** Display xl (B-Patrimonio): cifra neta, LED «Sube»/«Baja», delta del periodo en el pie y la línea
+ *  de los últimos ≤6 puntos de netWorthSeries (cerrados + hoy) con su eje de meses. La variación
+ *  es el último punto (hoy) contra el penúltimo (el último cierre). Sin ningún cierre (menos de 2
+ *  puntos) no hay con qué comparar: ni LED, ni delta, ni línea. El delta positivo va en --ok (C4:
+ *  deltas dentro del Display); el negativo en --disp-ink con «−», porque --neg no llega a 3:1 sobre
+ *  el panel oscuro. */
+function netWorthDisplayHtml(netWorthCents, series) {
+  const pts = series.slice(-6);
+  const n = pts.length;
+  if (n < 2) {
+    return displayHtml({ label: t("patrimonio.netWorth.title"), value: fmtMoney(netWorthCents), size: "xl" });
   }
-  return [typeLabel];
+  const variation = pts[n - 1].cents - pts[n - 2].cents;
+  const up = variation >= 0;
+  const footHtml = `<span class="num pat-delta ${up ? "is-up" : "is-down"}">${escHtml(signedMoney(variation, { plus: true }))}</span> ${escHtml(t("patrimonio.netWorth.thisPeriod"))}`;
+  return displayHtml({
+    label: t("patrimonio.netWorth.title"),
+    value: fmtMoney(netWorthCents),
+    size: "xl",
+    led: { state: up ? "ok" : "idle", text: t(up ? "patrimonio.netWorth.up" : "patrimonio.netWorth.down") },
+    footHtml,
+    slot: sparklineSvg(pts.map((p) => p.cents), { labels: pts.map((p) => cap(String(p.label))), dots: true }),
+  });
 }
 
-/** Fila de cuenta (60px, §2.2): sin insignia ni icono — solo nombre + tipo escrito. Un pasivo va
- *  entero (las tres partes del importe) en --danger. */
-function cuentaRowHtml(a, isDefault, accountLoans) {
-  const isLiability = a.type === "liability";
-  return `
-    <button type="button" class="list-row" data-acc="${a.id}"
-      style="width:100%;min-height:60px;text-align:left;background:none;border:0;padding:10px 0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-      <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;">
-        <span style="font-size:15px;font-weight:500;color:var(--ink);">${escHtml(a.name)}</span>
-        ${metaHtml(accountSubtitleSegments(a, isDefault, accountLoans))}
-      </div>
-      <div class="num" style="flex-shrink:0;font-size:16px;font-weight:500;${isLiability ? "color:var(--danger);" : ""}">${moneyPartsHtml(a.balance_cents)}</div>
+// ---- Composición: barra apilada + Tienes / Debes + operativo -------------------------------------
+
+/** Bloque bajo el Display (B-Patrimonio): la barra apilada grande con un segmento por cuenta (su
+ *  familia; la deuda con la trama --stripe-debt), Tienes / Debes a los lados y, tras el separador,
+ *  el operativo (las cuentas corrientes). Los segmentos llevan su nombre (C12) en el aria-label de
+ *  la barra; a la vista, los nombran Tienes / Debes y las tarjetas de cuenta de debajo, con el
+ *  mismo color. Una cuenta que no es deuda pero está en negativo cuenta en «Debes» y se pinta
+ *  rayada: es dinero que se debe. Sin ningún saldo distinto de cero, no se pinta. */
+function compositionHtml(accounts, famOf) {
+  const segments = accounts.filter((a) => a.balance_cents !== 0).map((a) => ({
+    name: a.name,
+    amount: signedMoney(a.balance_cents),
+    value: Math.abs(a.balance_cents),
+    fam: famOf(a),
+    debt: a.balance_cents < 0,
+  }));
+  // Deuda al final (B-Patrimonio): lo que tienes, luego lo que debes.
+  segments.sort((x, y) => Number(x.debt) - Number(y.debt));
+  const bar = stackedBarHtml(segments, { legend: false, label: t("patrimonio.composition.label") });
+  if (!bar) return "";
+  const have = accounts.reduce((s, a) => s + Math.max(0, a.balance_cents), 0);
+  const owe = accounts.reduce((s, a) => s + Math.min(0, a.balance_cents), 0);
+  const operational = accounts.filter((a) => a.type === "checking").reduce((s, a) => s + a.balance_cents, 0);
+  const body = `${bar}
+    <div class="pat-split">
+      <div class="pat-split-col"><span class="pat-split-label">${escHtml(t("patrimonio.composition.have"))}</span><span class="num pat-split-fig">${escHtml(fmtMoney(have))}</span></div>
+      <div class="pat-split-col is-end"><span class="pat-split-label">${escHtml(t("patrimonio.composition.owe"))}</span><span class="num pat-split-fig">${escHtml(signedMoney(owe))}</span></div>
+    </div>
+    <div class="pat-oper"><span class="pat-oper-label">${escHtml(t("patrimonio.composition.operational"))}</span><span class="num pat-oper-fig">${escHtml(signedMoney(operational))}</span></div>`;
+  return containerHtml({ kind: "chart", label: t("patrimonio.composition.label"), body });
+}
+
+// ---- Cuentas ----------------------------------------------------------------------------------
+
+const ACCOUNT_TYPES = ["checking", "savings", "liability"];
+const TYPE_ORDER = Object.fromEntries(ACCOUNT_TYPES.map((k, i) => [k, i]));
+const typeLabel = (type) => t(`patrimonio.accountType.${ACCOUNT_TYPES.includes(type) ? type : "checking"}`);
+
+/** Cabecera de sección con el botón de añadir a la derecha (B-Patrimonio: «Cuentas» +). */
+function sectionWithAddHtml({ title, btnId, btnLabel }) {
+  return `<div class="pat-sec">${sectionHeaderHtml({ title })}`
+    + `<button type="button" class="icon-btn" id="${escAttr(btnId)}" aria-label="${escAttr(btnLabel)}">${icon("plus")}</button></div>`;
+}
+
+/** Icono de la cuenta por lo que es: tarjeta, banco, hucha (ahorro enlazado a un objetivo) o recibo. */
+function accountIcon(a, linkedGoal) {
+  if (a.type === "liability") return "debt";
+  if (a.type === "savings") return linkedGoal ? "piggy" : "bank";
+  return "card";
+}
+
+/** Línea 2 de la tarjeta, en HTML (texto en --fx; la cifra de la cuota, en tinta dim — C7):
+ *  corriente → «Corriente» / «Corriente, por defecto»; hucha → el objetivo al que sirve; pasivo con
+ *  cuota y saldo pendiente → «215,00 €/mes, quedan 20 cuotas»; el resto, su tipo. Un pasivo ya
+ *  pagado (saldo ≥ 0) no cuenta cuotas: «quedan 0 cuotas» se leería como un error. */
+function accountLineHtml(a, { isDefault, linkedGoal, accountLoans }) {
+  if (a.type === "checking") {
+    return escHtml(isDefault ? t("patrimonio.accountLine.checkingDefault", { type: typeLabel(a.type) }) : typeLabel(a.type));
+  }
+  if (a.type === "savings") return escHtml(linkedGoal ? linkedGoal.name : typeLabel(a.type));
+  const monthly = Object.hasOwn(accountLoans, a.id) ? accountLoans[a.id]?.monthlyCents : 0;
+  if (monthly > 0 && a.balance_cents < 0) {
+    const n = Math.ceil(Math.abs(a.balance_cents) / monthly);
+    return tNums("patrimonio.accountLine.installments", { amount: fmtMoney(monthly) }, { n });
+  }
+  return escHtml(typeLabel(a.type));
+}
+
+/** Tarjeta de cuenta (B-Patrimonio): tinte de su familia, baldosa 40 sobre --chip (la deuda, con
+ *  la trama), nombre 15/600, línea 2 y saldo mono 17/600 en tinta (la deuda con «−», también en
+ *  tinta: F-16). Ancha (fila) o media (apilada), según la rejilla. Toda la tarjeta abre la edición. */
+function accountCardHtml(a, { fam, wide, isDefault, linkedGoal, accountLoans }) {
+  const key = accountIcon(a, linkedGoal);
+  // Sin línea 2 cuando solo repetiría el nombre (una cuenta «Ahorro» de tipo Ahorro, B-Patrimonio).
+  const lineRaw = accountLineHtml(a, { isDefault, linkedGoal, accountLoans });
+  const line = lineRaw.trim().toLowerCase() === escHtml(a.name).trim().toLowerCase() ? "" : lineRaw;
+  const tile = isDebt(a)
+    ? `<span class="ent-tile ${famClass(fam)} acc-debt">${icon(key)}</span>`
+    : tileHtml({ fam, icon: key, onTint: true });
+  return `<button type="button" class="pat-acc ${famClass(fam) || "no-fam"}${wide ? " is-wide" : ""}" data-acc="${escAttr(a.id)}">
+      ${tile}
+      <span class="pat-acc-body">
+        <span class="pat-acc-name">${escHtml(a.name)}</span>
+        ${line ? `<span class="pat-acc-line">${line}</span>` : ""}
+      </span>
+      <span class="num pat-acc-fig">${escHtml(signedMoney(a.balance_cents))}</span>
     </button>`;
 }
 
-/** Cabecera de sección compartida por "Cuentas" y "Objetivos" (SISTEMA.md §4.6): título 15/600 +
- *  divisor de 1px + recuento en metaHtml (§1.3) + .icon-btn de 44px con icon("plus") a la
- *  derecha. El divisor es el mismo `.meta-sep` que publica ui.js — se reutiliza su markup en vez
- *  de duplicar la regla, aunque aquí no venga de una llamada a metaHtml (el título no es un
- *  segmento de metadatos: lleva su propio tamaño y color, --t-section/--ink, no --t-label/
- *  --ink-3). */
-function sectionHeaderHtml({ title, count, btnId, btnLabel }) {
-  return `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span class="section-title">${escHtml(title)}</span>
-        <span class="meta-sep" aria-hidden="true"></span>
-        ${metaHtml([count])}
-      </div>
-      <button type="button" class="icon-btn" id="${escAttr(btnId)}" aria-label="${escAttr(btnLabel)}">${icon("plus")}</button>
-    </div>`;
-}
-
-/** Tarjeta "Cuentas": una fila por cuenta activa (balancesAt ya excluye archivadas/borradas),
- *  separadas por <hr class="divider"> — réplica de Patrimonio.dc.html:61-125, + botón "Nueva
- *  cuenta" en la cabecera. Cada fila abre la subvista de edición. */
-function cuentasCardHtml(accounts, accountLoans) {
-  const n = accounts.length;
-  const header = sectionHeaderHtml({
-    title: t("patrimonio.accounts.title"),
-    count: t("patrimonio.accounts.countActive", { n }),
-    btnId: "btn-nueva-cuenta", btnLabel: t("patrimonio.accounts.new"),
-  });
-
-  if (n === 0) {
-    return `
-      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
-        ${header}
-        <div class="card" style="text-align:center;color:var(--ink-3);">${t("patrimonio.accounts.empty")}</div>
-      </div>`;
+/** Rejilla de cuentas (B-Patrimonio): corrientes y deudas a lo ancho; las de ahorro, de dos en
+ *  dos (si queda una suelta, va a lo ancho para no dejar un hueco). Orden: corriente, ahorro,
+ *  deuda (el de la barra). La cuenta «por defecto» es la primera corriente, como hasta ahora. */
+function cuentasHtml(accounts, { famOf, linkedGoalOf, accountLoans }) {
+  const header = sectionWithAddHtml({ title: t("patrimonio.accounts.title"), btnId: "btn-nueva-cuenta", btnLabel: t("patrimonio.accounts.new") });
+  if (accounts.length === 0) {
+    return `${header}${emptyStateHtml({ title: t("patrimonio.accounts.empty"), rows: 1 })}`;
   }
-
-  const firstCheckingId = accounts.find((a) => a.type === "checking")?.id;
-  const rowsHtml = accounts.map((a) => cuentaRowHtml(a, a.id === firstCheckingId, accountLoans)).join('<hr class="divider">');
-
-  return `
-    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
-      ${header}
-      <div style="display:flex;flex-direction:column;">
-        ${rowsHtml}
-      </div>
-    </div>`;
+  const defaultId = accounts.find((a) => a.type === "checking")?.id;
+  const sorted = [...accounts].sort((x, y) => (TYPE_ORDER[x.type] ?? 0) - (TYPE_ORDER[y.type] ?? 0));
+  const savings = sorted.filter((a) => a.type === "savings");
+  const loneSavingsId = savings.length % 2 === 1 ? savings[savings.length - 1].id : null;
+  const cards = sorted.map((a) => accountCardHtml(a, {
+    fam: famOf(a),
+    wide: a.type !== "savings" || a.id === loneSavingsId,
+    isDefault: a.id === defaultId,
+    linkedGoal: linkedGoalOf(a),
+    accountLoans,
+  })).join("");
+  return `${header}<div class="pat-grid">${cards}</div>`;
 }
 
-// ---- tarjeta "Objetivos" ---------------------------------------------------
+// ---- Objetivos --------------------------------------------------------------------------------
 
-const LEVEL_COLOR = { ok: "var(--pos)", warn: "var(--warn)", over: "var(--danger)" };
+const GOAL_TYPES = ["emergency_fund", "savings_target", "provision", "spending_cap", "savings_rate"];
+const goalTypeLabel = (type) => t(`patrimonio.goalType.${GOAL_TYPES.includes(type) ? type : "emergency_fund"}`);
 
-const GOAL_TYPES = [
-  { id: "emergency_fund", labelKey: "patrimonio.goalType.emergency_fund" },
-  { id: "savings_target", labelKey: "patrimonio.goalType.savings_target" },
-  { id: "provision", labelKey: "patrimonio.goalType.provision" },
-  { id: "spending_cap", labelKey: "patrimonio.goalType.spending_cap" },
-  { id: "savings_rate", labelKey: "patrimonio.goalType.savings_rate" },
-];
-const GOAL_TYPE_KEY = Object.fromEntries(GOAL_TYPES.map((gt) => [gt.id, gt.labelKey]));
-
-// Tipos con hucha propia (mismo criterio que repo.js#HUCHA_GOAL_TYPES): al crearlos sin cuenta
-// se les crea una savings dedicada — el formulario (renderGoalForm) usa este set para saber
-// cuándo mostrar la nota/bloque de "hucha vinculada" al editar. Ya NO decide el layout de la
-// fila en la tarjeta Objetivos (Task 6, P2): los tres tipos de goal se pintan igual, en barra —
-// spec §3.1.9, "barra para los tres, nunca anillo".
+// Tipos con hucha propia (mismo criterio que repo.js#HUCHA_GOAL_TYPES): al crearlos sin cuenta se
+// les crea una savings dedicada. El formulario lo usa para la fila y la nota de la hucha.
 const HUCHA_GOAL_TYPES = new Set(["emergency_fund", "savings_target", "provision"]);
+// La hucha que createGoal creará (savings enlazada a su objetivo): da la familia del bloque del
+// formulario de un objetivo nuevo con hucha, antes de que exista la cuenta.
+const NEW_HUCHA = { id: "nueva-hucha", type: "savings" };
 
-/** savings_rate guarda puntos porcentuales en currentCents/targetCents (ver repo.goalProgress):
- *  se muestran como "%", el resto de tipos como € (fmtMoney). */
+/** savings_rate guarda puntos porcentuales en currentCents/targetCents (repo.goalProgress): se
+ *  muestran como «%»; el resto, como importe. */
 function fmtGoalAmount(goal, cents) {
   return goal.type === "savings_rate" ? `${fmtDec1(cents)} %` : fmtMoney(cents);
 }
 
-/** Fila de un goal, SIEMPRE en barra (§3.1.9 — nunca anillo, ya no hay ring): título + "actual /
- *  objetivo", barra .bar de 8px, y al pie "{current} de {target}" + la etiqueta corta del tipo
- *  (Hucha / Límite de gasto, D15 — las frases largas de repo.goalProgress se quedan donde ya
- *  estaban, p.ej. PeriodoNuevo) unidos con el divisor de metaHtml, y el porcentaje a la derecha —
- *  réplica de Patrimonio.dc.html:138-190. El color (verde/ámbar/rojo) sigue el `level` de
- *  repo.goalProgress: solo se colorea texto cuando level≠'ok'; la barra es la única que lleva
- *  siempre su color de estado. Solo la fila SIN hucha (spending_cap) lleva `.dotico.sm` con el
- *  emoji de su categoría, delante del nombre. La fila entera es un botón: abre la subvista de
- *  edición. */
-function goalBarRowHtml(g, byId) {
+/** Tarjeta de objetivo (B-Patrimonio, con medidor en vez de anillo según el brief de S3): tinte de
+ *  la familia de su cuenta (C8) o, sin cuenta (techo de gasto, tasa de ahorro), --raised con borde
+ *  y medidor --idle (C11). Nombre, medidor, «actual de objetivo» en --fx con las cifras en tinta y
+ *  el porcentaje a la derecha; un techo de gasto sobrepasado lo marca en --neg (C4). */
+function goalCardHtml(g, { fam, wide }) {
   const { goal, currentCents, targetCents, pct, level } = g;
-  const barColor = LEVEL_COLOR[level];
-  const stateColor = level === "ok" ? null : LEVEL_COLOR[level];
-  const barPct = Math.min(100, Math.max(0, pct));
-  const isCap = goal.type === "spending_cap";
-  const doticoHtml = isCap
-    ? `<div class="dotico sm" style="--cat:${colorForCategory(goal.category_id, byId)};" aria-hidden="true">${catSvg(iconForCategory(goal.category_id, byId), { size: "1em" })}</div>`
-    : "";
-  const kindLabel = t(isCap ? "patrimonio.goals.kind.cap" : "patrimonio.goals.kind.savings");
-
-  return `
-    <button type="button" data-goal="${goal.id}"
-      style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;flex-direction:column;gap:9px;">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
-        <div style="display:flex;align-items:center;gap:10px;min-width:0;">
-          ${doticoHtml}
-          <span style="font-size:15px;font-weight:600;color:var(--ink);">${escHtml(goal.name)}</span>
-        </div>
-        <div class="num" style="font-size:15px;font-weight:600;color:${stateColor ?? "var(--ink)"};white-space:nowrap;flex-shrink:0;">
-          ${fmtGoalAmount(goal, currentCents)} <span style="color:var(--ink-3);">/ ${fmtGoalAmount(goal, targetCents)}</span>
-        </div>
-      </div>
-      <div class="bar" style="--cat:${barColor};">
-        <i style="width:${barPct}%;"></i>
-      </div>
-      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
-        ${metaHtml([t("patrimonio.goals.ofTarget", { current: fmtGoalAmount(goal, currentCents), target: fmtGoalAmount(goal, targetCents) }), kindLabel])}
-        <span class="num" style="font-size:12px;font-weight:700;color:${stateColor ?? "var(--ink-2)"};white-space:nowrap;flex-shrink:0;">${Math.round(pct)} %</span>
-      </div>
+  const pctRound = Math.round(pct);
+  const line = tNums("patrimonio.goals.ofTarget", { current: fmtGoalAmount(goal, currentCents), target: fmtGoalAmount(goal, targetCents) });
+  return `<button type="button" class="pat-goal ${famClass(fam) || "no-fam"}${wide ? " is-wide" : ""}" data-goal="${escAttr(goal.id)}">
+      <span class="pat-goal-name">${escHtml(goal.name)}</span>
+      ${meterHtml({ fam, value: Math.max(0, pct), max: 100, onTint: Boolean(fam), label: t("patrimonio.goals.progress", { name: goal.name, pct: pctRound }) })}
+      <span class="pat-goal-foot">
+        <span class="pat-goal-line">${line}</span>
+        <span class="num pat-goal-pct${level === "over" ? " is-over" : ""}">${pctRound} %</span>
+      </span>
     </button>`;
 }
 
-/** Tarjeta "Objetivos": una fila por goal activo, siempre en barra — réplica de
- *  Patrimonio.dc.html:127-190, + botón "Nuevo objetivo" en la cabecera. Cada fila abre la
- *  subvista de edición. */
-function objetivosCardHtml(goals, byId) {
-  const n = goals.length;
-  const header = sectionHeaderHtml({
-    title: t("patrimonio.goals.title"),
-    count: t("patrimonio.goals.countActive", { n }),
-    btnId: "btn-nuevo-objetivo", btnLabel: t("patrimonio.goals.new"),
-  });
-
-  if (n === 0) {
-    return `
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        ${header}
-        <div class="card" style="text-align:center;color:var(--ink-3);">${t("patrimonio.goals.empty")}</div>
-      </div>`;
-  }
-
-  return `
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      ${header}
-      <div style="display:flex;flex-direction:column;gap:24px;">
-        ${goals.map((g) => goalBarRowHtml(g, byId)).join("")}
-      </div>
-    </div>`;
+function objetivosHtml(goals, goalFamOf) {
+  const header = sectionWithAddHtml({ title: t("patrimonio.goals.title"), btnId: "btn-nuevo-objetivo", btnLabel: t("patrimonio.goals.new") });
+  if (goals.length === 0) return `${header}${emptyStateHtml({ title: t("patrimonio.goals.empty"), rows: 1 })}`;
+  const odd = goals.length % 2 === 1;
+  const cards = goals.map((g, i) => goalCardHtml(g, { fam: goalFamOf(g.goal), wide: odd && i === goals.length - 1 })).join("");
+  return `${header}<div class="pat-grid">${cards}</div>`;
 }
 
-/** Pantalla "Patrimonio" (Task 13 + formularios de Task 14): cabecera + tarjeta de patrimonio
- *  neto (con su evolución) + tarjeta Cuentas + tarjeta Objetivos, con subvistas de formulario
- *  para crear/editar cuentas y objetivos (mismo patrón detalle que movimientos.js/recurrentes.js:
- *  view interno 'main' | 'account-form' | 'goal-form', sin onBack — Patrimonio es pestaña de
- *  nivel superior, la subvista siempre vuelve a su propio 'main'). */
+// ---- Pantalla ---------------------------------------------------------------------------------
+
+/** Pantalla «Patrimonio»: Display, composición, cuentas y objetivos, con subvistas de formulario
+ *  para crear/editar cuentas y objetivos (view interno 'main' | 'account-form' | 'goal-form', sin
+ *  onBack: Patrimonio es pestaña de nivel superior y la subvista vuelve a su propio 'main'). El
+ *  detalle de cuenta (B-6) y de objetivo (B-7) es lógica nueva bloqueada: un toque sigue abriendo
+ *  la edición. */
 export async function renderPatrimonio(container) {
-  let series, accounts, goals, expenseRootCats, byId, accountLoans;
+  let series, accounts, goals, expenseRootCats, byId, accountLoans, accountStyle;
 
   async function loadData() {
-    // accountLoans (meta.account_loans, Task 6): a diferencia de category_style, que se
-    // inicializa como singleton en el boot (main.js) porque colorForCategory/iconForCategory se
-    // llaman desde varias pantallas, account_loans SOLO lo usa Patrimonio (accountSubtitle) — se
-    // carga aquí en cada loadData en vez de un estado global, sin tocar main.js.
-    [series, accounts, goals, expenseRootCats, byId, accountLoans] = await Promise.all([
+    // accountLoans y accountStyle (meta.account_loans / meta.account_style) solo los usa esta
+    // pantalla: se leen en cada loadData, sin estado global (mismo criterio que getAccountLoans).
+    [series, accounts, goals, expenseRootCats, byId, accountLoans, accountStyle] = await Promise.all([
       netWorthSeries(), balancesAt(hoyISO()), goalsWithProgress(), listExpenseRootCategories(), allCategoriesById(),
-      getAccountLoans(),
+      getAccountLoans(), getAccountStyle(),
     ]);
   }
 
@@ -278,7 +251,11 @@ export async function renderPatrimonio(container) {
     return;
   }
 
-  const accountNameById = () => Object.fromEntries(accounts.map((a) => [a.id, a.name]));
+  const rawGoals = () => goals.map((g) => g.goal);
+  const accountsById = () => Object.fromEntries(accounts.map((a) => [a.id, a]));
+  const famOf = (a) => familyForAccount(a, accountStyle, rawGoals());
+  const linkedGoalOf = (a) => rawGoals().find((g) => g.account_id && g.account_id === a.id) ?? null;
+  const goalFamOf = (goal) => goalFamily(goal, accountsById(), accountStyle);
 
   const state = {
     view: "main",
@@ -288,6 +265,8 @@ export async function renderPatrimonio(container) {
   };
   let errorMsg = "";
 
+  const errorHtml = () => (errorMsg ? `<div class="banner-aviso red">${escHtml(errorMsg)}</div>` : "");
+
   function backToMain() {
     state.view = "main";
     state.editingAccountId = null; state.accountForm = null;
@@ -296,11 +275,26 @@ export async function renderPatrimonio(container) {
     render();
   }
 
+  /** Tras un render que rehace el formulario, devuelve el foco al control que lo pidió (K12). */
+  function refocus(selector) {
+    container.querySelector(selector)?.focus();
+  }
+
+  function shake(id) {
+    const b = container.querySelector(`#${id}`);
+    if (!b) return;
+    b.classList.add("shake");
+    setTimeout(() => b.classList.remove("shake"), 400);
+  }
+
   // ---- subvista: formulario de cuenta --------------------------------------
 
   function openAccountNew() {
     state.editingAccountId = null;
-    state.accountForm = { name: "", type: "checking", raw: "", cents: 0, sign: "+", loanRaw: "", loanCents: 0 };
+    state.accountForm = {
+      name: "", type: "checking", raw: "", cents: 0, sign: "+", loanRaw: "", loanCents: 0,
+      fam: defaultFamilyForAccount({ type: "checking" }, []), famTouched: false, hasOverride: false,
+    };
     errorMsg = "";
     pushBack(backToMain);
     state.view = "account-form";
@@ -323,15 +317,16 @@ export async function renderPatrimonio(container) {
     }
     if (!row) { state.opening = false; return; }
     state.editingAccountId = id;
-    // monthlyCents (Task 6): precarga desde accountLoans (cargado en loadData), no desde `row` —
-    // vive en meta.account_loans, no en la tabla accounts (config-in-meta, sin migración).
+    // monthlyCents: de accountLoans (meta.account_loans), no de `row` — no vive en la tabla.
     const monthlyCents = accountLoans[id]?.monthlyCents ?? 0;
     state.accountForm = {
       name: row.name, type: row.type,
-      raw: centsToRaw(row.opening_balance_cents),
+      raw: centsToRaw(Math.abs(row.opening_balance_cents)),
       cents: Math.abs(row.opening_balance_cents),
       sign: row.opening_balance_cents < 0 ? "-" : "+",
-      loanRaw: centsToRaw(monthlyCents), loanCents: monthlyCents,
+      loanRaw: monthlyCents ? centsToRaw(monthlyCents) : "", loanCents: monthlyCents,
+      fam: familyForAccount(row, accountStyle, rawGoals()), famTouched: false,
+      hasOverride: Object.hasOwn(accountStyle, id),
     };
     errorMsg = "";
     pushBack(backToMain);
@@ -340,55 +335,70 @@ export async function renderPatrimonio(container) {
     render();
   }
 
+  /** Quién usa ya cada familia (para «la usa X» / «la misma que X», C8): primero las otras
+   *  cuentas, luego las categorías raíz de gasto. La colisión se acepta; el icono las distingue. */
+  function familyUsers(excludeAccountId) {
+    const users = {};
+    for (const a of accounts) {
+      if (a.id === excludeAccountId) continue;
+      const fam = famOf(a);
+      if (fam && !users[fam]) users[fam] = a.name;
+    }
+    for (const c of expenseRootCats) {
+      const fam = familyForCategory(c.id, byId);
+      if (fam && !users[fam]) users[fam] = c.name;
+    }
+    return users;
+  }
+
   function renderAccountForm() {
     const f = state.accountForm;
     const editing = !!state.editingAccountId;
+    const users = familyUsers(state.editingAccountId);
+    const colorName = (fam) => t(`families.${fam}`);
+    const swatches = familySwatchesHtml({
+      id: "cuenta-fam",
+      label: t("patrimonio.account.color"),
+      value: f.fam,
+      options: FAMILIES.map((fam) => ({
+        fam,
+        label: users[fam] ? t("patrimonio.account.colorUsedBy", { color: colorName(fam), name: users[fam] }) : colorName(fam),
+      })),
+    });
+    const famHint = users[f.fam]
+      ? escHtml(t("patrimonio.account.colorShared", { color: colorName(f.fam), name: users[f.fam] }))
+        .replace(escHtml(colorName(f.fam)), `<b class="pat-hint-strong">${escHtml(colorName(f.fam))}</b>`)
+      : `<b class="pat-hint-strong">${escHtml(colorName(f.fam))}</b>`;
 
     container.innerHTML = `
       ${subHeaderHtml({ id: "cuenta-back", title: editing ? t("patrimonio.account.title.edit") : t("patrimonio.accounts.new") })}
+      <div class="pat-form">
+        <section class="pat-group">
+          ${sectionHeaderHtml({ title: t("patrimonio.account.settings"), level: "group" })}
+          <div class="pat-block ${famClass(f.fam) || "no-fam"}">
+            ${fieldHtml({ id: "cuenta-name", label: t("common.name"), value: f.name, placeholder: t("common.egPlaceholder", { example: "Revolut" }) })}
+            <div class="pat-field">
+              <span class="ctl-field-label" id="cuenta-tipo-label">${escHtml(t("common.typeLabel"))}</span>
+              ${segmentedHtml({ id: "cuenta-tipo", name: t("common.typeLabel"), labelledBy: "cuenta-tipo-label", value: f.type, options: ACCOUNT_TYPES.map((k) => ({ value: k, label: typeLabel(k) })) })}
+            </div>
+            <div class="pat-amount-row">
+              <button type="button" class="icon-btn pat-sign" id="cuenta-sign" aria-label="${escAttr(t("common.changeSign"))}">${f.sign === "-" ? MINUS : "+"}</button>
+              ${fieldHtml({ id: "cuenta-raw", label: t("patrimonio.account.openingBalance"), value: f.raw, inputmode: "decimal", placeholder: "0", num: true, suffix: currencySymbol() })}
+            </div>
+            ${f.type === "liability" ? fieldHtml({ id: "cuenta-loan-raw", label: t("patrimonio.account.monthlyInstallment"), value: f.loanRaw, inputmode: "decimal", placeholder: "0", num: true, suffix: currencySymbol() }) : ""}
+          </div>
+          <p class="pat-help">${escHtml(t(f.type === "liability" ? "patrimonio.account.note.liability" : "patrimonio.account.note.default"))}</p>
+        </section>
 
-      <label class="field field-stack" style="margin-bottom:18px;">
-        <span class="field-label">${t("common.name")}</span>
-        <input type="text" id="cuenta-name" value="${escAttr(f.name)}" placeholder="${t("common.egPlaceholder", { example: "Revolut" })}">
-      </label>
+        <section class="pat-group">
+          ${sectionHeaderHtml({ title: t("patrimonio.account.color"), level: "group" })}
+          ${swatches}
+          <p class="pat-help ${famClass(f.fam)}">${famHint}</p>
+        </section>
 
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <span class="field-label">${t("common.typeLabel")}</span>
-        <div class="chips">
-          ${ACCOUNT_TYPES.map((at) => `<button type="button" class="chip${f.type === at.id ? " active" : ""}" data-acc-tipo="${at.id}">${t(at.labelKey)}</button>`).join("")}
-        </div>
+        ${errorHtml()}
+        ${buttonHtml({ kind: "primary", id: "cuenta-save", label: editing ? t("common.saveChanges") : t("patrimonio.account.create") })}
       </div>
-
-      <div style="display:flex; flex-direction:column; gap:4px; padding-bottom:8px; margin-bottom:8px; border-bottom:2px solid var(--accent);">
-        <span style="font-size:13px;font-weight:500;color:var(--accent);">${t("patrimonio.account.openingBalance")}</span>
-        <div class="amount-display" style="align-items:center;">
-          <button type="button" class="icon-btn" id="cuenta-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;">${f.sign}</button>
-          <input type="text" inputmode="decimal" id="cuenta-raw" value="${escAttr(f.raw)}" placeholder="0"
-            style="border:0;background:none;color:var(--ink);font:600 36px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
-          <span class="amount-currency" style="font-size:17px;">${currencySymbol()}</span>
-          <span style="width:2px;height:30px;background:var(--accent);margin-left:4px;flex-shrink:0;" aria-hidden="true"></span>
-        </div>
-      </div>
-      <div style="font-size:11px;color:var(--ink-3);margin-bottom:18px;">
-        ${f.type === "liability"
-          ? t("patrimonio.account.note.liability")
-          : t("patrimonio.account.note.default")}
-      </div>
-
-      ${f.type === "liability" ? `
-      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
-        <div class="section-title">${t("patrimonio.account.monthlyInstallment")}</div>
-        <div class="amount-display" style="align-items:center;">
-          <input type="text" inputmode="decimal" id="cuenta-loan-raw" value="${escAttr(f.loanRaw)}" placeholder="0"
-            style="border:0;background:none;color:var(--ink);font:600 32px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
-          <span class="amount-currency">${currencySymbol()}</span>
-        </div>
-        <hr class="divider" style="margin-top:6px;">
-      </div>` : ""}
-
-      ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
-
-      <button type="button" class="btn-primary" id="cuenta-save">${editing ? t("common.saveChanges") : t("patrimonio.account.create")}</button>
     `;
 
     wireAccountForm();
@@ -397,35 +407,48 @@ export async function renderPatrimonio(container) {
   function wireAccountForm() {
     const f = state.accountForm;
     container.querySelector("#cuenta-back").onclick = () => goBack();
-
     container.querySelector("#cuenta-name").oninput = (e) => { f.name = e.target.value; };
 
-    container.querySelectorAll("[data-acc-tipo]").forEach((b) => {
+    wireSegmented(container.querySelector("#cuenta-tipo"), (type) => {
+      f.type = type;
+      // Solo empuja el signo a negativo si el importe todavía no se ha tocado: no pisa un
+      // valor que el usuario ya haya escrito a mano.
+      if (f.type === "liability" && f.cents === 0) f.sign = "-";
+      // La familia sigue al tipo mientras nadie la haya elegido (C8: por defecto según el tipo).
+      if (!f.famTouched && !f.hasOverride) {
+        f.fam = defaultFamilyForAccount({ id: state.editingAccountId, type }, rawGoals());
+      }
+      render();
+      refocus('#cuenta-tipo [aria-checked="true"]');
+    });
+
+    container.querySelectorAll("#cuenta-fam [data-fam]").forEach((b) => {
       b.onclick = () => {
-        f.type = b.dataset.accTipo;
-        // Solo empuja el signo a negativo si el importe todavía no se ha tocado: no pisa un
-        // valor que el usuario ya haya escrito a mano.
-        if (f.type === "liability" && f.cents === 0) f.sign = "-";
+        f.fam = b.dataset.fam;
+        f.famTouched = true;
         render();
+        refocus(`#cuenta-fam [data-fam="${f.fam}"]`);
       };
     });
 
-    container.querySelector("#cuenta-sign").onclick = () => { f.sign = f.sign === "+" ? "-" : "+"; render(); };
+    container.querySelector("#cuenta-sign").onclick = () => {
+      f.sign = f.sign === "+" ? "-" : "+";
+      render();
+      refocus("#cuenta-sign");
+    };
 
     container.querySelector("#cuenta-raw").oninput = (e) => {
       f.raw = e.target.value;
-      f.cents = parseCentsRaw(f.raw);
+      // Math.abs: el signo lo pone el botón, no lo tecleado.
+      f.cents = Math.abs(parseCentsRaw(f.raw));
       errorMsg = "";
     };
 
     const loanRawInput = container.querySelector("#cuenta-loan-raw");
     if (loanRawInput) loanRawInput.oninput = (e) => {
       f.loanRaw = e.target.value;
-      // Math.abs: a diferencia de #cuenta-raw (saldo), este campo no tiene botón de signo — pero
-      // parseCentsRaw respeta el signo tecleado (el flip queda siempre en el llamante, ver
-      // format.js). En un pasivo el signo de #cuenta-raw ya suele ser "-": sin este abs, un usuario
-      // que teclee "-189" aquí guardaría monthlyCents negativo, que setAccountLoan interpretaría
-      // como "borrar la cuota" en silencio, sin ningún aviso.
+      // Math.abs: sin él, un «-189» tecleado guardaría monthlyCents negativo, que setAccountLoan
+      // interpretaría como «borrar la cuota» en silencio.
       f.loanCents = Math.abs(parseCentsRaw(f.loanRaw));
       errorMsg = "";
     };
@@ -435,18 +458,14 @@ export async function renderPatrimonio(container) {
       if (!f.name.trim()) {
         errorMsg = t("patrimonio.account.validation.name");
         render();
-        const savedBtn = container.querySelector("#cuenta-save");
-        savedBtn.classList.add("shake");
-        setTimeout(() => savedBtn.classList.remove("shake"), 400);
+        shake("cuenta-save");
         return;
       }
       btn.disabled = true;
       try {
         const openingBalanceCents = f.sign === "-" ? -f.cents : f.cents;
-        // Cuota mensual (Task 6): solo se persiste para pasivos — un tipo distinto manda
-        // monthlyCents 0, que setAccountLoan interpreta como "borrar la entrada" (p.ej. si el
-        // usuario cambia el tipo de la cuenta de pasivo a otra cosa, no debe quedar una cuota
-        // huérfana en meta.account_loans).
+        // Cuota mensual: solo en pasivos. Otro tipo manda 0, que setAccountLoan lee como «borrar
+        // la entrada» (no queda una cuota huérfana al pasar de pasivo a otra cosa).
         const monthlyCents = f.type === "liability" ? f.loanCents : 0;
         let accountId = state.editingAccountId;
         if (accountId) {
@@ -455,6 +474,12 @@ export async function renderPatrimonio(container) {
           accountId = await createAccount({ name: f.name.trim(), type: f.type, openingBalanceCents });
         }
         await setAccountLoan(accountId, monthlyCents);
+        // Familia (C8): solo se escribe si se eligió a mano. Si coincide con la de su tipo, se
+        // borra el override para que siga al tipo.
+        if (f.famTouched) {
+          const byDefault = defaultFamilyForAccount({ id: accountId, type: f.type }, rawGoals());
+          await setAccountFamily(accountId, f.fam === byDefault ? null : f.fam);
+        }
         await loadData();
         goBack();
       } catch (e) {
@@ -470,8 +495,8 @@ export async function renderPatrimonio(container) {
   function openGoalNew() {
     state.editingGoalId = null;
     state.goalForm = {
-      name: "", type: "emergency_fund", raw: "", cents: 0, months: "", pct: "",
-      targetDate: "", categoryId: null, isActive: true, accountName: "",
+      name: "", type: "emergency_fund", raw: "", cents: 0, months: 3, pct: "",
+      targetDate: "", categoryId: null, isActive: true, accountName: "", goal: null,
     };
     errorMsg = "";
     pushBack(backToMain);
@@ -483,14 +508,15 @@ export async function renderPatrimonio(container) {
     state.editingGoalId = goal.id;
     state.goalForm = {
       name: goal.name, type: goal.type,
-      raw: centsToRaw(goal.target_amount_cents ?? 0),
+      raw: goal.target_amount_cents ? centsToRaw(goal.target_amount_cents) : "",
       cents: goal.target_amount_cents ?? 0,
-      months: goal.target_months != null ? String(goal.target_months) : "",
+      months: goal.target_months != null ? Number(goal.target_months) : 3,
       pct: goal.target_pct != null ? String(goal.target_pct).replace(".", ",") : "",
       targetDate: goal.target_date || "",
       categoryId: goal.category_id || null,
       isActive: !!goal.is_active,
-      accountName: accountNameById()[goal.account_id] ?? "",
+      accountName: accountsById()[goal.account_id]?.name ?? "",
+      goal,
     };
     errorMsg = "";
     pushBack(backToMain);
@@ -502,8 +528,7 @@ export async function renderPatrimonio(container) {
     const f = state.goalForm;
     if (!f.name.trim()) return t("patrimonio.goal.validation.name");
     if (f.type === "emergency_fund") {
-      const m = parseInt(f.months, 10);
-      if (!m || m < 1) return t("patrimonio.goal.validation.months");
+      if (!(f.months >= 1)) return t("patrimonio.goal.validation.months");
     } else if (f.type === "savings_target" || f.type === "provision") {
       if (f.cents <= 0) return t("patrimonio.goal.validation.amount");
     } else if (f.type === "spending_cap") {
@@ -518,10 +543,8 @@ export async function renderPatrimonio(container) {
 
   /** Arma los fields camelCase que espera createGoal/updateGoal. Los 3 campos NULLABLE_NUM
    *  (target_amount_cents/target_months/target_pct) se ponen a `null` EXPLÍCITAMENTE salvo el
-   *  que use el tipo elegido — así al editar un goal y cambiarle el tipo, los campos del tipo
-   *  anterior se limpian en vez de quedar con un valor obsoleto. accountId no se toca aquí:
-   *  al crear, createGoal decide sola si le crea hucha; al editar, updateGoal conserva la
-   *  cuenta ya vinculada (no se permite cambiarla desde este formulario). */
+   *  que use el tipo elegido. accountId no se toca aquí: al crear, createGoal decide sola si le
+   *  crea hucha; al editar, updateGoal conserva la cuenta ya vinculada. */
   function buildGoalFields() {
     const f = state.goalForm;
     const fields = {
@@ -529,7 +552,7 @@ export async function renderPatrimonio(container) {
       targetAmountCents: null, targetMonths: null, targetPct: null,
       targetDate: "", categoryId: "", isActive: f.isActive,
     };
-    if (f.type === "emergency_fund") fields.targetMonths = parseInt(f.months, 10) || null;
+    if (f.type === "emergency_fund") fields.targetMonths = f.months || null;
     if (f.type === "savings_target") { fields.targetAmountCents = f.cents; fields.targetDate = f.targetDate || ""; }
     if (f.type === "provision") fields.targetAmountCents = f.cents;
     if (f.type === "spending_cap") { fields.targetAmountCents = f.cents; fields.categoryId = f.categoryId || ""; }
@@ -537,148 +560,90 @@ export async function renderPatrimonio(container) {
     return fields;
   }
 
-  function renderGoalConditionalFields(f) {
+  /** Campos que dependen del tipo: meses (paso a paso, B-Objetivo), porcentaje, importe, fecha y
+   *  categoría del techo de gasto (chips de filtro con la familia de cada categoría). */
+  function goalConditionalHtml(f) {
     if (f.type === "emergency_fund") {
-      return `
-      <label class="field field-stack" style="margin-bottom:18px;">
-        <span class="field-label">${t("patrimonio.goal.monthsLabel")}</span>
-        <input type="number" min="1" id="goal-months" value="${escAttr(f.months)}" placeholder="${t("common.egPlaceholder", { example: "3" })}">
-      </label>`;
+      return `<div class="pat-row">
+        <span class="pat-row-label" id="goal-months-label">${escHtml(t("patrimonio.goal.monthsLabel"))}</span>
+        ${stepperHtml({ id: "goal-months", value: String(f.months), decId: "goal-months-dec", incId: "goal-months-inc", decLabel: t("patrimonio.goal.monthLess"), incLabel: t("patrimonio.goal.monthMore") })}
+      </div>`;
     }
     if (f.type === "savings_rate") {
-      return `
-      <label class="field field-stack" style="margin-bottom:18px;">
-        <span class="field-label">${t("patrimonio.goal.pctLabel")}</span>
-        <input type="text" inputmode="decimal" id="goal-pct" value="${escAttr(f.pct)}" placeholder="${t("common.egPlaceholder", { example: "20" })}">
-      </label>`;
+      return fieldHtml({ id: "goal-pct", label: t("patrimonio.goal.pctLabel"), value: f.pct, inputmode: "decimal", placeholder: "20", num: true, suffix: "%" });
     }
-    // savings_target / provision / spending_cap: los 3 llevan un importe objetivo, "Meta" a 34px
-    // (campo destacado en --accent, D13) en vez de los 56px de un héroe de pantalla.
     const amountLabel = f.type === "provision" ? t("patrimonio.goal.amountLabel.annual") : t("patrimonio.goal.amountLabel.default");
-    const amountHtml = `
-      <div style="display:flex; flex-direction:column; gap:4px; padding-bottom:8px; margin-bottom:8px; border-bottom:2px solid var(--accent);">
-        <span style="font-size:13px;font-weight:500;color:var(--accent);">${amountLabel}</span>
-        <div class="amount-display" style="align-items:center;">
-          <input type="text" inputmode="decimal" id="goal-raw" value="${escAttr(f.raw)}" placeholder="0"
-            style="border:0;background:none;color:var(--ink);font:600 34px var(--font-num);letter-spacing:-0.015em;width:100%;outline:none;">
-          <span class="amount-currency" style="font-size:15px;">${currencySymbol()}</span>
-          <span style="width:2px;height:28px;background:var(--accent);margin-left:4px;flex-shrink:0;" aria-hidden="true"></span>
-        </div>
-      </div>`;
-
+    const amount = fieldHtml({ id: "goal-raw", label: amountLabel, value: f.raw, inputmode: "decimal", placeholder: "0", num: true, suffix: currencySymbol() });
     if (f.type === "savings_target") {
-      // Misma caja + input nativo transparente que mov-fecha (movimientos.js#fechaBoxHtml,
-      // .field-date en app.css): el input real queda a sangre encima (opacity:0) de una caja que
-      // muestra dd/mm/aaaa en mono con el icono del sistema, en vez del <input type="date"> nativo
-      // desnudo — mismo componente reutilizado, sin CSS nuevo.
-      const display = f.targetDate
-        ? new Date(f.targetDate + "T12:00:00").toLocaleDateString(appLocale(), { day: "2-digit", month: "2-digit", year: "numeric" })
-        : "";
-      return `${amountHtml}
-      <label class="field field-stack" style="margin-bottom:18px;">
-        <span class="field-label">${t("patrimonio.goal.dateLabel")}</span>
-        <div class="field-date">
-          ${icon("calendar", { size: 18, stroke: "var(--ink-3)" })}
-          <span class="num" style="font-size:13px;font-weight:500;">${escHtml(display)}</span>
-          <input type="date" id="goal-date" value="${escAttr(f.targetDate)}" aria-label="${escAttr(t("patrimonio.goal.dateLabel"))}">
-        </div>
-      </label>`;
+      return `${amount}${fieldHtml({ id: "goal-date", label: t("patrimonio.goal.dateLabel"), type: "date", value: f.targetDate })}`;
     }
-
     if (f.type === "spending_cap") {
-      return `${amountHtml}
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">${t("common.category")}</div>
-        <div class="chips-scroll">
-          ${expenseRootCats.map((c) => {
-            const color = colorForCategory(c.id, byId);
-            const catIcon = catSvg(iconForCategory(c.id, byId), { size: "1em" });
-            const active = f.categoryId === c.id;
-            return `<button type="button" class="chip-v${active ? " active" : ""}" data-goal-cat="${c.id}" style="--cat:${color};">
-              <span class="chip-icon">${catIcon}</span><span>${escHtml(c.name)}</span>
-            </button>`;
-          }).join("")}
-        </div>
-      </div>`;
+      const chips = expenseRootCats.map((c) => filterChipHtml({
+        fam: familyForCategory(c.id, byId), label: c.name, selected: f.categoryId === c.id, data: { goalCat: c.id },
+      })).join("");
+      return `${amount}
+        <div class="pat-field">
+          <span class="ctl-field-label" id="goal-cat-label">${escHtml(t("common.category"))}</span>
+          <div class="pat-chips" role="group" aria-labelledby="goal-cat-label">${chips}</div>
+        </div>`;
     }
-
-    return amountHtml; // provision
+    return amount; // provision
   }
 
   function renderGoalForm() {
     const f = state.goalForm;
     const editing = !!state.editingGoalId;
     const isHucha = HUCHA_GOAL_TYPES.has(f.type);
-    // "Ahorrado hoy" (spec §3.3.4): el dato ya está en `goals` (goalsWithProgress, cargado en
-    // loadData) — se busca por id en vez de recalcularlo. Solo existe editando: un goal nuevo
-    // todavía no tiene progreso que mostrar.
+    // La familia del bloque es la de su cuenta (C8). Uno nuevo con hucha tendrá una savings
+    // enlazada, cuya familia por defecto es la de hucha; sin hucha no hay familia (C11).
+    const fam = editing ? goalFamOf(f.goal) : isHucha ? defaultFamilyForAccount(NEW_HUCHA, [{ account_id: NEW_HUCHA.id }]) : null;
     const progress = editing ? goals.find((x) => x.goal.id === state.editingGoalId) : null;
 
-    const prevChipsScroll = container.querySelector(".chips-scroll")?.scrollLeft;
+    const typeHtml = editing
+      ? `<div class="pat-row"><span class="pat-row-label">${escHtml(t("common.typeLabel"))}</span><span class="pat-row-value">${escHtml(goalTypeLabel(f.type))}</span></div>`
+      : `<div class="pat-field">
+          <span class="ctl-field-label" id="goal-tipo-label">${escHtml(t("common.typeLabel"))}</span>
+          <div class="pat-chips" role="group" aria-labelledby="goal-tipo-label">
+            ${GOAL_TYPES.map((k) => filterChipHtml({ label: goalTypeLabel(k), selected: f.type === k, data: { goalTipo: k } })).join("")}
+          </div>
+        </div>`;
+
+    const progressHtml = progress ? containerHtml({
+      kind: "chart",
+      label: t("patrimonio.goal.savedToday"),
+      body: `<div class="pat-row">
+          <span class="pat-row-label">${escHtml(t("patrimonio.goal.savedToday"))}</span>
+          <span class="num pat-progress-fig">${escHtml(fmtGoalAmount(progress.goal, progress.currentCents))}</span>
+        </div>
+        ${meterHtml({ fam, value: Math.max(0, progress.pct), max: 100 })}
+        <span class="num pat-progress-pct">${Math.round(progress.pct)} %</span>`,
+    }) : "";
+
+    const helpKey = editing ? "patrimonio.goal.typeLockedNote" : isHucha ? "patrimonio.goal.autoSavingsNote" : "";
 
     container.innerHTML = `
       ${subHeaderHtml({ id: "goal-back", title: editing ? t("patrimonio.goal.title.edit") : t("patrimonio.goals.new") })}
+      <div class="pat-form">
+        ${progressHtml}
+        <section class="pat-group">
+          ${sectionHeaderHtml({ title: t("patrimonio.goal.settings"), level: "group" })}
+          <div class="pat-block ${famClass(fam) || "no-fam"}">
+            ${fieldHtml({ id: "goal-name", label: t("common.name"), value: f.name, placeholder: t("common.egPlaceholder", { example: goalTypeLabel(f.type) }) })}
+            ${typeHtml}
+            ${goalConditionalHtml(f)}
+            ${editing && isHucha ? `<div class="pat-row"><span class="pat-row-label">${escHtml(t("patrimonio.goal.linkedSavings"))}</span><span class="pat-row-value">${escHtml(f.accountName || "—")}</span></div>` : ""}
+            ${settingRowHtml({ id: "goal-active-row", label: t("patrimonio.goal.activeLabel"), controlHtml: switchHtml({ id: "goal-active", checked: f.isActive, label: t("patrimonio.goal.activeLabel") }) })}
+          </div>
+          ${helpKey ? `<p class="pat-help">${escHtml(t(helpKey))}</p>` : ""}
+        </section>
 
-      <label class="field field-stack" style="margin-bottom:18px;">
-        <span class="field-label">${t("common.name")}</span>
-        <input type="text" id="goal-name" value="${escAttr(f.name)}" placeholder="${t("common.egPlaceholder", { example: t(GOAL_TYPE_KEY[f.type]) })}">
-      </label>
-
-      ${editing ? `
-      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
-        <span class="field-label">${t("common.typeLabel")}</span>
-        <div style="padding:14px 16px;font-size:15px;font-weight:600;background:var(--card2);border-radius:var(--radius-sm);">${t(GOAL_TYPE_KEY[f.type])}</div>
-        <div style="font-size:11px;color:var(--ink-3);">${t("patrimonio.goal.typeLockedNote")}</div>
-      </div>` : `
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <span class="field-label">${t("common.typeLabel")}</span>
-        <div class="chips">
-          ${GOAL_TYPES.map((gt) => `<button type="button" class="chip${f.type === gt.id ? " active" : ""}" data-goal-tipo="${gt.id}">${t(gt.labelKey)}</button>`).join("")}
+        ${errorHtml()}
+        <div class="pat-actions">
+          ${buttonHtml({ kind: "primary", id: "goal-save", label: editing ? t("common.saveChanges") : t("patrimonio.goal.create") })}
+          ${editing ? buttonHtml({ kind: "tertiary-danger", id: "goal-delete", label: t("patrimonio.goal.delete"), icon: "trash" }) : ""}
         </div>
-      </div>`}
-
-      ${renderGoalConditionalFields(f)}
-
-      ${progress ? `
-      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px;">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
-          <span class="field-label">${t("patrimonio.goal.savedToday")}</span>
-          <div class="num" style="font-size:16px;font-weight:600;color:var(--ink);">${fmtGoalAmount(progress.goal, progress.currentCents)}</div>
-        </div>
-        <div class="bar" style="--cat:var(--pos);"><i style="width:${Math.min(100, Math.max(0, progress.pct))}%;"></i></div>
-        <span class="num" style="font-size:12px;font-weight:600;color:var(--ink-2);align-self:flex-end;">${Math.round(progress.pct)} %</span>
-      </div>` : ""}
-
-      ${isHucha ? `
-      <div class="card" style="padding:12px 14px; margin-bottom:18px;">
-        ${editing ? `
-        <div style="font-size:10px; color:var(--ink-3);">${t("patrimonio.goal.linkedSavings")}</div>
-        <div style="font-size:14px; font-weight:600;">${escHtml(f.accountName || "—")}</div>`
-          : `<div style="font-size:12px;color:var(--ink-2);">${t("patrimonio.goal.autoSavingsNote")}</div>`}
-      </div>` : ""}
-
-      <div class="card" style="padding:0 16px; margin-bottom:18px;">
-        <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
-          <span style="font-size:15px; font-weight:600;">${t("patrimonio.goal.activeLabel")}</span>
-          <span class="toggle">
-            <input type="checkbox" id="goal-active" ${f.isActive ? "checked" : ""}>
-            <span class="toggle-track"><span class="toggle-knob"></span></span>
-          </span>
-        </label>
       </div>
-
-      ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
-
-      <button type="button" class="btn-primary" id="goal-save" style="margin-bottom:${editing ? "10px" : "0"};">
-        ${editing ? t("common.saveChanges") : t("patrimonio.goal.create")}
-      </button>
-      ${editing ? `<button type="button" class="btn-danger" id="goal-delete">${t("patrimonio.goal.delete")}</button>` : ""}
     `;
-
-    if (prevChipsScroll != null) {
-      const chipsEl = container.querySelector(".chips-scroll");
-      if (chipsEl) chipsEl.scrollLeft = prevChipsScroll;
-    }
 
     wireGoalForm();
   }
@@ -693,6 +658,7 @@ export async function renderPatrimonio(container) {
         f.type = b.dataset.goalTipo;
         errorMsg = "";
         render();
+        refocus(`[data-goal-tipo="${f.type}"]`);
       };
     });
 
@@ -703,23 +669,40 @@ export async function renderPatrimonio(container) {
       errorMsg = "";
     };
 
-    const monthsInput = container.querySelector("#goal-months");
-    if (monthsInput) monthsInput.oninput = (e) => { f.months = e.target.value; errorMsg = ""; };
+    // Paso a paso de meses: se actualiza en su sitio (sin render), así el foco no se mueve.
+    const monthsValue = container.querySelector("#goal-months .ctl-stepper-value");
+    // Sin re-render el lector de pantalla no se entera del valor nuevo: se anuncia en vivo (K12).
+    monthsValue?.setAttribute("aria-live", "polite");
+    const stepMonths = (d) => {
+      f.months = Math.min(99, Math.max(1, (f.months || 1) + d));
+      if (monthsValue) monthsValue.textContent = String(f.months);
+      errorMsg = "";
+    };
+    const dec = container.querySelector("#goal-months-dec");
+    const inc = container.querySelector("#goal-months-inc");
+    if (dec) dec.onclick = () => stepMonths(-1);
+    if (inc) inc.onclick = () => stepMonths(1);
 
     const pctInput = container.querySelector("#goal-pct");
     if (pctInput) pctInput.oninput = (e) => { f.pct = e.target.value; errorMsg = ""; };
 
     const dateInput = container.querySelector("#goal-date");
-    // A diferencia de goal-raw/goal-months (oninput, sin render — perderían el foco en cada
-    // dígito), goal-date es onchange: solo dispara una vez elegida la fecha, así que puede
-    // re-renderizar para refrescar el texto dd/mm/aaaa de la caja (mismo criterio que mov-fecha).
-    if (dateInput) dateInput.onchange = (e) => { f.targetDate = e.target.value; render(); };
+    if (dateInput) dateInput.onchange = (e) => { f.targetDate = e.target.value; };
 
     container.querySelectorAll("[data-goal-cat]").forEach((b) => {
-      b.onclick = () => { f.categoryId = b.dataset.goalCat; errorMsg = ""; render(); };
+      b.onclick = () => {
+        f.categoryId = b.dataset.goalCat;
+        errorMsg = "";
+        render();
+        refocus(`[data-goal-cat="${f.categoryId}"]`);
+      };
     });
 
-    container.querySelector("#goal-active").onchange = (e) => { f.isActive = e.target.checked; };
+    const activeSwitch = container.querySelector("#goal-active");
+    activeSwitch.onclick = () => {
+      f.isActive = !f.isActive;
+      activeSwitch.setAttribute("aria-checked", f.isActive ? "true" : "false");
+    };
 
     container.querySelector("#goal-save").onclick = async () => {
       const btn = container.querySelector("#goal-save");
@@ -727,9 +710,7 @@ export async function renderPatrimonio(container) {
       if (msg) {
         errorMsg = msg;
         render();
-        const savedBtn = container.querySelector("#goal-save");
-        savedBtn.classList.add("shake");
-        setTimeout(() => savedBtn.classList.remove("shake"), 400);
+        shake("goal-save");
         return;
       }
       btn.disabled = true;
@@ -774,16 +755,14 @@ export async function renderPatrimonio(container) {
 
   function renderMain() {
     container.innerHTML = `
-      <header class="screen-header">
-        <h1>${t("patrimonio.title")}</h1>
-        <p>${t("patrimonio.subtitle")}</p>
-      </header>
-
-      ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
-
-      ${netWorthCardHtml(netWorthOfBalances(accounts), series, accounts)}
-      ${cuentasCardHtml(accounts, accountLoans)}
-      ${objetivosCardHtml(goals, byId)}
+      <div class="pat">
+        ${rootHeaderHtml({ title: t("patrimonio.title") })}
+        ${errorHtml()}
+        ${netWorthDisplayHtml(netWorthOfBalances(accounts), series)}
+        ${compositionHtml(accounts, famOf)}
+        ${cuentasHtml(accounts, { famOf, linkedGoalOf, accountLoans })}
+        ${objetivosHtml(goals, goalFamOf)}
+      </div>
     `;
     wireMain();
   }
