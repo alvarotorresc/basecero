@@ -181,6 +181,32 @@ export const ES = {
       },
       dismiss: "Ahora no",
     },
+    // Sistema B (S1, B-Home / B-Inicio-Vacio). Las claves de arriba que ya no pinta Inicio
+    // (saludo, racha, Gastado/Ingresos/Ahorrado, «Disponible del periodo») se quedan hasta la
+    // PR-99: alguna la leen otras pantallas (header.dayOf, savings.negative).
+    b: {
+      sub: { one: "Día {day} de {total}, queda {n} día", other: "Día {day} de {total}, quedan {n} días" },
+      led: "Periodo abierto",
+      left: "Quedan {amount} de {budget}",
+      over: "Te has pasado {amount} de {budget}",
+      todayMark: "hoy",
+      endMark: "día {n}",
+      balanceToday: "Saldo de hoy",
+      balanceStart: "Saldo de partida, sin movimientos",
+      savings: "Ahorras",
+      savingsOf: "de {amount}",
+      rest: "Resto",
+      lastMovements: "Últimos movimientos",
+      emptyTitle: "Aún no hay movimientos",
+      emptyText: "El primer gasto se apunta con el botón de abajo.",
+      yesterday: "Ayer",
+      weekdayShort: { 0: "dom", 1: "lun", 2: "mar", 3: "mié", 4: "jue", 5: "vie", 6: "sáb" },
+      renewalTitle: "{name} se renueva el {date}",
+      renewalAsk: "¿Lo sigues usando?",
+      afterPay: "Tras pagarlo te quedarán {amount}",
+      review: "Revisar",
+      switchAccount: "{name}, cambiar de cuenta",
+    },
   },
   semana: {
     title: "Semana",
