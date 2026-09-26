@@ -5,7 +5,7 @@ import { fmtMoney, fmtDiaCorto } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
-import { subHeaderHtml } from "../ui.js";
+import { subHeaderHtml, buttonHtml } from "../ui.js";
 import { segmentedHtml, wireSegmented, checkboxHtml } from "../controls.js";
 import { tileHtml } from "../entity.js";
 import { displayHtml, dispInkHtml, emptyStateHtml } from "../instrument.js";
@@ -159,9 +159,7 @@ export async function renderLiquidar(container, onBack) {
           ${section("liquidar.balance.against", iOwe, against, true)}
         </section>
 
-        <button type="button" class="btn-primary liq-primary" id="liq-settle-all"${state.busy || nothingSelected ? " disabled" : ""}>
-          <span>${escHtml(label)}</span>${withAmount ? ` <span class="num">${escHtml(amount)}</span>` : ""}
-        </button>
+        ${buttonHtml({ kind: "primary", id: "liq-settle-all", label, amount: withAmount ? amount : "", disabled: state.busy || nothingSelected })}
       </div>`;
     wire();
   }

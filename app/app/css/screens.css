@@ -820,7 +820,6 @@
 /* 44 de casilla + 8 + 40 de baldosa + 8. */
 .liq-sep { height: 1px; margin-left: 100px; background: var(--border); }
 
-.liq-primary .num { font-weight: 600; }
 /* === fin: liquidar === */
 
 /* === pantalla: movimiento-detalle === */

@@ -123,6 +123,13 @@ test("buttonHtml: la nota del primario va DEBAJO del botón (I-67), en un conten
   assert.ok(!buttonHtml({ kind: "secondary", label: "X", note: "n" }).includes("btn-note"), "la nota es solo del primario");
 });
 
+test("buttonHtml: amount pinta la cifra en mono detrás de la etiqueta, escapada", () => {
+  const html = buttonHtml({ kind: "primary", id: "liq-settle-all", label: "Liquidar y cobrar", amount: "24,00 €", disabled: true });
+  assert.match(html, /^<button type="button" class="btn-primary" id="liq-settle-all" disabled><span>Liquidar y cobrar<\/span><span class="num">24,00 €<\/span><\/button>$/);
+  assert.ok(!buttonHtml({ kind: "primary", label: "X" }).includes('class="num"'), "sin amount, sin cifra");
+  assert.match(buttonHtml({ kind: "primary", label: "X", amount: "<b>" }), /<span class="num">&lt;b&gt;<\/span>/);
+});
+
 test("buttonHtml: escapa etiqueta, nota e id", () => {
   const html = buttonHtml({ kind: "primary", id: 'a"b', label: "<b>Borrar</b> & co", note: "<i>n</i>" });
   assert.match(html, /id="a&quot;b"/);

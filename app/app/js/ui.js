@@ -92,13 +92,15 @@ const BUTTON_CLASS = {
  *  @param {string}  [o.id]
  *  @param {string}  o.label     Se escapa aquí.
  *  @param {string}  [o.note]    Solo primario. Se escapa aquí.
+ *  @param {string}  [o.amount]  Cifra ya formateada detrás de la etiqueta, en mono (`.num`), p. ej.
+ *                               «Liquidar y cobrar 24,00 €». Se escapa aquí.
  *  @param {string}  [o.icon]    Nombre de icons.js, 18 px, delante del texto.
  *  @param {boolean} [o.disabled]
  *  @param {object}  [o.data]    data-* para el wire() de la pantalla (patrón entity.js#attrs):
  *                               claves en kebab o camel; se pasan a kebab. Para una lista de
  *                               botones sin id fijo (candidatas de S9, una por comercio).
  *  @returns {string} HTML */
-export function buttonHtml({ kind = "secondary", size = "m", id = "", label, note = "", icon: iconName = "", disabled = false, data = null }) {
+export function buttonHtml({ kind = "secondary", size = "m", id = "", label, note = "", amount = "", icon: iconName = "", disabled = false, data = null }) {
   const base = BUTTON_CLASS[kind] ?? BUTTON_CLASS.secondary;
   const small = size === "s" && (base === "btn-secondary" || base === "btn-danger");
   const cls = small ? `${base} btn-s` : base;
@@ -111,7 +113,8 @@ export function buttonHtml({ kind = "secondary", size = "m", id = "", label, not
     }
   }
   const btn = `<button type="button" class="${cls}"${attrs}${disabled ? " disabled" : ""}>`
-    + `${iconName ? icon(iconName, { size: 18 }) : ""}<span>${escHtml(label)}</span></button>`;
+    + `${iconName ? icon(iconName, { size: 18 }) : ""}<span>${escHtml(label)}</span>`
+    + `${amount ? `<span class="num">${escHtml(amount)}</span>` : ""}</button>`;
   if (base !== "btn-primary" || !note) return btn;
   return `<div class="btn-stack">${btn}<span class="btn-note">${escHtml(note)}</span></div>`;
 }
