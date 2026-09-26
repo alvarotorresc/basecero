@@ -16,7 +16,8 @@ import { switchHtml, segmentedHtml, wireSegmented, stepperHtml, fieldHtml } from
 import { chosenCategoryHtml, settingRowHtml, filterChipHtml, tileHtml, sectionHeaderHtml } from "../entity.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { pushBack, goBack } from "../back.js";
-import { userMessage } from "../errors.js";
+import { userMessage, writeThenRefresh } from "../errors.js";
+import { showToast } from "../toast.js";
 import { showConfirm } from "../modal.js";
 import { showSheet } from "../sheet.js";
 import { escHtml, escAttr } from "../esc.js";
@@ -622,17 +623,16 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
         // detalle, así que se deshabilita para que un segundo toque no abra otro aviso.
         const btn = container.querySelector("#mdet-delete");
         if (btn) btn.disabled = true;
-        try {
-          await softDeleteTransaction(state.detailId);
-          await onChanged();
-          goBack();
-        } catch (e) {
+        const res = await writeThenRefresh(() => softDeleteTransaction(state.detailId), onChanged);
+        if (!res.written) {
           if (btn) btn.disabled = false;
           // Incluye el guard de repo.js (expenseDeleteLocked): un gasto con su devolución de
           // liquidación activa no se borra; el motivo llega en el mensaje del error.
-          errorMsg = t("movimientos.error.delete", { error: userMessage(e) });
+          errorMsg = t("movimientos.error.delete", { error: userMessage(res.error) });
           render("#mdet-delete");
+          return;
         }
+        afterWrite(res);
       },
     });
   }
@@ -652,38 +652,44 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
       return;
     }
     btn.disabled = true;
-    try {
-      const withCategory = needsCategory(d.type);
-      await updateTransaction(state.detailId, {
-        type: d.type,
-        amountCents: d.type === "adjustment" && d.sign === "-" ? -d.cents : d.cents,
-        date: d.fecha,
-        categoryId: withCategory ? d.categoryId : "",
-        // Un gasto que pagó la contraparte no toca ninguna cuenta mía hasta liquidar (el repo
-        // además lo blanquea por su cuenta, pero el payload no debe contradecirlo).
-        accountId: partnerPaid(d) ? "" : d.accountId,
-        counterAccountId: d.type === "transfer" ? d.counterAccountId : "",
-        merchant: d.merchant,
-        note: d.note,
-        isShared: withCategory && d.type !== "income" ? d.isShared : false,
-        // Locked (gasto liquidado con apunte enlazado): se deja undefined para que updateTransaction
-        // conserve el valor guardado — si mandáramos d.sharePct explícito, un gasto antiguo con override
-        // NULL dispararía sharedFieldsLocked al editar solo la nota o la fecha.
-        sharePctOverride: d.settledLocked ? undefined : (withCategory && d.type !== "income" && d.isShared ? d.sharePct : null),
-        // Mismo motivo que sharePctOverride: undefined conserva el paid_by guardado. Desmarcar
-        // «Compartido» cae a "me" — el guard del repo rechazaría un 'partner' sin is_shared.
-        paidBy: d.settledLocked ? undefined : (withCategory && d.type === "expense" && d.isShared ? d.paidBy : "me"),
-        refId: d.refId,
-        ruleId: d.ruleId,
-        tagId: d.tagId || "",
-      });
-      await onChanged();
-      goBack();
-    } catch (e) {
+    const withCategory = needsCategory(d.type);
+    const res = await writeThenRefresh(() => updateTransaction(state.detailId, {
+      type: d.type,
+      amountCents: d.type === "adjustment" && d.sign === "-" ? -d.cents : d.cents,
+      date: d.fecha,
+      categoryId: withCategory ? d.categoryId : "",
+      // Un gasto que pagó la contraparte no toca ninguna cuenta mía hasta liquidar (el repo
+      // además lo blanquea por su cuenta, pero el payload no debe contradecirlo).
+      accountId: partnerPaid(d) ? "" : d.accountId,
+      counterAccountId: d.type === "transfer" ? d.counterAccountId : "",
+      merchant: d.merchant,
+      note: d.note,
+      isShared: withCategory && d.type !== "income" ? d.isShared : false,
+      // Locked (gasto liquidado con apunte enlazado): se deja undefined para que updateTransaction
+      // conserve el valor guardado — si mandáramos d.sharePct explícito, un gasto antiguo con override
+      // NULL dispararía sharedFieldsLocked al editar solo la nota o la fecha.
+      sharePctOverride: d.settledLocked ? undefined : (withCategory && d.type !== "income" && d.isShared ? d.sharePct : null),
+      // Mismo motivo que sharePctOverride: undefined conserva el paid_by guardado. Desmarcar
+      // «Compartido» cae a "me" — el guard del repo rechazaría un 'partner' sin is_shared.
+      paidBy: d.settledLocked ? undefined : (withCategory && d.type === "expense" && d.isShared ? d.paidBy : "me"),
+      refId: d.refId,
+      ruleId: d.ruleId,
+      tagId: d.tagId || "",
+    }), onChanged);
+    if (!res.written) {
       btn.disabled = false;
-      errorMsg = t("common.saveFailed", { error: userMessage(e) });
+      errorMsg = t("common.saveFailed", { error: userMessage(res.error) });
       render();
+      return;
     }
+    afterWrite(res);
+  }
+
+  /** Tras guardar o borrar con éxito se vuelve SIEMPRE: si falló la recarga de la lista (onChanged),
+   *  el cambio ya está hecho y se avisa con un toast, no con «no se pudo guardar». */
+  function afterWrite(res) {
+    if (res.error) showToast(t("movimientos.error.loadPeriod", { error: userMessage(res.error) }));
+    goBack();
   }
 
   async function submitNewTag() {
