@@ -923,6 +923,28 @@
 .reg-limit.is-warn { color: var(--text); }
 .reg-limit.is-over { color: var(--text); font-weight: 700; }
 
+/* Registro rápido plegado: «Ver las N categorías» y la fila «Más» (fila de 60 en --raised con
+   borde: «Más» 15/600, resumen 13/500 dim con el divisor de metaHtml, chevron). */
+.reg-cats-more { align-self: flex-start; }
+.reg-more {
+  width: 100%;
+  min-height: 60px;
+  padding: var(--sp-8) var(--sp-12) var(--sp-8) var(--sp-16);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  border-radius: var(--radius);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.reg-more-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.reg-more-label { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); }
+.reg-more-sum { font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+
 /* Filas de cuenta y fecha, y «Con Marta 50 %» (F-20): píldoras de 48 en --raised con borde. */
 .reg-row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
 .reg-pill {

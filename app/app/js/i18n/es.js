@@ -257,11 +257,14 @@ export const ES = {
       adjustment: "Guardar ajuste",
       expenseWithAmount: "Guardar gasto de {amount}",
     },
-    // more.*: los usa registro-mode.js#foldedSummaryParts (lógica pura con sus tests), aunque la
-    // pantalla B ya no pinta el resumen plegado.
+    categories: {
+      showAll: "Ver las {n} categorías",
+    },
     more: {
+      toggle: "Más",
       summaryNoNote: "sin nota ni foto",
       summaryPhoto: "con foto",
+      summaryToday: "hoy",
     },
     merchant: { placeholder: "Comercio o concepto" },
     chosen: { remembered: "La que usas en {merchant}" },

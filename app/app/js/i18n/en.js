@@ -247,9 +247,14 @@ export const EN = {
       adjustment: "Save adjustment",
       expenseWithAmount: "Save expense of {amount}",
     },
+    categories: {
+      showAll: "See all {n} categories",
+    },
     more: {
+      toggle: "More",
       summaryNoNote: "no note or photo",
       summaryPhoto: "has a photo",
+      summaryToday: "today",
     },
     merchant: { placeholder: "Shop or description" },
     chosen: { remembered: "The one you use at {merchant}" },

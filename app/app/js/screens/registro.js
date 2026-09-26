@@ -23,7 +23,7 @@ import { userMessage } from "../errors.js";
 import { focusInput } from "../viewport.js";
 import { showReceipt } from "../recibo.js";
 import { showToast } from "../toast.js";
-import { quickRegisterEnabled, detailsOpen } from "../registro-mode.js";
+import { quickRegisterEnabled, detailsOpen, foldedSummaryParts, visibleCategories } from "../registro-mode.js";
 import { normalizeMerchant, memoryPatch } from "../merchant-memory.js";
 import { parseNaturalExpense } from "../natural.js";
 import { speech } from "../speech.js";
@@ -50,6 +50,9 @@ const SAVE_KEY = {
 const needsCategory = (tipo) => tipo === "expense" || tipo === "income" || tipo === "refund";
 // Columnas de la rejilla de familias (B-Gasto: 3 × 4 = las 12 familias sembradas).
 const GRID_COLS = 3;
+// Registro rápido plegado: cuántas familias se ven antes de «Ver las N categorías» (tres filas de
+// tres). El literal vive aquí, no en registro-mode.js — el módulo puro solo decide CUÁLES entran.
+const CATS_GRID_LIMIT = 9;
 
 /** Copia de la banda de límite (Registro v2 §6.2): «Con este gasto quedan {amount} de {name}» en
  *  ok/warn, «…te pasas {amount}…» en over. Devuelve texto SIN escapar — quien la use en un
@@ -160,10 +163,13 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     // parseNaturalExpense, y es lo que pinta los chips; `micOff` se enciende para el resto de la
     // sesión de pantalla si el usuario deniega el permiso.
     natural: { text: "", parsed: null, listening: false, micOff: false },
-    // «Registro rápido» (Ajustes): en B-Gasto cuenta, fecha y compartido están SIEMPRE a la vista
-    // (una fila cada uno); lo que el modo rápido sigue plegando es la nota, que en modo completo
-    // sale abierta. `noteOpen` es el botón de nota tocado a mano en ESTE formulario.
+    // Registro v2 §4: quick gobierna qué se pinta (registro-mode.js#detailsOpen). Plegado: solo
+    // importe y categoría, y la fila «Más» con el resumen. `expanded` es el «Más» tocado a mano en
+    // ESTE formulario (nunca persiste). Con el ajuste apagado, B-Gasto completo. `allCats`: se
+    // tocó «Ver las N categorías» (solo existe plegado). `noteOpen`: el botón de nota tocado.
     quick: quickRegisterEnabled(meta.quick_register),
+    expanded: false,
+    allCats: false,
     noteOpen: false,
     // Rejilla de familias (B-Gasto): qué baldosa tiene desplegadas sus subcategorías. null =
     // automático (la raíz de la categoría elegida); "" = cerrada a mano; un id = esa raíz.
@@ -421,8 +427,14 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
    *  hijas despliega debajo de SU fila las subcategorías como chips neutros (el elegido, relleno
    *  --accent con check). Una raíz sin hijas se elige directamente. */
   function categoryGridHtml(cats) {
-    const groups = categoryGroups(cats);
+    const all = categoryGroups(cats);
     const selRoot = state.categoryId ? rootOf(state.categoryId, byId) : null;
+    // Plegado: las 9 primeras familias (la elegida siempre entra, visibleCategories) y «Ver las N».
+    const limited = !formOpen() && !state.allCats;
+    const { shown, hidden } = limited
+      ? visibleCategories(all.map((g) => ({ ...g, id: g.root })), selRoot, CATS_GRID_LIMIT)
+      : { shown: all, hidden: 0 };
+    const groups = shown;
     const selGroup = groups.find((g) => g.root === selRoot);
     const openRoot = state.openRoot ?? (selGroup && !selGroup.direct ? selRoot : "");
     const rows = [];
@@ -443,7 +455,30 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         </div>`;
       }
       return `<div class="reg-grid">${tiles}</div>${panel}`;
-    }).join("")}</div>`;
+    }).join("")}
+    ${hidden > 0 ? `<button type="button" class="btn-tertiary reg-cats-more" id="reg-cats-more" aria-expanded="false">${t("registro.categories.showAll", { n: all.length })}</button>` : ""}
+    </div>`;
+  }
+
+  /** Fila «Más» del registro rápido plegado (Registro v2 §4.3, anatomía B de fila de 60): «Más»
+   *  15/600, el resumen de registro-mode.js#foldedSummaryParts con el divisor de metaHtml (nunca un
+   *  «·») y el chevron. Despliega cuenta, fecha, «Con Marta», etiqueta, foto y nota. */
+  function moreRowHtml() {
+    const accountName = partnerPaid() ? "" : (accounts.find((a) => a.id === state.accountId)?.name ?? "");
+    const dateLabel = state.fecha === hoyISO() ? t("registro.more.summaryToday") : fmtDiaCorto(state.fecha);
+    const sharedLabel = needsCategory(state.tipo) && state.tipo !== "income" && partnerName && state.isShared
+      ? t("common.sharedWith", { name: partnerName }) : "";
+    const parts = foldedSummaryParts({
+      accountName, dateLabel, hasNote: !!state.note.trim(), hasPhoto: !!state.photo, sharedLabel,
+      tagName: state.tagId ? tagName(state.tagId) : "",
+    }, t);
+    return `<button type="button" class="reg-more" id="reg-more-toggle" aria-expanded="false">
+      <span class="reg-more-body">
+        <span class="reg-more-label">${t("registro.more.toggle")}</span>
+        ${metaHtml(parts, { cls: "reg-more-sum" })}
+      </span>
+      ${icon("chevronDown", { size: 20, cls: "reg-pill-chev" })}
+    </button>`;
   }
 
   /** Tarjeta de la categoría elegida (§9, sin borde): nombre de la hoja y, debajo, «La que usas en
@@ -525,9 +560,10 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
   }
 
   /** La nota se ve si hay texto, si se tocó el botón o en modo completo (Ajustes, «Registro
-   *  rápido» apagado: detailsOpen de registro-mode.js). */
-  const noteVisible = () => !!state.note.trim() || state.noteOpen
-    || detailsOpen({ quick: state.quick, expanded: false, tipo: state.tipo });
+   *  rápido» desplegado con «Más», como antes de B). */
+  const noteVisible = () => !!state.note.trim() || state.noteOpen || (state.quick && state.expanded);
+  /** ¿Se pinta todo (B-Gasto completo) o el registro rápido plegado? */
+  const formOpen = () => detailsOpen({ quick: state.quick, expanded: state.expanded, tipo: state.tipo });
 
   /** Detalle del reparto cuando el interruptor está encendido: quién pagó (solo gasto), el paso a
    *  paso del % y las dos partes. */
@@ -596,21 +632,23 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       ? limitWarning({ categoryId: state.categoryId, amountCents: myCents, byId, spentByRoot, budgetByCategory })
       : null;
     const chips = naturalChips();
+    const open = formOpen();
 
     container.innerHTML = `
     <div class="reg">
       <header class="reg-head">
         <h1 class="reg-title">${escHtml(t("registro.title"))}</h1>
         <button type="button" class="icon-btn" id="reg-close" aria-label="${escAttr(t("registro.close"))}">${icon("close")}</button>
-        ${segmentedHtml({ id: "reg-type", name: t("registro.type.label"), value: state.tipo, allowNone: true,
-          options: TIPOS_MAIN.map((tp) => ({ value: tp.id, label: t(tp.labelKey) })) })}
+        ${open ? segmentedHtml({ id: "reg-type", name: t("registro.type.label"), value: state.tipo, allowNone: true,
+          options: TIPOS_MAIN.map((tp) => ({ value: tp.id, label: t(tp.labelKey) })) }) : ""}
       </header>
 
       <section class="disp reg-disp">
         <div class="reg-disp-main">
           <div class="reg-disp-fields">
-            <input type="text" id="reg-merchant" class="reg-merchant-input" list="reg-merchants" value="${escAttr(state.merchant)}"
-              placeholder="${escAttr(t("registro.merchant.placeholder"))}" aria-label="${escAttr(t("common.merchant"))}" autocomplete="off">
+            ${open ? `<input type="text" id="reg-merchant" class="reg-merchant-input" list="reg-merchants" value="${escAttr(state.merchant)}"
+              placeholder="${escAttr(t("registro.merchant.placeholder"))}" aria-label="${escAttr(t("common.merchant"))}" autocomplete="off">`
+              : `<span class="disp-label">${escHtml(state.merchant.trim() || t("common.amount"))}</span>`}
             <div class="num disp-value disp-value-xl reg-amount">
               ${state.tipo === "adjustment" ? `<button type="button" class="reg-sign" id="reg-sign" aria-label="${escAttr(t("common.changeSign"))}">${state.adjustmentSign === "-" ? "−" : "+"}</button>` : ""}
               <input type="text" inputmode="decimal" id="reg-raw" class="reg-amount-input" value="${escAttr(state.raw)}" placeholder="0" autocomplete="off"
@@ -637,13 +675,14 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         ${icon("warn", { size: 18 })}<span id="reg-limit-text">${escHtml(limitBandText(warning))}</span>
       </div>` : ""}
 
+      ${open ? `
       ${accountRowsHtml()}
       ${extrasRowHtml()}
       ${sharedDetailHtml(myCents, partnerCents)}
       ${photoHtml()}
       ${tagControlHtml()}
       ${noteVisible() ? fieldHtml({ id: "reg-note", label: t("common.note"), value: state.note }) : ""}
-      ${extraTypesHtml()}
+      ${extraTypesHtml()}` : moreRowHtml()}
 
       ${errorMsg ? `<div class="reg-error" role="alert">${icon("warn", { size: 18 })}<span>${escHtml(errorMsg)}</span></div>` : ""}
 
@@ -685,7 +724,8 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     };
 
     // render() rehace el DOM: el foco vuelve al radio elegido para que las flechas sigan (K12).
-    wireSegmented(container.querySelector("#reg-type"), (v) => {
+    const typeSeg = container.querySelector("#reg-type");
+    if (typeSeg) wireSegmented(typeSeg, (v) => {
       setTipo(v);
       container.querySelector(`#reg-type [data-value="${v}"]`)?.focus();
     });
@@ -754,6 +794,8 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     container.querySelectorAll("[data-nat-chip]").forEach((b) => {
       b.onclick = () => {
         const field = b.dataset.natChip;
+        // Comercio y compartido viven tras «Más» en el registro rápido plegado: se despliega.
+        if ((field === "merchant" || field === "shared") && !formOpen()) { state.expanded = true; render(); }
         if (field === "amount") focusInput(container.querySelector("#reg-raw"));
         else if (field === "category") container.querySelector(".ent-chosen, .reg-grid-wrap")?.scrollIntoView({ block: "nearest" });
         else if (field === "merchant") focusInput(container.querySelector("#reg-merchant"));
@@ -869,8 +911,18 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     const unlinkBtn = container.querySelector("#reg-refund-unlink");
     if (unlinkBtn) unlinkBtn.onclick = () => clearRefundLink();
 
+    const catsMoreBtn = container.querySelector("#reg-cats-more");
+    if (catsMoreBtn) catsMoreBtn.onclick = () => { state.allCats = true; render(); };
+    const moreToggle = container.querySelector("#reg-more-toggle");
+    if (moreToggle) moreToggle.onclick = () => {
+      state.expanded = true;
+      render();
+      // Invariante de foco (§4.5): SOLO desde el handler, nunca desde render().
+      focusInput(container.querySelector("#reg-merchant"));
+    };
+
     const merchantInput = container.querySelector("#reg-merchant");
-    merchantInput.oninput = (e) => {
+    if (merchantInput) merchantInput.oninput = (e) => {
       state.merchant = e.target.value;
       // Registro v2 §5.4: casar EXACTO por valor normalizado, nunca por prefijo. Todo lo rellenado
       // es editable y respeta `touched` (memoryPatch). Un render() completo hace falta porque el
@@ -908,10 +960,10 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     };
 
     const fechaInput = container.querySelector("#reg-fecha");
-    fechaInput.onchange = (e) => { state.fecha = e.target.value || hoyISO(); render(); };
+    if (fechaInput) fechaInput.onchange = (e) => { state.fecha = e.target.value || hoyISO(); render(); };
     // En escritorio el input de fecha transparente solo abre el calendario desde su icono: se pide
     // explícitamente. Donde showPicker no existe, el toque nativo ya lo abre.
-    fechaInput.onclick = () => { try { fechaInput.showPicker?.(); } catch { /* sin gesto válido */ } };
+    if (fechaInput) fechaInput.onclick = () => { try { fechaInput.showPicker?.(); } catch { /* sin gesto válido */ } };
 
     // Foto del ticket (N5, Registro v2 §9.4): el botón dispara el input oculto, que comprime la
     // foto elegida y la guarda en state.photo — no se escribe en OPFS hasta el guardado.
