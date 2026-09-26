@@ -396,15 +396,12 @@ export const EN = {
     },
     row: {
       limit: "limit {limit}",
-      ofLimit: "of {limit}",
       overBy: "over by {over}",
     },
     detail: {
       noSubcategory: "No subcategory",
       changeLimit: "Change limit",
       setLimit: "Set limit",
-      limitOfPeriod: "{amount} this period",
-      noLimit: "no limit",
     },
     edit: {
       title: "Limit for {name}",

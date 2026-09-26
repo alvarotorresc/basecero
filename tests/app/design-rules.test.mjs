@@ -23,7 +23,6 @@ export const PENDIENTES = new Set([
   // Las 15 pantallas (cada S* saca las suyas). Una por línea para que las uniones no choquen.
   "js/screens/categorias.js",
   "js/screens/etiquetas.js",
-  "js/screens/gasto-por-categoria.js",
   "js/screens/inicio.js",
   "js/screens/movimientos.js",
   "js/screens/onboarding.js",

@@ -420,15 +420,12 @@ export const ES = {
       // Pie de la fila (B-GastoCategoria): el límite puesto, o el exceso si se ha pasado (sustituye
       // a la línea del límite: no se pintan las dos a la vez).
       limit: "límite {limit}",
-      ofLimit: "de {limit}",
       overBy: "superado por {over}",
     },
     detail: {
       noSubcategory: "Sin subcategoría",
       changeLimit: "Cambiar límite",
       setLimit: "Poner límite",
-      limitOfPeriod: "{amount} este periodo",
-      noLimit: "sin límite",
     },
     edit: {
       title: "Límite de {name}",
