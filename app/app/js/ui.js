@@ -43,19 +43,25 @@ export function rootHeaderHtml({ title, subtitle = "", subtitleAction = null }) 
  *  @param {string|null} [o.id]           id del botón «atrás». null → sin botón «atrás».
  *  @param {string}      [o.subtitle]     Segunda línea. Se escapa aquí.
  *  @param {object|null} [o.action]       { id, icon, label } del botón derecho. null → nada.
+ *  @param {boolean}     [o.center]       Título de 15 CENTRADO entre el atrás y la acción (o un hueco
+ *                                        de 44 si no hay acción), como B-Movimiento-Detalle y
+ *                                        B-Borrar («Gasto»). Por defecto false (20 a la izquierda).
+ *                                        F-15 retirada ahí (Álvaro 2026-09-27: igual que el mockup).
+ *  @param {string}      [o.leadHtml]     HTML de confianza entre el atrás y el título: la baldosa de
+ *                                        32 de la familia de B-Cuenta (entity.js#tileHtml size:32).
  *  @returns {string} HTML
  *
  *  El «atrás» se llama siempre t("common.back") («Atrás», §11). NO cablea nada: devuelve HTML con
  *  los ids que le pasas y la pantalla los conecta en su wire(). Es lo que permite que sea puro. */
-export function subHeaderHtml({ title, id = "screen-back", subtitle = "", action = null }) {
+export function subHeaderHtml({ title, id = "screen-back", subtitle = "", action = null, center = false, leadHtml = "" }) {
   const back = id === null
     ? ""
     : `<button type="button" class="icon-btn" id="${escAttr(id)}" aria-label="${escAttr(t("common.back"))}">${icon("back")}</button>`;
   const right = action
     ? `<button type="button" class="icon-btn" id="${escAttr(action.id)}" aria-label="${escAttr(action.label)}">${icon(action.icon)}</button>`
-    : "";
-  return `<header class="sub-header">
-    ${back}
+    : center ? `<span class="sub-header-spacer" aria-hidden="true"></span>` : "";
+  return `<header class="sub-header${center ? " is-center" : ""}">
+    ${back}${leadHtml ? `<span class="sub-header-lead" aria-hidden="true">${leadHtml}</span>` : ""}
     <div class="sub-header-body">
       <h1 class="sub-header-title">${escHtml(title)}</h1>
       ${subtitle ? `<span class="sub-header-sub">${escHtml(subtitle)}</span>` : ""}

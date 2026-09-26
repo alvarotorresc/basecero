@@ -2,6 +2,7 @@
 // solo importa icons.js y t(), así que se prueba sin Worker ni DOM.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { subHeaderHtml, rootHeaderHtml, buttonHtml, metaHtml, radioKeyIndex } from "../../app/app/js/ui.js";
 
 // Cabecera con atrás, forma canónica B/C (DESIGN.md §9, inventario-B I-15): atrás · título a la
@@ -180,4 +181,24 @@ test("radioKeyIndex: flechas con vuelta, Inicio/Fin, y el resto de teclas no mue
   assert.equal(radioKeyIndex("End", 0, 3), 2);
   assert.equal(radioKeyIndex("Tab", 1, 3), -1);
   assert.equal(radioKeyIndex("Enter", 1, 3), -1);
+});
+
+// ---- Variantes de fidelidad al mockup (2026-09-27) ----------------------------------------
+
+test("subHeaderHtml: center pone el título de 15 centrado con un hueco de 44 si no hay acción; por defecto, no", () => {
+  const html = subHeaderHtml({ title: "Gasto", id: "det-back", center: true });
+  assert.match(html, /<header class="sub-header is-center">/);
+  assert.match(html, /sub-header-spacer/);
+  const conAccion = subHeaderHtml({ title: "Gasto", id: "det-back", center: true, action: { id: "a", icon: "plus", label: "Añadir" } });
+  assert.ok(!conAccion.includes("sub-header-spacer"), "con acción, el hueco lo ocupa ella");
+  assert.equal((html.match(/<h1/g) ?? []).length, 1);
+  const css = readFileSync(new URL("../../app/app/css/components.css", import.meta.url), "utf8");
+  assert.match(css, /\.sub-header\.is-center \.sub-header-title\s*\{\s*font-size:\s*var\(--fs-15\)/);
+});
+
+test("subHeaderHtml: leadHtml va entre el atrás y el título (baldosa de B-Cuenta); sin él, nada", () => {
+  assert.ok(!subHeaderHtml({ title: "X" }).includes("sub-header-lead"));
+  const html = subHeaderHtml({ title: "Cuenta corriente", id: "c-back", leadHtml: '<span class="ent-tile"></span>' });
+  const [b, l, t] = ["c-back", "sub-header-lead", "Cuenta corriente"].map((s) => html.indexOf(s));
+  assert.ok(b < l && l < t);
 });

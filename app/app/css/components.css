@@ -92,6 +92,13 @@
   overflow-wrap: anywhere;
 }
 .sub-header-sub { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+/* Centrada (subHeaderHtml `center`, B-Movimiento-Detalle/B-Borrar): 44 · título 15 centrado · 44.
+   Baldosa delante del título (`leadHtml`, B-Cuenta). F-15 retirada (Álvaro 2026-09-27). */
+.sub-header.is-center { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; }
+.sub-header.is-center .sub-header-body { align-items: center; text-align: center; }
+.sub-header.is-center .sub-header-title { font-size: var(--fs-15); }
+.sub-header-spacer { width: 44px; height: 44px; }
+.sub-header-lead { flex: none; display: flex; }
 
 /* --- Botón icono (§9): 44 redondo, raised con borde. --- */
 .icon-btn {
