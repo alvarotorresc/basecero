@@ -28,7 +28,6 @@ export const PENDIENTES = new Set([
   "js/screens/registro.js", "js/screens/semana.js", "js/screens/suscripciones.js",
   // Módulos con plantilla o paleta propia, que migran con su pantalla o con su PR de fundación.
   "js/recibo.js",        // S2
-  "js/charts.js",        // PR-07
   "js/informe-pdf.js",   // S8 (paleta de PDF-lib, D-impl-3)
   "css/app.css",         // estilos «Neto»; cada PR de fundación y cada S* le quita lo suyo
   // Ficheros que otras PRs de fundación reescriben en paralelo con esta; salen al integrarlas
