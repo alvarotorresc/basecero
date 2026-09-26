@@ -748,6 +748,64 @@
 /* === fin: recurrentes === */
 
 /* === pantalla: registro === */
+/* --- Recibo (js/recibo.js, B-Recibo): papel --raised con zigzag sobre el velo, Display con el
+   total, comercio y sello, ficha de 28 y líneas con guía de puntos. Entra como un aviso (§10:
+   250 ms ease-out) y se va más rápido (180 ms ease-in); nada rebota. --- */
+#recibo {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-16);
+  padding: var(--sp-16);
+  background: var(--scrim);
+  animation: bc-recibo-veil 150ms ease-out;
+}
+.recibo-ticket { width: 310px; max-width: 100%; filter: drop-shadow(var(--sh-alert)); animation: bc-recibo-in 250ms ease-out; }
+.recibo-edge { display: block; width: 100%; height: 10px; color: var(--raised); }
+.recibo-body { display: flex; flex-direction: column; gap: var(--sp-12); padding: var(--sp-16); background: var(--raised); color: var(--text); }
+.recibo-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
+.recibo-brand { font-family: var(--font-display); font-size: var(--fs-13); font-weight: 700; line-height: var(--lh-title); letter-spacing: -.01em; }
+.recibo-time { font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
+.recibo-body .disp { padding: var(--sp-12) var(--sp-16); border-radius: var(--radius); }
+.recibo-id { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); min-height: 60px; }
+.recibo-id-text { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.recibo-title { font-size: var(--fs-20); font-weight: 700; line-height: var(--lh-title); overflow-wrap: anywhere; }
+.recibo-sub { font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+.recibo-stamp {
+  flex: none;
+  padding: var(--sp-2);
+  border: 2px solid currentColor;
+  border-radius: var(--radius);
+  color: var(--fx, var(--text));
+  transform: rotate(-8deg);
+  animation: bc-recibo-stamp 200ms ease-out 250ms backwards;
+}
+.recibo-stamp-in { display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); padding: var(--sp-4) var(--sp-12); border: 1px solid currentColor; border-radius: var(--radius-xs); }
+.recibo-stamp-label { font-family: var(--font-display); font-size: var(--fs-13); font-weight: 700; line-height: var(--lh-title); }
+.recibo-stamp-date { font-size: var(--fs-12); font-weight: 600; }
+.recibo-badge { display: flex; }
+.recibo-perf { border-top: 1px dashed var(--border); }
+.recibo-lines { display: flex; flex-direction: column; gap: var(--sp-12); }
+.recibo-line { display: flex; align-items: baseline; gap: var(--sp-8); }
+.recibo-label { flex: none; font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+.recibo-dots { flex: 1; min-width: 12px; border-bottom: 2px dotted var(--border); transform: translateY(-4px); }
+.recibo-value { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--sp-8); font-size: var(--fs-14); font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.recibo-swatch { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--fb); }
+#recibo.is-leaving { animation: bc-recibo-out 180ms ease-in forwards; }
+@keyframes bc-recibo-veil { from { opacity: 0; } }
+@keyframes bc-recibo-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes bc-recibo-stamp { from { opacity: 0; } }
+@keyframes bc-recibo-out { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  /* Sin desplazamiento ni sello animado: solo fundidos cortos (§10, K13). */
+  .recibo-ticket, .recibo-stamp { animation: none; }
+  #recibo { animation: bc-recibo-veil 120ms linear; }
+  #recibo.is-leaving { animation: bc-recibo-out 120ms linear forwards; }
+}
 /* === fin: registro === */
 
 /* === pantalla: semana === */
