@@ -541,7 +541,7 @@ export const EN = {
       allSettled: "All paid",
       remaining: "You'll have {amount} left",
       paidLabel: "Paid",
-      meterAria: "Paid {paid} of {total} this period",
+      meterAria: "Pending {pending} of {total} this period",
     },
     section: { all: "All", pending: "Pending", paidPeriod: "Paid this period", other: "Other rules" },
     state: {

@@ -569,7 +569,7 @@ export const ES = {
       allSettled: "Todo pagado",
       remaining: "Te quedarán {amount}",
       paidLabel: "Pagado",
-      meterAria: "Pagado {paid} de {total} este periodo",
+      meterAria: "Pendiente {pending} de {total} este periodo",
     },
     section: { all: "Todas", pending: "Pendiente", paidPeriod: "Pagado este periodo", other: "Otras reglas" },
     state: {

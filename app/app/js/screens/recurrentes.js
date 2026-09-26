@@ -1,9 +1,10 @@
 import {
   listRules, listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById,
   createRule, updateRule, softDeleteRule, cancelSubscription, getMetaAll,
-  getOpenPeriod, previsionOfPeriod,
+  getOpenPeriod, previsionOfPeriod, getAccountStyle, listGoals,
 } from "../repo.js";
 import { familyForCategory, iconForCategory } from "../category-colors.js";
+import { familyForAccount } from "../account-colors.js";
 import { fmtMoney, moneyPartsHtml, currencySymbol, parseCentsRaw, centsToRaw, hoyISO } from "../format.js";
 import { annualCents, monthlyCommitmentCents, ruleStateKey, paidThisPeriodCents } from "../subscriptions.js";
 import { t, monthLong } from "../i18n/index.js";
@@ -118,8 +119,10 @@ function heroHtml(prevision, rules) {
     : { state: "ok", text: t("recurrentes.hero.allSettled") };
   const meterSlot = total > 0
     ? meterHtml({
+      // value es lo PENDIENTE (el ámbar del medidor, C2: lo que llama la atención) — el
+      // aria-label tiene que hablar del mismo número, no del pagado (revisión ronda 1).
       value: prevision.comprometidoCents, max: total, onDisplay: true,
-      label: t("recurrentes.hero.meterAria", { paid: fmtMoney(paid), total: fmtMoney(total) }),
+      label: t("recurrentes.hero.meterAria", { pending: fmtMoney(prevision.comprometidoCents), total: fmtMoney(total) }),
     })
     : "";
   const footRow = `<div class="rec-hero-row">
@@ -154,11 +157,11 @@ function amountFieldHtml(f) {
  *  Omite (lógica nueva bloqueada, brief S9): nada — la tabla del brief no lista nada para esta
  *  pantalla. */
 export async function renderRecurrentes(container, onBack, opts = {}) {
-  let rules, expenseCats, incomeCats, accountsAll, byId, meta, period, prevision;
+  let rules, expenseCats, incomeCats, accountsAll, byId, meta, period, prevision, accountStyle, goals;
   try {
-    [rules, expenseCats, incomeCats, accountsAll, byId, meta, period] = await Promise.all([
+    [rules, expenseCats, incomeCats, accountsAll, byId, meta, period, accountStyle, goals] = await Promise.all([
       listRules(), listExpenseLeafCategories(), listIncomeCategories(), listAccounts(), allCategoriesById(),
-      getMetaAll(), getOpenPeriod(),
+      getMetaAll(), getOpenPeriod(), getAccountStyle(), listGoals(),
     ]);
     prevision = period ? await previsionOfPeriod(period) : null;
   } catch (e) {
@@ -232,20 +235,24 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
     return "";
   }
 
+  // Familia de cuenta (C8, PR-10): cada cuenta elige una de las 12 familias como una categoría;
+  // el chip la lleva igual que el resto de la app (liquidar.js#familyForAccount).
+  const accountFam = (a) => familyForAccount(a, accountStyle, goals);
+
   function renderAccountsSection(f) {
     if (f.type === "transfer") {
       return `
       <div class="rec-field-group">
         <div class="rec-field-label">${escHtml(t("common.from"))}</div>
         <div class="rec-chip-row">
-          ${accounts.map((a) => filterChipHtml({ label: a.name, selected: f.accountId === a.id, data: { acc: a.id } })).join("")}
+          ${accounts.map((a) => filterChipHtml({ label: a.name, fam: accountFam(a), selected: f.accountId === a.id, data: { acc: a.id } })).join("")}
         </div>
       </div>
       <div class="rec-field-group">
         <div class="rec-field-label">${escHtml(t("common.to"))}</div>
         <div class="rec-chip-row">
           ${accountsAll.filter((a) => a.id !== f.accountId)
-            .map((a) => filterChipHtml({ label: a.name, selected: f.counterAccountId === a.id, data: { counterAcc: a.id } })).join("")}
+            .map((a) => filterChipHtml({ label: a.name, fam: accountFam(a), selected: f.counterAccountId === a.id, data: { counterAcc: a.id } })).join("")}
         </div>
       </div>`;
     }
@@ -253,7 +260,7 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
     <div class="rec-field-group">
       <div class="rec-field-label">${escHtml(t("common.account"))}</div>
       <div class="rec-chip-row">
-        ${accounts.map((a) => filterChipHtml({ label: a.name, selected: f.accountId === a.id, data: { acc: a.id } })).join("")}
+        ${accounts.map((a) => filterChipHtml({ label: a.name, fam: accountFam(a), selected: f.accountId === a.id, data: { acc: a.id } })).join("")}
       </div>
     </div>`;
   }
@@ -277,8 +284,10 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
         + `${sectionHtml("recurrentes.section.other", other, byId, accountsAll)}`
       : sectionHtml("recurrentes.section.all", state.rules.map((r) => ({ r, item: itemFor(r) })), byId, accountsAll);
 
+    // Sin fam: no es una entidad (C11), es un enlace de navegación — baldosa neutra en --well,
+    // aunque su icono sea el mismo trazo que la familia "sus" (revisión ronda 1).
     const radarLink = `<div class="rec-radar-link">${settingRowHtml({
-      icon: "sus", fam: "sus", label: t("recurrentes.radarLink"), id: "rec-radar-link",
+      icon: "sus", label: t("recurrentes.radarLink"), id: "rec-radar-link",
     })}</div>`;
 
     container.innerHTML = `
