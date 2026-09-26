@@ -514,6 +514,27 @@ main#screen {
   width: 100%;
 }
 
+/* ===== fila Tema de Ajustes (DESIGN §3, mockup B-Ajustes) =====
+   PROVISIONAL: la PR-06 lleva el Segmented canónico a components.css y esto se borra. El elegido
+   se marca con relieve (--raised + --sh-thumb), no con naranja. */
+.theme-row { display: flex; align-items: center; gap: var(--sp-12); min-height: 60px; margin-bottom: var(--sp-4); }
+.theme-row-label { flex: 1; min-width: 0; font-size: var(--fs-15); font-weight: 600; }
+.theme-seg {
+  display: flex; flex: none; padding: var(--sp-4);
+  border-radius: var(--radius-pill); background: var(--well); box-shadow: var(--sh-well);
+}
+.theme-seg [role="radio"] {
+  height: 44px; padding: 0 var(--sp-12); border: 0; border-radius: var(--radius-pill);
+  background: transparent; color: var(--text-dim);
+  font-size: var(--fs-14); font-weight: 600; cursor: pointer;
+  transition: background-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+.theme-seg [role="radio"][aria-checked="true"] {
+  background: var(--raised); color: var(--text); font-weight: 700; box-shadow: var(--sh-thumb);
+}
+.theme-seg [role="radio"]:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+@media (prefers-reduced-motion: reduce) { .theme-seg [role="radio"] { transition: none; } }
+
 /* ===== interruptor (toggle, SISTEMA.md §4.8) ===== */
 .toggle {
   position: relative;

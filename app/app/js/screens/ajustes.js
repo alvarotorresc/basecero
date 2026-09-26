@@ -21,7 +21,8 @@ import { showToast } from "../toast.js";
 import { attachments } from "../attachments.js";
 import { packBundle, unpackRestore } from "../bundle.js";
 import { download } from "../download.js";
-import { subHeaderHtml, metaHtml } from "../ui.js";
+import { subHeaderHtml, metaHtml, themeSegmentedHtml, radioKeyIndex } from "../ui.js";
+import { applyTheme, readPref, writePref, getStorage, systemDarkQuery } from "../theme.js";
 import { icon } from "../icons.js";
 
 import { escHtml, escAttr } from "../esc.js";
@@ -424,6 +425,7 @@ export async function renderAjustes(container) {
 
       <section style="margin-bottom:var(--gap-section)">
         <div class="section-title" style="margin-bottom:20px">${t("ajustes.prefs.title")}</div>
+        ${themeSegmentedHtml(readPref(getStorage(window)))}
         <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;cursor:pointer;margin-bottom:4px;">
           <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
             <span style="font-size:15px;font-weight:600;">${t("ajustes.prefs.quickRegisterLabel")}</span>
@@ -722,6 +724,31 @@ export async function renderAjustes(container) {
           state.errors = [t("ajustes.sheet.replaceFailed", { error: userMessage(err) })]; state.pending = null;
           render();
         }
+      };
+    }
+
+    // Tema: igual que el interruptor, se aplica AL INSTANTE y sin recargar ni repintar la pantalla
+    // (repintar se llevaría el foco del radio). Va a localStorage, no a la BD: el script en línea
+    // del <head> lo tiene que leer antes de que exista la BD.
+    const themeRadios = [...container.querySelectorAll(".theme-seg [role=radio]")];
+    const chooseTheme = (btn) => {
+      const pref = btn.dataset.themePref;
+      writePref(getStorage(window), pref);
+      applyTheme(document, pref, systemDarkQuery(window));
+      for (const r of themeRadios) {
+        const on = r === btn;
+        r.setAttribute("aria-checked", String(on));
+        r.tabIndex = on ? 0 : -1;
+      }
+    };
+    for (const r of themeRadios) {
+      r.onclick = () => chooseTheme(r);
+      r.onkeydown = (e) => {
+        const i = radioKeyIndex(e.key, themeRadios.indexOf(r), themeRadios.length);
+        if (i < 0) return;
+        e.preventDefault();
+        chooseTheme(themeRadios[i]);
+        themeRadios[i].focus();
       };
     }
 

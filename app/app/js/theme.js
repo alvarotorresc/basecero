@@ -65,3 +65,8 @@ export function applyTheme(doc, pref, mql) {
   }
   return theme;
 }
+
+/** matchMedia del modo oscuro del sistema, o null si el navegador no lo tiene. */
+export function systemDarkQuery(win) {
+  return typeof win.matchMedia === "function" ? win.matchMedia("(prefers-color-scheme: dark)") : null;
+}

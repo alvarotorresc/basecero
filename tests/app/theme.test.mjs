@@ -3,7 +3,7 @@
 // evalúa index-theme.test.mjs sobre el script en línea del <head>.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { THEME_KEY, readPref, writePref, resolveTheme, applyTheme, getStorage } from "../../app/app/js/theme.js";
+import { THEME_KEY, readPref, writePref, resolveTheme, applyTheme, getStorage, systemDarkQuery } from "../../app/app/js/theme.js";
 import { THEME_CASES } from "./fixtures/theme-cases.mjs";
 
 function fakeStorage({ stored = null, throws = false } = {}) {
@@ -161,4 +161,12 @@ test("applyTheme: sin <meta name=theme-color> ni matchMedia no lanza", () => {
   const doc = fakeDoc({ meta: false });
   assert.equal(applyTheme(doc, "system", null), "light");
   assert.equal(applyTheme(doc, "dark", null), "dark");
+});
+
+test("systemDarkQuery: pide prefers-color-scheme: dark, o null si no hay matchMedia", () => {
+  const q = [];
+  const mql = systemDarkQuery({ matchMedia: (s) => { q.push(s); return { matches: true }; } });
+  assert.deepEqual(q, ["(prefers-color-scheme: dark)"]);
+  assert.equal(mql.matches, true);
+  assert.equal(systemDarkQuery({}), null);
 });

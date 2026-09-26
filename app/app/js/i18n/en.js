@@ -1138,4 +1138,11 @@ export const EN = {
     capped: "You can sweep at most {amount}: that's what's in {account}",
     note: "End-of-period sweep",
   },
+  // Tema de la app (DESIGN §3): fila de Ajustes. Las claves de valor son las preferencias de theme.js.
+  theme: {
+    label: "Theme",
+    light: "Light",
+    dark: "Dark",
+    system: "System",
+  },
 };
