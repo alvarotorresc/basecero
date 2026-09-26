@@ -676,7 +676,7 @@ export const ES = {
       needSectionTitle: "¿Necesario o prescindible?",
       parentSectionTitle: "Dentro de",
       rootLockedNote: "Una categoría con subcategorías no puede colgarse de otra.",
-      inheritNote: "Una subcategoría hereda el color y el icono de su categoría.",
+      inheritNote: "Las subcategorías heredan color e icono de la suya.",
       famLabel: "Familia de color",
       famUsedBy: "{fam}, la usa {name}",
       famShared: ", la misma que {name}. El icono las distingue.",

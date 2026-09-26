@@ -648,7 +648,7 @@ export const EN = {
       needSectionTitle: "Essential or discretionary?",
       parentSectionTitle: "Inside",
       rootLockedNote: "A category with subcategories can’t be nested under another one.",
-      inheritNote: "A subcategory inherits its category’s color and icon.",
+      inheritNote: "Subcategories inherit their category’s color and icon.",
       famLabel: "Color family",
       famUsedBy: "{fam}, used by {name}",
       famShared: ", the same as {name}. The icon tells them apart.",
