@@ -1,5 +1,6 @@
-/* BaseCero — shell de la app. Layout móvil-first, centrado en escritorio (max 480px).
-   Proporciones de tab bar / FAB tomadas de design/Resumen.dc.html y design/Ajustes.dc.html. */
+/* BaseCero — base de la app: reset, html/body, main#screen, el chrome que se oculta por pantalla,
+   utilidades y @keyframes. Los componentes viven en components.css y cada pantalla en su sección de
+   screens.css (DESIGN.md §9). Layout móvil-first, centrado en escritorio (max 480px). */
 
 /* ===== base (sale de tokens.css, que ya es la copia exacta de tokens-B.css) ===== */
 /* El margin:0 del reset lo necesita el <dialog> modal (modal.js): sin él, el UA lo centra con margen. */
@@ -11,7 +12,6 @@
 html { background: var(--bg); }
 /* 500 = secundario, el peso base de todo texto (DESIGN §7: el 400 no se usa). */
 body { font-family: var(--font-body); font-weight: 500; color: var(--text); background: var(--bg); }
-.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 /* ===== estructura general ===== */
 html, body { height: 100%; }
@@ -19,10 +19,11 @@ body {
   max-width: 480px;
   margin: 0 auto;
   position: relative;
-  font-size: 15px;
+  font-size: var(--fs-15);
   line-height: 1.4;
 }
 button { font: inherit; color: inherit; }
+/* Texto seleccionado: lo seleccionado va en naranja (C1). */
 ::selection { background: var(--accent); color: var(--on-accent); }
 
 main#screen {
@@ -34,99 +35,39 @@ main#screen {
   padding: var(--sp-12) var(--sp-16) calc(var(--tabbar-real) + var(--sp-24));
 }
 
-/* ===== aviso / banner (SISTEMA.md §4.17) ===== */
-.banner-aviso {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  min-height: 44px;
-  padding: 12px 14px;
-  border-radius: var(--radius);
-  background: var(--well);
-  border: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--text);
-}
-.banner-aviso svg {
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-  margin-top: 1px;
-  color: var(--text);
-}
-.banner-aviso.red {
-  background: color-mix(in srgb, var(--neg) 14%, transparent);
-  color: var(--neg);
-}
-.banner-aviso.red svg { color: var(--neg); }
-
-/* el aviso de almacenamiento no persistente se antepone a body (fuera de #screen):
-   franja roja tenue fija arriba, a todo lo ancho del layout */
-body > .banner-aviso {
-  position: fixed;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 480px;
-  z-index: 30;
-  border-radius: 0;
-  background: color-mix(in srgb, var(--neg) 14%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--neg) 35%, var(--border));
-  border-top: 0;
-}
-body:has(> .banner-aviso) main#screen { margin-top: 46px; }
-
-/* chrome oculto durante el asistente de periodo (onboarding y cierre normal, ver main.js nav()) */
+/* ===== chrome oculto ===== */
+/* Durante el asistente de periodo (onboarding y cierre normal, ver main.js nav()). */
 body.onboarding .tabbar { display: none; }
-
-/* chrome oculto en cualquier subpantalla (SISTEMA.md §4.14: solo Inicio/Movimientos/Patrimonio/
-   Ajustes llevan tab bar). La clase la pone/quita back.js (createBackStack#syncChrome) exactamente
-   mientras la pila de subpantallas tenga alguna entrada — ver el comentario ahí. Sin la barra,
-   main#screen ya no necesita reservarle sitio abajo: el hueco del padding original (barra +
-   holgura) se cambia por uno mucho menor, solo para que los botones «Guardar»/«Borrar» del final de
-   los formularios no queden pegados al borde de la pantalla, respetando el notch inferior. */
+/* En cualquier subpantalla: solo Inicio, Movimientos, Patrimonio y Ajustes llevan barra de
+   pestañas. La clase la pone y la quita back.js (createBackStack#syncChrome) mientras la pila de
+   subpantallas tenga alguna entrada. Sin la barra, main#screen no le reserva sitio abajo: queda un
+   hueco de 24 sobre el notch inferior para que los botones del final no vayan pegados al borde. */
 body.subscreen .tabbar { display: none; }
 body.subscreen main#screen {
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--sp-24));
 }
 
-/* Anatomía del importe (SISTEMA.md §2.3). En `em`: la MISMA pareja sirve al héroe de 56px, al
-   total de 34 y a la fila de 16 sin una sola medida absoluta. */
-.money-cents { font-size: 0.56em; color: var(--text-dim); }
-.money-cur { font-size: 0.42em; font-weight: 500; color: var(--text-dim); margin-left: .06em; }
+/* ===== utilidades ===== */
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+/* Anatomía del importe (format.js#moneyPartsHtml): en el sistema B la cifra es plana (mismo tamaño
+   y color que el entero, DESIGN §7); el símbolo va a 500. */
+.money-cur { font-weight: 500; }
 
-/* ===== animación de aviso (importe/categoría inválidos al guardar) ===== */
+/* Aviso de importe o categoría inválidos al guardar. */
+.shake { animation: bc-shake 0.4s; }
+@media (prefers-reduced-motion: reduce) {
+  .shake { animation: none; }
+}
+
+/* ===== @keyframes ===== */
 @keyframes bc-shake {
   10%, 90% { transform: translateX(-1px); }
   20%, 80% { transform: translateX(2px); }
   30%, 50%, 70% { transform: translateX(-4px); }
   40%, 60% { transform: translateX(4px); }
 }
-.shake { animation: bc-shake 0.4s; }
-
-/* ===== esqueleto de carga (skeleton.js) ===== */
-/* Misma tinta y mismo radio que las tarjetas para que la silueta prometa lo que va a llegar. */
-.skeleton-stack { display: flex; flex-direction: column; gap: var(--sp-16); }
-.skeleton {
-  background: var(--raised);
-  border-radius: var(--radius);
-  animation: bc-skeleton 1.2s ease-in-out infinite;
-}
+/* El pulso del esqueleto de carga (components.css, sección «Piezas sueltas»). */
 @keyframes bc-skeleton {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .shake { animation: none; }
-  .skeleton { animation: none; }
-}
-
-/* ===== metadatos con divisor de 1px (SISTEMA.md §1 · helper ui.js#metaHtml) ===== */
-/* Sustituye al punto medio, que §1 prohíbe explícitamente. La altura del divisor es la del
-   artboard (11px en fila de lista, 12px en cabecera de sección): 11px es el caso mayoritario y
-   la diferencia no se ve, así que hay un solo valor. */
-.meta-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font: 500 var(--fs-13)/var(--lh-body) var(--font-body); color: var(--text-dim); }
-.meta-sep { width: 1px; height: 11px; background: var(--border-strong); flex-shrink: 0; }

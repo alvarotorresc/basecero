@@ -1228,3 +1228,65 @@ body.subscreen #toast, body.onboarding #toast { bottom: calc(var(--sp-16) + env(
 .ent-fam-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 12px; background: var(--fb); }
 .ent-fam-pick[aria-pressed="true"] { box-shadow: var(--ring-sel); }
 .ent-fam-pick[aria-pressed="true"] .ent-fam-bar { left: 2px; right: 2px; bottom: 2px; }
+
+/* ===== Piezas sueltas: metadatos, aviso de error y esqueleto (PR-99, antes en app.css) ===== */
+
+/* --- Metadatos con divisor de 1px (ui.js#metaHtml): la alternativa al punto medio, que el sistema
+   no usa. 13/500 dim; divisor de 11 en --border-strong. --- */
+.meta-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font: 500 var(--fs-13)/var(--lh-body) var(--font-body); color: var(--text-dim); }
+.meta-sep { width: 1px; height: 11px; background: var(--border-strong); flex-shrink: 0; }
+
+/* --- Aviso de error (.banner-aviso): franja en --well con texto en tinta; .red lo tiñe de --neg.
+   main.js lo antepone a <body> cuando el almacenamiento no es persistente (franja fija arriba, a
+   todo el ancho del layout) y las pantallas lo usan para su error de carga. --- */
+.banner-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--well);
+  border: 0;
+  font-size: var(--fs-12);
+  line-height: 1.5;
+  color: var(--text);
+}
+.banner-aviso svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  color: var(--text);
+}
+.banner-aviso.red {
+  background: color-mix(in srgb, var(--neg) 14%, transparent);
+  color: var(--neg);
+}
+.banner-aviso.red svg { color: var(--neg); }
+body > .banner-aviso {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  z-index: 30;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--neg) 14%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--neg) 35%, var(--border));
+  border-top: 0;
+}
+body:has(> .banner-aviso) main#screen { margin-top: 46px; }
+
+/* --- Esqueleto de carga (skeleton.js): bloques en --raised con el radio de las tarjetas y un pulso
+   (@keyframes bc-skeleton en app.css); quieto con movimiento reducido. --- */
+.skeleton-stack { display: flex; flex-direction: column; gap: var(--sp-16); }
+.skeleton {
+  background: var(--raised);
+  border-radius: var(--radius);
+  animation: bc-skeleton 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}

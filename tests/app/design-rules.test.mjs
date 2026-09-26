@@ -7,9 +7,9 @@
 // incluidas: el naranja y los estilos en línea viven sobre todo en los template strings de las
 // pantallas. Son regex, no un parser de CSS: reglas simples, y cada excepción cita su línea de DESIGN.
 //
-// PENDIENTES: ficheros aún sin migrar, que las reglas se saltan (desviación «Ficheros de la lista
-// PENDIENTES», DESIGN §Desviaciones, se retira en la PR-99). La lista SOLO ENCOGE: si un fichero de
-// la lista ya cumple todas las reglas, el último test falla hasta que se saca de ella.
+// PENDIENTES: ficheros aún sin migrar, que las reglas se saltaban durante la migración a B. Se vació
+// en la PR-99 (todas las pantallas y app.css migradas) y un test vigila que siga vacía: un fichero
+// que no cumple se arregla, no se añade a la lista.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -20,13 +20,7 @@ import { EN as en } from "../../app/app/js/i18n/en.js";
 
 const APP = fileURLToPath(new URL("../../app/app/", import.meta.url));
 
-export const PENDIENTES = new Set([
-  // Las 15 pantallas (cada S* saca las suyas). Una por línea para que las uniones no choquen.
-  // Módulos con plantilla o paleta propia, que migran con su pantalla o con su PR de fundación.
-  "css/app.css",         // estilos «Neto»; cada PR de fundación y cada S* le quita lo suyo
-  // Ficheros que otras PRs de fundación reescriben en paralelo con esta; salen al integrarlas
-  // (el test de «ya cumple» obliga a sacarlos).
-]);
+export const PENDIENTES = new Set();
 
 // ---------- lectura ----------
 
@@ -388,6 +382,11 @@ test("detectores: cazan lo que prohíben y dejan pasar lo permitido", () => {
 });
 
 // ---------- la lista PENDIENTES solo encoge ----------
+
+test("PENDIENTES: vacía desde la PR-99 (todo app/app pasa por todas las reglas)", () => {
+  assert.equal(PENDIENTES.size, 0, `vuelve a haber ficheros exentos: ${[...PENDIENTES].join(", ")}`);
+  assert.equal(migrados.length, FICHEROS.length);
+});
 
 test("PENDIENTES: cada entrada existe y está dentro del escaneo", () => {
   const rels = new Set(FICHEROS.map((f) => f.rel));
