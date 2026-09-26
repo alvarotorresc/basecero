@@ -1695,13 +1695,19 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .reg-head .ctl-segmented [role="radio"] { flex: none; }
 
-/* Display xl de entrada (F-48): comercio arriba como etiqueta, importe, «o dicta…» en el pie. */
-.reg-disp { gap: var(--sp-8); }
+/* Display de entrada (B-Gasto): «Importe» arriba, la cifra a 48 (--disp-fs en línea) y en el pie
+   el comercio a la izquierda y «o dicta…» a la derecha. Relleno 14 16 14 20 y separación 6. */
+.reg-disp { gap: 6px; padding: 14px var(--sp-16) 14px var(--sp-20); }
 .reg-disp-main { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); }
 .reg-disp-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+/* Los dos campos del pie tienen área de toque de 44 (K10) sin engordar el pie: los márgenes
+   negativos devuelven el alto a la línea de 20. El texto escrito va a 16 (--fs-input: por debajo,
+   iOS amplía la página al enfocar); la pista en reposo, a su tamaño del mockup. */
 .reg-merchant-input {
   width: 100%;
   min-width: 0;
+  height: 44px;
+  margin: -12px 0;
   padding: 0;
   border: 0;
   background: none;
@@ -1709,12 +1715,9 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   font-family: var(--font-body);
   font-size: var(--fs-input);
   font-weight: 600;
-  line-height: var(--lh-title);
-  /* Área de toque de 44 (K10) sin engordar la etiqueta: los márgenes negativos devuelven el alto. */
-  height: 44px;
-  margin: calc(-1 * var(--sp-12)) 0 calc(-1 * var(--sp-8));
 }
-.reg-merchant-input::placeholder { color: var(--disp-dim); }
+.reg-merchant-input::placeholder { color: var(--disp-dim); font-size: var(--fs-14); font-weight: 500; }
+.reg-merchant-text { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-14); font-weight: 600; line-height: var(--lh-title); color: var(--disp-ink); }
 .reg-amount { display: flex; align-items: baseline; gap: var(--sp-12); min-width: 0; }
 .reg-amount-input {
   min-width: 44px;
@@ -1746,6 +1749,7 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   font-weight: 600;
   text-shadow: none;
 }
+/* El micro, en el ámbar del Display (lo pone la clase .disp-amber del marcado). */
 .reg-mic {
   flex: none;
   width: 48px;
@@ -1757,20 +1761,24 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   border: 0;
   border-radius: var(--radius-pill);
   background: var(--disp-line);
-  color: var(--disp-ink);
 }
 .reg-disp-foot {
   display: flex;
   align-items: center;
-  gap: var(--sp-8);
-  min-height: 44px;
-  padding-top: var(--sp-4);
+  justify-content: space-between;
+  gap: var(--sp-12);
+  min-height: 20px;
+  padding-top: var(--sp-8);
   border-top: 1px solid var(--disp-line);
 }
+.reg-foot-left { flex: 1 1 0; min-width: 0; display: flex; align-items: center; }
+.reg-foot-right { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-8); }
 .reg-nat-input {
   flex: 1;
+  width: 100%;
   min-width: 0;
   height: 44px;
+  margin: -12px 0;
   padding: 0;
   border: 0;
   background: none;
@@ -1778,20 +1786,22 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   font-family: var(--font-body);
   font-size: var(--fs-input);
   font-weight: 500;
+  text-align: right;
 }
-.reg-nat-input::placeholder { color: var(--disp-dim); }
+.reg-nat-input::placeholder { color: var(--disp-dim); font-size: var(--fs-12); font-weight: 500; }
 .reg-nat-status,
-.reg-nat-quote { flex: 1; min-width: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--disp-ink); }
+.reg-nat-quote { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--disp-ink); }
 .reg-nat-status { color: var(--disp-dim); }
 .reg-nat-reset {
   flex: none;
   min-height: 44px;
+  margin: -12px 0;
   padding: 0 var(--sp-4);
   border: 0;
   background: none;
   color: var(--disp-dim);
   font-family: var(--font-body);
-  font-size: var(--fs-13);
+  font-size: var(--fs-12);
   font-weight: 600;
 }
 .reg-help { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
@@ -1845,35 +1855,14 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 .reg-limit.is-over { color: var(--text); font-weight: 600; }
 .reg-limit-over { color: var(--neg); }
 
-/* Registro rápido plegado: «Ver las N categorías» y la fila «Más» (fila de 60 en --raised con
-   borde: «Más» 15/600, resumen 13/500 dim con el divisor de metaHtml, chevron). */
+/* Registro rápido plegado: «Ver las N categorías» y la fila «Más», con la misma receta que las
+   píldoras de cuenta y fecha de B-Gasto (48, --raised con borde, 14/600; resumen 13/500 dim en una
+   línea con el divisor de metaHtml; chevron 16 dim). */
 .reg-cats-more { align-self: flex-start; }
 .reg-more {
   width: 100%;
-  min-height: 60px;
-  padding: var(--sp-8) var(--sp-12) var(--sp-8) var(--sp-16);
-  display: flex;
-  align-items: center;
-  gap: var(--sp-12);
-  border-radius: var(--radius);
-  background: var(--raised);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-family: var(--font-body);
-  text-align: left;
-  cursor: pointer;
-}
-.reg-more-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
-.reg-more-label { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); }
-.reg-more-sum { font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
-
-/* Filas de cuenta y fecha, y «Con Marta 50 %» (F-20): píldoras de 48 en --raised con borde. */
-.reg-row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
-.reg-pill {
-  position: relative;
-  min-width: 0;
   height: 48px;
-  padding: 0 var(--sp-8) 0 var(--sp-12);
+  padding: 0 var(--sp-12) 0 14px;
   display: flex;
   align-items: center;
   gap: var(--sp-8);
@@ -1882,12 +1871,39 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   border: 1px solid var(--border);
   color: var(--text);
   font-family: var(--font-body);
-  font-size: var(--fs-15);
+  text-align: left;
+  cursor: pointer;
+}
+.reg-more-body { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--sp-12); }
+.reg-more-label { flex: none; font-size: var(--fs-14); font-weight: 600; line-height: var(--lh-title); }
+.reg-more-sum { flex: 1; min-width: 0; flex-wrap: nowrap; overflow: hidden; font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+.reg-more-sum > span { flex: none; white-space: nowrap; }
+
+/* Filas de cuenta y fecha, y «Con Marta 50 %» (F-20): píldoras de 48 en --raised con borde. */
+.reg-row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.reg-pill {
+  position: relative;
+  min-width: 0;
+  height: 48px;
+  padding: 0 var(--sp-12);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  border-radius: var(--radius-pill);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-14);
   font-weight: 600;
   text-align: left;
   cursor: pointer;
 }
 .reg-pill-wide { width: 100%; }
+/* Cuenta y fecha (B-Gasto): el chevron casi pegado al borde, para que «Cuenta corriente» quepa
+   entera en media fila como en el original. */
+.reg-row2 .reg-pill { padding-right: var(--sp-4); }
+.reg-row2 .reg-pill-chev { margin-left: calc(-1 * var(--sp-4)); }
 .reg-pill-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .reg-pill-pre { flex: none; font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
 .reg-pill-chev,
@@ -1906,8 +1922,14 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .reg-date:has(.reg-date-input:focus-visible) { outline: var(--focus); outline-offset: var(--focus-offset); }
 .reg-extras { display: flex; align-items: center; gap: var(--sp-8); }
-.reg-shared { flex: 1; padding: 0 var(--sp-8) 0 var(--sp-16); }
+.reg-shared { flex: 1; padding: 0 var(--sp-8) 0 14px; }
 .reg-shared-pct { font-weight: 500; color: var(--text-dim); }
+/* Interruptor de «Con Marta» (B-Gasto): 40×24 con pomo 18; apagado, pomo --raised en claro y --idle
+   en oscuro (BD-Gasto). El área de toque sigue siendo la píldora entera. */
+.reg-shared .ctl-switch { width: 40px; height: 24px; }
+.reg-shared .ctl-switch-knob { width: 18px; height: 18px; background: var(--raised); }
+:root[data-theme="dark"] .reg-shared .ctl-switch[aria-checked="false"] .ctl-switch-knob { background: var(--idle); }
+.reg-shared .ctl-switch[aria-checked="true"] .ctl-switch-knob { transform: translateX(16px); }
 .reg-round {
   flex: none;
   width: 48px;
