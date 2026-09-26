@@ -498,7 +498,6 @@ export const EN = {
       empty: "You don’t have any accounts yet.",
     },
     account: {
-      title: { edit: "Edit account" },
       settings: "Account settings",
       openingBalance: "Opening balance",
       note: {
@@ -527,7 +526,6 @@ export const EN = {
       savings_rate: "Savings rate",
     },
     goal: {
-      title: { edit: "Edit goal" },
       settings: "Goal settings",
       monthsLabel: "Months to cover",
       monthLess: "One month less",

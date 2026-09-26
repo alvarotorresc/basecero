@@ -1483,28 +1483,53 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .pat-ring-pct.is-over { color: var(--neg); }
 
-/* Formularios (anatomía de «Ajustes de la cuenta» / «Ajustes del objetivo»): encabezado de grupo
-   13/600 dim, bloque teñido con la familia (o --surface con borde sin ella, C11) y una línea de
-   ayuda como mucho por sección (K14). */
+/* Formularios (anatomía de «Ajustes de la cuenta» / «Ajustes del objetivo» de B-Cuenta y
+   B-Objetivo): encabezado de grupo en Unbounded 13 con el -x de la familia, bloque teñido con
+   relleno 4 (sin familia, --surface con borde, C11) y filas de ajuste con baldosa rellena y filete
+   con la sangría de la baldosa. Una línea de ayuda como mucho por sección (K14). */
 .pat-group { display: flex; flex-direction: column; gap: var(--sp-8); }
 .pat-block {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-16);
-  padding: var(--sp-16) var(--sp-12);
+  padding: var(--sp-4);
   border-radius: var(--radius-lg);
   background: var(--ft);
 }
 .pat-block.no-fam { background: var(--surface); border: 1px solid var(--border); }
-.pat-field { display: flex; flex-direction: column; gap: var(--sp-8); }
+.pat-sep { height: 1px; margin: 0 var(--sp-8) 0 calc(var(--sp-8) + 32px + var(--sp-12)); background: var(--border); }
+.pat-frow-label { flex: 1; min-width: 0; }
+.pat-frow.is-tall { min-height: 64px; padding-right: var(--sp-4); }
+/* Fila con el control debajo (Tipo, Categoría): cabecera de 30 y el control a lo ancho. */
+.pat-sub { display: flex; flex-direction: column; gap: var(--sp-8); padding: var(--sp-8) var(--sp-4) var(--sp-8) var(--sp-8); }
+.pat-frow.is-head { min-height: 32px; padding: 0; }
+/* El valor de la fila es el input: sin pozo, a la derecha, 16 (K9) y 600, en el -x de la familia
+   (en tinta sin ella). El anillo de foco sigue en :focus-visible. */
+.pat-input {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 60%;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-input);
+  font-weight: 600;
+  text-align: right;
+}
+.pat-input.is-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.pat-input.is-fam-ink { color: var(--fx); }
+.pat-input::placeholder { color: var(--text-dim); font-weight: 500; }
+.pat-input:focus { outline: none; }
+.pat-input:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+.pat-input-suffix { flex: none; margin-left: calc(var(--sp-8) * -1); font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+.pat-input-suffix.is-fam-ink { color: var(--fx); }
 .pat-help { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 .pat-hint-strong { font-weight: 700; color: var(--fx, var(--text)); }
-.pat-amount-row { display: flex; align-items: flex-end; gap: var(--sp-8); }
-.pat-amount-row .ctl-field-wrap { flex: 1; min-width: 0; }
-.pat-sign { font-family: var(--font-mono); font-size: var(--fs-17); font-weight: 600; margin-bottom: var(--sp-2); }
+.pat-sign { flex: none; font-family: var(--font-mono); font-size: var(--fs-17); font-weight: 600; }
 .pat-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); min-height: 48px; padding: 0 var(--sp-4); }
 .pat-row-label { font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-title); color: var(--text); }
-.pat-row-value { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); text-align: right; overflow-wrap: anywhere; }
 .pat-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
 .pat-progress-fig { font-size: var(--fs-20); font-weight: 600; color: var(--text); white-space: nowrap; }
 .pat-progress-pct { align-self: flex-end; font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }

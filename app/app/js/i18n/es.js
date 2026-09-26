@@ -525,7 +525,6 @@ export const ES = {
       empty: "Todavía no tienes ninguna cuenta.",
     },
     account: {
-      title: { edit: "Editar cuenta" },
       settings: "Ajustes de la cuenta",
       openingBalance: "Saldo inicial",
       note: {
@@ -555,7 +554,6 @@ export const ES = {
       savings_rate: "Tasa de ahorro",
     },
     goal: {
-      title: { edit: "Editar objetivo" },
       settings: "Ajustes del objetivo",
       monthsLabel: "Meses a cubrir",
       monthLess: "Un mes menos",
