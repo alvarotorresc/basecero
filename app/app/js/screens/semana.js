@@ -157,7 +157,7 @@ export async function renderSemana(container, onBack, { openDay } = {}) {
         <span class="sem-day-notch" aria-hidden="true"></span>
         <div class="sem-day-head">
           <h2 class="sem-day-title">${escHtml(title)}</h2>
-          ${movs.length ? `<span class="num sem-day-total">${moneyPartsHtml(day.totalCents)}</span>` : ""}
+          ${movs.length ? `<span class="num sem-day-total">${escHtml(fmtMoney(day.totalCents))}</span>` : ""}
         </div>
         ${movs.length ? `<div class="sem-day-rows">${rows}</div>` : `<p class="sem-day-empty">${escHtml(t("semana.noSpend"))}</p>`}
       </section>`;
