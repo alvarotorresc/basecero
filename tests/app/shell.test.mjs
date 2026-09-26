@@ -21,7 +21,7 @@ test("sw: cada entrada del SHELL existe en disco", () => {
 test("sw: cada woff2 y cada licencia de vendor/fonts está en el SHELL", () => {
   // Leído del disco, no de una lista: una fuente nueva que no entre en el SHELL se queda sin caché offline.
   const enDisco = readdirSync(APP + "vendor/fonts").filter((f) => f.endsWith(".woff2") || f.endsWith("-OFL.txt"));
-  assert.ok(enDisco.filter((f) => f.endsWith(".woff2")).length >= 6, "faltan woff2 en vendor/fonts");
+  assert.ok(enDisco.filter((f) => f.endsWith(".woff2")).length >= 4, "faltan woff2 en vendor/fonts");
   for (const f of enDisco) assert.ok(shell.includes("vendor/fonts/" + f), `vendor/fonts/${f} no está en el SHELL`);
   assert.ok(!sw.includes("QGYvz"), "Outfit ya no se sirve");
 });

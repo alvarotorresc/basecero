@@ -2,7 +2,6 @@ const CACHE = "bc-v50";
 // sqlite3-opfs-async-proxy.js queda fuera a propósito: solo lo usa el VFS "opfs" clásico (requiere COOP/COEP), no el sahpool que usamos.
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/icon.svg", "icons/icon-maskable.svg",
   "css/tokens.css", "css/components.css", "css/app.css", "css/screens.css", "vendor/pure.js", "vendor/xlsx/xlsx.full.min.js", "vendor/pdf-lib/pdf-lib.min.js", "vendor/fonts/fonts.css",
-  "vendor/fonts/schibsted-grotesk-latin.woff2", "vendor/fonts/jetbrains-mono-latin.woff2",
   "vendor/fonts/unbounded-latin.woff2", "vendor/fonts/instrument-sans-latin.woff2", "vendor/fonts/ibm-plex-mono-latin-500.woff2", "vendor/fonts/ibm-plex-mono-latin-600.woff2",
   "vendor/fonts/unbounded-OFL.txt", "vendor/fonts/instrument-sans-OFL.txt", "vendor/fonts/ibm-plex-mono-OFL.txt",
   "js/main.js", "js/theme.js", "js/tabs.js", "js/back.js", "js/errors.js", "js/toast.js", "js/esc.js", "js/recibo.js", "js/skeleton.js", "js/viewport.js", "js/modal.js", "js/sheet.js", "js/format.js", "js/icons.js", "js/ui.js", "js/controls.js", "js/share-pct.js", "js/registro-mode.js", "js/migrations.js", "js/i18n/index.js", "js/i18n/es.js", "js/i18n/en.js", "js/db.js", "js/db-worker.js", "js/schema.sql", "js/merchant-memory.js", "js/limit-warning.js", "js/natural.js", "js/speech.js", "js/entity.js",
