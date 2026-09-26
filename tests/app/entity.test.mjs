@@ -264,3 +264,11 @@ test("famNumHtml: cifra mono en -x de su familia, escapada; familia desconocida,
   assert.match(famNumHtml("1.250", "imp", { weight: 600 }), /is-w600/);
   assert.equal(decl(".ent-fam-num.is-fam-ink", "color"), "var(--fx)");
 });
+
+test("settingRowHtml: trailHtml va entre el valor y el chevron y la fila sigue siendo botón; por defecto, nada", () => {
+  const trail = '<span class="aj-cat-swatches" aria-hidden="true"></span>';
+  const html = settingRowHtml({ icon: "grid", label: "Categorías", id: "btn-categorias", trailHtml: trail });
+  assert.match(html, /^<button type="button" class="ent-set" id="btn-categorias">/);
+  assert.ok(html.indexOf(trail) > html.indexOf("ent-set-label") && html.indexOf(trail) < html.indexOf("ent-chev"), "entre la etiqueta y el chevron");
+  assert.equal(settingRowHtml({ label: "Categorías" }), settingRowHtml({ label: "Categorías", trailHtml: "" }), "sin trailHtml, igual que antes");
+});
