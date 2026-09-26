@@ -40,6 +40,22 @@ export const ICON_PATHS = {
   file:         '<path d="M13 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V9z"/><path d="M13 3v6h6M8.5 13h7M8.5 16.5h7"/>',
   // (artboard) transferencia entre cuentas — hoy movimientos.js:57
   transfer:     '<path d="M7 10l-3 3 3 3M4 13h13M17 8l3-3-3-3M20 5H7"/>',
+  // (artboard) filas de ajuste — B-Ajustes.dc.html (S4). «theme» rellena su mitad con fill en el
+  // path (atributo, no estilo); «format» y «chart» no están en B-Ajustes: formato de números y
+  // fechas, y la entrada al informe (las barras que ya pintaba ajustes.js).
+  people:       '<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0M15.5 5.5a3 3 0 0 1 0 6M17.5 14.5a5 5 0 0 1 3 5"/>',
+  split:        '<circle cx="12" cy="12" r="8"/><path d="M12 4v16"/>',
+  periodNext:   '<path d="M4 12h12M12 7l5 5-5 5M20 5v14"/>',
+  theme:        '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/>',
+  bolt:         '<path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/>',
+  currency:     '<path d="M17.5 6.5a7 7 0 1 0 0 11M4 10.5h9M4 13.5h9"/>',
+  format:       '<path d="M4 7h16M4 12h10M4 17h13"/>',
+  globe:        '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.5 3.5 5.5 3.5 8.5s-1 6-3.5 8.5c-2.5-2.5-3.5-5.5-3.5-8.5s1-6 3.5-8.5z"/>',
+  screen:       '<rect x="3.5" y="5" width="17" height="12" rx="2"/><path d="M10 9v4l3.5-2zM8 20.5h8"/>',
+  grid:         '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
+  table:        '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9.5h16M4 15h16M10 4v16"/>',
+  bank:         '<path d="M4 20h16M6 20V11M10 20V11M14 20V11M18 20V11M3 8l9-5 9 5z"/>',
+  chart:        '<path d="M4 19V10M12 19V5M20 19v-7"/>',
 };
 
 /** SVG listo para pegar. `size` en px (20 dentro de fila o botón, 24 en cabecera, 16 dentro de la

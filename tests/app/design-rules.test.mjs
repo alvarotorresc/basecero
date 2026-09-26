@@ -21,11 +21,12 @@ const APP = fileURLToPath(new URL("../../app/app/", import.meta.url));
 
 export const PENDIENTES = new Set([
   // Las 15 pantallas (cada S* saca las suyas).
-  "js/screens/ajustes.js", "js/screens/categorias.js", "js/screens/etiquetas.js",
+  "js/screens/categorias.js", "js/screens/etiquetas.js",
   "js/screens/gasto-por-categoria.js", "js/screens/informe.js", "js/screens/inicio.js",
   "js/screens/liquidar.js", "js/screens/movimientos.js", "js/screens/onboarding.js",
   "js/screens/patrimonio.js", "js/screens/periodo-nuevo.js", "js/screens/recurrentes.js",
   "js/screens/registro.js", "js/screens/semana.js", "js/screens/suscripciones.js",
+  "js/screens/importar.js", // asistente de importación, separado de ajustes.js en S4; lo migra S12
   // Módulos con plantilla o paleta propia, que migran con su pantalla o con su PR de fundación.
   "js/recibo.js",        // S2
   "js/informe-pdf.js",   // S8 (paleta de PDF-lib, D-impl-3)
