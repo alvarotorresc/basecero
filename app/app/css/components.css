@@ -57,6 +57,19 @@
   color: var(--text);
 }
 .root-header-sub { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+/* Subtítulo pulsable (rootHeaderHtml subtitleAction): alto de toque 44 (§8) sin mover la cabecera;
+   el margen negativo devuelve lo que el alto mínimo añade alrededor de la línea de 13. */
+.root-header-sub-btn {
+  align-self: flex-start;
+  min-height: 44px;
+  margin-block: calc((44px - var(--lh-title) * 1em) / -2);
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
 
 /* --- Cabecera con atrás (§9, B-Categorias · ui.js#subHeaderHtml): atrás 44 · h1 20 a la
    izquierda con subtítulo opcional · acción 44 opcional. Alto mínimo 48. --- */

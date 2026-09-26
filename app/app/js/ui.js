@@ -10,11 +10,23 @@ import { THEME_PREFS } from "./theme.js";
  *  @param {object} o
  *  @param {string} o.title       Se escapa aquí.
  *  @param {string} [o.subtitle]  Segunda línea. Se escapa aquí; vacía → no se pinta.
+ *  @param {{id:string,label:string}|null} [o.subtitleAction]  El subtítulo pasa a ser un botón
+ *                                (alto de toque 44) con ese id. Su nombre accesible empieza por el
+ *                                texto visible y sigue con `label` (la acción). El h1 nunca va
+ *                                dentro: un botón no puede contener un encabezado. Inicio lo usa
+ *                                para «Periodo nuevo».
  *  @returns {string} HTML */
-export function rootHeaderHtml({ title, subtitle = "" }) {
+export function rootHeaderHtml({ title, subtitle = "", subtitleAction = null }) {
+  let sub = "";
+  if (subtitle && subtitleAction) {
+    sub = `<button type="button" class="root-header-sub root-header-sub-btn" id="${escAttr(subtitleAction.id)}"`
+      + ` aria-label="${escAttr(`${subtitle}, ${subtitleAction.label}`)}">${escHtml(subtitle)}</button>`;
+  } else if (subtitle) {
+    sub = `<span class="root-header-sub">${escHtml(subtitle)}</span>`;
+  }
   return `<header class="root-header">
     <h1 class="root-header-title">${escHtml(title)}</h1>
-    ${subtitle ? `<span class="root-header-sub">${escHtml(subtitle)}</span>` : ""}
+    ${sub}
   </header>`;
 }
 

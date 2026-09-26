@@ -80,6 +80,14 @@ test("rootHeaderHtml: sin subtítulo no pinta la segunda línea", () => {
   assert.ok(!rootHeaderHtml({ title: "Ajustes" }).includes("root-header-sub"));
 });
 
+test("rootHeaderHtml: con subtitleAction el subtítulo es un botón (el h1 sigue fuera de él)", () => {
+  const html = rootHeaderHtml({ title: "Septiembre", subtitle: "Día 13 & 30", subtitleAction: { id: "hdr-per", label: "Abrir <periodo>" } });
+  assert.match(html, /<h1 class="root-header-title">Septiembre<\/h1>/);
+  assert.match(html, /<button type="button" class="root-header-sub root-header-sub-btn" id="hdr-per" aria-label="Día 13 &amp; 30, Abrir &lt;periodo&gt;">Día 13 &amp; 30<\/button>/);
+  assert.ok(!/<button[^>]*>[^]*<h1/.test(html), "el h1 no va dentro del botón");
+  assert.ok(!rootHeaderHtml({ title: "X", subtitleAction: { id: "a", label: "b" } }).includes("<button"), "sin subtítulo no hay botón");
+});
+
 // Botones del sistema (DESIGN.md §9: Primario, Secundario M/S, Terciario, Destructivo de entrada).
 test("buttonHtml: cada kind lleva su clase y siempre type=\"button\"", () => {
   const cases = { primary: "btn-primary", secondary: "btn-secondary", tertiary: "btn-tertiary", "danger-entry": "btn-danger" };
