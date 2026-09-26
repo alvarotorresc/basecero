@@ -242,7 +242,223 @@
   cursor: pointer;
 }
 
-/* ===== Controles: Segmented, interruptor, casilla, paso a paso, progreso, campo, chip (PR-06) ===== */
+/* ===== Controles: Segmented, interruptor, casilla, paso a paso, progreso, campo, chip (PR-06) =====
+   Prefijo ctl- a propósito: .segmented, .toggle*, .check-box, .stepper-btn y .field* YA EXISTEN en
+   app.css con otra anatomía (el scroller de chips de Movimientos, el <input type=checkbox> oculto
+   del toggle viejo…) y siguen en uso en pantallas sin migrar (grep antes de tocar app.css — ver
+   PR-06-report.md). Reusar esos nombres aquí chocaría: app.css carga DESPUÉS de este fichero, así
+   que sus reglas ganarían sobre las de abajo en cualquier propiedad compartida. */
+
+/* Segmented (§9): pozo píldora con relleno 4 y --sh-well; ítems de 44, 14/600 dim; el activo va en
+   --raised + --sh-thumb y 700 — NUNCA naranja (C1, K3, F-*). */
+.ctl-segmented {
+  display: flex;
+  padding: var(--sp-4);
+  border-radius: var(--radius-pill);
+  background: var(--well);
+  box-shadow: var(--sh-well);
+}
+.ctl-segmented [role="radio"] {
+  flex: 1;
+  height: 44px;
+  padding: 0 var(--sp-12);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: center;
+  white-space: nowrap;
+  transition: background-color 150ms ease-out, color 150ms ease-out;
+}
+.ctl-segmented [role="radio"][aria-checked="true"] {
+  background: var(--raised);
+  color: var(--text);
+  font-weight: 700;
+  box-shadow: var(--sh-thumb);
+}
+.ctl-segmented [role="radio"]:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+@media (prefers-reduced-motion: reduce) { .ctl-segmented [role="radio"] { transition: none; } }
+
+/* Interruptor (§9): 44×26, pomo 20. Apagado: pista --well + --sh-well, pomo --idle. Encendido:
+   pista --text, pomo --raised — tinta, nunca naranja (F-04, K3). El área de toque real tiene que
+   llegar a 44×44 (§11, K10) sin tocar el dibujo: el ::before amplía el hit area 9px arriba y abajo
+   (26 + 9 + 9 = 44) sin pintar nada, así que la pastilla se sigue viendo de 26 de alto. */
+.ctl-switch {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--well);
+  box-shadow: var(--sh-well);
+}
+.ctl-switch::before {
+  content: "";
+  position: absolute;
+  inset: -9px 0;
+}
+.ctl-switch[aria-checked="true"] { background: var(--text); }
+.ctl-switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--idle);
+  box-shadow: var(--sh-knob);
+  transition: transform 150ms ease-out, background-color 150ms ease-out;
+}
+.ctl-switch[aria-checked="true"] .ctl-switch-knob {
+  background: var(--raised);
+  transform: translateX(18px);
+}
+.ctl-switch:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+@media (prefers-reduced-motion: reduce) { .ctl-switch-knob { transition: none; } }
+
+/* Casilla (§9): 24 de radio 7 (única excepción al radio de tokens, K10) dentro de un área de toque
+   de 44. Marcada: --text con el check en --raised. Vacía: --raised con borde interior --idle
+   (F-22) — tinta, nunca naranja (F-05, K3). */
+.ctl-checkbox {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ctl-checkbox-box {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1.5px var(--idle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--raised);
+}
+.ctl-checkbox[aria-checked="true"] .ctl-checkbox-box {
+  background: var(--text);
+  box-shadow: none;
+}
+.ctl-checkbox:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+
+/* Paso a paso (§9): pozo píldora con relleno 4, teclas de 44 en --raised + --sh-thumb, valor mono
+   17/600. */
+.ctl-stepper {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  border-radius: var(--radius-pill);
+  background: var(--well);
+  box-shadow: var(--sh-well);
+}
+.ctl-stepper-btn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--raised);
+  box-shadow: var(--sh-thumb);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ctl-stepper-btn:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+.ctl-stepper-value {
+  min-width: 24px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-17);
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Progreso por pasos (§9): segmentos de 6 en píldora; hecho y actual en --text, pendiente en el
+   pozo (I-35/F-27). grid-auto-flow reparte N columnas iguales sin conocer `total` de antemano. */
+.ctl-steps {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: var(--sp-4);
+}
+.ctl-steps-seg {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--well);
+  box-shadow: var(--sh-well);
+}
+.ctl-steps-seg.is-done { background: var(--text); box-shadow: none; }
+
+/* Campo hundido (§9): 48 de alto, --well + --sh-well, radio 10, input de 16 (--fs-input, evita el
+   zoom de iOS: K9) y etiqueta 13/600 dim encima. */
+.ctl-field-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+.ctl-field-label {
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.ctl-field {
+  height: 48px;
+  padding: 0 var(--sp-16);
+  border-radius: var(--radius);
+  background: var(--well);
+  box-shadow: var(--sh-well);
+  display: flex;
+  align-items: center;
+}
+.ctl-field-input {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-input);
+  font-weight: 600;
+}
+/* El foco va en el input, no en el pozo que lo envuelve (R-C1 exige que un var(--focus) viva
+   siempre bajo un selector :focus-visible — un :focus-within en .ctl-field no vale). */
+.ctl-field-input:focus { outline: none; }
+.ctl-field-input:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+
+/* Chip neutro (§9): 44 píldora, --raised, 14/500 — subcategoría o etiqueta, nunca color propio (el
+   chip de filtro con tinte de familia es de otra PR). is-tag añade borde e icono de etiqueta. */
+.ctl-chip {
+  flex: none;
+  height: 44px;
+  padding: 0 var(--sp-12);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--raised);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  font-size: var(--fs-14);
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+}
+.ctl-chip.is-tag {
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.ctl-chip:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
 
 /* ===== Instrumento: Display, LED, bento, barras, medidor (PR-07) ===== */
 
