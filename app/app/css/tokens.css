@@ -75,14 +75,16 @@
 }
 
 :root[data-theme="dark"]{
+  /* Oscuro «grafito» (V3 de DARK-propuestas.md, Álvaro 2026-09-27): capas sobre un grafito medio,
+     bordes e --idle visibles, --text-dim más claro; el pozo y el Display siguen hundidos. */
   /* Base Instrumento */
-  --bg:#161719;--surface:#1E1F22;--raised:#28292D;--well:#131416;
-  --border:#393A3F;--border-strong:#4A4B51;
-  --text:#EDECE8;--text-dim:#A09F9B;
-  --chip:#161719;--lift:#393A3F;--idle:#6B6A66;
+  --bg:#1D1E20;--surface:#292A2D;--raised:#38393D;--well:#131416;
+  --border:#66686D;--border-strong:#828389;
+  --text:#F3F2EE;--text-dim:#CAC9C4;
+  --chip:#1D1E20;--lift:#494A4F;--idle:#8B8A85;
 
   /* Acción */
-  --accent:#FF5A1F;--on-accent:#161719;--accent-text:#FF7B47;
+  --accent:#FF5A1F;--on-accent:#161719;--accent-text:#FE885A;
 
   /* Display */
   --disp:#0E0F10;--disp-line:#26272B;--disp-text:#FFC266;--disp-dim:#9A8D74;--disp-ink:#EDECE8;
@@ -94,9 +96,9 @@
   /* Velo */
   --scrim:rgba(0,0,0,.6);
 
-  /* Sombras y anillos (en oscuro los hundidos llevan anillo de borde) */
+  /* Sombras y anillos (en oscuro los hundidos llevan anillo de borde; el del pozo, --border-strong) */
   --sh-display:inset 0 2px 6px rgba(0,0,0,.6),inset 0 0 0 1px var(--disp-line);
-  --sh-well:inset 0 1px 2px rgba(0,0,0,.4),inset 0 0 0 1px var(--border);
+  --sh-well:inset 0 1px 2px rgba(0,0,0,.4),inset 0 0 0 1px var(--border-strong);
   --sh-thumb:0 1px 2px rgba(0,0,0,.45);
   --sh-knob:0 1px 2px rgba(0,0,0,.5);
   --sh-key:0 2px 0 rgba(0,0,0,.4);
@@ -104,19 +106,21 @@
   --sh-alert:0 4px 16px rgba(0,0,0,.5);
   --disp-glow:0 0 12px rgba(255,194,102,.25);
 
-  /* Familias, oscuro (Casa, Coche y el texto de Restauración, con sus valores de antes del retoque) */
-  --f-casa-t:#30251B;--f-casa-b:#AE8A69;--f-casa-x:#E3CDB5;
-  --f-ali-t:#202B22;--f-ali-b:#628D6C;--f-ali-x:#B9DBBD;
-  --f-res-t:#2D2716;--f-res-b:#BA9B39;--f-res-x:#DAD3A6;
-  --f-tra-t:#1F2838;--f-tra-b:#799EE3;--f-tra-x:#BBD1FC;
-  --f-coc-t:#23282F;--f-coc-b:#7C8FAB;--f-coc-x:#C6D2E5;
-  --f-sal-t:#182B2E;--f-sal-b:#4C9DA6;--f-sal-x:#A7DCE2;
-  --f-sus-t:#272538;--f-sus-b:#8F81D3;--f-sus-x:#D0CAFD;
-  --f-oci-t:#33222A;--f-oci-b:#C5749C;--f-oci-x:#F4C0D5;
-  --f-rop-t:#2D2332;--f-rop-b:#A27CBA;--f-rop-x:#E1C5EF;
-  --f-reg-t:#352221;--f-reg-b:#C17676;--f-reg-x:#F6C2C1;
-  --f-imp-t:#272A1A;--f-imp-b:#828D50;--f-imp-x:#D1D6A9;
-  --f-otr-t:#292724;--f-otr-b:#98958E;--f-otr-x:#D4D0C8;
+  /* Familias, oscuro: tintes con L +0,085 y croma ×1,7 y textos con croma ×1,5 sobre su tono (V3);
+     barras sin cambios. Casa y Coche parten de sus valores de antes del retoque; el texto de
+     Restauración no cambia (V3 lo deja quieto para no acercarlo al ámbar). */
+  --f-casa-t:#4C3826;--f-casa-b:#AE8A69;--f-casa-x:#ECCBA6;
+  --f-ali-t:#2F4333;--f-ali-b:#628D6C;--f-ali-x:#ACE0B3;
+  --f-res-t:#473C1B;--f-res-b:#BA9B39;--f-res-x:#DAD3A6;
+  --f-tra-t:#2D3D5A;--f-tra-b:#799EE3;--f-tra-x:#BAD1FF;
+  --f-coc-t:#353E4A;--f-coc-b:#7C8FAB;--f-coc-x:#C0D2EF;
+  --f-sal-t:#1E4349;--f-sal-b:#4C9DA6;--f-sal-x:#8DE1EB;
+  --f-sus-t:#3C385B;--f-sus-b:#8F81D3;--f-sus-x:#D0CAFF;
+  --f-oci-t:#513241;--f-oci-b:#C5749C;--f-oci-x:#FEBAD6;
+  --f-rop-t:#473550;--f-rop-b:#A27CBA;--f-rop-x:#E9BEFE;
+  --f-reg-t:#553231;--f-reg-b:#C17676;--f-reg-x:#FEBEBD;
+  --f-imp-t:#3C4123;--f-imp-b:#828D50;--f-imp-x:#D1D893;
+  --f-otr-t:#3F3C39;--f-otr-b:#98958E;--f-otr-x:#D4D0C8;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
