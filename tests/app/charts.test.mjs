@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { sparklineSvg, netWorthBarsHtml, barRowsGeometry, categoryBarsSvg, comparisonBarsSvg, trendOf, trendSvg, TREND_MIN_H } from "../../app/app/js/charts.js";
+import { sparklineSvg, barRowsGeometry, categoryBarsSvg, comparisonBarsSvg, trendOf, trendSvg, TREND_MIN_H } from "../../app/app/js/charts.js";
 import { SQL } from "../../app/app/js/sql.js";
 import { fmtDiaIni } from "../../app/app/js/format.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
@@ -49,31 +49,6 @@ test("sparklineSvg: dots pinta un punto por valor además del de hoy", () => {
 test("sparklineSvg: un único punto o ninguno no revienta (sin NaN)", () => {
   assert.ok(!sparklineSvg([50]).includes("NaN"));
   assert.ok(!sparklineSvg([]).includes("NaN"));
-});
-
-// ---- netWorthBarsHtml (compatibilidad de Patrimonio, sobre columnsHtml) ---------------------
-
-test("netWorthBarsHtml: hasta 6 columnas, la última es hoy (tinta) y las demás --idle; etiquetas capitalizadas", () => {
-  const series = ["mar", "abr", "may", "jun", "jul", "ago", "sep"].map((label, i) => ({ label, cents: (i + 1) * 100000 }));
-  const html = netWorthBarsHtml(series);
-  assert.equal((html.match(/class="col-bar"/g) || []).length, 6); // 7 puntos → 6 columnas
-  assert.equal((html.match(/class="col is-today"/g) || []).length, 1);
-  assert.ok(html.includes(">Sep<") && !html.includes(">SEP<"), "la etiqueta capitaliza, no grita");
-  assert.ok(!html.includes(">Mar<") && !html.includes(">mar<")); // slice(-6) descarta el más viejo
-  assert.doesNotMatch(html, /var\(--(accent|red|card2|r-0)/);
-});
-
-test("netWorthBarsHtml: oculto con menos de 2 puntos", () => {
-  assert.equal(netWorthBarsHtml([{ label: "ago", cents: 100 }]), "");
-  assert.equal(netWorthBarsHtml([]), "");
-});
-
-// Sistema B (C4): el rojo solo va en cifras. Un cierre negativo mide por su valor absoluto.
-test("netWorthBarsHtml: un cierre negativo no pinta ningún rojo y mide por su valor absoluto", () => {
-  const html = netWorthBarsHtml([{ label: "jul", cents: 50000 }, { label: "ago", cents: -50000 }]);
-  assert.doesNotMatch(html, /--red|--neg/);
-  const hs = [...html.matchAll(/style="height:(\d+)%"/g)].map((m) => Number(m[1]));
-  assert.deepEqual(hs, [76, 76]);
 });
 
 // ---- SQL.spentByDay -------------------------------------------------------
