@@ -671,6 +671,8 @@ export async function renderPatrimonio(container) {
 
     // Paso a paso de meses: se actualiza en su sitio (sin render), así el foco no se mueve.
     const monthsValue = container.querySelector("#goal-months .ctl-stepper-value");
+    // Sin re-render el lector de pantalla no se entera del valor nuevo: se anuncia en vivo (K12).
+    monthsValue?.setAttribute("aria-live", "polite");
     const stepMonths = (d) => {
       f.months = Math.min(99, Math.max(1, (f.months || 1) + d));
       if (monthsValue) monthsValue.textContent = String(f.months);
