@@ -144,7 +144,8 @@ function activeRowHtml(rule, byId, todayIso) {
 function candidateCardHtml(candidate, byId) {
   const fam = familyForCategory(candidate.categoryId, byId);
   const iconKey = iconForCategory(candidate.categoryId, byId);
-  const dates = [...candidate.lastDates].reverse().map((d) => fmtDiaCorto(d)).join(", ");
+  // Cada fecha va entera (espacio duro dentro de «2 sep»): la línea 2 parte entre fechas, no dentro.
+  const dates = [...candidate.lastDates].reverse().map((d) => fmtDiaCorto(d).replace(/ /g, "\u00a0")).join(", ");
   return `
   <div class="susc-candidate">
     <div class="susc-candidate-head ${famClass(fam)}">

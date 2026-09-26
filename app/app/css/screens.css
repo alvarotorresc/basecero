@@ -2231,7 +2231,9 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   border: 1px solid var(--border);
 }
 .susc-candidate-head { display: flex; align-items: center; gap: var(--sp-12); }
-.susc-candidate-amount { font-weight: 600; }
+.susc-candidate-amount { flex: none; font-weight: 600; white-space: nowrap; }
+/* Las fechas del radar caben enteras: la línea 2 puede ir en dos líneas en vez de cortarse. */
+.susc-candidate-head .ent-line2 { white-space: normal; overflow: visible; text-overflow: clip; }
 .susc-candidate-actions { display: flex; gap: var(--sp-8); }
 .susc-candidate-actions .btn-secondary { flex: 1; }
 
