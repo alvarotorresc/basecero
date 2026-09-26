@@ -19,7 +19,7 @@ const bgDe = (bloque) => tokens.match(new RegExp(bloque + "\\s*\\{[^}]*--bg:\\s*
 const BG_CLARO = bgDe(":root");
 const BG_OSCURO = bgDe(':root\\[data-theme="dark"\\]');
 
-function run({ stored = null, throws = false, prefersDark = false, matchMedia = true } = {}) {
+function run({ stored = null, throws = false, prefersDark = false, matchMedia = true, mediaThrows = false } = {}) {
   const attrs = {};
   const meta = { content: BG_CLARO, setAttribute(k, v) { this[k] = v; } };
   const document = {
@@ -31,7 +31,10 @@ function run({ stored = null, throws = false, prefersDark = false, matchMedia = 
     get localStorage() { if (throws) throw new Error("SecurityError"); return storage; },
   };
   if (matchMedia) {
-    window.matchMedia = (q) => ({ matches: q === "(prefers-color-scheme: dark)" && prefersDark });
+    window.matchMedia = (q) => {
+      if (mediaThrows) throw new Error("matchMedia roto");
+      return { matches: q === "(prefers-color-scheme: dark)" && prefersDark };
+    };
   }
   new Function("document", "window", code)(document, window);
   return { attrs, meta };
@@ -65,4 +68,14 @@ for (const c of THEME_CASES) {
 test("script en línea: sin matchMedia, Sistema se queda en claro y no lanza", () => {
   const { attrs } = run({ stored: "system", matchMedia: false });
   assert.equal(attrs["data-theme"], undefined);
+});
+
+test("script en línea: si matchMedia lanza, no rompe la carga y Sistema queda en claro", () => {
+  const { attrs } = run({ stored: "system", prefersDark: true, mediaThrows: true });
+  assert.equal(attrs["data-theme"], undefined);
+});
+
+test("script en línea: si matchMedia lanza, Oscuro guardado sigue aplicándose", () => {
+  const { attrs } = run({ stored: "dark", mediaThrows: true });
+  assert.equal(attrs["data-theme"], "dark");
 });

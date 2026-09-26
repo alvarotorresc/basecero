@@ -15,8 +15,10 @@
     var v = window.localStorage.getItem("bc-theme");
     if (v === "light" || v === "dark" || v === "system") pref = v;
   } catch (e) {}
-  var dark = pref === "dark" || (pref === "system" && !!window.matchMedia &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches);
+  var dark = pref === "dark";
+  if (pref === "system") {
+    try { dark = window.matchMedia("(prefers-color-scheme: dark)").matches; } catch (e) {}
+  }
   if (dark) {
     document.documentElement.setAttribute("data-theme", "dark");
     var meta = document.querySelector('meta[name="theme-color"]');
