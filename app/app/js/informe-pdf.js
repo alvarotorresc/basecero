@@ -35,8 +35,8 @@ function isWinAnsiCodePoint(cp) {
   return (cp >= 0x20 && cp <= 0x7e) || (cp >= 0xa0 && cp <= 0xff) || WIN_ANSI_SPECIALS.has(cp);
 }
 
-// Marcas combinantes y caracteres de formato de ancho cero (p.ej. el ZWJ que encadena un emoji
-// compuesto como "❤️‍🩹"): se DESCARTAN en silencio en vez de convertirse en "?", porque no ocupan
+// Marcas combinantes y caracteres de formato de ancho cero (p.ej. el ZWJ, U+200D, que encadena un
+// emoji compuesto): se DESCARTAN en silencio en vez de convertirse en "?", porque no ocupan
 // espacio visual propio — un "?" ahí sería un carácter que nunca estuvo.
 function isZeroWidthOrMark(cp) {
   return /^[\p{M}\p{Cf}]$/u.test(String.fromCodePoint(cp));
@@ -302,19 +302,34 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
  *  texto libre del usuario). Mismo estilo que basecero-{hoy}.xlsx. */
 export const reportFilename = (report) => `basecero-informe-${report.meta.startDate}.pdf`;
 
-const PAPER = [0xed, 0xe6, 0xda];
-const PAPER_INK = [0x1b, 0x1a, 0x16];
-const PAPER_DIM = [0x6b, 0x64, 0x59];
+// Materiales del papel (D-impl-3): TODOS salen de la paleta clara de tokens.css, ninguno se
+// escribe aquí. El papel es --raised (el blanco roto del sistema), la tinta --text, lo secundario
+// --text-dim y los filetes --border. El PDF va siempre en claro: parseRootTokens solo lee `:root{`.
+export const PAPER_TOKENS = { paper: "--raised", ink: "--text", dim: "--text-dim", rule: "--border" };
+
+// Sin paleta (tokens.css no se pudo leer), el PDF sale igual en blanco y gris neutro: la escala de
+// grises de PDF-lib (0 negro, 1 blanco), no un color del sistema.
+const GRAY_FALLBACK = { paper: 1, ink: 0.1, dim: 0.4, rule: 0.75 };
 
 function rgbFromParts(PDFLib, [r, g, b]) {
   return PDFLib.rgb(r / 255, g / 255, b / 255);
 }
 
 // Un bloque trae el NOMBRE de un token; la paleta (tokens.css) lo convierte en números. Un token
-// que la paleta no trae cae al respaldo (gris de papel en rects, tinta en texto): nunca negro.
+// que la paleta no trae cae al respaldo que decide quien llama.
 function colorOf(PDFLib, token, palette, fallback) {
   const rgb = rgbOf(token, palette);
   return rgb ? rgbFromParts(PDFLib, rgb) : fallback;
+}
+
+/** Los cuatro materiales del papel ya convertidos a color de PDF-lib. */
+function paperColors(PDFLib, palette) {
+  const out = {};
+  for (const [k, token] of Object.entries(PAPER_TOKENS)) {
+    const g = GRAY_FALLBACK[k];
+    out[k] = colorOf(PDFLib, token, palette, PDFLib.rgb(g, g, g));
+  }
+  return out;
 }
 
 // Alineación derecha y truncado con elipsis vía font.widthOfTextAtSize (§7.3): busca por
@@ -331,12 +346,12 @@ function truncateToFit(font, text, size, maxWidth) {
   return text.slice(0, lo) + ellipsis;
 }
 
-/** Adaptador: recorre layoutReport y dibuja con pdf-lib. Fondo `--paper`, StandardFonts
+/** Adaptador: recorre layoutReport y dibuja con pdf-lib. Fondo `--raised` (PAPER_TOKENS), StandardFonts
  *  Helvetica/HelveticaBold/Courier/CourierBold (Courier para las cifras, `--font-mono` del
  *  sistema; CourierBold cuando además son totales — bold Y mono a la vez).
  *  `drawText` con `winAnsiSafe` SIEMPRE — es la única frontera de saneo del módulo (Task 2).
  *  `opts.palette`: {token: hex} del bloque claro de tokens.css (pdf-palette.js#loadPdfPalette), para
- *  resolver los colores de familia; sin ella las barras salen en el gris de papel.
+ *  resolver los colores de familia y del papel; sin ella el PDF sale en blanco y grises neutros.
  *  Devuelve Uint8Array. */
 export async function buildPdfBytes(PDFLib, report, opts = {}) {
   const { pageSize, pages } = layoutReport(report, opts);
@@ -346,16 +361,14 @@ export async function buildPdfBytes(PDFLib, report, opts = {}) {
   const helveticaBold = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
   const courier = await doc.embedFont(PDFLib.StandardFonts.Courier);
   const courierBold = await doc.embedFont(PDFLib.StandardFonts.CourierBold);
-  const paper = rgbFromParts(PDFLib, PAPER);
-  const ink = rgbFromParts(PDFLib, PAPER_INK);
-  const dim = rgbFromParts(PDFLib, PAPER_DIM);
+  const { paper, ink, dim, rule } = paperColors(PDFLib, palette);
 
   for (const p of pages) {
     const pdfPage = doc.addPage([pageSize.w, pageSize.h]);
     pdfPage.drawRectangle({ x: 0, y: 0, width: pageSize.w, height: pageSize.h, color: paper });
     for (const b of p.blocks) {
       if (b.kind === "rule") {
-        pdfPage.drawRectangle({ x: b.x, y: b.y, width: b.w, height: 1, color: dim });
+        pdfPage.drawRectangle({ x: b.x, y: b.y, width: b.w, height: 1, color: rule });
       } else if (b.kind === "rect") {
         if (b.w > 0 && b.h > 0) {
           pdfPage.drawRectangle({ x: b.x, y: b.y, width: b.w, height: b.h, color: colorOf(PDFLib, b.color, palette, dim), opacity: b.opacity ?? 1 });
