@@ -1046,6 +1046,47 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 /* === fin: periodo-nuevo === */
 
 /* === pantalla: recurrentes === */
+
+.rec-body { display: flex; flex-direction: column; gap: var(--sp-24); }
+.rec-section { display: flex; flex-direction: column; gap: var(--sp-8); }
+
+/* Fila de regla + interruptor HERMANO (D7, nunca anidados): el botón comparte fila con el
+   interruptor; pausada se atenúa solo en el botón, nunca en el interruptor (§F-04). */
+.rec-row { display: flex; align-items: center; gap: var(--sp-8); }
+.rec-row .ent-row { flex: 1; min-width: 0; width: auto; }
+.rec-row-paused .ent-row { opacity: .55; }
+
+/* Pie del héroe (§9 Display): medidor + fila «Pagado X · Y al mes», en --disp-dim con las cifras
+   en --disp-ink (dispInkHtml). */
+.rec-hero-slot { display: flex; flex-direction: column; gap: var(--sp-8); }
+.rec-hero-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  font-size: var(--fs-12);
+  font-weight: 500;
+  color: var(--disp-dim);
+}
+
+/* Campo de importe (§9 «Campo hundido» + sufijo de moneda, ver recurrentes.js#amountFieldHtml). */
+.rec-amount-field { gap: var(--sp-8); }
+.rec-amount-suffix { flex: none; font-size: var(--fs-15); font-weight: 600; color: var(--text-dim); }
+
+.rec-field-group { display: flex; flex-direction: column; gap: var(--sp-8); }
+.rec-field-label { padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }
+.rec-chip-row { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+.rec-cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: var(--sp-8); }
+.rec-day-month { display: flex; gap: var(--sp-8); }
+.rec-day-month > .ctl-field-wrap { flex: 1; min-width: 0; }
+
+.rec-toggles { display: flex; flex-direction: column; gap: var(--sp-12); }
+.rec-sub-annual { display: flex; align-items: baseline; gap: var(--sp-4); margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+
+.rec-radar-link { border-radius: var(--radius-lg); background: var(--raised); border: 1px solid var(--border); }
+.rec-foot-note { margin: 0; font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+
+.rec-form-body { display: flex; flex-direction: column; gap: var(--sp-16); }
+
 /* === fin: recurrentes === */
 
 /* === pantalla: registro === */
@@ -1566,4 +1607,51 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 /* === fin: semana === */
 
 /* === pantalla: suscripciones === */
+
+.susc-body { display: flex; flex-direction: column; gap: var(--sp-24); }
+.susc-section { display: flex; flex-direction: column; gap: var(--sp-8); }
+
+/* Marcas de renovación del Display (§9 LED, B-Suscripciones · suscripciones.js#renewalTimelineHtml):
+   la más próxima usa .disp-today (ya existente, C2); el resto, apagadas, nunca en el ámbar que manda. */
+.susc-mark { fill: var(--disp-dim); stroke: var(--disp); }
+
+/* Tarjeta de aviso (F-1x): tintada con la familia de la única suscripción de la que toca preguntar
+   esta semana (C6: una entidad sola, tinte permitido). Sin familia (defensivo): --well. */
+.susc-notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border-radius: var(--radius-lg);
+  background: var(--ft, var(--well));
+}
+.susc-notice-head { display: flex; align-items: center; gap: var(--sp-12); }
+/* .ent-name/.ent-line2 (entity.js) truncan a una línea para la fila de 60 — aquí el título es un
+   párrafo de dos líneas dentro de una tarjeta ancha (B-Suscripciones): se deja envolver. */
+.susc-notice-head .ent-name { white-space: normal; overflow: visible; text-overflow: clip; }
+.susc-notice-sub { font-size: var(--fs-13); white-space: normal; overflow: visible; text-overflow: clip; }
+.susc-notice-amount { font-weight: 600; color: var(--text); }
+.susc-notice-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+
+.susc-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
+.susc-section-title { margin: 0; font-size: var(--fs-15); line-height: var(--lh-title); }
+.susc-section-hint { font-size: var(--fs-12); font-weight: 600; color: var(--text-dim); }
+
+.susc-candidates { display: flex; flex-direction: column; gap: var(--sp-12); }
+.susc-candidate {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.susc-candidate-head { display: flex; align-items: center; gap: var(--sp-12); }
+.susc-candidate-amount { font-weight: 600; }
+.susc-candidate-actions { display: flex; gap: var(--sp-8); }
+.susc-candidate-actions .btn-secondary { flex: 1; }
+
+.susc-row-inactive { opacity: .6; }
+
 /* === fin: suscripciones === */
