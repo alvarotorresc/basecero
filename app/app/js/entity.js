@@ -119,6 +119,8 @@ export function badgeHtml({ fam = null, income = false, tag = false, icon: key =
  *   - "detail" (B-Movimiento-Detalle, B-Borrar): relleno 12; `path` 13/600 -x ARRIBA («Restauración»)
  *              y `name` 17/700 debajo («Bares y cafés»).
  *  Por defecto "" (la tarjeta sin borde de siempre). Sin familia, la variante no pinta borde.
+ *  `check` (por defecto false): marca de «aplicada» de 22 al final, en -x (B-Gasto). Decorativa: el
+ *  nombre ya dice cuál está elegida. Si hay chevron, gana el chevron.
  *  @param {object} o
  *  @param {string|null} [o.fam]
  *  @param {string} [o.icon]
@@ -128,8 +130,9 @@ export function badgeHtml({ fam = null, income = false, tag = false, icon: key =
  *  @param {string} [o.id]
  *  @param {object} [o.data]
  *  @param {""|"pick"|"detail"} [o.variant]
+ *  @param {boolean} [o.check]
  *  @returns {string} HTML */
-export function chosenCategoryHtml({ fam = null, icon: key = "", name, path = "", chevron, id = "", data = null, variant = "" }) {
+export function chosenCategoryHtml({ fam = null, icon: key = "", name, path = "", chevron, id = "", data = null, variant = "", check = false }) {
   const fc = famClass(fam);
   const tag = id ? "button" : "div";
   const showChev = chevron ?? Boolean(id);
@@ -139,7 +142,8 @@ export function chosenCategoryHtml({ fam = null, icon: key = "", name, path = ""
   return `<${tag}${tag === "button" ? ' type="button"' : ""} class="${cls("ent-chosen", v && `ent-chosen-${v}`, fc, !fc && "ent-neutral")}"${attrs({ id, data })}>`
     + tileHtml({ fam, icon: key, size: 40, onTint: true })
     + `<span class="ent-body">${v === "detail" ? pathHtml + nameHtml : nameHtml + pathHtml}</span>`
-    + `${showChev ? `<span class="ent-chev">${icon("chevronRight", { size: 16 })}</span>` : ""}</${tag}>`;
+    + `${showChev ? `<span class="ent-chev">${icon("chevronRight", { size: 16 })}</span>`
+      : check ? `<span class="ent-chosen-check">${icon("check", { size: 22 })}</span>` : ""}</${tag}>`;
 }
 
 /** Chip de filtro (§9, B-Movimientos-Filtros): 44 píldora con aria-pressed.

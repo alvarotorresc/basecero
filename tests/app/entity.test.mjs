@@ -239,6 +239,18 @@ test("chosenCategoryHtml: variant pick (B-Gasto) y detail (B-Movimiento-Detalle)
   assert.equal(decl(".ent-chosen-pick .ent-name", "font-weight"), "700");
 });
 
+test("chosenCategoryHtml: check (B-Gasto) pinta la marca de 22 al final, en -x; por defecto no", () => {
+  assert.doesNotMatch(chosenCategoryHtml({ fam: "res", name: "Bares" }), /ent-chosen-check/);
+  const html = chosenCategoryHtml({ fam: "res", name: "Restauración › Bares y cafés", variant: "pick", check: true });
+  assert.match(html, /<span class="ent-chosen-check"><svg[^>]*width="22"[^>]*aria-hidden="true"/);
+  assert.ok(html.indexOf("ent-chosen-check") > html.indexOf("ent-body"), "la marca va al final");
+  // Con chevron (tarjeta pulsable), gana el chevron: nunca las dos.
+  const both = chosenCategoryHtml({ fam: "res", name: "x", id: "c", check: true });
+  assert.match(both, /ent-chev/);
+  assert.doesNotMatch(both, /ent-chosen-check/);
+  assert.equal(decl(".ent-chosen-check", "color"), "var(--fx)");
+});
+
 test("txRowHtml: height 52 y amountWeight 500 (B-Home); por defecto, 60 y 600", () => {
   const base = txRowHtml({ fam: "ali", title: "Mercadona", amountHtml: AMOUNT });
   assert.doesNotMatch(base, /ent-row-52|ent-row-w500/);

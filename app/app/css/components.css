@@ -877,6 +877,9 @@ button.ent-chosen { cursor: pointer; }
 .ent-chosen-detail .ent-name { font-size: var(--fs-17); font-weight: 700; }
 .ent-chosen-pick.ent-neutral,
 .ent-chosen-detail.ent-neutral { border-color: transparent; }
+/* Marca de «aplicada» (chosenCategoryHtml `check`, B-Gasto): check de 22 al final, en -x. */
+.ent-chosen-check { flex: none; display: flex; color: var(--fx); }
+.ent-chosen.ent-neutral .ent-chosen-check { color: var(--text-dim); }
 
 /* --- Chip de filtro (§9, B-Movimientos-Filtros): 44 píldora. Con familia: tinte + muestra 10
    --fb + 14/600 --text; neutro: --raised 14/500; etiqueta: + borde e icono (C10). --- */
