@@ -286,3 +286,15 @@ test("segmentedHtml: una opción con `fam` lleva la muestra de su familia; sin f
   assert.equal((html.match(/ctl-seg-muestra/g) ?? []).length, 1);
   assert.match(html, /<span class="ctl-seg-muestra fam-tra" aria-hidden="true"><\/span><span class="ctl-seg-text">Corriente<\/span>/);
 });
+
+test("segmentedHtml: allowNone con un valor fuera del grupo no marca ninguno y deja tabulable el primero", () => {
+  const opts = [{ value: "expense", label: "Gasto" }, { value: "income", label: "Ingreso" }];
+  const html = segmentedHtml({ name: "Tipo", options: opts, value: "refund", allowNone: true });
+  assert.doesNotMatch(html, /aria-checked="true"/);
+  assert.equal((html.match(/tabindex="0"/g) || []).length, 1);
+  assert.match(html, /tabindex="0" data-value="expense"/);
+  // Sin allowNone, el comportamiento de siempre: cae al primero y lo marca.
+  assert.match(segmentedHtml({ name: "Tipo", options: opts, value: "refund" }), /aria-checked="true" tabindex="0" data-value="expense"/);
+  // Con allowNone y un valor que SÍ está, marca ese.
+  assert.match(segmentedHtml({ name: "Tipo", options: opts, value: "income", allowNone: true }), /aria-checked="true" tabindex="0" data-value="income"/);
+});

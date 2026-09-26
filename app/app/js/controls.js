@@ -31,14 +31,20 @@ import { famClass } from "./category-colors.js";
  *  Cada opción admite `fam` (clave de familia, category-colors.js): pinta delante del texto la
  *  muestra de 10 en la barra de esa familia (--fb), como las cuentas de B-Liquidar. Sin `fam` o con
  *  una clave desconocida, sin muestra. */
-export function segmentedHtml({ id = "", name, labelledBy = "", options, value }) {
-  const sel = options.some((o) => o.value === value) ? value : options[0]?.value;
-  const items = options.map((o) => {
-    const on = o.value === sel;
+export function segmentedHtml({ id = "", name, labelledBy = "", options, value, allowNone = false }) {
+  // allowNone (Crear gasto, S2): el valor activo puede vivir FUERA del grupo (devolución o ajuste,
+  // que se eligen debajo). Entonces ningún radio va marcado —marcar el primero mentiría— y la
+  // primera opción sigue siendo la tabulable, para que el grupo no quede fuera del teclado (K12).
+  const matches = options.some((o) => o.value === value);
+  const none = allowNone && !matches;
+  const sel = matches ? value : options[0]?.value;
+  const items = options.map((o, i) => {
+    const on = !none && o.value === sel;
+    const tab = none ? i === 0 : on;
     // Muestra de 10 en la barra de la familia (B-Liquidar «Entra en»: la cuenta con su familia, C8).
     const fc = o.fam ? famClass(o.fam) : "";
     const swatch = fc ? `<span class="ctl-seg-muestra ${fc}" aria-hidden="true"></span>` : "";
-    return `<button type="button" role="radio" aria-checked="${on}" tabindex="${on ? "0" : "-1"}" data-value="${escAttr(o.value)}">${swatch ? `${swatch}<span class="ctl-seg-text">${escHtml(o.label)}</span>` : escHtml(o.label)}</button>`;
+    return `<button type="button" role="radio" aria-checked="${on}" tabindex="${tab ? "0" : "-1"}" data-value="${escAttr(o.value)}">${swatch ? `${swatch}<span class="ctl-seg-text">${escHtml(o.label)}</span>` : escHtml(o.label)}</button>`;
   }).join("");
   const labelAttr = labelledBy ? `aria-labelledby="${escAttr(labelledBy)}"` : `aria-label="${escAttr(name)}"`;
   return `<div class="ctl-segmented"${id ? ` id="${escAttr(id)}"` : ""} role="radiogroup" ${labelAttr}>${items}</div>`;
