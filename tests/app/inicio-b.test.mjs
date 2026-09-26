@@ -22,6 +22,13 @@ test("periodRemainingSeries: sin días, solo el presupuesto; un valor no numéri
   assert.deepEqual(periodRemainingSeries(500, [NaN, 100]), [500, 500, 400]);
 });
 
+test("periodRemainingSeries: con el total del periodo, hoy cuadra con «Quedan» (apuntes futuros incluidos)", () => {
+  // 30 € pintados en los días, pero spentOfPeriod dice 50 € (20 € con fecha de mañana).
+  assert.deepEqual(periodRemainingSeries(1000, [10, 20], 50), [1000, 990, 950]);
+  assert.deepEqual(periodRemainingSeries(1000, [], 50), [950], "sin días, el único punto es hoy");
+  assert.deepEqual(periodRemainingSeries(1000, [10], null), [1000, 990], "sin total, como antes");
+});
+
 // ---- topCategoriesWithRest ---------------------------------------------------------------------
 
 const row = (id, c) => ({ root_id: id, name: id, spent_cents: c });
@@ -87,7 +94,12 @@ test("periodChartSvg: sin serie, línea de tiempo plana con el punto en el día 
   const dia1 = periodChartSvg({ days: 30, today: 1, todayLabel: "hoy", endLabel: "día 30" });
   assert.doesNotMatch(dia1, /<polyline/);
   assert.match(dia1, /<path class="disp-chart-guide" d="M6,14 L312,14"/);
-  assert.match(dia1, /<circle class="disp-today" cx="6" cy="14"/);
+  assert.match(dia1, /<circle class="disp-today" cx="16.2" cy="14"/, "el final del día 1 de 30");
+  // «hoy» en el mismo x en los dos modos.
+  const cx = (h) => Number(h.match(/<circle class="disp-today" cx="([\d.]+)"/)[1]);
+  const plana = periodChartSvg({ days: 30, today: 13 });
+  const baja = periodChartSvg({ days: 30, today: 13, values: Array.from({ length: 14 }, (_, i) => 100 - i), max: 100 });
+  assert.equal(cx(plana), cx(baja));
   assert.match(dia1, />día 30<\/text>/);
   // Sin presupuesto (max 0) también es la línea plana, aunque llegue una serie.
   assert.doesNotMatch(periodChartSvg({ days: 30, today: 5, values: [0, 1], max: 0 }), /<polyline/);

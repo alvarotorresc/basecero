@@ -176,14 +176,18 @@ export function huchaMessage(ctx) {
  *  orden (semana-logic.js#daysWithCategories → totalCents, con el mismo criterio que spentOfPeriod:
  *  un día con más devoluciones que gasto resta en negativo, es decir, sube). Devuelve
  *  dailyCents.length + 1 valores; el primero es `budgetCents`. Sin recortar: puede bajar de cero
- *  (lo recorta quien lo pinta, charts.js#periodChartSvg). */
-export function periodRemainingSeries(budgetCents, dailyCents) {
+ *  (lo recorta quien lo pinta, charts.js#periodChartSvg).
+ *  Con `totalSpentCents` (spentOfPeriod), el ÚLTIMO punto —hoy— es budget − total: así cuadra con
+ *  el «Quedan X» del Display aunque el periodo tenga apuntes fuera de los días pintados (con fecha
+ *  futura o anterior al inicio); la diferencia cae entera en hoy. */
+export function periodRemainingSeries(budgetCents, dailyCents, totalSpentCents = null) {
   const out = [budgetCents];
   let left = budgetCents;
   for (const c of dailyCents ?? []) {
     left -= Number.isFinite(c) ? c : 0;
     out.push(left);
   }
+  if (Number.isFinite(totalSpentCents)) out[out.length - 1] = budgetCents - totalSpentCents;
   return out;
 }
 

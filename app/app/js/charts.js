@@ -86,6 +86,7 @@ const r2 = (n) => Number(n.toFixed(2));
  *     inicio del periodo (el presupuesto entero) y values[k], lo que queda al cerrar el día k; el
  *     último es hoy. La guía discontinua va de `max` al cero en el último día: el ritmo parejo.
  *   - Sin ellos (B-Inicio-Vacio): una línea de tiempo plana con el punto en el día de hoy.
+ *  En los dos modos hoy está en el mismo x: el final del día `today` (k = today sobre `days`).
  *  Sin color en el HTML: .disp-chart-guide (--disp-dim), .disp-chart-line y .disp-today (ámbar,
  *  C2) y .disp-chart-label (--disp-dim) los pinta components.css.
  *  @param {object} o
@@ -107,9 +108,9 @@ export function periodChartSvg({ days, today, values = null, max = 0, todayLabel
   const inner = width - PERIOD_PAD * 2;
 
   if (!burn) {
-    const span = Math.max(1, (days | 0) - 1);
-    const k = Math.min(span, Math.max(0, (today | 0) - 1));
-    const x = PERIOD_PAD + (inner * k) / span;
+    // Mismo sitio para «hoy» que en la línea que baja: el final del día `today` sobre `days`.
+    const span = Math.max(1, days | 0, today | 0);
+    const x = PERIOD_PAD + (inner * Math.max(0, today | 0)) / span;
     const nearEnd = x > width - LABEL_ROOM;
     return `<div class="disp-chart">${svgOpen}`
       + `<path class="disp-chart-guide" d="M${PERIOD_PAD},${FLAT.Y} L${width - PERIOD_PAD},${FLAT.Y}" fill="none" stroke-width="1.25"></path>`
