@@ -60,6 +60,17 @@ test("displayHtml: lanza si el pie o el instrumento traen una segunda cifra .dis
   assert.throws(() => displayHtml({ label: "x", value: "1", footHtml: otra }), /K4/);
 });
 
+test("displayHtml: `aside` pinta un corner de texto junto al label, sin LED (B-PeriodoNuevo)", () => {
+  const html = displayHtml({ label: "Septiembre ahorró", value: "1.008,29 €", size: "l", aside: "28 ago – 27 sep" });
+  assert.match(html, /<span class="num disp-aside">28 ago – 27 sep<\/span>/);
+  assert.ok(!html.includes("led-"), "sin led, no hay punto de estado");
+});
+test("displayHtml: con led y aside a la vez, el LED manda (el hueco es uno solo)", () => {
+  const html = displayHtml({ label: "x", value: "1 €", led: { state: "ok", text: "Periodo abierto" }, aside: "no cabe" });
+  assert.match(html, /class="led led-ok"/);
+  assert.ok(!html.includes("disp-aside"));
+});
+
 test("displayHtml: escapa etiqueta, cifra y pie en texto", () => {
   const html = displayHtml({ label: "<b>", value: "1 & 2", foot: "\"pie\"" });
   assert.ok(html.includes("&lt;b&gt;") && html.includes("1 &amp; 2") && html.includes("&quot;pie&quot;"));

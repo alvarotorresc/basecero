@@ -490,6 +490,9 @@
 .disp-value-m { font-size: var(--disp-m); }
 .disp-foot { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--disp-dim); }
 .disp-ink { color: var(--disp-ink); }
+/* Corner del Display (instrument.js#displayHtml `aside`, B-PeriodoNuevo): texto plano junto al
+   label cuando no hay LED — un rango de fechas, no un estado. */
+.disp-aside { font-size: var(--fs-12); font-weight: 500; color: var(--disp-dim); }
 .disp-slot { min-width: 0; }
 
 /* Línea del Display (charts.js#sparklineSvg): ámbar en la línea, su área y el punto de hoy (C2). */
