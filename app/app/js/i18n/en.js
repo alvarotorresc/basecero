@@ -360,9 +360,10 @@ export const EN = {
       fallbackName: "the other party",
       fallbackLabel: "Other party",
     },
-    // Note under a shared row's figure (B-Movimientos): the figure is my share; {amount} is the
-    // whole receipt, without symbol and already wrapped in mono by movimientos.js.
-    row: { partnerPaid: "{name} paid", sharedOf: "with {name}, of {amount}" },
+    // partnerPaid: prose that Inicio and Semana append to the merchant. paidBy and sharedOf: the
+    // note under a shared Movimientos row's figure (B-Movimientos), where the figure is my share;
+    // {amount} is the whole receipt, without symbol and already wrapped in mono by movimientos.js.
+    row: { partnerPaid: ", {name} paid, your share {amount}", paidBy: "{name} paid", sharedOf: "with {name}, of {amount}" },
     delete: {
       button: "Delete",
       title: "Delete this transaction?",

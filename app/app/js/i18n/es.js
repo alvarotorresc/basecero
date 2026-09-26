@@ -377,9 +377,10 @@ export const ES = {
       fallbackName: "la contraparte",
       fallbackLabel: "Contraparte",
     },
-    // Nota bajo la cifra de una fila compartida (B-Movimientos): la cifra es mi parte; {amount} es
-    // el ticket entero, sin símbolo y ya envuelto en mono por movimientos.js.
-    row: { partnerPaid: "pagó {name}", sharedOf: "con {name}, de {amount}" },
+    // partnerPaid: prosa que Inicio y Semana concatenan al comercio. paidBy y sharedOf: la nota
+    // bajo la cifra de una fila compartida de Movimientos (B-Movimientos), donde la cifra es mi
+    // parte; {amount} es el ticket entero, sin símbolo y ya envuelto en mono por movimientos.js.
+    row: { partnerPaid: ", pagó {name}, tu parte {amount}", paidBy: "pagó {name}", sharedOf: "con {name}, de {amount}" },
     delete: {
       button: "Borrar",
       title: "¿Borrar este movimiento?",

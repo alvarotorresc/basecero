@@ -83,7 +83,7 @@ function movRowHtml(r, byId, accById, partnerName) {
   const who = escHtml(partnerName || t("movimientos.shared.fallbackName"));
   const shareNoteHtml = !shared ? ""
     : r.paid_by === "partner"
-      ? t("movimientos.row.partnerPaid", { name: who })
+      ? t("movimientos.row.paidBy", { name: who })
       : t("movimientos.row.sharedOf", { name: who, amount: `<span class="num">${escHtml(bareAmount(r.amount_cents))}</span>` });
   return txRowHtml({
     fam,
