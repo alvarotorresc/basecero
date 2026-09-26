@@ -240,8 +240,11 @@ export function txRowHtml({ fam = null, icon: key = "", title, line2 = "", amoun
  *  @param {boolean} [o.valueInFam] Valor en el -x de `fam` (B-Ajustes/B-Cuenta/B-Objetivo original:
  *                                  «Marta», «50 %» en -d). Distinto de `valueFam` (la muestra).
  *                                  Sin `fam`, no hace nada.
+ *  @param {string} [o.valueIcon]   Clave de icons.js: icono de 16 en dim delante del valor, a 6 de
+ *                                  él (la etiqueta de B-Movimiento-Detalle: «Oficina»). Sin valor,
+ *                                  no se pinta.
  *  @returns {string} HTML */
-export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", value = "", valueNum = false, valueFam = null, chevron, controlHtml = "", expanded, controls = "", disabled = false, id = "", data = null, tileFilled = false, valueInFam = false }) {
+export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", value = "", valueNum = false, valueFam = null, chevron, controlHtml = "", expanded, controls = "", disabled = false, id = "", data = null, tileFilled = false, valueInFam = false, valueIcon = "" }) {
   const tag = controlHtml ? "div" : "button";
   const showChev = !controlHtml && (chevron ?? true);
   const labelId = controlHtml && id ? ` id="${escAttr(id + "-label")}"` : "";
@@ -257,6 +260,7 @@ export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", va
     + `<span class="ent-set-body"><span class="ent-set-label"${labelId}>${escHtml(label)}</span>`
     + `${sub ? `<span class="ent-set-sub">${escHtml(sub)}</span>` : ""}</span>`
     + `${value !== "" && value != null && famClass(valueFam) ? `<span class="ent-swatch ${famClass(valueFam)}" aria-hidden="true"></span>` : ""}`
+    + `${value !== "" && value != null && valueIcon ? `<span class="ent-set-vicon">${catIcon(valueIcon, { size: 16 })}</span>` : ""}`
     + `${value !== "" && value != null ? `<span class="${cls("ent-set-value", valueNum && "num", valueInFam && famClass(fam), valueInFam && famClass(fam) && "is-fam-ink")}">${escHtml(value)}</span>` : ""}`
     + `${controlHtml}`
     + `${showChev ? `<span class="ent-chev">${icon("chevronRight", { size: 16 })}</span>` : ""}</${tag}>`;

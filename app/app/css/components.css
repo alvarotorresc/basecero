@@ -1014,6 +1014,9 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
 .ent-set-value.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 /* Valor en el -x de su familia (settingRowHtml `valueInFam`; I-61 retirada fuera de lo aprobado). */
 .ent-set-value.is-fam-ink { color: var(--fx); }
+/* Icono delante del valor (settingRowHtml `valueIcon`): 16 en dim, a 6 del valor (la fila separa 12). */
+.ent-set-vicon { flex: none; display: flex; color: var(--text-dim); }
+.ent-set-vicon + .ent-set-value { margin-left: -6px; }
 /* Cifra suelta en su familia (entity.js#famNumHtml): mono, hereda tamaño y peso salvo que se pida. */
 .ent-fam-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .ent-fam-num.is-fam-ink { color: var(--fx); }

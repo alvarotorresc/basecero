@@ -265,6 +265,14 @@ test("filterChipHtml: trailCheck pone el check de 16 detrás al estar elegido; s
   assert.equal(decl(".ent-chip[aria-pressed=\"true\"] .ent-chip-trail", "color"), "var(--accent-text)");
 });
 
+test("settingRowHtml: valueIcon pinta el icono de 16 delante del valor; sin valor o por defecto, nada", () => {
+  const html = settingRowHtml({ label: "Etiqueta", value: "Oficina", valueIcon: "tag" });
+  assert.match(html, /<span class="ent-set-vicon"><svg[^>]*width="16"[\s\S]*?<\/svg><\/span><span class="ent-set-value">Oficina<\/span>/);
+  assert.ok(!settingRowHtml({ label: "Etiqueta", valueIcon: "tag" }).includes("ent-set-vicon"), "sin valor, sin icono");
+  assert.ok(!settingRowHtml({ label: "Etiqueta", value: "Oficina" }).includes("ent-set-vicon"), "por defecto, sin icono");
+  assert.equal(decl(".ent-set-vicon + .ent-set-value", "margin-left"), "-6px");
+});
+
 test("sectionHeaderHtml: fam (texto -x; en grupo, Unbounded), ttl y dim; por defecto, sin modificadores", () => {
   assert.equal(sectionHeaderHtml({ title: "Activas" }).includes("is-"), false);
   assert.match(sectionHeaderHtml({ title: "Activas", fam: "sus" }), /class="ent-sec ent-sec-title fam-sus is-fam"/);
