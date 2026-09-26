@@ -25,22 +25,23 @@ const EXIT_MS_REDUCED = 120;
 
 /** Interior del <dialog>, envuelto en .modal-content: el <dialog> se queda con padding:0 (para que
  *  un clic en el velo, fuera de esa caja, llegue con target=dlg — createModal#onClickBackdrop) y
- *  el relleno real (24 16 16) vive en el envoltorio. Cancelar va PRIMERO en el DOM: primero en la
- *  tabulación, primero en la lectura y es quien recibe el foco inicial — la salida segura por
- *  defecto. `preview` es HTML de confianza que trae YA escapado quien llama (la vista previa de la
+ *  el relleno real (20 16 16, B-Borrar) vive en el envoltorio. Cancelar va PRIMERO en el DOM:
+ *  primero en la tabulación, primero en la lectura y es quien recibe el foco inicial — la salida
+ *  segura por defecto. `preview` es HTML de confianza que trae YA escapado quien llama (la vista previa de la
  *  fila, DESIGN.md §9): se inserta tal cual, como el `html` de otros helpers del proyecto que
  *  documentan lo mismo. `destructive` (por defecto true, D-1/C5): la confirmación es la ÚNICA
  *  excepción a «rojo solo en cifras» — relleno --neg, texto --on-neg (.btn-danger-confirm). Las
  *  pantallas sin migrar que llaman a showConfirm() con su forma antigua siguen recibiendo ese rojo
- *  relleno por defecto, sin tocarlas. */
-export function modalHtml({ title, message, cancelText, confirmText, preview = "", destructive = true }) {
+ *  relleno por defecto, sin tocarlas. `confirmIcon` (opcional, clave de icons.js): icono de 18
+ *  delante del texto de confirmar, como la papelera de «Borrar» en B-Borrar. */
+export function modalHtml({ title, message, cancelText, confirmText, preview = "", destructive = true, confirmIcon = "" }) {
   return `<div class="modal-content">
     <h2 id="modal-title" class="modal-title">${escHtml(title)}</h2>
     ${preview ? `<div class="modal-preview">${preview}</div>` : ""}
     ${message ? `<p id="modal-text" class="modal-text">${escHtml(message)}</p>` : ""}
     <div class="modal-actions">
       ${buttonHtml({ kind: "secondary", id: "modal-cancel", label: cancelText })}
-      ${buttonHtml({ kind: destructive ? "danger-confirm" : "secondary", id: "modal-confirm", label: confirmText })}
+      ${buttonHtml({ kind: destructive ? "danger-confirm" : "secondary", id: "modal-confirm", label: confirmText, icon: confirmIcon })}
     </div>
   </div>`;
 }
@@ -48,7 +49,7 @@ export function modalHtml({ title, message, cancelText, confirmText, preview = "
 export function createModal(doc, { pushBack, goBack, win, wait = (ms, fn) => setTimeout(fn, ms) }) {
   let current = null;
   return {
-    confirm({ title, message, cancelText, confirmText, preview, destructive, onConfirm }) {
+    confirm({ title, message, cancelText, confirmText, preview, destructive, confirmIcon, onConfirm }) {
       if (current) return null;                 // un solo aviso a la vez
       const opener = doc.activeElement;
       const dlg = doc.createElement("dialog");
@@ -60,7 +61,7 @@ export function createModal(doc, { pushBack, goBack, win, wait = (ms, fn) => set
       dlg.setAttribute("aria-modal", "true");
       dlg.setAttribute("aria-labelledby", "modal-title");
       if (message) dlg.setAttribute("aria-describedby", "modal-text");
-      dlg.innerHTML = modalHtml({ title, message, cancelText, confirmText, preview, destructive });
+      dlg.innerHTML = modalHtml({ title, message, cancelText, confirmText, preview, destructive, confirmIcon });
 
       let confirmed = false;
       let byBack = false;
