@@ -585,11 +585,13 @@ export const ES = {
     title: "Recurrentes",
     empty: "Todavía no hay ninguna regla recurrente.",
     hero: {
-      pending: "Pendiente este periodo",
+      pending: "Queda por pagar este periodo",
       perMonth: "al mes",
       pendingCount: { one: "{n} pendiente", other: "{n} pendientes" },
       allSettled: "Todo pagado",
       remaining: "Te quedarán {amount}",
+      // Con algo pendiente (B-Recurrentes).
+      remainingAfter: "Tras pagarlo te quedarán {amount}",
       paidLabel: "Pagado",
       meterAria: "Pendiente {pending} de {total} este periodo",
     },
@@ -601,7 +603,7 @@ export const ES = {
     },
     newRule: "Nueva regla recurrente",
     toggle: { aria: "Activar {name}" },
-    footNote: "El interruptor pausa la regla sin borrarla.",
+    footNote: "Apagar una regla la pausa sin borrarla: no se genera el próximo cargo hasta que la vuelvas a encender.",
     type: { transfer: "Transfer." },
     freq: {
       weekly: "Semanal",

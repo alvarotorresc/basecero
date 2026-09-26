@@ -557,11 +557,12 @@ export const EN = {
     title: "Recurring",
     empty: "You don’t have any recurring rules yet.",
     hero: {
-      pending: "Pending this period",
+      pending: "Still to pay this period",
       perMonth: "per month",
       pendingCount: { one: "{n} pending", other: "{n} pending" },
       allSettled: "All paid",
       remaining: "You'll have {amount} left",
+      remainingAfter: "After paying it you'll have {amount} left",
       paidLabel: "Paid",
       meterAria: "Pending {pending} of {total} this period",
     },
@@ -573,7 +574,7 @@ export const EN = {
     },
     newRule: "New recurring rule",
     toggle: { aria: "Enable {name}" },
-    footNote: "The switch pauses the rule without deleting it.",
+    footNote: "Turning a rule off pauses it without deleting it: the next charge isn't generated until you turn it back on.",
     type: { transfer: "Transfer" },
     freq: {
       weekly: "Weekly",

@@ -1685,18 +1685,43 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 
 /* === pantalla: recurrentes === */
 
-.rec-body { display: flex; flex-direction: column; gap: var(--sp-24); }
-.rec-section { display: flex; flex-direction: column; gap: var(--sp-8); }
+/* B-Recurrentes: pila de 12 (§8) y cabecera a 12 del Display. */
+.sub-header:has(+ .rec-body) { margin-bottom: var(--sp-12); }
+.rec-body { display: flex; flex-direction: column; gap: var(--sp-12); }
+.rec-section { display: flex; flex-direction: column; gap: var(--sp-12); }
+.rec-section > .ent-sec { padding: var(--sp-4) var(--sp-4) 0; }
+/* Display del original: relleno 18 20 16 y pila de 6. */
+.rec-body .disp { padding: 18px var(--sp-20) var(--sp-16); gap: 6px; }
 
 /* Fila de regla + interruptor HERMANO (D7, nunca anidados): el botón comparte fila con el
-   interruptor; pausada se atenúa solo en el botón, nunca en el interruptor (§F-04). */
-.rec-row { display: flex; align-items: center; gap: var(--sp-8); }
-.rec-row .ent-row { flex: 1; min-width: 0; width: auto; }
+   interruptor (B-Recurrentes: relleno 0 8, todo a 12); pausada se atenúa solo en el botón, nunca
+   en el interruptor (§F-04). */
+.rec-row { display: flex; align-items: center; gap: var(--sp-12); padding-right: var(--sp-8); }
+.rec-row .ent-row { flex: 1; min-width: 0; width: auto; min-height: 60px; padding: 0 0 0 var(--sp-8); }
 .rec-row-paused .ent-row { opacity: .55; }
+.rec-body .box-list { gap: 0; }
+.rec-body .box-list .ent-divider { margin: 0 var(--sp-8) 0 60px; }
+/* «pagado» / «pendiente» bajo la cifra: 12/600. */
+.rec-row .ent-amount-note { font-weight: 600; }
 
-/* Pie del héroe (§9 Display): medidor + fila «Pagado X · Y al mes», en --disp-dim con las cifras
+/* «Pendiente»: cada regla en su tarjeta sobre el tinte de su familia (C6), fila de 64, baldosa en
+   --chip y «pendiente» en su -x. */
+.rec-pending { display: flex; flex-direction: column; gap: var(--sp-8); }
+.rec-pending-card { padding: var(--sp-4); border-radius: var(--radius-lg); background: var(--ft, var(--surface)); }
+.rec-pending-card:not(.is-fam-ink) { border: 1px solid var(--border); }
+.rec-pending-card .ent-row { min-height: 64px; }
+.rec-pending-card .ent-tile { background: var(--chip); }
+.rec-pending-card.is-fam-ink .ent-amount-note { color: var(--fx); }
+
+/* Barra del héroe: lo pagado en --disp-dim y lo pendiente en ámbar (.disp-amber-fill), 10 de alto
+   con 3 de separación; lo pendiente nunca baja de 14 para que se vea. */
+.rec-hero-bar { display: flex; gap: 3px; height: 10px; margin-top: 10px; border-radius: var(--radius-xs); overflow: hidden; }
+.rec-hero-paid { flex-grow: 0; flex-shrink: 1; background: var(--disp-dim); }
+.rec-hero-pending { flex-grow: 0; flex-shrink: 0; min-width: 14px; }
+
+/* Pie del héroe (§9 Display): barra + fila «Pagado X · Y al mes», en --disp-dim con las cifras
    en --disp-ink (dispInkHtml). */
-.rec-hero-slot { display: flex; flex-direction: column; gap: var(--sp-8); }
+.rec-hero-slot { display: flex; flex-direction: column; gap: 6px; }
 .rec-hero-row {
   display: flex;
   justify-content: space-between;
@@ -1720,8 +1745,11 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 .rec-toggles { display: flex; flex-direction: column; gap: var(--sp-12); }
 .rec-sub-annual { display: flex; align-items: baseline; gap: var(--sp-4); margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
 
+/* Enlace al radar (B-Recurrentes): 52 de alto, relleno 0 12, etiqueta 600. */
 .rec-radar-link { border-radius: var(--radius-lg); background: var(--raised); border: 1px solid var(--border); }
-.rec-foot-note { margin: 0; font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+.rec-radar-link .ent-set { min-height: 50px; padding: 0 var(--sp-12); border-radius: var(--radius-lg); }
+.rec-radar-link .ent-set-label { font-weight: 600; }
+.rec-foot-note { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 
 .rec-form-body { display: flex; flex-direction: column; gap: var(--sp-16); }
 
