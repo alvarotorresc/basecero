@@ -935,55 +935,61 @@ export const ES = {
   },
   onboarding: {
     cta: { next: "Seguir" },
+    // Progreso (controls.js#stepsHtml): «1 de 3» junto a los segmentos; el aria del progressbar.
+    progress: { count: "{n} de {total}", aria: "Paso {n} de {total}" },
+    // Bienvenida (S13, B-Onb-Bienvenida): marca, Display «Saldo de partida» y tres promesas.
     welcome: {
-      // Titular audaz (SISTEMA.md §1.7): una sola cadena a 34/600, no dos claves con <br>.
-      title: "Tu dinero, desde cero.",
-      feature1: { title: "Todo se queda aquí", subtitle: "Sin servidor y sin registro. Funciona hasta sin conexión." },
-      feature2: { title: "Tu dato es una hoja de cálculo", subtitle: "Exporta e importa tus datos cuando quieras: nunca están atrapados." },
-      feature3: { title: "Tu mes empieza cuando cobras", subtitle: "Los periodos van de nómina a nómina, no del 1 al 30." },
-      startBtn: "Empezar",
-      // startHint: recortada de startBtn («Empezar · 2 minutos» → PROSA en P0 → aquí SEGMENTOS,
-      // línea propia bajo el CTA, Onboarding1.dc.html:66).
-      startHint: "Dos minutos",
-      importPrompt: "¿Vienes de otra copia?",
-      importLink: "Importar una hoja o backup",
+      brand: "basecero",
+      tagline: "Gastos, ingresos y ahorro de cada mes.",
+      displayLabel: "Saldo de partida",
+      ready: "Listo",
+      promise1: "Sin registro ni contraseña",
+      promise2: "Funciona sin conexión",
+      promise3: "Tus datos se quedan en este móvil",
+      startBtn: "Empezar de cero",
+      importBtn: "Importar una hoja o copia",
+      // «Hoja .xlsx o copia cifrada .bce»: las extensiones van en mono entre los trozos.
+      importHint: { pre: "Hoja ", mid: " o copia cifrada ", post: "" },
     },
     account: {
       title: "Tus cuentas",
-      subtitle: "Las de verdad: tu banco del día a día, tu hucha, tu préstamo. Con al menos una basta para empezar.",
+      subtitle: "Con una basta. El resto, luego en Patrimonio.",
       addAnotherTitle: "Añadir otra",
       firstTitle: "Tu primera cuenta",
-      namePlaceholder: "p. ej. Hucha del banco",
+      // Las cuatro baldosas (onboarding-steps.js#ACCOUNT_KINDS). Hucha = ahorro con familia imp.
+      kindGroup: "Tipo de cuenta",
+      kind: { checking: "Corriente", savings: "Ahorro", hucha: "Hucha", liability: "Deuda" },
+      checkingDefault: "Corriente, por defecto",
+      namePlaceholder: "p. ej. Fondo de emergencia",
       balanceTitle: "Saldo de hoy",
-      addBtn: "Añadir",
-      liabilityNote: "El saldo de un pasivo es lo que debes: se guarda en negativo.",
-      infoNote: "Aquí no se conecta ningún banco: tú apuntas o importas su CSV. Podrás añadir y renombrar cuentas cuando quieras en Patrimonio.",
-      // importDefault: SEGMENTOS (spec §1.4) — línea propia de 11px bajo la fila, ya no un sufijo
-      // con coma inicial concatenado tras el tipo (Onboarding2.dc.html:44).
-      importDefault: "será la cuenta de tus imports",
+      addBtn: "Añadir cuenta",
+      liabilityNote: "Lo que debes se guarda en negativo.",
       needOne: "Crea al menos una cuenta para seguir.",
       createFailed: "No se pudo crear la cuenta: {error}",
       nameRequired: "Ponle un nombre a la cuenta.",
-      type: { checking: "Corriente", savings: "Ahorro", liability: "Pasivo" },
-      // Borrar (D9, spec §8 punto 4): solo desde el paso 2, solo cuentas sin movimientos.
+      // Borrar (D9, spec §8 punto 4): solo desde el paso Cuentas, solo cuentas sin movimientos.
       deleteAria: "Borrar {name}",
       deleteTitle: "¿Borrar esta cuenta?",
       deleteBody: "{name}, {amount}. Todavía no tiene movimientos.",
       deleteFailed: "No se pudo borrar la cuenta: {error}",
-      // deleteHasMovements: NO está en la tabla de copy de la spec — deleteEmptyAccount no lanza
-      // cuando el guard frena el borrado (D9: "no se lanza"), así que ese camino necesita su
-      // propio texto para rellenar el {error} de deleteFailed en vez de dejarlo literal.
+      // deleteHasMovements: deleteEmptyAccount no lanza cuando el guard frena el borrado (D9), así
+      // que ese camino necesita su propio texto para rellenar el {error} de deleteFailed.
       deleteHasMovements: "Ya tiene movimientos.",
     },
     prefs: {
       title: "A tu manera",
-      subtitle: "Cuatro cosas rápidas. Todas se cambian luego en Ajustes.",
-      language: "Idioma",
+      subtitle: "Todo se cambia luego en Ajustes.",
+      sharedTitle: "Gastos compartidos",
+      partnerLabel: "Con quién, opcional",
+      partnerPlaceholder: "Su nombre",
+      shareLabel: "Tu parte",
+      shareYou: "Tú",
+      prefsTitle: "Preferencias",
       currencyLabel: "Moneda",
+      currencyOther: "Otra",
+      currencyOtherLabel: "Otra moneda",
+      language: "Idioma",
       formatLabel: "Formato",
-      partnerTitle: "¿Compartes gastos con alguien?",
-      partnerPlaceholder: "Su nombre — o déjalo vacío si vas por libre",
-      partnerNote: "Con nombre, cada gasto puede marcarse como compartido y la app lleva las cuentas de quién debe qué. Vacío = ni rastro de esa parte de la app.",
     },
     // Paso 4 (D10/D11, spec §8 punto 6): título + subtítulo del paso — el formulario real vive
     // embebido debajo (renderPeriodoNuevo, embed:true), sin pantalla ilustrativa.

@@ -832,10 +832,6 @@ body.subscreen main#screen {
 .meta-row.pos { color: var(--pos); }
 /* ===================== P7 · Onboarding ===================== */
 
-/* ===== progreso del onboarding (Onboarding1-4.dc.html:19-24) ===== */
-.onb-bars { display: flex; align-items: center; gap: 6px; }
-.onb-bar { flex: 1; height: 3px; border-radius: var(--r-pill); background: var(--surface-2); }
-.onb-bar.on { background: var(--accent); }
 /* ===================== P8 · Pantallas nuevas ===================== */
 /* Suscripciones (§9.4): el subtítulo de la fila activa («renueva el martes, 15 de…») se trunca
    con la elipsis de .tx-sub cuando el nombre del día es largo. El artboard deja que la línea
