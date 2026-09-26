@@ -294,6 +294,17 @@ test("R-BACK: el atrás lleva aria-label t(\"common.back\") y vale «Atrás»", 
   assert.deepEqual(incumple("rBACK"), []);
 });
 
+test("C4: el aviso de error (.banner-aviso) es neutro: ni rojo en CSS ni la clase «red» en JS", () => {
+  const css = FICHEROS.filter((f) => f.rel.endsWith(".css")).flatMap((f) => reglasCss(f.text));
+  const aviso = css.filter(({ sel }) => /\.banner-aviso/.test(sel));
+  assert.ok(aviso.length > 0, "no hay reglas de .banner-aviso");
+  for (const { sel, decls } of aviso) {
+    assert.ok(!decls.some((d) => /var\(--neg\)/.test(d.value)), `«${sel}» lee --neg`);
+  }
+  const js = FICHEROS.filter((f) => f.rel.endsWith(".js") && /banner-aviso red\b/.test(f.text)).map((f) => f.rel);
+  assert.deepEqual(js, []);
+});
+
 test("screens.css: una sección sembrada por fichero de js/screens/, en su orden", () => {
   const pantallas = readdirSync(APP + "js/screens").filter((f) => f.endsWith(".js")).map((f) => f.slice(0, -3)).sort();
   const css = readFileSync(APP + "css/screens.css", "utf8");

@@ -43,7 +43,7 @@ function renderInformeError(container, onBack, message, retry) {
   container.innerHTML = `
     ${subHeaderHtml({ id: "informe-back", title: t("informe.title") })}
     <div class="inf">
-      <div class="banner-aviso red">${escHtml(message)}</div>
+      <div class="banner-aviso is-error">${escHtml(message)}</div>
       ${buttonHtml({ kind: "primary", id: "informe-error-retry", label: t("common.retry") })}
       ${buttonHtml({ kind: "secondary", id: "informe-error-leave", label: t("common.goBack") })}
     </div>`;
@@ -228,7 +228,7 @@ function downloadHtml(state, report) {
       note: report.movements.count ? t("informe.downloadNote", { n: report.movements.count }) : t("informe.downloadNoteEmpty"),
       disabled: state.downloading,
     })}
-    ${state.downloadError ? `<div class="banner-aviso red">${escHtml(state.downloadError)}</div>` : ""}
+    ${state.downloadError ? `<div class="banner-aviso is-error">${escHtml(state.downloadError)}</div>` : ""}
   </div>`;
 }
 
