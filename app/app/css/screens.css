@@ -593,44 +593,48 @@
 .inf-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* Segmented de periodos: el nombre lo escribe el usuario, se recorta en vez de desbordar. */
 .inf .ctl-segmented [role="radio"] { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.inf-gap-16 { gap: var(--sp-16); }
+.inf-gap-16 { gap: 14px; }
+/* Display del original: relleno 18 20 20, pila de 6 y la cifra de 64 a interlineado 1. */
+.inf .disp { padding: 18px var(--sp-20) var(--sp-20); gap: 6px; }
+.inf .disp-value { line-height: 1; }
 
 .inf-line { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
 .inf-line-label { font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
 .inf-income { font-size: var(--fs-20); font-weight: 600; line-height: var(--lh-title); color: var(--pos); }
 
-/* Ingresado · Gastado · Ahorrado (F-10): pozo con el filete de abajo en --idle (gastado) o en
-   --text (ahorrado); el nombre y la cifra van dentro de cada tramo (C12). */
-.inf-split { display: flex; gap: var(--sp-2); height: 64px; }
+/* Ingresado · Gastado · Ahorrado (B-Informe; F-10 retirada): cada tramo sobre el tinte de su
+   familia (Otros / Alimentación) con el filete de abajo en su barra; nombre en -x y cifra en tinta
+   dentro (C12). */
+.inf .box-chart:has(.inf-split) { gap: 10px; }
+.inf-split { display: flex; gap: 3px; height: 64px; }
 .inf-split-seg {
   flex-grow: 0;
   flex-shrink: 1;
   min-width: 96px;
   box-sizing: border-box;
-  padding: var(--sp-8) var(--sp-12);
+  padding: var(--sp-8) 10px;
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
   overflow: hidden;
-  background: var(--well);
+  background: var(--ft);
+  box-shadow: inset 0 -6px 0 var(--fb);
 }
 .inf-split-seg:first-child { border-radius: var(--radius) 0 0 var(--radius); }
 .inf-split-seg:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
 .inf-split-seg:only-child { border-radius: var(--radius); }
-.inf-split-seg.is-spent { box-shadow: inset 0 -6px 0 var(--idle); }
-.inf-split-seg.is-saved { box-shadow: inset 0 -6px 0 var(--text); }
-.inf-split-name { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
-.inf-split-seg.is-saved .inf-split-name { color: var(--text); }
-.inf-split-amt { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
+.inf-split-name { font-size: var(--fs-12); font-weight: 600; line-height: 1.3; color: var(--fx); }
+.inf-split-amt { font-size: var(--fs-15); font-weight: 600; line-height: 1.3; color: var(--text); white-space: nowrap; }
 
 /* Variación de gasto: subir avisa (--neg), bajar es buena (--pos). C4: señal en la cifra. */
 .inf-delta { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-13); font-weight: 600; white-space: nowrap; }
 .inf-delta.is-up { color: var(--neg); }
 .inf-delta.is-down { color: var(--pos); }
 
-/* Frente al periodo anterior: este en --text, el anterior en --idle, cada uno con su nombre (C11, C12). */
-.inf-cmp { display: flex; flex-direction: column; gap: var(--sp-8); }
-.inf-cmp-grid { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp-8); }
+/* Frente al periodo anterior: este en --text, el anterior en la barra de Otros, cada uno con su
+   rótulo corto (C12); barras de 12. */
+.inf-cmp { display: flex; flex-direction: column; gap: 6px; }
+.inf-cmp-grid { display: grid; grid-template-columns: minmax(36px, auto) minmax(0, 1fr) 88px; align-items: center; gap: var(--sp-8); }
 .inf-cmp-name {
   max-width: 96px;
   font-size: var(--fs-12);
@@ -642,17 +646,18 @@
   text-overflow: ellipsis;
 }
 .inf-cmp-name.is-prev { font-weight: 600; color: var(--text-dim); }
-.inf-cmp-track { height: 8px; border-radius: var(--radius-pill); background: var(--well); }
-.inf-cmp-fill { display: block; height: 100%; border-radius: var(--radius-pill); }
+.inf-cmp-track { height: 12px; border-radius: var(--radius-xs); background: var(--well); }
+.inf-cmp-fill { display: block; height: 100%; border-radius: var(--radius-xs); }
 .inf-cmp-fill.is-cur { background: var(--text); }
-.inf-cmp-fill.is-prev { background: var(--idle); }
-.inf-cmp-amt { font-size: var(--fs-14); font-weight: 600; text-align: right; color: var(--text); white-space: nowrap; }
+.inf-cmp-fill.is-prev { background: var(--fb); }
+.inf-cmp-note { margin: 0; font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+.inf-cmp-amt { font-size: var(--fs-14); font-weight: 600; line-height: 1.3; text-align: right; color: var(--text); white-space: nowrap; }
 .inf-cmp-amt.is-prev { font-weight: 500; color: var(--text-dim); }
 
 /* Por categoría: nombre, cifra en tinta (C7), variación y medidor -b; «Resto» en dim e --idle (C11). */
 .inf-vs { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
-.inf-cats { display: flex; flex-direction: column; gap: var(--sp-16); }
-.inf-cat { display: flex; flex-direction: column; gap: var(--sp-4); }
+.inf-cats { display: flex; flex-direction: column; gap: 14px; }
+.inf-cat { display: flex; flex-direction: column; gap: 5px; }
 .inf-cat-line { display: flex; align-items: baseline; gap: var(--sp-8); }
 .inf-cat-name {
   flex: 1;
@@ -678,7 +683,26 @@
 /* «Anteriores»: la lista de periodos cerrados, desplegada bajo el Segmented. */
 .inf-older-none { margin: 0; padding: var(--sp-8) var(--sp-12) var(--sp-12); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 
-.inf-download { display: flex; flex-direction: column; gap: var(--sp-12); padding-top: var(--sp-12); }
+/* Barra de pie de B-Informe: --surface con filete arriba, fija abajo como la barra de pestañas
+   (mismo tope de 480). Mide 12 + 56 + 8 + 18 de nota + 24 (+ safe-area); .inf reserva ese alto
+   menos el hueco que ya deja main#screen en subpantalla (24 + safe-area), más 12 de aire. */
+.inf:has(> .inf-download) { padding-bottom: 106px; }
+.inf-download {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: var(--sp-12) var(--sp-16) calc(env(safe-area-inset-bottom, 0px) + var(--sp-24));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
 .inf-download .btn-note { text-align: center; }
 /* === fin: informe === */
 

@@ -1270,6 +1270,8 @@ export const ES = {
     },
     compare: {
       title: "Frente a {name}",
+      // Nota bajo la comparativa con este periodo abierto (B-Informe).
+      note: "{prev} está cerrado; {cur} va por el día {day}.",
       up: "Sube",
       down: "Baja",
     },

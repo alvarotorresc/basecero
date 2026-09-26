@@ -1199,6 +1199,7 @@ export const EN = {
     },
     compare: {
       title: "Compared with {name}",
+      note: "{prev} is closed; {cur} is on day {day}.",
       up: "Up",
       down: "Down",
     },
