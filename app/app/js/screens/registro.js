@@ -54,25 +54,16 @@ const GRID_COLS = 3;
 // tres). El literal vive aquí, no en registro-mode.js — el módulo puro solo decide CUÁLES entran.
 const CATS_GRID_LIMIT = 9;
 
-/** Copia de la banda de límite (Registro v2 §6.2): «Con este gasto quedan {amount} de {name}» en
- *  ok/warn, «…te pasas {amount}…» en over. Devuelve texto SIN escapar — quien la use en un
- *  `innerHTML` (render()) lo escapa; quien la use en `textContent` (el oninput del importe) no
- *  necesita, y escaparlo dos veces convertiría un «&» legítimo del nombre de una categoría en
- *  «&amp;amp;». */
-/** La misma copia en HTML (Gasto por categoría, S7): texto en tinta y SOLO la cifra excedida en
- *  --neg (C4, «−» que avisa). Escapa aquí; sirve para render() y para el parche del oninput. */
+/** Banda de límite (Registro v2 §6.2, como Gasto por categoría, S7): «Con este gasto quedan… /
+ *  te pasas…», texto en tinta y SOLO la cifra excedida en
+ *  --neg (C4, «−» que avisa). Se construye por partes —importe y nombre escapados antes de entrar
+ *  en la plantilla de i18n, que no lleva «<»—; sirve para render() y para el parche del oninput. */
 function limitBandHtml(warning) {
-  const text = escHtml(limitBandText(warning));
-  if (warning.level !== "over") return text;
   const amount = escHtml(fmtMoney(Math.abs(warning.remainingAfterCents)));
-  return text.replace(amount, `<span class="num reg-limit-over">${amount}</span>`);
-}
-
-function limitBandText(warning) {
-  const amount = fmtMoney(Math.abs(warning.remainingAfterCents));
+  const name = escHtml(warning.rootName);
   return warning.level === "over"
-    ? t("registro.limit.over", { amount, name: warning.rootName })
-    : t("registro.limit.remaining", { amount, name: warning.rootName });
+    ? t("registro.limit.over", { amount: `<span class="num reg-limit-over">${amount}</span>`, name })
+    : t("registro.limit.remaining", { amount, name });
 }
 
 /** Ancho del input del importe en `ch` (la mono es tabular: un carácter, un ch). Así el símbolo de
@@ -570,7 +561,10 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
 
   /** La nota se ve si hay texto, si se tocó el botón o en modo completo (Ajustes, «Registro
    *  rápido» desplegado con «Más», como antes de B). */
-  const noteVisible = () => !!state.note.trim() || state.noteOpen || (state.quick && state.expanded);
+  // Los tipos que detailsOpen fuerza abiertos (transferencia, devolución, ajuste, también cuando
+  // llegan de un prefill de regla) enseñan la nota abierta, como antes de B.
+  const noteVisible = () => !!state.note.trim() || state.noteOpen || (state.quick && state.expanded)
+    || detailsOpen({ quick: true, expanded: false, tipo: state.tipo });
   /** ¿Se pinta todo (B-Gasto completo) o el registro rápido plegado? */
   const formOpen = () => detailsOpen({ quick: state.quick, expanded: state.expanded, tipo: state.tipo });
 
@@ -665,7 +659,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
               <span class="reg-amount-cur" aria-hidden="true">${escHtml(currencySymbol())}</span>
             </div>
           </div>
-          ${micAvailable() && !state.natural.text.trim() ? `<button type="button" class="reg-mic" id="reg-nat-mic" aria-label="${escAttr(t("registro.natural.mic"))}">${icon("mic", { size: 22 })}</button>` : ""}
+          ${micAvailable() && !state.natural.text.trim() && !state.natural.listening ? `<button type="button" class="reg-mic" id="reg-nat-mic" aria-label="${escAttr(t("registro.natural.mic"))}">${icon("mic", { size: 22 })}</button>` : ""}
         </div>
         ${displayFootHtml()}
       </section>
@@ -770,6 +764,9 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
 
     const natMicBtn = container.querySelector("#reg-nat-mic");
     if (natMicBtn) natMicBtn.onclick = () => {
+      // Un segundo toque mientras escucha crearía otro reconocedor (y rompería stop()/micOff): el
+      // botón ni se pinta con `listening`, y esta guarda cubre un doble toque antes del repintado.
+      if (state.natural.listening) return;
       state.natural.listening = true;
       render();
       speech.start(
@@ -1108,6 +1105,9 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
           } catch { showToast(t("registro.photo.savedWithout")); }
         }
         const periodLines = await receiptPeriodLines();
+        // Si se cerró Registro mientras se leían las cifras del periodo, no se toca `container`
+        // (ya es otra pantalla): el gasto está guardado igual.
+        if (!alive) return;
         // D-3/D-4: guardar con éxito es el otro punto de salida de la pantalla.
         alive = false;
         speech?.stop();
