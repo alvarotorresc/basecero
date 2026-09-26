@@ -6,7 +6,11 @@ CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 -- subscription_ignored/renewal_snoozed (Suscripciones, N6): CONFIG-IN-META igual que
 -- account_loans/category_style — sin migración de esquema, repo.js:697. subscription_ignored es
 -- un array JSON de comercios normalizados ignorados; renewal_snoozed es un objeto {ruleId: fecha}.
-INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version','5'),('currency','EUR'),('created_with','basecero-pwa'),('locale','es-ES'),('import_account_id',''),('default_account_id',''),('partner_name',''),('category_style','{}'),('csv_profile',''),('lang',''),('account_loans','{}'),('quick_register','1'),('subscription_ignored','[]'),('renewal_snoozed','{}');
+-- account_style (PR-10, D-2/D-impl-2, DESIGN.md C8): CONFIG-IN-META igual que category_style —
+-- {accountId: {fam}}, la familia elegida por cada cuenta. Sin esta clave (hoja anterior a esta
+-- PR), account-colors.js#parseAccountStyle/repo.getAccountStyle devuelven {} y cada cuenta cae a
+-- la familia por defecto de su tipo (defaultFamilyForAccount).
+INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version','5'),('currency','EUR'),('created_with','basecero-pwa'),('locale','es-ES'),('import_account_id',''),('default_account_id',''),('partner_name',''),('category_style','{}'),('csv_profile',''),('lang',''),('account_loans','{}'),('quick_register','1'),('subscription_ignored','[]'),('renewal_snoozed','{}'),('account_style','{}');
 
 CREATE TABLE IF NOT EXISTS accounts (
   id TEXT PRIMARY KEY, name TEXT NOT NULL,
