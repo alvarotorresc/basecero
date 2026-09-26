@@ -278,6 +278,10 @@
   font-weight: 700;
   box-shadow: var(--sh-thumb);
 }
+/* Muestra de familia delante del texto (opción `fam`, B-Liquidar): 10 de radio 3, en la barra -b (C6). */
+.ctl-segmented [role="radio"]:has(.ctl-seg-muestra) { display: flex; align-items: center; justify-content: center; gap: var(--sp-8); min-width: 0; padding: 0 var(--sp-8); }
+.ctl-seg-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ctl-seg-muestra { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--fb); }
 .ctl-segmented [role="radio"]:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
 @media (prefers-reduced-motion: reduce) { .ctl-segmented [role="radio"] { transition: none; } }
 

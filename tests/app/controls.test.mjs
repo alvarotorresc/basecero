@@ -240,3 +240,11 @@ test("neutralChipHtml: tag:true añade is-tag y el icono de etiqueta; sin tag, n
 test("neutralChipHtml: con id lo pone en el botón", () => {
   assert.match(neutralChipHtml({ id: "chip-viaje", label: "Viaje" }), /id="chip-viaje"/);
 });
+
+test("segmentedHtml: una opción con `fam` lleva la muestra de su familia; sin fam o desconocida, ninguna", () => {
+  const html = segmentedHtml({ name: "Cuenta", value: "a", options: [
+    { value: "a", label: "Corriente", fam: "tra" }, { value: "b", label: "Ahorro" }, { value: "c", label: "Rara", fam: "zzz" },
+  ] });
+  assert.equal((html.match(/ctl-seg-muestra/g) ?? []).length, 1);
+  assert.match(html, /<span class="ctl-seg-muestra fam-tra" aria-hidden="true"><\/span><span class="ctl-seg-text">Corriente<\/span>/);
+});

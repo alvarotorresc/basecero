@@ -13,6 +13,7 @@
 import { icon } from "./icons.js";
 import { escHtml, escAttr } from "./esc.js";
 import { radioKeyIndex } from "./ui.js";
+import { famClass } from "./category-colors.js";
 
 /** Segmented (§9): pozo píldora con relleno 4 y `--sh-well`; ítems de 44, 14/600 dim; el activo va
  *  en `--raised` + `--sh-thumb` y 700 — NUNCA naranja (C1, K3). `options`: `[{value, label}]` con
@@ -25,12 +26,19 @@ import { radioKeyIndex } from "./ui.js";
  *  de ese elemento — entonces sale `aria-labelledby` en vez de `aria-label`, así el grupo se asocia
  *  con el texto que el usuario ya ve en vez de duplicarlo (mismo patrón que el `theme-label` de la
  *  vieja `themeSegmentedHtml` de ui.js). `name` sigue siendo obligatorio: es el aria-label de
- *  respaldo cuando no hay `labelledBy`. */
+ *  respaldo cuando no hay `labelledBy`.
+ *
+ *  Cada opción admite `fam` (clave de familia, category-colors.js): pinta delante del texto la
+ *  muestra de 10 en la barra de esa familia (--fb), como las cuentas de B-Liquidar. Sin `fam` o con
+ *  una clave desconocida, sin muestra. */
 export function segmentedHtml({ id = "", name, labelledBy = "", options, value }) {
   const sel = options.some((o) => o.value === value) ? value : options[0]?.value;
   const items = options.map((o) => {
     const on = o.value === sel;
-    return `<button type="button" role="radio" aria-checked="${on}" tabindex="${on ? "0" : "-1"}" data-value="${escAttr(o.value)}">${escHtml(o.label)}</button>`;
+    // Muestra de 10 en la barra de la familia (B-Liquidar «Entra en»: la cuenta con su familia, C8).
+    const fc = o.fam ? famClass(o.fam) : "";
+    const swatch = fc ? `<span class="ctl-seg-muestra ${fc}" aria-hidden="true"></span>` : "";
+    return `<button type="button" role="radio" aria-checked="${on}" tabindex="${on ? "0" : "-1"}" data-value="${escAttr(o.value)}">${swatch ? `${swatch}<span class="ctl-seg-text">${escHtml(o.label)}</span>` : escHtml(o.label)}</button>`;
   }).join("");
   const labelAttr = labelledBy ? `aria-labelledby="${escAttr(labelledBy)}"` : `aria-label="${escAttr(name)}"`;
   return `<div class="ctl-segmented"${id ? ` id="${escAttr(id)}"` : ""} role="radiogroup" ${labelAttr}>${items}</div>`;
