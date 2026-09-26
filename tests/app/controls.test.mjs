@@ -252,6 +252,12 @@ test("fieldHtml: inputmode, placeholder (escapado), cifra mono y sufijo dentro d
   assert.match(html, /<span class="ctl-field-suffix" aria-hidden="true">€<\/span><\/span>/);
 });
 
+test("fieldHtml: min y step solo si llegan (S7, límite)", () => {
+  const html = fieldHtml({ id: "lim", label: "Límite", type: "number", min: "0", step: "0.01" });
+  assert.match(html, / min="0" step="0\.01">/);
+  assert.doesNotMatch(fieldHtml({ id: "x", label: "X" }), /min=|step=/);
+});
+
 // ---------- neutralChipHtml ----------
 
 test("neutralChipHtml: pinta el label escapado", () => {

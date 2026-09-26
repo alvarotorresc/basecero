@@ -23,13 +23,11 @@ export const PENDIENTES = new Set([
   // Las 15 pantallas (cada S* saca las suyas). Una por línea para que las uniones no choquen.
   "js/screens/categorias.js",
   "js/screens/etiquetas.js",
-  "js/screens/gasto-por-categoria.js",
   "js/screens/movimientos.js",
   "js/screens/onboarding.js",
   "js/screens/periodo-nuevo.js",
   "js/screens/recurrentes.js",
   "js/screens/registro.js",
-  "js/screens/semana.js",
   "js/screens/suscripciones.js",
   // Módulos con plantilla o paleta propia, que migran con su pantalla o con su PR de fundación.
   "js/recibo.js",        // S2

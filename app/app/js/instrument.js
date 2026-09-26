@@ -207,31 +207,61 @@ const COL_TOP = 76;
 /** Columnas (DESIGN.md §9, B-Home «Esta semana», B-Semana): radio xs arriba; «hoy» en --text (o en
  *  la barra de su familia con `fam`), el resto en --idle (C11). Encima de la columna, la cifra mono
  *  12/600 cuando trae `amount` (en B-Home, solo hoy). Debajo, la inicial del día; la de hoy en tinta.
- *  @param {Array<{label:string, value:number, today?:boolean, fam?:string, amount?:string, name?:string}>} days
+ *
+ *  Apiladas (B-Semana): un día con `segments` pinta su columna como una pila de tramos por
+ *  familia (-b, C6), el mayor abajo, separados 2; la altura sale de `value`. C12: cada tramo lleva
+ *  su nombre (sin `name` LANZA), que va también al aria-label de la columna; la leyenda con nombre
+ *  la pone la pantalla («Dónde se ha ido»). `selected` hunde la columna en un pozo (--well).
+ *  @param {Array<{label:string, value:number, today?:boolean, fam?:string, amount?:string, name?:string,
+ *    selected?:boolean, segments?:Array<{fam?:string, value:number, name:string}>}>} days
  *    label: la inicial que se ve («L»); name: el nombre largo para el lector («Lunes 7»).
  *  @param {object} [o]
  *  @param {string} [o.label]    aria-label del grupo (p. ej. «Gasto por día»).
+ *  @param {boolean} [o.labels]  Fila de iniciales debajo. Por defecto true; false si la pantalla
+ *                               pone su propia fila (los días pulsables de B-Semana).
  *  @returns {string} HTML ("" sin días) */
-export function columnsHtml(days, { label = "" } = {}) {
+export function columnsHtml(days, { label = "", labels = true } = {}) {
   const ds = days ?? [];
   if (!ds.length) return "";
+  for (const d of ds) {
+    for (const s of d.segments ?? []) {
+      if (!s || !s.name || !String(s.name).trim()) throw new Error("columnsHtml: cada tramo lleva su nombre (C12)");
+    }
+  }
   const max = Math.max(0, ...ds.map((d) => Number(d.value) || 0));
   const h = (v) => {
     if (!(max > 0) || !(v > 0)) return 0;
     // Tope 76 %: la columna más alta deja sitio encima para su cifra 12/600 (B-Home: 52 de 72).
     return Math.max(4, Math.round((v / max) * COL_TOP));
   };
+  const stack = (d) => {
+    const vivos = (d.segments ?? []).filter((s) => Number(s.value) > 0);
+    const total = vivos.reduce((a, s) => a + Number(s.value), 0);
+    const height = h(Number(d.value));
+    if (!(total > 0) || !height) return `<span class="col-stack" style="height:0%"></span>`;
+    // El mayor abajo: la pila se pinta de arriba abajo, así que va en orden ascendente.
+    const segs = [...vivos].sort((a, b) => Number(a.value) - Number(b.value)).map((s) =>
+      `<span class="col-seg ${isFamily(s.fam) ? famClass(s.fam) : "is-idle"}" style="flex-basis:${Number(((Number(s.value) / total) * 100).toFixed(3))}%"></span>`).join("");
+    return `<span class="col-stack" style="height:${height}%">${segs}</span>`;
+  };
   const cols = ds.map((d) => {
-    const cls = d.today ? (isFamily(d.fam) ? `is-today has-fam ${famClass(d.fam)}` : "is-today") : "";
-    const aria = [d.name || d.label, d.amount].filter(Boolean).join(" ");
+    const stacked = Array.isArray(d.segments);
+    const cls = [
+      d.today ? (isFamily(d.fam) ? `is-today has-fam ${famClass(d.fam)}` : "is-today") : "",
+      d.selected ? "is-selected" : "",
+    ].filter(Boolean).join(" ");
+    const names = stacked ? (d.segments ?? []).filter((s) => Number(s.value) > 0).map((s) => s.name).join(", ") : "";
+    const aria = [d.name || d.label, d.amount, names].filter(Boolean).join(" ");
     return `<div class="col${cls ? ` ${cls}` : ""}" role="listitem" aria-label="${escAttr(aria)}">`
       + `${d.amount ? `<span class="num col-amt" aria-hidden="true">${escHtml(d.amount)}</span>` : ""}`
-      + `<span class="col-bar" style="height:${h(Number(d.value))}%"></span></div>`;
+      + `${stacked ? stack(d) : `<span class="col-bar" style="height:${h(Number(d.value))}%"></span>`}</div>`;
   }).join("");
-  const labels = ds.map((d) => `<span class="${d.today ? "is-today" : ""}">${escHtml(d.label)}</span>`).join("");
+  const row = labels
+    ? `<div class="cols-labels" aria-hidden="true">${ds.map((d) => `<span class="${d.today ? "is-today" : ""}">${escHtml(d.label)}</span>`).join("")}</div>`
+    : "";
   return `<div class="cols-wrap" style="--n:${ds.length}">
     <div class="cols" role="list"${label ? ` aria-label="${escAttr(label)}"` : ""}>${cols}</div>
-    <div class="cols-labels" aria-hidden="true">${labels}</div>
+    ${row}
   </div>`;
 }
 

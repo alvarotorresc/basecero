@@ -127,10 +127,11 @@ export function stepsHtml({ total, current, ariaLabel = "", labels = null }) {
  *  evita el zoom de iOS: K9) y etiqueta 13/600 dim encima. `type` por defecto "text"; `value` ya
  *  viene formateado por la pantalla. Opcionales (S3, formularios de Patrimonio): `inputmode`
  *  («decimal» en importes), `placeholder` (ya traducido), `num` (cifra en mono tabular) y `suffix`,
- *  la unidad 15/600 dim a la derecha dentro del pozo («€», «%»). Sin ellos, el marcado es el de
- *  siempre. */
-export function fieldHtml({ id, label, type = "text", value = "", inputmode = "", placeholder = "", num = false, suffix = "" }) {
-  const extra = `${inputmode ? ` inputmode="${escAttr(inputmode)}"` : ""}${placeholder ? ` placeholder="${escAttr(placeholder)}"` : ""}`;
+ *  la unidad 15/600 dim a la derecha dentro del pozo («€», «%»). `min` y `step` (S7, límite de
+ *  Gasto por categoría) para inputs numéricos. Sin ellos, el marcado es el de siempre. */
+export function fieldHtml({ id, label, type = "text", value = "", inputmode = "", placeholder = "", num = false, suffix = "", min = "", step = "" }) {
+  const extra = `${inputmode ? ` inputmode="${escAttr(inputmode)}"` : ""}${placeholder ? ` placeholder="${escAttr(placeholder)}"` : ""}`
+    + `${min !== "" ? ` min="${escAttr(min)}"` : ""}${step !== "" ? ` step="${escAttr(step)}"` : ""}`;
   return `<label class="ctl-field-wrap" for="${escAttr(id)}">
     <span class="ctl-field-label">${escHtml(label)}</span>
     <span class="ctl-field"><input class="ctl-field-input${num ? " is-num" : ""}" id="${escAttr(id)}" type="${escAttr(type)}" value="${escAttr(value)}"${extra}>${suffix ? `<span class="ctl-field-suffix" aria-hidden="true">${escHtml(suffix)}</span>` : ""}</span>
