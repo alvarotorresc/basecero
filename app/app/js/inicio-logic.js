@@ -170,3 +170,31 @@ export function huchaMessage(ctx) {
 
   return null;
 }
+
+/** Serie de la línea del Display de Inicio (sistema B, B-Home): lo que queda del presupuesto al
+ *  empezar el periodo y al cerrar cada día hasta hoy. `dailyCents` es el gasto de cada día en
+ *  orden (semana-logic.js#daysWithCategories → totalCents, con el mismo criterio que spentOfPeriod:
+ *  un día con más devoluciones que gasto resta en negativo, es decir, sube). Devuelve
+ *  dailyCents.length + 1 valores; el primero es `budgetCents`. Sin recortar: puede bajar de cero
+ *  (lo recorta quien lo pinta, charts.js#periodChartSvg). */
+export function periodRemainingSeries(budgetCents, dailyCents) {
+  const out = [budgetCents];
+  let left = budgetCents;
+  for (const c of dailyCents ?? []) {
+    left -= Number.isFinite(c) ? c : 0;
+    out.push(left);
+  }
+  return out;
+}
+
+/** Barra apilada de «Gasto por categoría» en Inicio (sistema B, B-Home; C11/C12): las `top` raíces
+ *  con más gasto (> 0) y todo lo demás sumado en `restCents` («Resto», en --idle). `rows` es
+ *  spentByRootCategory (ya ordenado DESC); una raíz con más devoluciones que gasto (≤ 0) no entra
+ *  ni en la barra ni en el total. `totalCents` = la suma de lo que se pinta. */
+export function topCategoriesWithRest(rows, top = 5) {
+  const positive = (rows ?? []).filter((r) => r.spent_cents > 0).sort((a, b) => b.spent_cents - a.spent_cents);
+  const head = positive.slice(0, top);
+  const restCents = positive.slice(top).reduce((s, r) => s + r.spent_cents, 0);
+  const totalCents = head.reduce((s, r) => s + r.spent_cents, 0) + restCents;
+  return { top: head, restCents, totalCents };
+}
