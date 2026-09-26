@@ -2243,12 +2243,20 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 
 /* === pantalla: suscripciones === */
 
-.susc-body { display: flex; flex-direction: column; gap: var(--sp-24); }
-.susc-section { display: flex; flex-direction: column; gap: var(--sp-8); }
+/* B-Suscripciones: pila de 12 (§8) y cabecera a 12 del Display. */
+.sub-header:has(+ .susc-body) { margin-bottom: var(--sp-12); }
+.susc-body { display: flex; flex-direction: column; gap: var(--sp-12); }
+.susc-section { display: flex; flex-direction: column; gap: var(--sp-12); }
+/* Display del original: relleno 18 20 16 y pila de 6. */
+.susc-body .disp { padding: 18px var(--sp-20) var(--sp-16); gap: 6px; }
 
-/* Marcas de renovación del Display (§9 LED, B-Suscripciones · suscripciones.js#renewalTimelineHtml):
-   la más próxima usa .disp-today (ya existente, C2); el resto, apagadas, nunca en el ámbar que manda. */
+/* Línea de renovaciones del Display (suscripciones.js#renewalTimelineHtml): pista y marcas por
+   semana en --disp-line; la próxima usa .disp-today y su fecha .disp-amber (C2); el resto, en
+   --disp-dim con el anillo del Display. */
+.susc-timeline { margin-top: 10px; }
 .susc-mark { fill: var(--disp-dim); stroke: var(--disp); }
+.susc-tl-label { fill: var(--disp-dim); font-family: var(--font-mono); font-size: var(--fs-12); font-weight: 500; }
+.susc-tl-label.disp-amber { fill: var(--disp-text); font-weight: 600; }
 
 /* Tarjeta de aviso (F-1x): tintada con la familia de la única suscripción de la que toca preguntar
    esta semana (C6: una entidad sola, tinte permitido). Sin familia (defensivo): --well. */
@@ -2264,13 +2272,25 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 /* .ent-name/.ent-line2 (entity.js) truncan a una línea para la fila de 60 — aquí el título es un
    párrafo de dos líneas dentro de una tarjeta ancha (B-Suscripciones): se deja envolver. */
 .susc-notice-head .ent-name { white-space: normal; overflow: visible; text-overflow: clip; }
+.susc-notice-head .ent-name { line-height: 1.25; }
 .susc-notice-sub { font-size: var(--fs-13); white-space: normal; overflow: visible; text-overflow: clip; }
-.susc-notice-amount { font-weight: 600; color: var(--text); }
+/* La cifra del aviso en el -x de su familia, como el resto de la línea (B-Suscripciones). */
+.susc-notice-amount.is-fam-ink { font-weight: 600; color: var(--fx); }
 .susc-notice-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.susc-notice-actions .btn-secondary { font-size: var(--fs-15); }
 
-.susc-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
-.susc-section-title { margin: 0; font-size: var(--fs-15); line-height: var(--lh-title); }
+/* «Activas»: Unbounded 15 en el -x de Suscripciones, con la pista de orden a la derecha. */
+.susc-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); padding: var(--sp-4) var(--sp-4) 0; }
+.susc-section-title { margin: 0; font-family: var(--font-display); font-size: var(--fs-15); font-weight: 700; letter-spacing: -0.01em; line-height: var(--lh-title); color: var(--fx); }
 .susc-section-hint { font-size: var(--fs-12); font-weight: 600; color: var(--text-dim); }
+
+/* Lista de B-Suscripciones: --raised, filas de 60 pegadas (relleno 0 8) y filete desde la baldosa. */
+.susc-list .box-list { gap: 0; background: var(--raised); }
+.susc-list .ent-row { min-height: 60px; padding: 0 var(--sp-8); }
+.susc-list .ent-divider { margin: 0 var(--sp-8) 0 60px; }
+/* «468,00 €/año» en mono, como la cifra. */
+.susc-list .ent-amount-note { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.susc-foot-note { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 
 .susc-candidates { display: flex; flex-direction: column; gap: var(--sp-12); }
 .susc-candidate {

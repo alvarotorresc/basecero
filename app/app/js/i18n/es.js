@@ -1074,6 +1074,8 @@ export const ES = {
       activeCount: { one: "{n} activa", other: "{n} activas" },
       chartLabel: "Renovaciones de los próximos 30 días",
     },
+    // Nota al pie de la lista (B-Suscripciones).
+    footNote: "Salen de tus recurrentes marcados como suscripción y de los cargos que se repiten con el mismo importe.",
     notice: {
       title: "{name} se renueva el {when}",
       question: "¿Lo sigues usando?",
@@ -1087,11 +1089,13 @@ export const ES = {
       cancelled: "Canceladas",
     },
     row: {
-      renewsOn: "renueva el {date}",
-      renewsInDays: { one: "renueva el {date}, en {n} día", other: "renueva el {date}, en {n} días" },
-      renewsWeekly: "renueva cada semana",
+      // Línea 2 de una activa (B-Suscripciones): «Renueva en 2 días» / «Renueva el 2 oct».
+      renewsOn: "Renueva el {date}",
+      renewsInDays: { one: "Renueva en {n} día", other: "Renueva en {n} días" },
+      renewsToday: "Renueva hoy",
+      renewsWeekly: "Renueva cada semana",
       perYear: "/año",
-      noDate: "sin fecha de renovación",
+      noDate: "Sin fecha de renovación",
     },
     candidate: {
       sameAmountOn: "mismo importe el {dates}",

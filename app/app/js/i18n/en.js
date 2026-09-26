@@ -1014,6 +1014,7 @@ export const EN = {
       activeCount: { one: "{n} active", other: "{n} active" },
       chartLabel: "Renewals in the next 30 days",
     },
+    footNote: "They come from your recurring rules marked as a subscription and from charges that repeat with the same amount.",
     notice: {
       title: "{name} renews on {when}",
       question: "Still using it?",
@@ -1027,11 +1028,12 @@ export const EN = {
       cancelled: "Cancelled",
     },
     row: {
-      renewsOn: "renews on {date}",
-      renewsInDays: { one: "renews on {date}, in {n} day", other: "renews on {date}, in {n} days" },
-      renewsWeekly: "renews every week",
+      renewsOn: "Renews on {date}",
+      renewsInDays: { one: "Renews in {n} day", other: "Renews in {n} days" },
+      renewsToday: "Renews today",
+      renewsWeekly: "Renews every week",
       perYear: "/year",
-      noDate: "no renewal date",
+      noDate: "No renewal date",
     },
     candidate: {
       sameAmountOn: "same amount on {dates}",
