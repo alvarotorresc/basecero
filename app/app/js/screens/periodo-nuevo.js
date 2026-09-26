@@ -352,7 +352,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
   // Tres cards independientes (una por bloque: nombre, fecha, reparto), réplica de la estructura
   // de PeriodoNuevo.dc.html — antes era un único .card con <hr> entre secciones; el artboard las
   // separa. Nombre/fecha siguen siendo <input> reales (el input manda, no se convierten a texto),
-  // solo re-vestidos como tile --card2 (antes hex #1b1e21 suelto).
+  // solo re-vestidos como tile --card2 (antes, un color literal suelto).
   function bloqueNombre() {
     return `
     <div class="card" style="display:flex; flex-direction:column; gap:8px;">

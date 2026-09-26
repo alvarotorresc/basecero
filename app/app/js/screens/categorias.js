@@ -510,7 +510,7 @@ export async function renderCategorias(container, onBack) {
     container.querySelector("#cf-back").onclick = () => goBack();
 
     // El nombre NO repinta en cada tecla (perdería el foco/cursor del input, como el resto de
-    // pantallas de la app — ver acc-name/goal-name en patrimonio.js): el estado (y la sugerencia
+    // pantallas de la app — ver cuenta-name/goal-name en patrimonio.js): el estado (y la sugerencia
     // de color, mientras no se haya tocado un swatch) se recalcula en cada tecla igualmente
     // ("recalculada al teclear" es sobre el ESTADO — lo que se GUARDA es siempre correcto — no
     // hace falta que el repintado visual del preview/swatch sea síncrono con cada pulsación).
