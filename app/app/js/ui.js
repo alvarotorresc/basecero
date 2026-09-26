@@ -3,7 +3,6 @@
 import { icon } from "./icons.js";
 import { t } from "./i18n/index.js";
 import { escHtml, escAttr } from "./esc.js";
-import { THEME_PREFS } from "./theme.js";
 
 /** Cabecera de raíz (DESIGN.md §9, B-Home): `h1` de 24 en Unbounded y subtítulo opcional 13/500
  *  dim debajo. La llevan los 4 destinos de la barra de pestañas; es el único `h1` de la pantalla.
@@ -128,22 +127,6 @@ export function buttonHtml({ kind = "secondary", size = "m", id = "", label, not
 export function metaHtml(segments, { cls = "" } = {}) {
   const parts = segments.filter((s) => s !== "" && s != null).map((s) => `<span>${escHtml(s)}</span>`);
   return `<div class="meta-row${cls ? ` ${cls}` : ""}">${parts.join('<span class="meta-sep" aria-hidden="true"></span>')}</div>`;
-}
-
-/** Fila «Tema» de Ajustes (DESIGN.md §3): Segmented Claro · Oscuro · Sistema. Marcado PROVISIONAL
- *  (la PR-06 le da la anatomía canónica del Segmented), pero con su contrato de accesibilidad:
- *  radiogroup, un radio por opción con aria-checked y tabindex itinerante (solo el elegido es
- *  tabulable; las flechas mueven y eligen, ver radioKeyIndex). */
-export function themeSegmentedHtml(pref) {
-  const sel = THEME_PREFS.includes(pref) ? pref : "system";
-  const radios = THEME_PREFS.map((p) => {
-    const on = p === sel;
-    return `<button type="button" role="radio" aria-checked="${on}" tabindex="${on ? 0 : -1}" data-theme-pref="${escAttr(p)}">${escHtml(t("theme." + p))}</button>`;
-  }).join("");
-  return `<div class="theme-row">
-      <span class="theme-row-label" id="theme-label">${escHtml(t("theme.label"))}</span>
-      <div class="theme-seg" role="radiogroup" aria-labelledby="theme-label">${radios}</div>
-    </div>`;
 }
 
 /** Índice al que lleva una tecla dentro de un grupo de radios (patrón radiogroup de WAI-ARIA):
