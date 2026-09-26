@@ -901,6 +901,9 @@ button.ent-chosen { cursor: pointer; }
 .ent-amount .money-cents,
 .ent-amount .money-cur { font-size: inherit; color: inherit; margin-left: 0; }
 .ent-amount-note { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+/* Sin familia (ingreso, sin categoría): la línea 2 en dim aunque la fila cuelgue de un contenedor
+   con familia (no hereda su --fx), como .ent-chosen.ent-neutral. */
+.ent-row.ent-neutral .ent-line2 { color: var(--text-dim); }
 
 /* --- Fila de ajuste (§9, B-Ajustes): 48 (60 con dos líneas); baldosa 32 opcional · etiqueta
    15/500 · valor 15/600 --text (nunca familia, I-61) · chevron 16 dim o control. --- */

@@ -173,7 +173,7 @@ const SIGNS = {
 export function txRowHtml({ fam = null, icon: key = "", title, line2 = "", amountHtml, sign = "expense", amountNote = "", id = "", data = null }) {
   const s = Object.hasOwn(SIGNS, sign) ? SIGNS[sign] : SIGNS.expense;
   const fc = famClass(fam);
-  return `<button type="button" class="${cls("ent-row", fc)}"${attrs({ id, data })}>`
+  return `<button type="button" class="${cls("ent-row", fc, !fc && "ent-neutral")}"${attrs({ id, data })}>`
     + tileHtml({ fam, icon: key || (fc ? fam : sign === "income" ? "income" : "otr") })
     + `<span class="ent-body"><span class="ent-name">${escHtml(title)}</span>`
     + `${line2 ? `<span class="ent-line2">${escHtml(line2)}</span>` : ""}</span>`

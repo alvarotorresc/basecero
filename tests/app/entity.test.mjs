@@ -54,6 +54,7 @@ test("txRowHtml: un ingreso lleva «+» y la clase pos; sin familia, baldosa neu
   assert.match(html, /class="ent-amount num pos">\+12,50/);
   assert.ok(!html.includes("fam-"));
   assert.match(html, /ent-tile ent-neutral/);
+  assert.match(html, /class="ent-row ent-neutral"/, "la fila sin familia también es neutra");
 });
 
 test("txRowHtml: un gasto lleva «−» (U+2212) y va en tinta (ni pos ni neg)", () => {
