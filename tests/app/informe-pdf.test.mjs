@@ -420,3 +420,65 @@ test("buildPdfBytes: el color de la barra es el del token en la paleta (no negro
   await buildPdfBytes(spy, smallReport(), { palette: PALETTE });
   assert.ok(seen.some(([r, g, b]) => r === 0xa8 && g === 0x89 && b === 0x5f), "Casa en arena (--f-casa-b claro)");
 });
+
+// ---- S8: el papel y las barras, dibujados con la paleta del tokens.css real ---------------------
+
+/** PDFLib espía: el real, pero cada página anota lo que dibuja (drawRectangle / drawText) con su
+ *  color ya en 0..255. Así se comprueba el PDF que sale de verdad, no solo la geometría. */
+function spyPdfLib() {
+  const rects = [], texts = [];
+  const to255 = (c) => (c ? [c.red, c.green, c.blue].map((v) => Math.round(v * 255)) : null);
+  const spy = {
+    ...PDFLib,
+    PDFDocument: {
+      create: async () => {
+        const doc = await PDFLib.PDFDocument.create();
+        const addPage = doc.addPage.bind(doc);
+        doc.addPage = (...args) => {
+          const page = addPage(...args);
+          const drawRectangle = page.drawRectangle.bind(page);
+          const drawText = page.drawText.bind(page);
+          page.drawRectangle = (o) => { rects.push({ ...o, rgb: to255(o.color) }); return drawRectangle(o); };
+          page.drawText = (s, o) => { texts.push({ text: s, rgb: to255(o.color) }); return drawText(s, o); };
+          return page;
+        };
+        return doc;
+      },
+    },
+  };
+  return { spy, rects, texts };
+}
+
+test("buildPdfBytes: cada barra de categoría sale con el hex de --f-<fam>-b del tokens.css real", async () => {
+  const report = smallReport();
+  const { spy, rects } = spyPdfLib();
+  await buildPdfBytes(spy, report, { palette: PALETTE });
+  const hex = (rgb) => "#" + rgb.map((v) => v.toString(16).padStart(2, "0")).join("").toUpperCase();
+  const { pages, pageSize, margin } = layoutReport(report);
+  const contentW = pageSize.w - margin * 2;
+  const maxSpent = Math.max(...report.categories.rows.map((r) => r.spentCents));
+  for (const row of report.categories.rows) {
+    const token = `--f-${row.fam}-b`;
+    const [g] = barRowsGeometry([{ key: "row", value: row.spentCents, max: maxSpent, color: token }], { width: contentW, rowH: 16, barH: 6 });
+    const drawn = rects.find((r) => r.width === g.w && r.height === g.h && (r.opacity ?? 1) === 1 && r.rgb && hex(r.rgb) === PALETTE[token].toUpperCase());
+    assert.ok(drawn, `la barra de ${row.name} lleva ${token} = ${PALETTE[token]}`);
+  }
+  assert.ok(pages.length >= 1);
+});
+
+test("buildPdfBytes: el papel es --raised y la tinta --text del bloque claro (el PDF nunca sale en oscuro)", async () => {
+  const { spy, rects, texts } = spyPdfLib();
+  await buildPdfBytes(spy, smallReport(), { palette: PALETTE });
+  const rgbOfHex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const page = rects.find((r) => r.x === 0 && r.y === 0 && r.width === A4.w);
+  assert.deepEqual(page.rgb, rgbOfHex(PALETTE["--raised"]));
+  assert.ok(texts.length > 0);
+  for (const tx of texts) assert.deepEqual(tx.rgb, rgbOfHex(PALETTE["--text"]));
+});
+
+test("buildPdfBytes: sin paleta, papel blanco y tinta en gris neutro (nunca revienta)", async () => {
+  const { spy, rects } = spyPdfLib();
+  await buildPdfBytes(spy, smallReport(), {});
+  const page = rects.find((r) => r.x === 0 && r.y === 0 && r.width === A4.w);
+  assert.deepEqual(page.rgb, [255, 255, 255]);
+});

@@ -321,8 +321,19 @@ export const EN = {
       settle: "Couldn’t settle: {error}",
     },
     title: { withPartner: "Settle up with {name}" },
-    net: { title: "Net" },
-    account: { title: "Settlement account" },
+    // sub: header subtitle with the split the rows share (B-Liquidar).
+    sub: {
+      half: "Shared half and half, {pct}%",
+      split: "Their share, {pct}%",
+    },
+    balance: {
+      favor: "Owed to you",
+      against: "You owe",
+    },
+    account: {
+      in: "Goes into",
+      out: "Comes out of",
+    },
     empty: "Nothing left to settle.",
     // select.aria: aria-label for the per-row selection checkbox (SISTEMA.md §4.8bis).
     // select.none: footer button copy when no row is checked.
@@ -330,17 +341,20 @@ export const EN = {
       aria: "Include {merchant} in the settlement",
       none: "Pick at least one expense",
     },
-    // row.theirPct/myPct: third metaHtml segment of a row's sub, alongside
-    // common.dateValue/amountValue — replace subTheirs/subMine (spec §1.4/§4).
+    // row.*: line 2 of a row; theirPct/myPct are appended only when the row's split differs from
+    // the subtitle's.
     row: {
+      of: "{date}, of {amount}",
+      paidBy: "{date}, {name} paid {amount}",
       theirPct: "their {pct}%",
       myPct: "your {pct}%",
     },
+    // footer.*: the primary button; the amount follows in mono (B-Liquidar).
     footer: {
-      collect: "Collect {amount} from {name}",
-      collectConfirm: "Yes, collect {amount}",
-      pay: "Pay {amount} to {name}",
-      payConfirm: "Yes, pay {amount}",
+      collect: "Settle and collect",
+      collectConfirm: "Yes, collect",
+      pay: "Settle and pay",
+      payConfirm: "Yes, pay",
       even: "Settle up, nothing changes hands",
       evenConfirm: "Yes, settle up",
     },
@@ -1054,56 +1068,57 @@ export const EN = {
     title: "Report",
     openPeriod: "Period under way, day {n} of {m}",
     closedPeriod: "Closed, {start} to {end}",
-    generatedAt: "Generated today at {time}",
     download: "Download the PDF",
     downloading: "Generating…",
-    downloadHint: "Generated on your phone, with the same charts, without leaving this screen.",
+    // downloadNote: the one note under the primary button (F-11, B-Informe).
+    downloadNote: { one: "Made on your phone, with {n} transaction.", other: "Made on your phone, with all {n} transactions." },
+    downloadNoteEmpty: "Made on your phone.",
     selector: { label: "Period" },
+    older: {
+      label: "Earlier",
+      title: "Closed periods",
+      viewing: "Viewing",
+      none: "No closed periods yet.",
+    },
+    display: {
+      rate: "Share of income you save",
+      overspent: "You spend more than you earn",
+      vsPrev: "In {name}, {pct}",
+    },
+    split: {
+      income: "Earned",
+      aria: "Of {income} earned, {spent} spent and {saved} saved",
+    },
     summary: {
-      title: "Summary",
-      income: "Income",
       spent: "Spent",
       saved: "Saved",
-      available: "Available",
-      savingsRate: "You save {pct}% of what you earn.",
-      savingsRateVsPrev: " In {name}, {pct}%.",
     },
-    accounts: {
-      title: "Your accounts",
-      total: "Operating total",
+    compare: {
+      title: "Compared with {name}",
+      up: "Up",
+      down: "Down",
     },
     categories: {
-      title: "Spending by category",
-      vsPrev: "vs. {name}",
-      total: "Total",
+      byCategory: "By category",
+      vsPrev: "vs {name}",
+      rest: "Rest",
       orientativo: "{prev} is closed and {current} is on day {day} of {total}, so the comparison is only indicative until it closes.",
-      noPrev: "No previous period to compare against.",
     },
     shared: {
-      title: "With {name}",
-      periodTotal: "Shared expenses this period",
-      myPart: "Your share",
       net: {
         theyOwe: "{name} owes you",
         youOwe: "You owe {name}",
         even: "You're even",
       },
     },
-    subscriptions: {
-      title: "Subscriptions",
-      active: "{n} active, per month",
-      yearly: "What they add up to per year",
-      link: "The radar",
-    },
+    bento: { movements: "Transactions" },
     movements: {
-      title: "Movements by category",
-      count: "{n} total",
-      groupCount: { one: "{n} movement", other: "{n} movements" },
-      andMore: "and {n} more movements",
-      others: "Other",
       tag: "Tag: {name}",
     },
-    footer: "The PDF carries all of this plus the full list of the {n} movements, and looks the same on any phone.",
+    empty: {
+      title: "No transactions in this period yet",
+      text: "The report fills up with what you log.",
+    },
     error: {
       load: "Could not load the report: {error}",
       pdf: "Could not generate the PDF: {error}",

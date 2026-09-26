@@ -34,7 +34,7 @@ export function rgbOf(token, palette) {
 }
 
 /** Descarga css/tokens.css (el service worker lo tiene en caché, funciona sin red) y lo parsea.
- *  Cualquier fallo devuelve {}: el PDF sale igual, con las barras en el gris de papel. */
+ *  Cualquier fallo devuelve {}: el PDF sale igual, en blanco y grises neutros. */
 export async function loadPdfPalette(fetchFn = globalThis.fetch, url = "css/tokens.css") {
   try {
     const res = await fetchFn(url);

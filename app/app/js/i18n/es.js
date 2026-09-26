@@ -336,8 +336,19 @@ export const ES = {
       settle: "No se pudo liquidar: {error}",
     },
     title: { withPartner: "Liquidar con {name}" },
-    net: { title: "Neto" },
-    account: { title: "Cuenta de la liquidación" },
+    // sub: subtítulo de la cabecera con el reparto común de las filas (B-Liquidar).
+    sub: {
+      half: "Gastos a medias, {pct} %",
+      split: "Su parte, {pct} %",
+    },
+    balance: {
+      favor: "A tu favor",
+      against: "En contra",
+    },
+    account: {
+      in: "Entra en",
+      out: "Sale de",
+    },
     empty: "No queda nada pendiente de liquidar.",
     // select.aria: aria-label de la casilla de selección por fila (SISTEMA.md §4.8bis).
     // select.none: texto del botón de pie cuando no hay ninguna fila marcada.
@@ -345,17 +356,20 @@ export const ES = {
       aria: "Incluir {merchant} en la liquidación",
       none: "Elige al menos un gasto",
     },
-    // row.theirPct/myPct: tercer segmento del sub de una fila (metaHtml), junto a
-    // common.dateValue/amountValue — sustituyen a subTheirs/subMine (spec §1.4/§4).
+    // row.*: línea 2 de una fila; theirPct/myPct se añaden solo si el reparto de la fila no es el
+    // del subtítulo.
     row: {
+      of: "{date}, de {amount}",
+      paidBy: "{date}, pagó {name} {amount}",
       theirPct: "su {pct} %",
       myPct: "tu {pct} %",
     },
+    // footer.*: el primario; el importe va detrás, en mono (B-Liquidar).
     footer: {
-      collect: "Cobrar {amount} de {name}",
-      collectConfirm: "Sí, cobrar {amount}",
-      pay: "Pagar {amount} a {name}",
-      payConfirm: "Sí, pagar {amount}",
+      collect: "Liquidar y cobrar",
+      collectConfirm: "Sí, cobrar",
+      pay: "Liquidar y pagar",
+      payConfirm: "Sí, pagar",
       even: "Liquidar, queda a cero",
       evenConfirm: "Sí, liquidar",
     },
@@ -1125,56 +1139,57 @@ export const ES = {
     title: "Informe",
     openPeriod: "Periodo en curso, día {n} de {m}",
     closedPeriod: "Cerrado, del {start} al {end}",
-    generatedAt: "Generado hoy {time}",
     download: "Descargar el PDF",
     downloading: "Generando…",
-    downloadHint: "Se genera en tu móvil, con las mismas gráficas y sin salir de aquí.",
+    // downloadNote: la única nota bajo el primario (F-11, B-Informe).
+    downloadNote: { one: "Se genera en tu móvil, con {n} movimiento.", other: "Se genera en tu móvil, con los {n} movimientos." },
+    downloadNoteEmpty: "Se genera en tu móvil.",
     selector: { label: "Periodo" },
+    older: {
+      label: "Anteriores",
+      title: "Periodos cerrados",
+      viewing: "Viendo",
+      none: "Aún no hay periodos cerrados.",
+    },
+    display: {
+      rate: "Ahorras de lo que ingresas",
+      overspent: "Gastas más de lo que ingresas",
+      vsPrev: "En {name}, el {pct}",
+    },
+    split: {
+      income: "Ingresado",
+      aria: "De {income} ingresados, {spent} gastados y {saved} ahorrados",
+    },
     summary: {
-      title: "Resumen",
-      income: "Ingresos",
       spent: "Gastado",
       saved: "Ahorrado",
-      available: "Disponible",
-      savingsRate: "Ahorras el {pct} % de lo que ingresas.",
-      savingsRateVsPrev: " En {name}, el {pct} %.",
     },
-    accounts: {
-      title: "Tus cuentas",
-      total: "Total operativo",
+    compare: {
+      title: "Frente a {name}",
+      up: "Sube",
+      down: "Baja",
     },
     categories: {
-      title: "Gasto por categoría",
-      vsPrev: "frente a {name}",
-      total: "Total",
+      byCategory: "Por categoría",
+      vsPrev: "vs {name}",
+      rest: "Resto",
       orientativo: "{prev} está cerrado y {current} va por el día {day} de {total}, así que la comparación es orientativa hasta el cierre.",
-      noPrev: "Sin periodo anterior con el que comparar.",
     },
     shared: {
-      title: "Con {name}",
-      periodTotal: "Gastos compartidos del periodo",
-      myPart: "Tu parte",
       net: {
         theyOwe: "{name} te debe",
         youOwe: "Debes a {name}",
         even: "Estáis en paz",
       },
     },
-    subscriptions: {
-      title: "Suscripciones",
-      active: "{n} activas, al mes",
-      yearly: "Lo que suman al año",
-      link: "El radar",
-    },
+    bento: { movements: "Movimientos" },
     movements: {
-      title: "Movimientos por categoría",
-      count: "{n} en total",
-      groupCount: { one: "{n} movimiento", other: "{n} movimientos" },
-      andMore: "y {n} movimientos más",
-      others: "Otros",
       tag: "Etiqueta: {name}",
     },
-    footer: "El PDF lleva todo esto más la lista completa de los {n} movimientos, y se guarda igual en cualquier móvil.",
+    empty: {
+      title: "Este periodo aún no tiene movimientos",
+      text: "El informe se llena con lo que apuntes.",
+    },
     error: {
       load: "No se pudo cargar el informe: {error}",
       pdf: "No se pudo generar el PDF: {error}",
