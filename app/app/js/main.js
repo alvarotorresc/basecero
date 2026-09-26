@@ -12,7 +12,7 @@ import { renderPatrimonio } from "./screens/patrimonio.js";
 import { renderAjustes } from "./screens/ajustes.js";
 import { pushBack, goBack, clearBack, resetBack } from "./back.js";
 import { userMessage } from "./errors.js";
-import { scrollScreenTop } from "./viewport.js";
+import { scrollScreenTop, trackTabbarHeight } from "./viewport.js";
 import { setTabNavigator } from "./tabs.js";
 import { applyTheme, readPref, getStorage, systemDarkQuery } from "./theme.js";
 
@@ -42,10 +42,9 @@ export function nav(tab, opts) {
   // historial con «volver a Inicio» como callback, en la misma pila que las subpantallas.
   if (tab === "inicio") clearBack();
   else resetBack(() => nav("inicio"));
+  // La pestaña activa se pinta por [aria-current="page"] (components.css, §9): sin clase aparte.
   document.querySelectorAll(".tab").forEach((b) => {
-    const isActive = b.dataset.tab === tab;
-    b.classList.toggle("active", isActive);
-    if (isActive) b.setAttribute("aria-current", "page");
+    if (b.dataset.tab === tab) b.setAttribute("aria-current", "page");
     else b.removeAttribute("aria-current");
   });
   // clearBack()/resetBack() no ejecutan callbacks (su history.go cae en el guard del popstate,
@@ -56,7 +55,7 @@ export function nav(tab, opts) {
 setTabNavigator(nav);   // deja que una pantalla pida un cambio de pestaña sin importar main.js
 
 // Se llama en boot y de nuevo tras el onboarding, donde el usuario puede haber cambiado el idioma:
-// el tabbar y el FAB están ocultos durante el asistente, así que sin este segundo rotulado
+// la barra de pestañas (con su botón de añadir) está oculta durante el asistente, así que sin este segundo rotulado
 // quedarían con el idioma del arranque durante toda la sesión.
 function relabelChrome() {
   document.querySelectorAll(".tab").forEach((b) => {
@@ -114,6 +113,7 @@ async function boot() {
 }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => nav(b.dataset.tab)));
+trackTabbarHeight(window, document.querySelector(".tabbar"));   // hueco inferior de main#screen = alto real de la barra
 document.getElementById("btn-registro").onclick = () => {
   pushBack(() => nav("inicio"));
   renderRegistro(screen, goBack, undefined, () => nav("inicio"));

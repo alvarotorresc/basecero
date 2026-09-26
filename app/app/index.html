@@ -53,23 +53,23 @@
 <body>
 <main id="screen" aria-live="polite"></main>
 <nav class="tabbar" aria-label="Secciones">
-  <button class="tab active" data-tab="inicio">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20H4z"></path></svg>
+  <button type="button" class="tab" data-tab="inicio" aria-current="page">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-6.5 8 6.5v8.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"></path></svg>
     <span class="tab-label">Inicio</span>
   </button>
-  <button class="tab" data-tab="movimientos">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10"></path></svg>
+  <button type="button" class="tab" data-tab="movimientos">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6.5h12M8 12h12M8 17.5h12"></path><circle cx="4.5" cy="6.5" r=".8"></circle><circle cx="4.5" cy="12" r=".8"></circle><circle cx="4.5" cy="17.5" r=".8"></circle></svg>
     <span class="tab-label">Movimientos</span>
   </button>
-  <button class="tab" data-tab="patrimonio">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5h16v11H4z"></path><path d="M4 8.5 12 4l8 4.5M16 14h2"></path></svg>
+  <button type="button" class="tab-add" id="btn-registro" aria-label="Registrar gasto"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+  <button type="button" class="tab" data-tab="patrimonio">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8.5h16v11H4z"></path><path d="M6 8.5l10-4 1.5 4M15 14h2"></path></svg>
     <span class="tab-label">Patrimonio</span>
   </button>
-  <button class="tab" data-tab="ajustes">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"></path></svg>
+  <button type="button" class="tab" data-tab="ajustes">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"></path></svg>
     <span class="tab-label">Ajustes</span>
   </button>
-  <button class="fab" id="btn-registro" aria-label="Registrar gasto"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg></button>
 </nav>
 <script type="module" src="js/main.js"></script>
 <script>
