@@ -208,13 +208,15 @@ export function rINLINE(rel, text) {
 }
 
 // R-BACK · DESIGN §11: el atrás lleva aria-label «Atrás», es decir t("common.back").
-// Se reconoce por id o clase con «back» en la etiqueta del botón.
+// Se reconoce por id o clase con «back» en la etiqueta del botón: palabra suelta («mov-back»,
+// «back-btn») o tramo camelCase («goBack», «backBtn»), nunca dentro de otra palabra («background»).
+const ATRAS_ID = /\b(id|class)="[^"]*(\bback(?![a-z])|[a-z0-9]Back(?![a-z]))/;
 export function rBACK(rel, text) {
   if (!rel.endsWith(".js")) return [];
   const errs = [];
   for (const m of text.matchAll(/(<button\b[^>]*>)([\s\S]*?)<\/button>/g)) {
     const [, tag, cuerpo] = m;
-    const esAtras = /\b(id|class)="[^"]*\bback\b/.test(tag) || cuerpo.includes('icon("back"');
+    const esAtras = ATRAS_ID.test(tag) || cuerpo.includes('icon("back"');
     if (!esAtras) continue;
     if (!/aria-label="\$\{(escAttr\()?t\("common\.back"\)\)?\}"/.test(tag)) errs.push(`${rel}: atrás sin aria-label t("common.back"): ${tag.slice(0, 90)}`);
   }
@@ -322,6 +324,10 @@ test("detectores: cazan lo que prohíben y dejan pasar lo permitido", () => {
   assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"mov-back\" aria-label=\"${escAttr(t(\"common.back\"))}\"></button>`").length, 0);
   assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"mov-back\" aria-label=\"${t(\"common.goBack\")}\"></button>`").length, 1);
   assert.equal(rBACK("x.js", "`<button id=\"${escAttr(id)}\" aria-label=\"${t(\"common.goBack\")}\">${icon(\"back\")}</button>`").length, 1);
+  assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"goBack\" aria-label=\"Volver\">x</button>`").length, 1, "id camelCase");
+  assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"backBtn\" aria-label=\"Volver\">x</button>`").length, 1, "id camelCase delante");
+  assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"goBack\" aria-label=\"${t(\"common.back\")}\">x</button>`").length, 0);
+  assert.equal(rBACK("x.js", "`<button type=\"button\" class=\"background feedback\">x</button>`").length, 0, "back dentro de otra palabra no es atrás");
 
 });
 
