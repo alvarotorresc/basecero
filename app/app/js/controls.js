@@ -18,14 +18,22 @@ import { radioKeyIndex } from "./ui.js";
  *  en `--raised` + `--sh-thumb` y 700 — NUNCA naranja (C1, K3). `options`: `[{value, label}]` con
  *  `label` YA TRADUCIDO. Si `value` no casa con ninguna opción cae a la primera: si no, ningún
  *  ítem sería tabulable (tabindex itinerante, K12) y el grupo quedaría inalcanzable por teclado.
- *  `id`, opcional, es el gancho que usa `wireSegmented` para encontrar el grupo ya montado. */
-export function segmentedHtml({ id = "", name, options, value }) {
+ *  `id`, opcional, es el gancho que usa `wireSegmented` para encontrar el grupo ya montado.
+ *
+ *  Nombre accesible del radiogroup: por defecto `aria-label="${name}"`. Si la pantalla ya pinta una
+ *  etiqueta VISIBLE al lado del control (como el «Tema» de Ajustes), pásale `labelledBy` con el id
+ *  de ese elemento — entonces sale `aria-labelledby` en vez de `aria-label`, así el grupo se asocia
+ *  con el texto que el usuario ya ve en vez de duplicarlo (mismo patrón que el `theme-label` de la
+ *  vieja `themeSegmentedHtml` de ui.js). `name` sigue siendo obligatorio: es el aria-label de
+ *  respaldo cuando no hay `labelledBy`. */
+export function segmentedHtml({ id = "", name, labelledBy = "", options, value }) {
   const sel = options.some((o) => o.value === value) ? value : options[0]?.value;
   const items = options.map((o) => {
     const on = o.value === sel;
     return `<button type="button" role="radio" aria-checked="${on}" tabindex="${on ? "0" : "-1"}" data-value="${escAttr(o.value)}">${escHtml(o.label)}</button>`;
   }).join("");
-  return `<div class="ctl-segmented"${id ? ` id="${escAttr(id)}"` : ""} role="radiogroup" aria-label="${escAttr(name)}">${items}</div>`;
+  const labelAttr = labelledBy ? `aria-labelledby="${escAttr(labelledBy)}"` : `aria-label="${escAttr(name)}"`;
+  return `<div class="ctl-segmented"${id ? ` id="${escAttr(id)}"` : ""} role="radiogroup" ${labelAttr}>${items}</div>`;
 }
 
 /** Cablea un Segmented ya en el DOM: pulsar o mover con las flechas (Inicio/Fin incluidos, WAI-ARIA

@@ -282,7 +282,9 @@
 @media (prefers-reduced-motion: reduce) { .ctl-segmented [role="radio"] { transition: none; } }
 
 /* Interruptor (§9): 44×26, pomo 20. Apagado: pista --well + --sh-well, pomo --idle. Encendido:
-   pista --text, pomo --raised — tinta, nunca naranja (F-04, K3). */
+   pista --text, pomo --raised — tinta, nunca naranja (F-04, K3). El área de toque real tiene que
+   llegar a 44×44 (§11, K10) sin tocar el dibujo: el ::before amplía el hit area 9px arriba y abajo
+   (26 + 9 + 9 = 44) sin pintar nada, así que la pastilla se sigue viendo de 26 de alto. */
 .ctl-switch {
   position: relative;
   flex: none;
@@ -292,6 +294,11 @@
   border-radius: var(--radius-pill);
   background: var(--well);
   box-shadow: var(--sh-well);
+}
+.ctl-switch::before {
+  content: "";
+  position: absolute;
+  inset: -9px 0;
 }
 .ctl-switch[aria-checked="true"] { background: var(--text); }
 .ctl-switch-knob {
@@ -415,7 +422,6 @@
   display: flex;
   align-items: center;
 }
-.ctl-field:focus-within { outline: var(--focus); outline-offset: var(--focus-offset); }
 .ctl-field-input {
   flex: 1;
   width: 100%;
@@ -426,7 +432,10 @@
   font-size: var(--fs-input);
   font-weight: 600;
 }
+/* El foco va en el input, no en el pozo que lo envuelve (R-C1 exige que un var(--focus) viva
+   siempre bajo un selector :focus-visible — un :focus-within en .ctl-field no vale). */
 .ctl-field-input:focus { outline: none; }
+.ctl-field-input:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
 
 /* Chip neutro (§9): 44 píldora, --raised, 14/500 — subcategoría o etiqueta, nunca color propio (el
    chip de filtro con tinte de familia es de otra PR). is-tag añade borde e icono de etiqueta. */

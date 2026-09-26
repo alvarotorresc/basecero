@@ -43,6 +43,22 @@ test("segmentedHtml: con id, lo pone en el contenedor; sin id, no lo pone", () =
   assert.ok(!segmentedHtml({ name: "Tema", options: [{ value: "x", label: "X" }], value: "x" }).includes("id="));
 });
 
+test("segmentedHtml: sin labelledBy, aria-label (comportamiento por defecto)", () => {
+  const html = segmentedHtml({ name: "Tema", options: [{ value: "x", label: "X" }], value: "x" });
+  assert.match(html, /aria-label="Tema"/);
+  assert.ok(!html.includes("aria-labelledby"));
+});
+
+test("segmentedHtml: con labelledBy, aria-labelledby en vez de aria-label (asocia con la etiqueta visible)", () => {
+  const html = segmentedHtml({ name: "Tema", labelledBy: "theme-label", options: [{ value: "x", label: "X" }], value: "x" });
+  assert.match(html, /aria-labelledby="theme-label"/);
+  assert.ok(!html.includes("aria-label="), "no debe salir aria-label a la vez que aria-labelledby");
+});
+
+test("segmentedHtml: labelledBy se escapa", () => {
+  assert.match(segmentedHtml({ name: "Tema", labelledBy: 'a"b', options: [{ value: "x", label: "X" }], value: "x" }), /aria-labelledby="a&quot;b"/);
+});
+
 // ---------- wireSegmented ----------
 
 function fakeSegmented(values, selected = values[0]) {
@@ -109,6 +125,14 @@ test("switchHtml: role=switch, aria-checked y aria-label reflejan checked/label;
 
 test("switchHtml: escapa el label", () => {
   assert.match(switchHtml({ id: "x", checked: false, label: "A & B" }), /aria-label="A &amp; B"/);
+});
+
+// El dibujo se queda en 44×26 (§9); components.css amplía el área de toque real a 44×44 (§11, K10)
+// con un ::before invisible colgado de esta misma clase, sin tocar el marcado. Este test es la red
+// de seguridad: si alguna vez se renombra "ctl-switch" aquí sin tocar la regla CSS, el hit area
+// vuelve a quedarse en 44×26 en silencio.
+test("switchHtml: mantiene la clase ctl-switch (de ella cuelga el ::before que amplía el área de toque a 44×44)", () => {
+  assert.match(switchHtml({ id: "x", checked: false, label: "X" }), /class="ctl-switch"/);
 });
 
 // ---------- checkboxHtml ----------

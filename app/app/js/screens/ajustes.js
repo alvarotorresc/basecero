@@ -427,8 +427,8 @@ export async function renderAjustes(container) {
       <section style="margin-bottom:var(--gap-section)">
         <div class="section-title" style="margin-bottom:20px">${t("ajustes.prefs.title")}</div>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--sp-12);min-height:56px;margin-bottom:var(--sp-4);">
-          <span style="font-size:var(--fs-15);font-weight:600;">${t("theme.label")}</span>
-          ${segmentedHtml({ id: "theme-seg", name: t("theme.label"), options: THEME_PREFS.map((p) => ({ value: p, label: t("theme." + p) })), value: readPref(getStorage(window)) })}
+          <span id="theme-label" style="font-size:var(--fs-15);font-weight:600;">${t("theme.label")}</span>
+          ${segmentedHtml({ id: "theme-seg", name: t("theme.label"), labelledBy: "theme-label", options: THEME_PREFS.map((p) => ({ value: p, label: t("theme." + p) })), value: readPref(getStorage(window)) })}
         </div>
         <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;cursor:pointer;margin-bottom:4px;">
           <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
