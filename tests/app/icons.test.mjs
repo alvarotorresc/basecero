@@ -24,7 +24,7 @@ test("icons: el repertorio cubre todo lo que emite la app", () => {
     "trendUp", "trendDown", "camera", "mic", "drag", "file", "transfer",
     // Filas de Ajustes (S4, B-Ajustes)
     "people", "split", "periodNext", "theme", "bolt", "currency", "format", "globe", "screen",
-    "grid", "table", "bank", "chart"]) {
+    "grid", "table", "bank", "chart", "card"]) {
     assert.ok(ICON_PATHS[name], `falta el icono ${name}`);
   }
 });

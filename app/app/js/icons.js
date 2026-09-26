@@ -56,6 +56,8 @@ export const ICON_PATHS = {
   table:        '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9.5h16M4 15h16M10 4v16"/>',
   bank:         '<path d="M4 20h16M6 20V11M10 20V11M14 20V11M18 20V11M3 8l9-5 9 5z"/>',
   chart:        '<path d="M4 19V10M12 19V5M20 19v-7"/>',
+  // (artboard) cuenta, en su bloque de Inicio — B-Home.dc.html:171
+  card:         '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/>',
 };
 
 /** SVG listo para pegar. `size` en px (20 dentro de fila o botón, 24 en cabecera, 16 dentro de la
