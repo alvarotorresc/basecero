@@ -321,8 +321,19 @@ export const EN = {
       settle: "Couldn’t settle: {error}",
     },
     title: { withPartner: "Settle up with {name}" },
-    net: { title: "Net" },
-    account: { title: "Settlement account" },
+    // sub: header subtitle with the split the rows share (B-Liquidar).
+    sub: {
+      half: "Shared half and half, {pct}%",
+      split: "Their share, {pct}%",
+    },
+    balance: {
+      favor: "Owed to you",
+      against: "You owe",
+    },
+    account: {
+      in: "Goes into",
+      out: "Comes out of",
+    },
     empty: "Nothing left to settle.",
     // select.aria: aria-label for the per-row selection checkbox (SISTEMA.md §4.8bis).
     // select.none: footer button copy when no row is checked.
@@ -330,17 +341,20 @@ export const EN = {
       aria: "Include {merchant} in the settlement",
       none: "Pick at least one expense",
     },
-    // row.theirPct/myPct: third metaHtml segment of a row's sub, alongside
-    // common.dateValue/amountValue — replace subTheirs/subMine (spec §1.4/§4).
+    // row.*: line 2 of a row; theirPct/myPct are appended only when the row's split differs from
+    // the subtitle's.
     row: {
+      of: "{date}, of {amount}",
+      paidBy: "{date}, {name} paid {amount}",
       theirPct: "their {pct}%",
       myPct: "your {pct}%",
     },
+    // footer.*: the primary button; the amount follows in mono (B-Liquidar).
     footer: {
-      collect: "Collect {amount} from {name}",
-      collectConfirm: "Yes, collect {amount}",
-      pay: "Pay {amount} to {name}",
-      payConfirm: "Yes, pay {amount}",
+      collect: "Settle and collect",
+      collectConfirm: "Yes, collect",
+      pay: "Settle and pay",
+      payConfirm: "Yes, pay",
       even: "Settle up, nothing changes hands",
       evenConfirm: "Yes, settle up",
     },

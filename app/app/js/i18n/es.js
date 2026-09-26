@@ -336,8 +336,19 @@ export const ES = {
       settle: "No se pudo liquidar: {error}",
     },
     title: { withPartner: "Liquidar con {name}" },
-    net: { title: "Neto" },
-    account: { title: "Cuenta de la liquidación" },
+    // sub: subtítulo de la cabecera con el reparto común de las filas (B-Liquidar).
+    sub: {
+      half: "Gastos a medias, {pct} %",
+      split: "Su parte, {pct} %",
+    },
+    balance: {
+      favor: "A tu favor",
+      against: "En contra",
+    },
+    account: {
+      in: "Entra en",
+      out: "Sale de",
+    },
     empty: "No queda nada pendiente de liquidar.",
     // select.aria: aria-label de la casilla de selección por fila (SISTEMA.md §4.8bis).
     // select.none: texto del botón de pie cuando no hay ninguna fila marcada.
@@ -345,17 +356,20 @@ export const ES = {
       aria: "Incluir {merchant} en la liquidación",
       none: "Elige al menos un gasto",
     },
-    // row.theirPct/myPct: tercer segmento del sub de una fila (metaHtml), junto a
-    // common.dateValue/amountValue — sustituyen a subTheirs/subMine (spec §1.4/§4).
+    // row.*: línea 2 de una fila; theirPct/myPct se añaden solo si el reparto de la fila no es el
+    // del subtítulo.
     row: {
+      of: "{date}, de {amount}",
+      paidBy: "{date}, pagó {name} {amount}",
       theirPct: "su {pct} %",
       myPct: "tu {pct} %",
     },
+    // footer.*: el primario; el importe va detrás, en mono (B-Liquidar).
     footer: {
-      collect: "Cobrar {amount} de {name}",
-      collectConfirm: "Sí, cobrar {amount}",
-      pay: "Pagar {amount} a {name}",
-      payConfirm: "Sí, pagar {amount}",
+      collect: "Liquidar y cobrar",
+      collectConfirm: "Sí, cobrar",
+      pay: "Liquidar y pagar",
+      payConfirm: "Sí, pagar",
       even: "Liquidar, queda a cero",
       evenConfirm: "Sí, liquidar",
     },

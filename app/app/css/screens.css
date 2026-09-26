@@ -112,6 +112,47 @@
 /* === fin: inicio === */
 
 /* === pantalla: liquidar === */
+/* B-Liquidar / BD-Liquidar. Pila de bloques a 12 (§8). */
+.liq { display: flex; flex-direction: column; gap: var(--sp-12); padding-bottom: var(--sp-24); }
+
+/* Pie del Display: A tu favor / En contra, con el filete --disp-line encima; cifras en --disp-ink (C2). */
+.liq-split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-8);
+  border-top: 1px solid var(--disp-line);
+  font-size: var(--fs-13);
+  font-weight: 500;
+  line-height: var(--lh-title);
+  color: var(--disp-dim);
+}
+
+.liq-account { display: flex; flex-direction: column; gap: var(--sp-8); }
+.liq-account-label { padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.liq .ctl-segmented [role="radio"] { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* Un solo contenedor --surface con los dos grupos; filas de 60 con filete que empieza tras la baldosa. */
+.liq-list {
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-12) var(--sp-8) var(--sp-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.liq-group { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); padding: 0 var(--sp-8) var(--sp-4); }
+.liq-row + .liq-group { margin-top: var(--sp-4); padding-top: var(--sp-12); border-top: 1px solid var(--border); }
+.liq-group-title { margin: 0; font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.liq-group-total { font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); white-space: nowrap; }
+.liq-row { display: flex; align-items: center; gap: var(--sp-8); min-height: 60px; }
+.liq-amount { flex: none; padding-right: var(--sp-4); font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
+/* 44 de casilla + 8 + 40 de baldosa + 8. */
+.liq-sep { height: 1px; margin-left: 100px; background: var(--border); }
+
+.liq-primary .num { font-weight: 600; }
 /* === fin: liquidar === */
 
 /* === pantalla: movimientos === */
