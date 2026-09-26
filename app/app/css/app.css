@@ -688,7 +688,7 @@ body:has(> .banner-aviso) main#screen { margin-top: 46px; }
 .budget-input.is-empty {
   background: var(--bg);
   /* El borde discontinuo es la única señal de "vacío/sin límite": necesita 3:1 (WCAG 1.4.11).
-     --border-strong no llega sobre --bg en claro; --idle da ~4,3:1 (claro) y ~3,3:1 (oscuro). */
+     --border-strong no llega sobre --bg en claro; --idle da ~4,1:1 (claro) y ~3,3:1 (oscuro). */
   border: 1px dashed var(--idle);
   color: var(--ink-3);
   font: 500 12px var(--font-sans);
