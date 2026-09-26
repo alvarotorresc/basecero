@@ -234,9 +234,10 @@ export const ES = {
     error: { load: "No se pudo cargar la pantalla de registro: {error}" },
     title: "Registrar",
     close: "Cerrar",
-    type: { transfer: "Transfer.", more: "Más tipos de apunte" },
+    type: { label: "Tipo de movimiento", transfer: "Transferencia", others: "Devolución o ajuste" },
     natural: {
-      placeholder: "Dilo o escríbelo: «12,50 en el bar»",
+      placeholder: "o dicta «12,50 en el bar»",
+      placeholderNoMic: "o escribe «12,50 en el bar»",
       mic: "Dictar el gasto",
       micListening: "Escuchando…",
       micDenied: "No se pudo usar el micro. Escríbelo.",
@@ -246,7 +247,7 @@ export const ES = {
       // §13.10 de la spec (a validar por Álvaro): el reconocimiento de voz del navegador no es
       // local, el audio sale a un servidor del fabricante. Se dice bajo la caja, solo con el micro
       // disponible.
-      micNotice: "El dictado usa el reconocimiento de voz del navegador, que envía lo que dices a su servidor. Escribirlo no sale de tu móvil.",
+      micNotice: "Al dictar, el navegador envía tu voz a su servidor.",
     },
     save: {
       expense: "Guardar gasto",
@@ -256,25 +257,23 @@ export const ES = {
       adjustment: "Guardar ajuste",
       expenseWithAmount: "Guardar gasto de {amount}",
     },
-    categories: {
-      showAll: "Ver las {n} categorías",
-    },
+    // more.*: los usa registro-mode.js#foldedSummaryParts (lógica pura con sus tests), aunque la
+    // pantalla B ya no pinta el resumen plegado.
     more: {
-      toggle: "Más",
       summaryNoNote: "sin nota ni foto",
       summaryPhoto: "con foto",
-      summaryToday: "hoy",
     },
-    merchant: {
-      remembered: "recordado de la última vez",
-    },
+    merchant: { placeholder: "Comercio o concepto" },
+    chosen: { remembered: "La que usas en {merchant}" },
+    date: { today: "Hoy" },
+    shared: { row: "Con {name}" },
     limit: {
       remaining: "Con este gasto quedan {amount} de {name}",
       over: "Con este gasto te pasas {amount} de {name}",
     },
     refund: {
       unlink: "Quitar vínculo",
-      toggle: "¿Devuelve un gasto? {arrow}",
+      toggle: "¿Devuelve un gasto?",
       empty: "No hay gastos recientes.",
       sharedSuffix: " (compartido)",
       alreadyRefunded: "Ya devuelto, {amount}",
