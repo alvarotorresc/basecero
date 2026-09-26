@@ -1,6 +1,6 @@
 import { getOpenPeriod, spentByDayAndRootCategory, listByDay, allCategoriesById, getMetaAll, recentTxDates } from "../repo.js";
 import {
-  weekRange, daysWithCategories, maxDayTotal, weekTotals, categoryTotals, movementsOfDay,
+  weekRange, daysWithCategories, maxDayPositive, dayPositiveCents, weekTotals, categoryTotals, movementsOfDay,
   rangeLabelParts,
 } from "../semana-logic.js";
 import { familyForCategory, iconForCategory } from "../category-colors.js";
@@ -110,10 +110,10 @@ export async function renderSemana(container, onBack, { openDay } = {}) {
   /** Columnas apiladas (instrument.js#columnsHtml con `segments`) + línea discontinua de la media +
    *  los 7 días pulsables. La columna elegida lleva su cifra encima y se hunde en un pozo. */
   function chartHtml() {
-    const max = maxDayTotal(days);
+    const max = maxDayPositive(days);
     const cols = days.map((d) => {
       const selected = d.date === state.day;
-      const positive = d.segments.reduce((s, x) => s + x.cents, 0);
+      const positive = dayPositiveCents(d);
       return {
         label: fmtDiaIni(d.date),
         name: dayName(d.date),
