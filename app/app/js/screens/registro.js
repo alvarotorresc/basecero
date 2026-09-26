@@ -23,7 +23,7 @@ import { userMessage } from "../errors.js";
 import { focusInput } from "../viewport.js";
 import { showReceipt } from "../recibo.js";
 import { showToast } from "../toast.js";
-import { quickRegisterEnabled, detailsOpen, foldedSummaryParts, visibleCategories } from "../registro-mode.js";
+import { quickRegisterEnabled, detailsOpen, foldedSummaryParts, visibleCategories, createScreenLife } from "../registro-mode.js";
 import { normalizeMerchant, memoryPatch } from "../merchant-memory.js";
 import { parseNaturalExpense } from "../natural.js";
 import { speech } from "../speech.js";
@@ -192,11 +192,11 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
   // (crear una nueva en cada repintado filtraría memoria) y la revoca en cuanto state.photo
   // cambia de referencia o se vacía.
   let photoObjectUrl = null;
-  // D-3/D-4 (revisión de código): vida de la pantalla. Un callback async que resuelve DESPUÉS de
-  // cerrar Registro (voz tardía, foto que tarda en comprimirse) no debe repintar `container` encima
-  // de la pantalla que `nav()` ya puso detrás. Se apaga en los dos puntos de salida (✕ y guardar).
-  let alive = true;
   const releasePhotoUrl = () => { if (photoObjectUrl) { URL.revokeObjectURL(photoObjectUrl); photoObjectUrl = null; } };
+  // D-3/D-4 (revisión de código): vida de la pantalla (registro-mode.js#createScreenLife). Se apaga
+  // en ✕ y guardar, y también sola si el atrás del sistema ya quitó Registro del DOM: entonces para
+  // la voz y suelta la foto, como las otras dos salidas.
+  const life = createScreenLife(container, "#reg-save", () => { speech?.stop(); releasePhotoUrl(); });
   // D-5 (revisión de código): último texto ya interpretado por Enter/blur/voz — un blur sobre un
   // texto sin cambios desde la última interpretación no repinta.
   let lastInterpreted = null;
@@ -720,9 +720,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
 
   function wire() {
     container.querySelector("#reg-close").onclick = () => {
-      alive = false;
-      speech?.stop();
-      releasePhotoUrl();
+      life.end();
       onDone();
     };
 
@@ -755,7 +753,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         const value = natInput.value;
         if (!value.trim() || value === lastInterpreted) return;
         setTimeout(() => {
-          if (!alive) return;
+          if (!life.isAlive()) return;
           lastInterpreted = value;
           applyNatural(value);
         }, 0);
@@ -772,14 +770,14 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       speech.start(
         // D-4: guard de vida — un resultado que llega después de cerrar Registro no repinta.
         (resultText) => {
-          if (!alive) return;
+          if (!life.isAlive()) return;
           state.natural.listening = false;
           lastInterpreted = resultText;
           applyNatural(resultText);
           focusInput(container.querySelector("#reg-raw"));
         },
         () => {
-          if (!alive) return;
+          if (!life.isAlive()) return;
           state.natural.listening = false;
           state.natural.micOff = true;
           render();
@@ -983,13 +981,13 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       try {
         const compressed = await compressImage(file);
         // D-4: compressImage es async — si Registro se cerró mientras comprimía, no repintar.
-        if (!alive) return;
+        if (!life.isAlive()) return;
         // Reemplazar una foto ya elegida: la URL vieja apunta al Blob viejo.
         if (photoObjectUrl) { URL.revokeObjectURL(photoObjectUrl); photoObjectUrl = null; }
         state.photo = compressed;
         render();
       } catch (err) {
-        if (!alive) return;
+        if (!life.isAlive()) return;
         // El formulario NO pierde nada: state.photo se queda como estaba.
         showToast(t("errors.attachments.writeFailed", { error: userMessage(err) }));
       }
@@ -1107,11 +1105,9 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         const periodLines = await receiptPeriodLines();
         // Si se cerró Registro mientras se leían las cifras del periodo, no se toca `container`
         // (ya es otra pantalla): el gasto está guardado igual.
-        if (!alive) return;
+        if (!life.isAlive()) return;
         // D-3/D-4: guardar con éxito es el otro punto de salida de la pantalla.
-        alive = false;
-        speech?.stop();
-        releasePhotoUrl();
+        life.end();
         onDone();   // primero: el ticket cae sobre la pantalla ya repintada
         showReceipt({ ...receiptData(newId, withCategory, effectiveIsShared, effectiveAccountId), periodLines });
       } catch (e) {
