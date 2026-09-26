@@ -1,0 +1,78 @@
+/* BaseCero · alias de transición «Neto» → sistema B · se borra entero en la PR-99.
+   Cada nombre viejo que las pantallas sin migrar todavía emiten apunta a un token de tokens.css.
+   Reglas (legacy.test.mjs): no redeclara ningún nombre de tokens.css; cada valor es var(--…),
+   color-mix(…var(--…)…), una longitud o un atajo `font` montado solo con var(); se carga DESPUÉS
+   de tokens.css. Como solo hay var(), el oscuro sale solo: los alias se resuelven contra el tema
+   activo.
+   Nombres que existen en los dos sistemas y por eso NO tienen alias (cambian de valor al entrar):
+   --bg --surface --text --accent --pos --scrim --radius --font-mono.
+   Sin alias a propósito (ya hoy no están definidos, un uso cada uno; PENDIENTES de la PR-03):
+   --surface-1 y --r-1. */
+:root{
+  /* Texto y superficies */
+  --ink:var(--text);
+  --ink-2:var(--text-dim);
+  --ink-3:var(--text-dim);
+  --text-2:var(--text-dim);
+  --text-3:var(--text-dim);
+  --surface-2:var(--raised);
+  --card2:var(--raised);
+  --card:var(--surface);
+  --hairline:var(--border);
+  --rule:var(--border);
+  --hairline-strong:var(--border-strong);
+
+  /* Acción y señal */
+  --accent-ink:var(--on-accent);
+  --danger:var(--neg);
+  --red:var(--neg);
+  --green:var(--pos);
+  --warn:var(--text);
+  --amber:var(--text);
+  --accent-tint:color-mix(in srgb, var(--accent) 14%, transparent);
+  --pos-tint:color-mix(in srgb, var(--pos) 14%, transparent);
+  --danger-tint:color-mix(in srgb, var(--neg) 14%, transparent);
+  --warn-tint:var(--well);
+
+  /* Relieve y papel */
+  --shadow-float:var(--sh-alert);
+  --paper:var(--raised);
+  --paper-ink:var(--text);
+  --paper-dim:var(--text-dim);
+  --stamp:var(--pos);
+
+  /* Radios */
+  --r-0:var(--radius);
+  --radius-sm:var(--radius);
+  --r-pill:var(--radius-pill);
+  --r-circle:50%;
+
+  /* Espaciado */
+  --s-1:var(--sp-4);
+  --s-2:var(--sp-8);
+  --s-3:var(--sp-12);
+  --s-4:var(--sp-16);
+  --s-5:var(--sp-20);
+  --s-6:var(--sp-24);
+  --s-7:32px;
+  --s-8:40px;
+  --s-9:56px;
+  --pad-screen:var(--sp-16);
+  --gap-section:var(--sp-24);
+  --tabbar-h:84px;
+
+  /* Letra */
+  --font-sans:var(--font-body);
+  --font-ui:var(--font-body);
+  --font-num:var(--font-mono);
+  --t-hero:600 var(--disp-xl)/var(--lh-disp) var(--font-mono);
+  --t-figure-xl:600 var(--disp-m)/var(--lh-disp) var(--font-mono);
+  --t-figure-l:600 var(--fs-20)/var(--lh-title) var(--font-mono);
+  --t-figure-m:500 var(--fs-15)/var(--lh-title) var(--font-mono);
+  --t-figure-s:500 var(--fs-13)/var(--lh-title) var(--font-mono);
+  --t-title:600 var(--fs-24)/var(--lh-title) var(--font-body);
+  --t-section:600 var(--fs-15)/var(--lh-title) var(--font-body);
+  --t-body:500 var(--fs-15)/var(--lh-body) var(--font-body);
+  --t-label:500 var(--fs-13)/var(--lh-body) var(--font-body);
+  --t-micro:500 var(--fs-12)/var(--lh-title) var(--font-body);
+}

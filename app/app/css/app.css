@@ -1,6 +1,17 @@
 /* BaseCero — shell de la app. Layout móvil-first, centrado en escritorio (max 480px).
    Proporciones de tab bar / FAB tomadas de design/Resumen.dc.html y design/Ajustes.dc.html. */
 
+/* ===== base (sale de tokens.css, que ya es la copia exacta de tokens-B.css) ===== */
+/* El margin:0 del reset lo necesita el <dialog> modal (modal.js): sin él, el UA lo centra con margen. */
+* { box-sizing: border-box; margin: 0; }
+/* Los controles nativos (barras de desplazamiento, <select>, casillas) siguen al tema elegido, no al
+   del sistema: la <meta name="color-scheme"> solo declara que la página soporta los dos. */
+:root { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+html { background: var(--bg); }
+body { font-family: var(--font-body); color: var(--text); background: var(--bg); }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
 /* ===== estructura general ===== */
 html, body { height: 100%; }
 body {

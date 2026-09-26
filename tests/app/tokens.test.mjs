@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 
 const CSS = fileURLToPath(new URL("../../app/app/css/", import.meta.url));
 const FONTS = fileURLToPath(new URL("../../app/app/vendor/fonts/", import.meta.url));
@@ -68,44 +69,45 @@ test("vendor/fonts: ningún woff2 pasa de 120 KB", () => {
 });
 
 const tokens = readFileSync(CSS + "tokens.css", "utf8");
-const declara = (n) => new RegExp(`^\\s*${n.replace("--", "--")}\\s*:`, "m").test(tokens);
+const app = readFileSync(CSS + "app.css", "utf8");
+const sha256 = (buf) => createHash("sha256").update(buf).digest("hex");
 
-const NUEVOS = ["--bg","--surface","--surface-2","--hairline","--hairline-strong","--ink","--ink-2",
-  "--ink-3","--accent","--accent-ink","--accent-tint","--pos","--pos-tint","--warn","--warn-tint",
-  "--danger","--danger-tint","--scrim","--shadow-float","--paper","--paper-ink","--paper-dim",
-  "--stamp","--r-0","--r-pill","--r-circle","--pad-screen","--gap-section","--font-sans",
-  "--font-mono","--t-hero","--t-figure-xl","--t-figure-m","--t-title","--t-section","--t-body",
-  "--t-label","--t-micro","--tabbar-h"];
-// Los que las ~25 pantallas emiten inline: si uno desaparece, la pantalla que lo usa se queda sin color.
-const ALIAS = ["--card","--card2","--text","--text-2","--text-3","--rule","--red","--green",
-  "--amber","--radius","--radius-sm","--font-ui","--font-num"];
+// K2 (DESIGN §13): tokens.css es la copia BYTE A BYTE de design/design-system/tokens-B.css. La
+// constante fija la copia en CI (design/ está ignorado en git); si tokens-B cambia, se vuelve a
+// copiar con `cp` y se actualiza aquí, nunca se edita tokens.css a mano.
+const TOKENS_B_SHA256 = "67c8c169844ed179bfd0547705fa4e47fe0d9418398dc54051b3807eebd02904";
+const TOKENS_B = fileURLToPath(new URL("../../design/design-system/tokens-B.css", import.meta.url));
 
-test("tokens.css: declara todos los tokens de SISTEMA.md §2", () => {
-  for (const n of NUEVOS) assert.ok(declara(n), `falta el token ${n}`);
+test("tokens.css (K2): su sha256 es el de la copia canónica de tokens-B.css", () => {
+  assert.equal(sha256(readFileSync(CSS + "tokens.css")), TOKENS_B_SHA256);
 });
 
-test("tokens.css: mantiene vivos los alias que las pantallas emiten inline", () => {
-  for (const n of ALIAS) assert.ok(declara(n), `falta el alias ${n}`);
+test("tokens.css (K2): en local, sigue siendo idéntico a design/design-system/tokens-B.css",
+  { skip: !existsSync(TOKENS_B) && "design/ no existe aquí (CI o worktree)" }, () => {
+    assert.equal(sha256(readFileSync(CSS + "tokens.css")), sha256(readFileSync(TOKENS_B)),
+      "tokens-B.css ha cambiado: vuelve a copiarlo con cp y actualiza TOKENS_B_SHA256");
+  });
+
+test("tokens.css: claro en :root y oscuro en :root[data-theme=dark], con --bg en los dos", () => {
+  assert.match(tokens, /:root\s*\{[^}]*--bg:\s*#E3E1DC/i);
+  assert.match(tokens, /:root\[data-theme="dark"\]\s*\{[^}]*--bg:\s*#161719/i);
 });
 
-test("tokens.css: cada alias apunta a un token declarado, no a un hex suelto", () => {
-  for (const n of ALIAS) {
-    const valor = tokens.match(new RegExp(`${n}\\s*:\\s*([^;]+);`))[1].trim();
-    const destino = valor.match(/^var\((--[a-z0-9-]+)\)$/);
-    assert.ok(destino, `${n} debería ser var(--nuevo), es "${valor}"`);
-    assert.ok(declara(destino[1]), `${n} apunta a ${destino[1]}, que no existe`);
-  }
-});
-
-test("tokens.css: el fondo y el acento son los de v2", () => {
-  assert.match(tokens, /--bg:\s*#0B0B0C/i);
-  assert.match(tokens, /--accent:\s*#D4FF3F/i);
+test("tokens.css: solo tokens; ni @import de fuentes ni reglas de base", () => {
+  assert.ok(!/@import/.test(tokens), "las fuentes entran por <link> en index.html");
+  assert.ok(!/^\s*(\*|html|body|\.num)\s*\{/m.test(tokens), "reset, html, body y .num viven en app.css");
 });
 
 test("tokens.css: no queda ni rastro de Outfit", () => {
   assert.ok(!/Outfit/i.test(tokens));
 });
 
-test("tokens.css: sigue anulando el margen por defecto (el <dialog> modal depende de ello)", () => {
-  assert.match(tokens, /\*\s*\{[^}]*margin:\s*0/);
+test("app.css: sigue anulando el margen por defecto (el <dialog> modal depende de ello)", () => {
+  assert.match(app, /\*\s*\{[^}]*margin:\s*0/);
+});
+
+test("app.css: html y body pintan con los tokens del sistema B", () => {
+  assert.match(app, /html\s*\{[^}]*background:\s*var\(--bg\)/);
+  assert.match(app, /body\s*\{[^}]*font-family:\s*var\(--font-body\)[^}]*color:\s*var\(--text\)/);
+  assert.match(app, /\.num\s*\{[^}]*font-variant-numeric:\s*tabular-nums/);
 });

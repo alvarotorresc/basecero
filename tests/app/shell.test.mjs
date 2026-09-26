@@ -36,3 +36,9 @@ test("sw: cada url() de fonts.css está en el SHELL", () => {
 test("sw: pdf-lib está vendorizado y en el SHELL", () => {
   assert.ok(shell.includes("vendor/pdf-lib/pdf-lib.min.js"));
 });
+
+test("sw: las hojas nuevas del sistema B están en el SHELL", () => {
+  for (const f of ["css/tokens.css", "css/legacy.css", "css/components.css", "css/app.css"]) {
+    assert.ok(shell.includes(f), `falta ${f} en el SHELL`);
+  }
+});
