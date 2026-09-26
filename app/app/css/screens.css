@@ -1095,21 +1095,28 @@
    para que quepa a 390 (el 24 de la cabecera de raíz lo partía), y con elipsis si aun así no cabe. */
 .mov-head .root-header-title { font-size: var(--fs-20); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mov-period-nav { flex: none; display: flex; gap: var(--sp-8); }
+/* En el extremo, la flecha que no lleva a ningún sitio no se desvanece: fondo --surface y el
+   icono en el color del borde (B-Movimientos). */
+.mov-period-nav .icon-btn:disabled { opacity: 1; background: var(--surface); color: var(--border); }
 
-/* Display m: «de X» a la derecha de la cifra, abajo; el medidor de 8 debajo, a todo el ancho. */
+/* Display m (B-Movimientos): relleno 14 20 16; «de X» a la derecha de la cifra, abajo; el medidor
+   de 6 debajo, a 10 de la cifra y a todo el ancho (F-45 retirada, Álvaro 2026-09-27). */
 .mov-disp .disp {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   column-gap: var(--sp-12);
   row-gap: var(--sp-2);
+  padding: 14px var(--sp-20) var(--sp-16);
 }
 .mov-disp .disp-head,
 .mov-disp .disp-slot { grid-column: 1 / -1; }
-.mov-disp .disp-foot { align-self: end; padding-bottom: var(--sp-4); white-space: nowrap; }
+.mov-disp .disp-foot { align-self: end; padding-bottom: 6px; white-space: nowrap; }
 .mov-disp .disp-slot { margin-top: var(--sp-8); }
+.mov-disp .meter { height: 6px; }
 
-/* Buscador (F-29): campo hundido RECTANGULAR (radio 10, un campo nunca es píldora, §8) con la lupa
-   dentro; el foco se pinta en el pozo entero. Filtrar: botón icono de 48 a su lado. */
+/* Buscador: pozo en píldora con la lupa dentro, como en B-Movimientos (F-29 retirada, Álvaro
+   2026-09-27: igual que el mockup); el foco se pinta en el pozo entero. Filtrar: botón icono de 48
+   a su lado. */
 .mov-tools { display: flex; gap: var(--sp-8); }
 .mov-search {
   flex: 1;
@@ -1119,8 +1126,8 @@
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: var(--sp-8);
-  border-radius: var(--radius);
+  gap: 10px;
+  border-radius: var(--radius-pill);
   background: var(--well);
   box-shadow: var(--sh-well);
   color: var(--text-dim);
@@ -1155,11 +1162,16 @@
   scrollbar-width: none;
 }
 .mov-chips::-webkit-scrollbar { display: none; }
+/* «Todos» lleva 18 a cada lado (B-Movimientos), un poco más ancho que un chip neutro. */
+.mov-chips .ent-chip[data-chip-all] { padding: 0 18px; }
 
-/* Lista: un bloque por día (cabecera de 24 + tarjeta de filas de 60 con divisor a la altura del
-   texto, 12 + 40 + 12). */
+/* Lista: un bloque por día (cabecera de 24 con 6 a los lados, a 6 de su tarjeta de filas de 60;
+   la fila con 10 a los lados y el divisor a la altura del texto, 10 + 40 + 12), como en
+   B-Movimientos. */
 .mov-list { display: flex; flex-direction: column; gap: var(--sp-16); padding-top: var(--sp-4); }
-.mov-day { display: flex; flex-direction: column; gap: var(--sp-8); }
+.mov-day { display: flex; flex-direction: column; gap: 6px; }
+.mov-day .ent-day { padding: 0 6px; }
+.mov-card .ent-row { padding: var(--sp-8) 10px; }
 .mov-card {
   display: flex;
   flex-direction: column;
@@ -1168,7 +1180,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
 }
-.mov-hr { height: 1px; margin: 0 var(--sp-12) 0 calc(var(--sp-12) + 40px + var(--sp-12)); background: var(--border); }
+.mov-hr { height: 1px; margin: 0 10px 0 calc(10px + 40px + var(--sp-12)); background: var(--border); }
 
 /* Tarjeta de la etiqueta activa (entrando desde Etiquetas): neutra (C10), cifra en tinta a 20 (C3). */
 .mov-tag {
@@ -1203,6 +1215,9 @@
    movimientos» se queda abajo aunque el cuerpo haga scroll. */
 .mov-flt-sec { display: flex; flex-direction: column; gap: var(--sp-8); }
 .mov-flt-label { margin: 0; padding-left: var(--sp-4); font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.mov-flt-count { color: var(--text); }
+/* «Quitar filtros» a 14 como en el mockup (el terciario del sistema es de 13, F-26). */
+.mov-flt #mov-flt-clear { font-size: var(--fs-14); }
 .mov-flt-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); margin: calc(-1 * var(--sp-4)); padding: var(--sp-4); }
 .mov-flt-foot { position: sticky; bottom: 0; margin-top: auto; padding-top: var(--sp-8); background: var(--surface); }
 /* === fin: movimientos === */
