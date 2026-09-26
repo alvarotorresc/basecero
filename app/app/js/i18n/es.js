@@ -801,20 +801,9 @@ export const ES = {
       license: "Licencia MIT",
       feedbackNote: "El formulario se abre en Tally, fuera de la app: solo viaja lo que escribas ahí.",
     },
-    importResult: {
-      summary: "Nuevas: {created}, conciliadas: {reconciled}, duplicadas (saltadas): {skipped}",
-      omitted: { one: ", 1 fila ilegible omitida", other: ", {n} filas ilegibles omitidas" },
-      categorized: { one: ", 1 categorizado por el comercio", other: ", {n} categorizados por el comercio" },
-      tail: ". Revisa la bandeja «sin categorizar» en Movimientos.",
-      bizumHint: " Liquida en Inicio antes de importar: el Bizum que recibes se concilia solo; el que envías entra como movimiento nuevo.",
-    },
     assist: {
-      title: "Configura tu banco",
-      // rowCount/unknownFormat: segmentos de metaHtml (spec §7.2 bloque 2) para la fila de
-      // fichero — sustituyen a la vieja "rows" (una sola cadena con el aviso "dinos qué es cada
-      // columna" ya cubierto por footNote, así que no se traslada).
+      // rowCount: cifra de filas de la ficha del fichero del importador (screens/importar.js, S12).
       rowCount: { one: "{n} fila", other: "{n} filas" },
-      unknownFormat: "formato no reconocido",
       dateTitle: "Fecha",
       conceptTitle: "Concepto",
       counterpartyTitle: "Contraparte",
@@ -832,7 +821,6 @@ export const ES = {
       // citaba solo el PRIMER error (errors[0]) en una sola línea.
       counterWarnLine: { one: "1 fila no se lee", other: "{n} filas no se leen" },
       counterReasons: "{reasons}",
-      saveBtn: "Guardar perfil e importar",
       footNote: "El perfil se guarda en tu dispositivo: la próxima vez este banco se importa directo. Los CSV de N26 se reconocen solos, sin configurar nada.",
       dateFormat: { iso: "año-mes-día", dmy: "día/mes/año" },
       date: {
@@ -850,6 +838,30 @@ export const ES = {
         unrecognized: "No se reconoce el formato de importe en esta columna.",
       },
     },
+  },
+  importar: {
+    title: "Importar extracto",
+    steps: { aria: "Pasos", file: "Fichero", columns: "Columnas", result: "Resultado" },
+    led: {
+      unknown: "Formato no reconocido",
+      n26: "N26, reconocido solo",
+      profile: "Reconocido con tu perfil guardado",
+      saved: "Perfil guardado para la próxima vez",
+    },
+    cta: { one: "Importar 1 movimiento", other: "Importar {n} movimientos" },
+    ctaIdle: "Importar movimientos",
+    summaryAria: "Resultado del import",
+    tiles: {
+      created: { one: "nueva", other: "nuevas" },
+      reconciled: { one: "conciliada", other: "conciliadas" },
+      skipped: { one: "duplicada, saltada", other: "duplicadas, saltadas" },
+    },
+    omitted: { one: "1 fila no se pudo leer y se ha omitido.", other: "{n} filas no se pudieron leer y se han omitido." },
+    inbox: { one: "La que no tiene categoría está en la bandeja de Movimientos.", other: "Las {n} sin categoría están en la bandeja de Movimientos." },
+    allCategorized: "Todas llevan categoría, puesta por el comercio.",
+    nothingNew: "No había movimientos nuevos en este fichero.",
+    bizumHint: "Liquida en Inicio antes de importar: el Bizum que recibes se concilia solo; el que envías entra como movimiento nuevo.",
+    done: "Listo",
   },
   onboarding: {
     cta: { next: "Seguir" },
