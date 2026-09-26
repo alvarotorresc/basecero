@@ -1,7 +1,7 @@
 import { pendingSettlements, listAccounts, allCategoriesById, settleAllShared, getMetaAll, getAccountStyle, listGoals } from "../repo.js";
 import { familyForAccount } from "../account-colors.js";
 import { familyForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtDiaCorto } from "../format.js";
+import { fmtMoney, fmtDiaCorto, hoyISO } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
@@ -43,7 +43,8 @@ function commonTheirPct(rows) {
 function rowHtml(r, { byId, selected, partner, common }) {
   const catName = byId[r.category_id]?.name ?? "";
   const title = r.merchant || catName || t("common.type.expense");
-  const date = fmtDiaCorto(r.date);
+  // «Hoy» en vez de la fecha, como B-Liquidar («Hoy, de 9,90 €»).
+  const date = r.date === hoyISO() ? t("common.today") : fmtDiaCorto(r.date);
   let line2 = r.direction === "i_owe"
     ? t("liquidar.row.paidBy", { date, name: partner, amount: fmtMoney(r.amount_cents) })
     : t("liquidar.row.of", { date, amount: fmtMoney(r.amount_cents) });
