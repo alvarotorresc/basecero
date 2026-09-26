@@ -124,53 +124,6 @@ main#screen {
   font-weight: 600;
 }
 
-/* ===== selector "¿Devuelve un gasto?" (pantalla Registro, tipo devolución) ===== */
-.refund-toggle {
-  width: 100%;
-  height: 48px;
-  background: var(--card);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.refund-list {
-  max-height: 240px;
-  overflow-y: auto;
-}
-.refund-row {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  height: 48px;
-  background: none;
-  border: 0;
-  border-bottom: 1px solid var(--rule);
-  color: var(--text);
-  font-size: 13px;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.refund-row:last-child { border-bottom: 0; }
-
-/* ===== display del importe (pantalla Registro) ===== */
-.amount-display {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  line-height: 1;
-}
-.amount-display .amount-currency {
-  font-size: 23px;
-  font-weight: 500;
-  color: var(--ink-3);
-}
-
 /* barra de pestañas y botón de añadir: components.css (sección Chrome, PR-05) */
 
 /* ===== chips de categoría ===== */
@@ -511,29 +464,6 @@ main#screen {
 }
 .banner-aviso.red svg { color: var(--danger); }
 
-/* ===== banda de aviso de límite (Registro v2 §6.2, SISTEMA.md §4.17) =====
-   Tres estados vía clase + modificador — NUNCA estilo inline: el oninput del importe (registro.js)
-   solo parchea `textContent` y `className`, nunca hace un render() completo (mataría el cursor del
-   input), así que cambiar de pinta tiene que ser tan barato como reasignar una clase.
-   Ancho completo de verdad (bleed hasta el borde de la pantalla): los márgenes negativos compensan
-   el --pad-screen del contenedor, igual que pide "banda de ancho completo" del artboard. */
-.limit-band {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  margin: 0 calc(var(--pad-screen) * -1) 18px;
-  padding: 7px var(--pad-screen);
-  box-sizing: border-box;
-  font-size: 13px;
-  font-weight: 500;
-  background: var(--surface-2);
-  color: var(--ink-2);
-}
-.limit-band svg { flex-shrink: 0; width: 20px; height: 20px; color: currentColor; }
-.limit-band.warn { background: var(--warn-tint); color: var(--warn); }
-.limit-band.over { background: var(--danger-tint); color: var(--danger); }
-
 /* el aviso de almacenamiento no persistente se antepone a body (fuera de #screen):
    franja roja tenue fija arriba, a todo lo ancho del layout */
 body > .banner-aviso {
@@ -757,38 +687,6 @@ body.subscreen main#screen {
   background: var(--danger-tint); color: var(--danger);
   border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
   font: 600 16px var(--font-sans); cursor: pointer;
-}
-
-/* ===== recibo de guardado (recibo.js) ===== */
-/* Único material distinto de toda la app: papel sobre el velo. La mayúscula trackeada de las
-   etiquetas del ticket es la ÚNICA sancionada del sistema (SISTEMA.md §1): ahí es la metáfora. */
-#recibo { position: fixed; inset: 0; z-index: 40; background: var(--scrim);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
-  padding: var(--pad-screen); animation: bc-recibo-veil .14s ease-out; }
-.recibo-ticket { width: 296px; color: var(--paper); box-shadow: var(--shadow-float);
-  animation: bc-recibo-print .42s cubic-bezier(.22,1,.36,1); }
-.recibo-body { background: var(--paper); color: var(--paper-ink); padding: 4px 20px 6px; }
-.recibo-label { font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--paper-dim); }
-.recibo-value { font: var(--t-figure-s); color: var(--paper-ink); }
-.recibo-dots { flex: 1; min-width: 10px; border-bottom: 1px dotted var(--border-strong); transform: translateY(-3px); }
-.recibo-perf { height: 1px; background: repeating-linear-gradient(90deg, var(--border-strong) 0 4px, transparent 4px 8px); }
-.recibo-stamp { color: var(--stamp); transform: rotate(-8deg);
-  animation: bc-recibo-stamp .22s cubic-bezier(.34,1.56,.64,1) .38s backwards; }
-.recibo-undo { height: 44px; border-radius: var(--r-pill); background: transparent;
-  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
-  color: var(--accent); font: 600 15px var(--font-sans); padding: 0 26px; cursor: pointer; }
-#recibo.is-leaving { animation: bc-recibo-out .26s ease-in forwards; }
-@keyframes bc-recibo-veil { from { opacity: 0 } }
-@keyframes bc-recibo-print { from { clip-path: inset(0 0 100% 0); transform: translateY(-10px) } }
-@keyframes bc-recibo-stamp { from { opacity: 0; transform: rotate(-18deg) scale(1.6) } }
-@keyframes bc-recibo-out { to { opacity: 0; transform: translateY(-24px) } }
-
-@media (prefers-reduced-motion: reduce) {
-  /* Ni impresión, ni sello, ni rotación, ni escalado: solo opacidad (SISTEMA.md §4.13). */
-  .recibo-ticket, .recibo-stamp { animation: none; }
-  #recibo { animation: bc-recibo-veil .12s linear; }
-  #recibo.is-leaving { animation: bc-recibo-out .12s linear forwards; }
-  @keyframes bc-recibo-out { to { opacity: 0 } }
 }
 
 /* ===== Inicio v2: héroe de cuenta y la hucha (plan 2026-09-10-inicio-v2, Task 7) ===== */

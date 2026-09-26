@@ -227,16 +227,17 @@ export const EN = {
     error: { load: "Couldn’t load the entry screen: {error}" },
     title: "Log transaction",
     close: "Close",
-    type: { transfer: "Transfer", more: "More entry types" },
+    type: { label: "Entry type", transfer: "Transfer", others: "Refund or adjustment" },
     natural: {
-      placeholder: "Say it or type it: 12.50 at the bar",
+      placeholder: "or say: 12.50 at the bar",
+      placeholderNoMic: "or type: 12.50 at the bar",
       mic: "Dictate the expense",
       micListening: "Listening…",
       micDenied: "Couldn’t use the microphone. Type it instead.",
       notUnderstood: "I didn’t understand that sentence.",
       reset: "Clear",
       sharedChip: "{name} {pct}%",
-      micNotice: "Dictation uses the browser’s speech recognition, which sends what you say to its server. Typing never leaves your phone.",
+      micNotice: "Dictation sends your voice to the browser’s server.",
     },
     save: {
       expense: "Save expense",
@@ -255,16 +256,17 @@ export const EN = {
       summaryPhoto: "has a photo",
       summaryToday: "today",
     },
-    merchant: {
-      remembered: "remembered from last time",
-    },
+    merchant: { placeholder: "Shop or description" },
+    chosen: { remembered: "The one you use at {merchant}" },
+    date: { today: "Today" },
+    shared: { row: "With {name}" },
     limit: {
       remaining: "This leaves {amount} of {name}",
       over: "This goes {amount} over {name}",
     },
     refund: {
       unlink: "Remove link",
-      toggle: "Refunding an expense? {arrow}",
+      toggle: "Refunding an expense?",
       empty: "No recent expenses.",
       sharedSuffix: " (shared)",
       alreadyRefunded: "Already refunded, {amount}",
@@ -1120,6 +1122,8 @@ export const EN = {
     myPart: "Your share",
     tagLabel: "Tag",
     undoFailed: "Could not undo: {error}",
+    left: "Left in {month}",
+    today: "You can spend today",
   },
   // Period report (F1). screens/informe.js.
   informe: {

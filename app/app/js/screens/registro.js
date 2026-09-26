@@ -2,16 +2,22 @@ import {
   addTransaction, getOpenPeriod, listExpenseLeafCategories, listIncomeCategories,
   listAccounts, allCategoriesById, recentForRefund, getMetaAll, softDeleteTransaction,
   loadMerchantMemory, spentByRootCategory, budgetsOfPeriod, listTags, createTag, setAttachmentFlag,
+  listGoals, spentOfPeriod, previsionOfPeriod,
 } from "../repo.js";
 import { attachments, compressImage } from "../attachments.js";
-import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
+import { familyForCategory, iconForCategory, rootOf, famClass } from "../category-colors.js";
+import { familyForAccount, parseAccountStyle } from "../account-colors.js";
 import { budgetMap } from "../category-spend.js";
 import { limitWarning } from "../limit-warning.js";
-import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw, appLocale } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
-import { icon, catIcon as catSvg } from "../icons.js";
+import { dailyAllowanceCents } from "../inicio-logic.js";
+import { periodMonth } from "../prevision.js";
+import { icon } from "../icons.js";
 import { t, activeLang } from "../i18n/index.js";
-import { metaHtml, subHeaderHtml } from "../ui.js";
+import { metaHtml } from "../ui.js";
+import { segmentedHtml, wireSegmented, switchHtml, stepperHtml, fieldHtml } from "../controls.js";
+import { pickTileHtml, chosenCategoryHtml, filterChipHtml, badgeHtml, txRowHtml } from "../entity.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { userMessage } from "../errors.js";
 import { focusInput } from "../viewport.js";
@@ -26,36 +32,50 @@ import { escHtml, escAttr } from "../esc.js";
 // labelKey/SAVE_KEY en vez de texto resuelto: son consts de módulo, evaluadas al importar el
 // fichero (antes de que boot() llame a initI18n con el idioma real) — si guardaran el string ya
 // traducido, quedarían congeladas en español para siempre. Se resuelven con t() en cada render.
-const TIPOS = [
+// Los tres primeros van en el Segmented de la cabecera (B-Gasto); devolución y ajuste, debajo.
+const TIPOS_MAIN = [
   { id: "expense", labelKey: "common.type.expense" },
   { id: "income", labelKey: "common.type.income" },
   { id: "transfer", labelKey: "registro.type.transfer" },
+];
+const TIPOS_EXTRA = [
   { id: "refund", labelKey: "common.type.refund" },
   { id: "adjustment", labelKey: "common.type.adjustment" },
 ];
+const TIPO_LABEL = Object.fromEntries([...TIPOS_MAIN, ...TIPOS_EXTRA].map((tp) => [tp.id, tp.labelKey]));
 const SAVE_KEY = {
   expense: "registro.save.expense", income: "registro.save.income", transfer: "registro.save.transfer",
   refund: "registro.save.refund", adjustment: "registro.save.adjustment",
 };
 const needsCategory = (tipo) => tipo === "expense" || tipo === "income" || tipo === "refund";
-// §4.2 de la spec: dos filas de cuatro (Registro.dc.html). El literal vive aquí, no en
-// registro-mode.js — el módulo puro solo decide CUÁNTAS entran, no el número en sí.
-const CATS_GRID_LIMIT = 8;
+// Columnas de la rejilla de familias (B-Gasto: 3 × 4 = las 12 familias sembradas).
+const GRID_COLS = 3;
+// Registro rápido plegado: cuántas familias se ven antes de «Ver las N categorías» (tres filas de
+// tres). El literal vive aquí, no en registro-mode.js — el módulo puro solo decide CUÁLES entran.
+const CATS_GRID_LIMIT = 9;
 
-// Icono "etiqueta"/"más" del repertorio SISTEMA.md §3 (icons.js), ya no copias locales.
-const ICON_TAG = icon("tag", { size: 14 });
-const ICON_PLUS_SMALL = icon("plus", { size: 13, width: 2 });
-
-/** Copia de la banda de límite (Registro v2 §6.2): «Con este gasto quedan {amount} de {name}» en
- *  ok/warn, «…te pasas {amount}…» en over. Devuelve texto SIN escapar — quien la use en un
- *  `innerHTML` (render()) lo escapa; quien la use en `textContent` (el oninput del importe) no
- *  necesita, y escaparlo dos veces convertiría un «&» legítimo del nombre de una categoría en
- *  «&amp;amp;». */
-function limitBandText(warning) {
-  const amount = fmtMoney(Math.abs(warning.remainingAfterCents));
+/** Banda de límite (Registro v2 §6.2, como Gasto por categoría, S7): «Con este gasto quedan… /
+ *  te pasas…», texto en tinta y SOLO la cifra excedida en
+ *  --neg (C4, «−» que avisa). Se construye por partes —importe y nombre escapados antes de entrar
+ *  en la plantilla de i18n, que no lleva «<»—; sirve para render() y para el parche del oninput. */
+function limitBandHtml(warning) {
+  const amount = escHtml(fmtMoney(Math.abs(warning.remainingAfterCents)));
+  const name = escHtml(warning.rootName);
   return warning.level === "over"
-    ? t("registro.limit.over", { amount, name: warning.rootName })
-    : t("registro.limit.remaining", { amount, name: warning.rootName });
+    ? t("registro.limit.over", { amount: `<span class="num reg-limit-over">${amount}</span>`, name })
+    : t("registro.limit.remaining", { amount, name });
+}
+
+/** Ancho del input del importe en `ch` (la mono es tabular: un carácter, un ch). Así el símbolo de
+ *  la moneda va pegado a la cifra, como en B-Gasto, en vez de al otro extremo del Display. */
+const amountWidth = (raw) => `${Math.max(1, String(raw ?? "").length)}ch`;
+
+/** Etiqueta del primario: «Guardar gasto de 18,50 €» (cifra en mono) solo para gasto con importe.
+ *  HTML: el importe va escapado dentro de su <span>. */
+function saveLabelHtml(tipo, cents) {
+  return tipo === "expense" && cents > 0
+    ? t("registro.save.expenseWithAmount", { amount: `<span class="num">${escHtml(fmtMoney(cents))}</span>` })
+    : escHtml(t(SAVE_KEY[tipo]));
 }
 
 /** Monta la pantalla completa de registro rápido de un movimiento (5 tipos).
@@ -78,7 +98,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       listTags(),
     ]);
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("registro.error.load", { error: escHtml(userMessage(e)) })}</div>`;
+    container.innerHTML = `<div class="reg-error" role="alert">${icon("warn", { size: 18 })}<span>${t("registro.error.load", { error: escHtml(userMessage(e)) })}</span></div>`;
     return;
   }
 
@@ -95,8 +115,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
   }
 
   // Registro v2 §6.2: datos del aviso de límite, cargados aquí (no en el Promise.all de arriba)
-  // porque necesitan period.id, que ese Promise.all todavía está resolviendo. Mismo criterio y
-  // mismo try/catch que refundCandidates: un fallo aquí degrada a "sin aviso", no rompe la pantalla.
+  // porque necesitan period.id. Un fallo aquí degrada a "sin aviso", no rompe la pantalla.
   let spentByRoot = {}, budgetByCategory = {};
   if (period) {
     try {
@@ -105,6 +124,13 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       budgetByCategory = budgetMap(budgetRows);
     } catch { spentByRoot = {}; budgetByCategory = {}; }
   }
+
+  // Familia de cada cuenta (C8, PR-10): la muestra de 10 de la fila de cuenta y del recibo. Los
+  // objetivos solo deciden la familia por defecto de una hucha; si fallan, cae al tipo de cuenta.
+  let goals = [];
+  try { goals = await listGoals(); } catch { goals = []; }
+  const accountStyle = parseAccountStyle(meta.account_style);
+  const accountFam = (a) => (a ? familyForAccount(a, accountStyle, goals) : null);
 
   const accounts = accountsAll.filter((a) => a.type !== "liability");
   const partnerName = (meta.partner_name || "").trim();
@@ -125,58 +151,54 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     refId: "",
     ruleId: prefill?.ruleId ?? "",
     // Etiquetas de proyecto (N11, Task 13): D11 — jamás llega de merchantMemory/memoryPatch (ver
-    // merchant-memory.test.mjs), solo de un prefill explícito (p.ej. una regla recurrente que ya
-    // trajera una). tagPickerOpen/newTagDraft son puro estado de UI del selector inline, igual que
-    // en movimientos.js#openDetail.
+    // merchant-memory.test.mjs), solo de un prefill explícito. tagPickerOpen/newTagDraft son puro
+    // estado de UI del selector inline, igual que en movimientos.js#openDetail.
     tagId: prefill?.tagId ?? null,
     tagPickerOpen: false,
     newTagDraft: null,
     adjustmentSign: "+",
     refundPickerOpen: false,
     // Registro v2 §8.6: caja de lenguaje natural. `text` es lo tecleado o dictado (NO se
-    // interpreta en el oninput: eso mataría el cursor, igual que #reg-raw/#reg-merchant); `parsed`
-    // es el último resultado de parseNaturalExpense, y es lo que pinta los chips; `micOff` se
-    // enciende para el resto de la sesión de pantalla si el usuario deniega el permiso.
+    // interpreta en el oninput: eso mataría el cursor); `parsed` es el último resultado de
+    // parseNaturalExpense, y es lo que pinta los chips; `micOff` se enciende para el resto de la
+    // sesión de pantalla si el usuario deniega el permiso.
     natural: { text: "", parsed: null, listening: false, micOff: false },
-    // Registro v2 §4: quick gobierna qué se pinta (registro-mode.js#detailsOpen); expanded es el
-    // «Más» tocado a mano en ESTE formulario (nunca persiste entre aperturas de Registro).
-    // allCats: se pasó de las CATS_GRID_LIMIT primeras categorías a la lista entera («Ver las N
-    // categorías»); una vez tocado no se vuelve a plegar en este formulario.
+    // Registro v2 §4: quick gobierna qué se pinta (registro-mode.js#detailsOpen). Plegado: solo
+    // importe y categoría, y la fila «Más» con el resumen. `expanded` es el «Más» tocado a mano en
+    // ESTE formulario (nunca persiste). Con el ajuste apagado, B-Gasto completo. `allCats`: se
+    // tocó «Ver las N categorías» (solo existe plegado). `noteOpen`: el botón de nota tocado.
     quick: quickRegisterEnabled(meta.quick_register),
     expanded: false,
     allCats: false,
-    // Registro v2 §9.3: el desplegable manual de "los otros tres tipos" — se cierra al cambiar de
-    // tipo (ver el handler de [data-tipo]); typeSelectorHtml lo vuelve a abrir solo si hace falta.
+    noteOpen: false,
+    // Rejilla de familias (B-Gasto): qué baldosa tiene desplegadas sus subcategorías. null =
+    // automático (la raíz de la categoría elegida); "" = cerrada a mano; un id = esa raíz.
+    // Desplegar NO es seleccionar (DESIGN §9): la selección es siempre `categoryId`.
+    openRoot: null,
+    // Desplegables de cuenta ("from" | "to" | null) y de «Devolución o ajuste».
+    accPicker: null,
     typeMoreOpen: false,
     // Registro v2 §5.4: campos que el usuario ya tocó a mano en ESTE formulario — la memoria de
-    // comercios nunca vuelve a pisarlos (registro-mode no interviene aquí; es del formulario, no
-    // de la densidad). merchantRemembered pinta la pista «recordado de la última vez». Un prefill
-    // (Task 11: regla recurrente, importación…) YA es una decisión explícita para los campos que
-    // trae puestos — se siembra touched con ellos para que escribir el comercio después no los
-    // pise con lo que dice la memoria.
+    // comercios nunca vuelve a pisarlos. merchantRemembered pinta la pista «La que usas en…». Un
+    // prefill YA es una decisión explícita para los campos que trae puestos.
     touched: new Set(["categoryId", "accountId", "isShared", "paidBy", "sharePct"].filter((f) => prefill && prefill[f] !== undefined)),
     merchantRemembered: false,
     // Foto del ticket (N5, Registro v2 §9.4): el Blob YA comprimido (compressImage), listo para
-    // subir. El fichero no se escribe en OPFS hasta tener el id del movimiento (addTransaction
-    // corre primero) — ver el handler de guardar.
+    // subir. El fichero no se escribe en OPFS hasta tener el id del movimiento.
     photo: null,
   };
   let errorMsg = "";
   // Foto del ticket (N5): URL del Blob de state.photo YA creada, o null. render() la reutiliza
   // (crear una nueva en cada repintado filtraría memoria) y la revoca en cuanto state.photo
-  // cambia de referencia (nueva foto elegida) o se vacía — ver photoPreviewUrl() más abajo.
+  // cambia de referencia o se vacía.
   let photoObjectUrl = null;
-  // D-3/D-4 (revisión de código): vida de la pantalla. Sin esto, un callback async que resuelve
-  // DESPUÉS de que el usuario haya cerrado Registro (resultado de voz tardío, foto que tarda en
-  // comprimirse) podía repintar `container` encima de la pantalla que `nav()` ya había puesto
-  // detrás (main.js usa un único contenedor para todas las pantallas). `alive` se apaga en los dos
-  // puntos de salida de esta pantalla (✕ y guardado con éxito) y lo comprueban esos callbacks
-  // antes de tocar `state`/`render()`. `speech.stop()` no tenía NINGÚN llamante hasta este arreglo.
+  // D-3/D-4 (revisión de código): vida de la pantalla. Un callback async que resuelve DESPUÉS de
+  // cerrar Registro (voz tardía, foto que tarda en comprimirse) no debe repintar `container` encima
+  // de la pantalla que `nav()` ya puso detrás. Se apaga en los dos puntos de salida (✕ y guardar).
   let alive = true;
   const releasePhotoUrl = () => { if (photoObjectUrl) { URL.revokeObjectURL(photoObjectUrl); photoObjectUrl = null; } };
-  // D-5 (revisión de código): último texto ya interpretado por Enter/blur/voz — así un blur sobre
-  // un texto sin cambios desde la última interpretación no repinta (y no pisa lo que la memoria ya
-  // rellenó y el usuario pudo haber tocado a mano). Ver el onblur de #reg-nat-input en wire().
+  // D-5 (revisión de código): último texto ya interpretado por Enter/blur/voz — un blur sobre un
+  // texto sin cambios desde la última interpretación no repinta.
   let lastInterpreted = null;
 
   const categoriesFor = () => {
@@ -185,22 +207,42 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     return [];
   };
 
-  /** ¿Es un gasto compartido que pagó la contraparte? Gatea la sección de cuentas, el guard de
-   *  validación y lo que se guarda. Solo tiene sentido para expense: la tarjeta de compartido se
-   *  pinta también para refund, pero ahí no hay control de quién pagó. */
+  /** Familia de una categoría para ESTE formulario: los ingresos no llevan familia (C9), aunque el
+   *  byId de allCategoriesById no traiga `flow` para decirlo. */
+  const catFam = (id) => (state.tipo === "income" ? null : familyForCategory(id, byId));
+
+  /** ¿Es un gasto compartido que pagó la contraparte? Gatea la fila de cuenta, el guard de
+   *  validación y lo que se guarda. Solo tiene sentido para expense. */
   const partnerPaid = () => state.tipo === "expense" && state.isShared && state.paidBy === "partner";
+
+  /** Grupos de la rejilla: una baldosa por raíz, en el orden de la consulta (que ya agrupa por la
+   *  posición de la raíz). `direct`: la raíz no tiene hijas que elegir — la baldosa elige ella
+   *  misma, sin desplegar nada. Los ingresos llegan con raíces e hijas mezcladas: la raíz, si
+   *  está, entra como una opción más de su grupo. */
+  function categoryGroups(cats) {
+    const order = [];
+    const byRoot = new Map();
+    for (const c of cats) {
+      const root = rootOf(c.id, byId);
+      if (!byRoot.has(root)) { byRoot.set(root, []); order.push(root); }
+      byRoot.get(root).push(c);
+    }
+    return order.map((root) => {
+      const items = byRoot.get(root);
+      return { root, name: byId[root]?.name ?? items[0].name, items, direct: items.length === 1 && items[0].id === root };
+    });
+  }
 
   function selectRefundRow(row) {
     state.refId = row.id;
     state.categoryId = row.category_id;
+    state.openRoot = null;
     state.touched.add("categoryId");
     if (row.is_shared) {
       // Solo precarga categoría + importe de la parte de la contraparte; el refund de
       // liquidación en sí NO se marca compartido (mismo criterio que
       // repo.settleAllSharedStmts: is_shared=0, ya es el 100% de lo que la contraparte debe).
-      // Usa el pct EFECTIVO del gasto enlazado (su propio override, o el pct
-      // de SU periodo), no el del periodo abierto: el gasto puede venir de un
-      // periodo cerrado con reparto distinto o llevar su propio override.
+      // Usa el pct EFECTIVO del gasto enlazado (su propio override, o el pct de SU periodo).
       const { partner: partnerPart } = splitCents(row.amount_cents, normalizePct(row.share_pct_override ?? row.period_pct, 100));
       state.raw = centsToRaw(partnerPart);
       state.cents = partnerPart;
@@ -220,83 +262,55 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     render();
   }
 
-  /** Caja de lenguaje natural (Registro v2 §8.6). Vacía: fila de reposo de 44px con el micro (solo
-   *  si `speech.supported` y el usuario no lo ha apagado esta sesión) y el ejemplo. Con texto: el
-   *  bloque interpretado sobre --accent-tint con la frase entre comillas, el enlace «Borrar» y
-   *  hasta cuatro chips — importe/categoría/comercio/compartido, uno por cada campo que el parser
-   *  SÍ entendió (spec: "lo que el parser no entendió simplemente no produce chip"). Solo para
-   *  gasto e ingreso: una frase no puede describir una transferencia, devolución ni ajuste.
-   *  Estilos inline (nunca app.css, spec §8.6/§8.7: el fichero queda fuera de los dos paquetes de
-   *  esta PR para que el único cherry-pick delicado —dos paquetes tocando registro.js— no tenga
-   *  que fundir también una hoja de estilos). */
-  function naturalBoxHtml() {
-    if (state.tipo !== "expense" && state.tipo !== "income") return "";
+  /** Lenguaje natural (Registro v2 §8.6) solo para gasto e ingreso: una frase no puede describir
+   *  una transferencia, devolución ni ajuste. */
+  const naturalAllowed = () => state.tipo === "expense" || state.tipo === "income";
+  const micAvailable = () => naturalAllowed() && !!speech?.supported && !state.natural.micOff;
+
+  /** Pie del Display (F-48, B-Gasto): la caja de lenguaje natural. Vacía, es un input con «o dicta
+   *  «12,50 en el bar»» de placeholder; mientras el micro escucha, «Escuchando…»; con una frase ya
+   *  interpretada, la frase entre comillas y «Borrar». */
+  function displayFootHtml() {
+    if (!naturalAllowed()) return "";
     const { text } = state.natural;
-    const micAvailable = !!speech?.supported && !state.natural.micOff;
-    // §13.10 de la spec (a validar por Álvaro, recomendación adoptada): el reconocimiento de voz
-    // del navegador NO es local — el audio sale a un servidor del fabricante. Se dice bajo la caja,
-    // solo cuando el micro está disponible (si no hay soporte, o el usuario ya lo apagó esta
-    // sesión, no hay nada que avisar).
-    const micNotice = micAvailable
-      ? `<span style="font-size:11px; color:var(--ink-3);">${t("registro.natural.micNotice")}</span>` : "";
-    if (!text.trim()) {
-      // Mientras el reconocedor está abierto no hay input editable que mostrar: la fila se
-      // sustituye por «Escuchando…» (registro.natural.micListening) hasta que llegue el resultado
-      // o el error — ver el handler de #reg-nat-mic en wire().
-      const rowInner = state.natural.listening
-        ? `${icon("mic", { size: 20, stroke: "var(--accent)" })}<span style="font-size:14px; color:var(--ink-3);">${t("registro.natural.micListening")}</span>`
-        : `${micAvailable ? `<button type="button" id="reg-nat-mic" aria-label="${escAttr(t("registro.natural.mic"))}" style="border:0; background:transparent; padding:0; display:flex; align-items:center; flex-shrink:0; cursor:pointer;">${icon("mic", { size: 20, stroke: "var(--accent)" })}</button>` : ""}
-           <input type="text" id="reg-nat-input" value="${escAttr(text)}" placeholder="${escAttr(t("registro.natural.placeholder"))}" autocomplete="off"
-             style="flex:1; min-width:0; border:0; background:none; color:var(--ink); font-size:14px; outline:none;">`;
-      return `
-      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
-        <div style="display:flex; align-items:center; gap:11px; height:44px; background:var(--surface-2); border:1px solid var(--hairline); padding:0 14px; box-sizing:border-box;">
-          ${rowInner}
-        </div>
-        ${micNotice}
-      </div>`;
+    let inner;
+    if (state.natural.listening) {
+      inner = `<span class="reg-nat-status">${t("registro.natural.micListening")}</span>`;
+    } else if (!text.trim()) {
+      const ph = micAvailable() ? t("registro.natural.placeholder") : t("registro.natural.placeholderNoMic");
+      inner = `<input type="text" id="reg-nat-input" class="reg-nat-input" value="${escAttr(text)}" placeholder="${escAttr(ph)}" aria-label="${escAttr(ph)}" autocomplete="off">`;
+    } else {
+      const understood = naturalChips().length > 0;
+      inner = `<span class="reg-nat-quote">${understood ? `«${escHtml(text)}»` : escHtml(t("registro.natural.notUnderstood"))}</span>
+        <button type="button" id="reg-nat-reset" class="reg-nat-reset">${t("registro.natural.reset")}</button>`;
     }
+    return `<div class="reg-disp-foot">${inner}</div>`;
+  }
+
+  /** Chips de lo que el parser SÍ entendió (spec: "lo que el parser no entendió simplemente no
+   *  produce chip"): importe, categoría, comercio y compartido. Cada uno salta a su campo. */
+  function naturalChips() {
     const parsed = state.natural.parsed;
+    if (!parsed || !state.natural.text.trim()) return [];
     const chips = [];
-    if (parsed?.cents != null) {
-      chips.push(`<button type="button" data-nat-chip="amount" style="height:44px;border-radius:999px;border:1px solid var(--hairline-strong);background:var(--surface-2);color:var(--ink);font:600 13px var(--font-num);padding:0 13px;cursor:pointer;">${escHtml(fmtMoney(parsed.cents))}</button>`);
+    if (parsed.cents != null) chips.push(filterChipHtml({ label: fmtMoney(parsed.cents), data: { natChip: "amount" } }));
+    if (parsed.categoryId && byId[parsed.categoryId]) {
+      chips.push(filterChipHtml({ fam: catFam(parsed.categoryId), label: byId[parsed.categoryId].name, data: { natChip: "category" } }));
     }
-    if (parsed?.categoryId && byId[parsed.categoryId]) {
-      const color = colorForCategory(parsed.categoryId, byId);
-      const textColor = textColorForCategory(parsed.categoryId, byId);
-      const catEmoji = catSvg(iconForCategory(parsed.categoryId, byId), { size: "1em" });
-      chips.push(`<button type="button" data-nat-chip="category" style="height:44px;border-radius:999px;border:1px solid color-mix(in srgb, ${color} 42%, transparent);background:color-mix(in srgb, ${color} 16%, transparent);color:${textColor};font-size:13px;font-weight:500;padding:0 12px;display:flex;align-items:center;gap:6px;cursor:pointer;"><span style="font-size:13px;" aria-hidden="true">${catEmoji}</span>${escHtml(byId[parsed.categoryId].name)}</button>`);
+    if (parsed.merchant) chips.push(filterChipHtml({ label: parsed.merchant, data: { natChip: "merchant" } }));
+    // M-5 (revisión de código): el guardado descarta isShared para income — el chip no debe
+    // prometer un reparto que no se guarda.
+    if (parsed.shared && state.tipo === "expense") {
+      chips.push(filterChipHtml({ label: t("registro.natural.sharedChip", { name: partnerName, pct: parsed.sharePct ?? state.sharePct }), data: { natChip: "shared" } }));
     }
-    if (parsed?.merchant) {
-      chips.push(`<button type="button" data-nat-chip="merchant" style="height:44px;border-radius:999px;border:1px solid var(--hairline-strong);background:var(--surface-2);color:var(--ink);font-size:13px;font-weight:500;padding:0 13px;cursor:pointer;">${escHtml(parsed.merchant)}</button>`);
-    }
-    if (parsed?.shared && state.tipo === "expense") {
-      // M-5 (revisión de código): el guardado descarta isShared/sharePct para income
-      // (effectiveIsShared, más abajo) — el chip no debe prometer un reparto que no se guarda.
-      chips.push(`<button type="button" data-nat-chip="shared" style="height:44px;border-radius:999px;border:1px solid var(--hairline-strong);background:var(--surface-2);color:var(--ink);font-size:13px;font-weight:500;padding:0 13px;cursor:pointer;">${escHtml(t("registro.natural.sharedChip", { name: partnerName, pct: parsed.sharePct ?? state.sharePct }))}</button>`);
-    }
-    return `
-    <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
-      <div style="display:flex; flex-direction:column; gap:11px; padding:16px; background:var(--accent-tint);">
-        <div style="display:flex; align-items:flex-start; gap:11px;">
-          <span style="flex-shrink:0;margin-top:1px;display:flex;">${icon("mic", { size: 20, stroke: "var(--accent)" })}</span>
-          <span style="font-size:15px; line-height:1.4; color:var(--ink); flex:1; min-width:0;">${chips.length ? `«${escHtml(text)}»` : escHtml(t("registro.natural.notUnderstood"))}</span>
-          <button type="button" id="reg-nat-reset" style="border:0; background:transparent; color:var(--ink-3); font-size:13px; font-weight:500; padding:0; height:24px; flex-shrink:0; cursor:pointer;">${t("registro.natural.reset")}</button>
-        </div>
-        ${chips.length ? `<div style="display:flex; flex-wrap:wrap; gap:7px;">${chips.join("")}</div>` : ""}
-      </div>
-      ${micNotice}
-    </div>`;
+    return chips;
   }
 
   /** Interpreta `text` (tecleado o dictado) y aplica al formulario lo que el parser entendió
    *  (Registro v2 §8.6). LA FRASE GANA SOBRE `touched`: es el acto explícito más reciente del
-   *  usuario, así que cada campo que toca aquí entra también en `state.touched` para que el
-   *  `oninput` del comercio (memoryPatch, más abajo) no lo vuelva a pisar después con lo que diga
-   *  la memoria — la memoria sigue cediendo, igual que hoy. `sharePct` pasa por `normalizePct`,
-   *  igual que el parche de la memoria. No pide foco: el foco al importe lo pide SIEMPRE quien
-   *  llama, después de esta función (invariante de foco, `:862-871` — nunca desde aquí ni desde
-   *  render()). */
+   *  usuario, así que cada campo que toca aquí entra también en `state.touched` para que la
+   *  memoria de comercios no lo vuelva a pisar después. No pide foco: el foco al importe lo pide
+   *  SIEMPRE quien llama, después de esta función (nunca desde aquí ni desde render()). */
   function applyNatural(text) {
     state.natural.text = text;
     const parsed = parseNaturalExpense(text, {
@@ -306,12 +320,10 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     state.natural.parsed = parsed;
     if (parsed.cents != null) { state.cents = parsed.cents; state.raw = centsToRaw(parsed.cents); }
     if (parsed.merchant != null) state.merchant = parsed.merchant;
-    if (parsed.categoryId != null) { state.categoryId = parsed.categoryId; state.touched.add("categoryId"); }
+    if (parsed.categoryId != null) { state.categoryId = parsed.categoryId; state.openRoot = null; state.touched.add("categoryId"); }
     if (parsed.accountId != null) { state.accountId = parsed.accountId; state.touched.add("accountId"); }
     // D-1 (revisión de código): findDate SIEMPRE devuelve una fecha (today cuando no encuentra
-    // nada, natural.js#findDate), así que `parsed.date != null` nunca es falso — una frase sin
-    // fecha pisaba la que el usuario ya había elegido a mano. `spans.date` sí distingue "la frase
-    // decía una fecha" de "no decía nada".
+    // nada), así que solo `spans.date` distingue "la frase decía una fecha" de "no decía nada".
     if (parsed.spans?.date) state.fecha = parsed.date;
     if (parsed.shared) {
       state.isShared = true;
@@ -321,40 +333,27 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     render();
   }
 
-  /** Nombre de una etiqueta por id (Task 13). `tagsAll` es SOLO activas (listTags, un movimiento
-   *  nuevo no puede nacer con una ya archivada salvo por un prefill futuro que hoy nadie manda) —
-   *  a diferencia de movimientos.js#tagName, que resuelve contra tagTotalsAll para poder enseñar
-   *  el nombre de una archivada ya asignada a un movimiento existente. */
+  /** Nombre de una etiqueta por id (Task 13). `tagsAll` es SOLO activas (listTags). */
   function tagName(id) {
     return tagsAll.find((tg) => tg.id === id)?.name ?? "";
   }
 
-  /** Control «Etiqueta» (Task 13, mismo selector inline que movimientos.js#renderTagControl —
-   *  ver el Step 2 del plan: «mismo que el detalle»). Vive dentro del bloque que se pliega tras
-   *  «Más» en modo rápido (misma guarda que cuenta/comercio/fecha/nota, ver render()). */
-  function renderTagControl() {
+  /** Selector de etiqueta (Task 13, mismo que movimientos.js#renderTagControl): chips neutros de
+   *  etiqueta (C10) + «Nueva etiqueta». Cerrado, si hay una puesta, se ve como ficha. */
+  function tagControlHtml() {
     if (!state.tagPickerOpen) {
-      const hasTag = !!state.tagId;
-      return `
-      <button type="button" class="chip${hasTag ? " is-tag" : ""}" id="reg-tag-chip"
-        style="align-self:flex-start;padding:0 14px;display:inline-flex;align-items:center;gap:7px;${hasTag ? "" : "background:transparent;border:1px dashed var(--rule);"}">
-        ${ICON_TAG}${hasTag ? escHtml(tagName(state.tagId)) : t("movimientos.detail.noTag")}
-      </button>`;
+      return state.tagId ? `<div class="reg-tag-current">${badgeHtml({ tag: true, label: tagName(state.tagId) })}</div>` : "";
     }
-    return `
-    <div class="chips">
-      <button type="button" class="chip${!state.tagId ? " active" : ""}" data-tag-pick="">${t("movimientos.detail.noTag")}</button>
-      ${tagsAll.map((tg) => `<button type="button" class="chip${state.tagId === tg.id ? " active" : ""}" data-tag-pick="${escAttr(tg.id)}">${ICON_TAG}${escHtml(tg.name)}</button>`).join("")}
-      ${state.newTagDraft == null ? `
-      <button type="button" id="reg-tag-new" class="chip" style="background:transparent;border:1px dashed var(--rule);">${ICON_PLUS_SMALL}${t("movimientos.detail.newTag")}</button>
-      ` : `
-      <span style="display:inline-flex;align-items:center;gap:6px;">
-        <input type="text" id="reg-tag-new-input" value="${escAttr(state.newTagDraft)}" placeholder="${escAttr(t("etiquetas.form.namePlaceholder"))}"
-          style="height:44px;min-width:0;border:1px solid var(--rule);border-radius:999px;padding:0 14px;background:none;color:var(--text);font:14px inherit;">
-        <button type="button" id="reg-tag-new-save" class="icon-btn" aria-label="${t("common.save")}" style="width:44px;height:44px;flex-shrink:0;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"></path></svg>
-        </button>
-      </span>`}
+    const draft = state.newTagDraft == null
+      ? filterChipHtml({ label: t("movimientos.detail.newTag"), id: "reg-tag-new" })
+      : `<span class="reg-newtag">
+          <span class="ctl-field reg-newtag-field"><input type="text" class="ctl-field-input" id="reg-tag-new-input" value="${escAttr(state.newTagDraft)}" placeholder="${escAttr(t("etiquetas.form.namePlaceholder"))}" aria-label="${escAttr(t("movimientos.detail.newTag"))}"></span>
+          <button type="button" id="reg-tag-new-save" class="icon-btn" aria-label="${escAttr(t("common.save"))}">${icon("check", { size: 18 })}</button>
+        </span>`;
+    return `<div class="reg-chips" role="group" aria-label="${escAttr(t("movimientos.detail.tagLabel"))}">
+      ${filterChipHtml({ label: t("movimientos.detail.noTag"), selected: !state.tagId, check: true, data: { tagPick: "" } })}
+      ${tagsAll.map((tg) => filterChipHtml({ tag: true, label: tg.name, selected: state.tagId === tg.id, data: { tagPick: tg.id } })).join("")}
+      ${draft}
     </div>`;
   }
 
@@ -377,132 +376,252 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     return "";
   }
 
-  function renderRefundPicker() {
+  /** Selector «¿Devuelve un gasto?» (tipo devolución): filas de movimiento de los gastos recientes;
+   *  enlazado, una tarjeta con el gasto y el botón para quitar el vínculo. */
+  function refundPickerHtml() {
     const linked = state.refId ? refundCandidates.find((r) => r.id === state.refId) : null;
     if (linked) {
       const label = linked.merchant || byId[linked.category_id]?.name || t("common.type.expense");
       return `
-      <div class="card" style="padding:12px 14px; margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
-        <div style="min-width:0;">
-          <div style="font-size:10px; color:var(--text-3);">${t("common.linkedTo")}</div>
-          ${metaHtml([label, fmtMoney(linked.amount_cents)])}
+      <div class="reg-linked">
+        <div class="reg-linked-body">
+          <span class="reg-linked-label">${t("common.linkedTo")}</span>
+          ${metaHtml([label, fmtMoney(linked.amount_cents)], { cls: "reg-linked-meta" })}
         </div>
-        <button type="button" id="reg-refund-unlink" class="icon-btn" aria-label="${t("registro.refund.unlink")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+        <button type="button" id="reg-refund-unlink" class="icon-btn" aria-label="${escAttr(t("registro.refund.unlink"))}">${icon("close", { size: 18 })}</button>
       </div>`;
     }
     return `
-    <div style="margin-bottom:18px;">
-      <button type="button" id="reg-refund-toggle" class="refund-toggle">${t("registro.refund.toggle", { arrow: state.refundPickerOpen ? "▲" : "▼" })}</button>
+    <div class="reg-refund">
+      <button type="button" id="reg-refund-toggle" class="reg-pill reg-pill-wide" aria-expanded="${state.refundPickerOpen}">
+        <span class="reg-pill-text">${t("registro.refund.toggle")}</span>${icon("chevronDown", { size: 16, cls: "reg-pill-chev" })}
+      </button>
       ${state.refundPickerOpen ? `
-      <div class="card refund-list" style="padding:4px 14px; margin-top:8px;">
+      <div class="reg-refund-list">
         ${refundCandidates.length === 0
-          ? `<div style="padding:14px 0; font-size:13px; color:var(--text-3);">${t("registro.refund.empty")}</div>`
+          ? `<p class="reg-empty">${t("registro.refund.empty")}</p>`
           : refundCandidates.map((r) => {
             // Un gasto con algo ya devuelto sigue siendo elegible (una devolución parcial es
-            // legítima): solo se atenúa y se etiqueta. El SQL ya lo ha empujado al final de la
-            // lista (sql.js#recentForRefund), aquí no se reordena nada.
+            // legítima): solo se atenúa y se etiqueta. El SQL ya lo empuja al final de la lista.
             const done = r.refunded_cents > 0;
-            // ...pero «ya devuelto» y «liquidado» no son lo mismo: settled lo pone repo.addTransaction
-            // para CUALQUIER devolución o ajuste enlazado por refId (repo.js ~82-83), no solo los
-            // apuntes que crea Liquidar. Por eso un gasto compartido con una devolución de tienda
-            // enlazada y aún sin liquidar también sale aquí como «Liquidado» — límite conocido,
-            // anotado en el backlog; el arreglo real es marcar los apuntes de liquidación.
+            // «ya devuelto» y «liquidado» no son lo mismo: settled lo pone repo.addTransaction para
+            // CUALQUIER devolución o ajuste enlazado por refId — límite conocido, anotado en el
+            // backlog; el arreglo real es marcar los apuntes de liquidación.
             const settledShared = !!r.is_shared && !!r.settled;
             const doneLabel = settledShared
-              ? t("registro.refund.settledLabel", { amount: escHtml(fmtMoney(r.refunded_cents)) })
-              : t("registro.refund.alreadyRefunded", { amount: escHtml(fmtMoney(r.refunded_cents)) });
-            return `
-            <button type="button" class="refund-row" data-refund-row="${escAttr(r.id)}"${done ? ' style="opacity:.55;"' : ""}>
-              <span style="flex:1; min-width:0; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                ${escHtml(r.merchant || byId[r.category_id]?.name || t("common.type.expense"))}${r.is_shared ? t("registro.refund.sharedSuffix") : ""}
-              </span>
-              ${done ? `<span style="font-size:10.5px; color:var(--text-3); white-space:nowrap; flex-shrink:0;">${doneLabel}</span>` : ""}
-              <span class="num">${fmtMoney(r.amount_cents)}</span>
-            </button>`;
+              ? t("registro.refund.settledLabel", { amount: fmtMoney(r.refunded_cents) })
+              : t("registro.refund.alreadyRefunded", { amount: fmtMoney(r.refunded_cents) });
+            const title = `${r.merchant || byId[r.category_id]?.name || t("common.type.expense")}${r.is_shared ? t("registro.refund.sharedSuffix") : ""}`;
+            const row = txRowHtml({
+              fam: familyForCategory(r.category_id, byId), icon: iconForCategory(r.category_id, byId),
+              title, line2: done ? doneLabel : (byId[r.category_id]?.name ?? ""),
+              amountHtml: escHtml(fmtMoney(r.amount_cents)), sign: "expense", data: { refundRow: r.id },
+            });
+            return done ? `<div class="reg-refund-done">${row}</div>` : row;
           }).join("")}
       </div>` : ""}
     </div>`;
   }
 
-  function renderAccountsSection() {
+  /** Rejilla de familias (B-Gasto): baldosas seleccionables de 56 en filas de 3; tocar una raíz con
+   *  hijas despliega debajo de SU fila las subcategorías como chips neutros (el elegido, relleno
+   *  --accent con check). Una raíz sin hijas se elige directamente. */
+  function categoryGridHtml(cats) {
+    const all = categoryGroups(cats);
+    const selRoot = state.categoryId ? rootOf(state.categoryId, byId) : null;
+    // Plegado: las 9 primeras familias (la elegida siempre entra, visibleCategories) y «Ver las N».
+    const limited = !formOpen() && !state.allCats;
+    const { shown, hidden } = limited
+      ? visibleCategories(all.map((g) => ({ ...g, id: g.root })), selRoot, CATS_GRID_LIMIT)
+      : { shown: all, hidden: 0 };
+    const groups = shown;
+    const selGroup = groups.find((g) => g.root === selRoot);
+    const openRoot = state.openRoot ?? (selGroup && !selGroup.direct ? selRoot : "");
+    const rows = [];
+    for (let i = 0; i < groups.length; i += GRID_COLS) rows.push(groups.slice(i, i + GRID_COLS));
+    return `<div class="reg-grid-wrap">${rows.map((row) => {
+      const tiles = row.map((g) => pickTileHtml({
+        fam: catFam(g.root), icon: iconForCategory(g.root, byId), label: g.name,
+        selected: g.root === selRoot, expanded: g.direct ? null : g.root === openRoot,
+        data: { root: g.root },
+      })).join("");
+      const openIdx = row.findIndex((g) => g.root === openRoot && !g.direct);
+      let panel = "";
+      if (openIdx >= 0) {
+        const g = row[openIdx];
+        const fc = famClass(catFam(g.root));
+        panel = `<div class="reg-subs ${fc || "reg-subs-neutral"}" style="--col:${openIdx}" role="group" aria-label="${escAttr(g.name)}">
+          ${g.items.map((c) => filterChipHtml({ label: c.name, selected: state.categoryId === c.id, check: true, data: { cat: c.id } })).join("")}
+        </div>`;
+      }
+      return `<div class="reg-grid">${tiles}</div>${panel}`;
+    }).join("")}
+    ${hidden > 0 ? `<button type="button" class="btn-tertiary reg-cats-more" id="reg-cats-more" aria-expanded="false">${t("registro.categories.showAll", { n: all.length })}</button>` : ""}
+    </div>`;
+  }
+
+  /** Fila «Más» del registro rápido plegado (Registro v2 §4.3, anatomía B de fila de 60): «Más»
+   *  15/600, el resumen de registro-mode.js#foldedSummaryParts con el divisor de metaHtml (nunca un
+   *  «·») y el chevron. Despliega cuenta, fecha, «Con Marta», etiqueta, foto y nota. */
+  function moreRowHtml() {
+    const accountName = partnerPaid() ? "" : (accounts.find((a) => a.id === state.accountId)?.name ?? "");
+    const dateLabel = state.fecha === hoyISO() ? t("registro.more.summaryToday") : fmtDiaCorto(state.fecha);
+    const sharedLabel = needsCategory(state.tipo) && state.tipo !== "income" && partnerName && state.isShared
+      ? t("common.sharedWith", { name: partnerName }) : "";
+    const parts = foldedSummaryParts({
+      accountName, dateLabel, hasNote: !!state.note.trim(), hasPhoto: !!state.photo, sharedLabel,
+      tagName: state.tagId ? tagName(state.tagId) : "",
+    }, t);
+    return `<button type="button" class="reg-more" id="reg-more-toggle" aria-expanded="false">
+      <span class="reg-more-body">
+        <span class="reg-more-label">${t("registro.more.toggle")}</span>
+        ${metaHtml(parts, { cls: "reg-more-sum" })}
+      </span>
+      ${icon("chevronDown", { size: 20, cls: "reg-pill-chev" })}
+    </button>`;
+  }
+
+  /** Tarjeta de la categoría elegida (§9, sin borde): nombre de la hoja y, debajo, «La que usas en
+   *  Bar Pepe» si la ha puesto la memoria de comercios, o la ruta de su familia. */
+  function chosenHtml() {
+    const c = state.categoryId ? byId[state.categoryId] : null;
+    if (!c) return "";
+    const root = rootOf(c.id, byId);
+    const path = state.merchantRemembered && state.merchant.trim()
+      ? t("registro.chosen.remembered", { merchant: state.merchant.trim() })
+      : (root !== c.id ? (byId[root]?.name ?? "") : "");
+    return chosenCategoryHtml({ fam: catFam(c.id), icon: iconForCategory(c.id, byId), name: c.name, path });
+  }
+
+  /** Píldora de cuenta (B-Gasto): muestra de 10 en la familia de la cuenta (C8) + nombre + chevron.
+   *  Abre debajo la lista de cuentas como chips de filtro. */
+  function accountPillHtml(which, accId, prefix, showPrefix = false) {
+    const acc = accountsAll.find((a) => a.id === accId);
+    const fc = famClass(accountFam(acc));
+    const name = acc?.name ?? "";
+    return `<button type="button" class="reg-pill" data-acc-toggle="${which}" aria-expanded="${state.accPicker === which}" aria-label="${escAttr(name ? `${prefix}: ${name}` : prefix)}">
+      ${fc ? `<span class="ent-swatch ${fc}" aria-hidden="true"></span>` : ""}
+      ${showPrefix || !name ? `<span class="reg-pill-pre">${escHtml(prefix)}</span>` : ""}
+      <span class="reg-pill-text">${escHtml(name)}</span>${icon("chevronDown", { size: 16, cls: "reg-pill-chev" })}
+    </button>`;
+  }
+
+  function accountListHtml() {
+    if (state.accPicker === "from") {
+      return `<div class="reg-chips" role="group">${accounts.map((a) => filterChipHtml({ fam: accountFam(a), label: a.name, selected: state.accountId === a.id, data: { acc: a.id } })).join("")}</div>`;
+    }
+    if (state.accPicker === "to") {
+      return `<div class="reg-chips" role="group">${accountsAll.filter((a) => a.id !== state.accountId).map((a) => filterChipHtml({ fam: accountFam(a), label: a.name, selected: state.counterAccountId === a.id, data: { counterAcc: a.id } })).join("")}</div>`;
+    }
+    return "";
+  }
+
+  /** Fecha: píldora con el <input type=date> nativo encima, transparente — tocarla abre el selector
+   *  del sistema (y showPicker() en escritorio, ver wire()). */
+  function datePillHtml() {
+    const label = state.fecha === hoyISO() ? t("registro.date.today") : fmtDiaCorto(state.fecha);
+    return `<label class="reg-pill reg-date">
+      ${icon("calendar", { size: 18, cls: "reg-pill-ico" })}<span class="reg-pill-text">${escHtml(label)}</span>${icon("chevronDown", { size: 16, cls: "reg-pill-chev" })}
+      <input type="date" id="reg-fecha" class="reg-date-input" value="${escAttr(state.fecha)}" aria-label="${escAttr(t("common.date"))}">
+    </label>`;
+  }
+
+  function accountRowsHtml() {
     if (state.tipo === "transfer") {
       return `
-      <div class="card" style="border-radius:0; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">${t("common.from")}</div>
-        <div class="chips">
-          ${accounts.map((a) => `<button type="button" class="chip${state.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
-        </div>
-      </div>
-      <div class="card" style="border-radius:0; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">${t("common.to")}</div>
-        <div class="chips">
-          ${accountsAll.filter((a) => a.id !== state.accountId).map((a) => `<button type="button" class="chip${state.counterAccountId === a.id ? " active" : ""}" data-counter-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
-        </div>
-      </div>`;
+      <div class="reg-row2">${accountPillHtml("from", state.accountId, t("common.from"), true)}${accountPillHtml("to", state.counterAccountId, t("common.to"), true)}</div>
+      ${accountListHtml()}
+      <div class="reg-row2">${datePillHtml()}</div>`;
     }
+    const prefix = state.tipo === "refund" ? t("common.destAccount") : t("common.account");
     return `
-    <div class="card" style="border-radius:0; display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-      <div class="section-title">${state.tipo === "refund" ? t("common.destAccount") : t("common.account")}</div>
-      <div class="chips">
-        ${accounts.map((a) => `<button type="button" class="chip${state.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
+      <div class="reg-row2">${partnerPaid() ? "" : accountPillHtml("from", state.accountId, prefix)}${datePillHtml()}</div>
+      ${partnerPaid() ? "" : accountListHtml()}`;
+  }
+
+  /** Fila «Con Marta 50 %» (F-20, interruptor 44×26) + etiqueta, foto y nota como botones de 48. */
+  function extrasRowHtml() {
+    const sharedOffered = needsCategory(state.tipo) && state.tipo !== "income" && partnerName;
+    const shared = sharedOffered ? `
+      <div class="reg-pill reg-shared" id="reg-shared-row">
+        <span class="reg-pill-text" id="reg-shared-label">${escHtml(t("registro.shared.row", { name: partnerName }))} <span class="num reg-shared-pct">${state.sharePct} %</span></span>
+        ${switchHtml({ id: "reg-shared", checked: state.isShared, label: t("common.sharedWith", { name: partnerName }) })}
+      </div>` : "";
+    const photoBtn = attachments?.available()
+      ? `<button type="button" class="reg-round" id="reg-photo-btn" aria-label="${escAttr(state.photo ? t("registro.photo.replace") : t("registro.photo.add"))}">${icon("camera", { size: 20 })}</button>
+         <input type="file" id="reg-photo-input" class="reg-file" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true">`
+      : "";
+    return `<div class="reg-extras${sharedOffered ? "" : " is-icons-only"}">
+      ${shared}
+      <button type="button" class="reg-round" id="reg-tag-btn" aria-label="${escAttr(t("movimientos.detail.tagLabel"))}" aria-expanded="${state.tagPickerOpen}">${icon("tag", { size: 20 })}</button>
+      ${photoBtn}
+      <button type="button" class="reg-round" id="reg-note-btn" aria-label="${escAttr(t("common.note"))}" aria-expanded="${noteVisible()}">${icon("note", { size: 20 })}</button>
+    </div>`;
+  }
+
+  /** La nota se ve si hay texto, si se tocó el botón o en modo completo (Ajustes, «Registro
+   *  rápido» desplegado con «Más», como antes de B). */
+  // Los tipos que detailsOpen fuerza abiertos (transferencia, devolución, ajuste, también cuando
+  // llegan de un prefill de regla) enseñan la nota abierta, como antes de B.
+  const noteVisible = () => !!state.note.trim() || state.noteOpen || (state.quick && state.expanded)
+    || detailsOpen({ quick: true, expanded: false, tipo: state.tipo });
+  /** ¿Se pinta todo (B-Gasto completo) o el registro rápido plegado? */
+  const formOpen = () => detailsOpen({ quick: state.quick, expanded: state.expanded, tipo: state.tipo });
+
+  /** Detalle del reparto cuando el interruptor está encendido: quién pagó (solo gasto), el paso a
+   *  paso del % y las dos partes. */
+  function sharedDetailHtml(myCents, partnerCents) {
+    if (!(needsCategory(state.tipo) && state.tipo !== "income" && partnerName && state.isShared)) return "";
+    return `
+    <div class="reg-block">
+      ${state.tipo === "expense" ? `
+      <div class="reg-block-sec">
+        <span class="reg-block-label" id="reg-paidby-label">${t("common.paidBy.label")}</span>
+        ${segmentedHtml({ id: "reg-paidby", name: t("common.paidBy.label"), labelledBy: "reg-paidby-label", value: state.paidBy,
+          options: [{ value: "me", label: t("common.paidBy.me") }, { value: "partner", label: t("common.paidBy.partner", { name: partnerName }) }] })}
+      </div>` : ""}
+      <div class="reg-split-row">
+        <div class="reg-split-text">
+          <span class="reg-block-title">${t("common.split.label")}</span>
+          <span class="reg-block-hint">${escHtml(t("common.split.hint", { name: partnerName, pct: 100 - state.sharePct }))}</span>
+        </div>
+        ${stepperHtml({ value: `${state.sharePct} %`, decId: "reg-pct-down", incId: "reg-pct-up", decLabel: t("common.split.decreaseAria"), incLabel: t("common.split.increaseAria") })}
+      </div>
+      <div class="reg-split">
+        <div class="reg-split-cell">
+          ${metaHtml([t("common.myShare"), t("common.pctValue", { pct: state.sharePct })], { cls: "reg-split-label" })}
+          <span class="num reg-split-value" id="reg-split-mine">${escHtml(fmtMoney(myCents))}</span>
+        </div>
+        <div class="reg-split-cell">
+          ${partnerPaid() ? metaHtml([t("common.paidByName", { name: partnerName }), t("common.paidTotal")], { cls: "reg-split-label" }) : metaHtml([partnerName, t("common.pctValue", { pct: 100 - state.sharePct })], { cls: "reg-split-label" })}
+          <span class="num reg-split-value" id="reg-split-partner">${escHtml(fmtMoney(partnerPaid() ? state.cents : partnerCents))}</span>
+        </div>
       </div>
     </div>`;
   }
 
-  /** Fila «Más» que sustituye a cuenta/comercio/fecha/nota/compartido cuando `detailsOpen` dice que
-   *  no toca pintarlos (Registro v2 §4.3). El resumen sale de registro-mode.js#foldedSummaryParts
-   *  (array, nunca un string con «·»); aquí solo se decide QUÉ entra en cada campo del resumen y se
-   *  pinta con divisores de 1px entre trozos (SISTEMA.md §1). */
-  function moreRowHtml() {
-    const accountName = partnerPaid() ? "" : (accounts.find((a) => a.id === state.accountId)?.name ?? "");
-    const dateLabel = state.fecha === hoyISO() ? t("registro.more.summaryToday") : fmtDiaCorto(state.fecha);
-    const hasNote = !!state.note.trim();
-    // partnerName SIN escHtml aquí: summaryHtml (abajo) escapa cada trozo del resumen una vez —
-    // escaparlo también aquí convertiría un «&» legítimo del nombre en «&amp;amp;».
-    const sharedLabel = needsCategory(state.tipo) && state.tipo !== "income" && partnerName && state.isShared
-      ? t("common.sharedWith", { name: partnerName })
-      : "";
-    const tagLabel = state.tagId ? tagName(state.tagId) : "";
-    const parts = foldedSummaryParts({ accountName, dateLabel, hasNote, hasPhoto: !!state.photo, sharedLabel, tagName: tagLabel }, t);
-    const summaryHtml = parts.map((p, i) => (i === 0 ? "" : `<span style="width:1px;height:11px;background:var(--hairline-strong);flex-shrink:0;"></span>`)
-      + `<span style="font-size:12px;font-weight:500;color:var(--text-3);">${escHtml(p)}</span>`).join("");
-    return `
-    <button type="button" id="reg-more-toggle" aria-expanded="false" style="display:flex; align-items:center; gap:12px; width:100%; min-height:60px; padding:10px 0; margin-top:12px; border:0; border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline); background:transparent; color:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent;">
-      <div style="display:flex; flex-direction:column; gap:4px; flex:1; min-width:0;">
-        <span style="font-size:14px; font-weight:600;">${t("registro.more.toggle")}</span>
-        <div style="display:flex; align-items:center; gap:9px; flex-wrap:wrap;">${summaryHtml}</div>
-      </div>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;"><path d="M5 9.5 12 16l7-6.5"></path></svg>
-    </button>`;
+  function photoHtml() {
+    if (!attachments?.available()) return "";
+    // Foto del ticket (N5, §9.3): el módulo devuelve un Blob, nunca una URL — la pantalla es dueña
+    // del par crear/revocar. Se reutiliza la URL ya creada mientras state.photo no cambie.
+    if (state.photo && !photoObjectUrl) photoObjectUrl = URL.createObjectURL(state.photo);
+    if (!state.photo && photoObjectUrl) { URL.revokeObjectURL(photoObjectUrl); photoObjectUrl = null; }
+    if (!state.photo) return "";
+    return `<div class="reg-photo">
+      <img class="reg-photo-img" src="${escAttr(photoObjectUrl)}" alt="${escAttr(t("registro.photo.viewAria"))}">
+      <button type="button" class="btn-tertiary" id="reg-photo-remove">${t("registro.photo.remove")}</button>
+    </div>`;
   }
 
-  /** Selector de tipo (Registro v2 §9.3): en modo rápido, CON el bloque plegable cerrado, NO se
-   *  pinta — el formulario queda fijo a gasto. En cuanto el bloque está abierto (modo completo, o
-   *  modo rápido tras tocar «Más» — detailsOpen() es el mismo criterio que gatea cuenta/comercio/
-   *  fecha/nota) aparecen dos píldoras siempre visibles (Gasto/Ingreso) + un botón circular de
-   *  30px que despliega los otros tres tipos (transferencia/devolución/ajuste). La rejilla extra se
-   *  enseña si el usuario la ha abierto a mano O si el tipo activo ya es uno de esos tres — así un
-   *  prefill de transferencia no aterriza con su propio tipo escondido. */
-  function typeSelectorHtml(formOpen) {
-    if (!formOpen) return "";
-    const mainTipos = TIPOS.filter((tp) => tp.id === "expense" || tp.id === "income");
-    const extraTipos = TIPOS.filter((tp) => tp.id !== "expense" && tp.id !== "income");
-    const extraOpen = state.typeMoreOpen || extraTipos.some((tp) => tp.id === state.tipo);
-    const pillStyle = (active) => active
-      ? "height:44px;border-radius:999px;border:0;background:var(--surface-2);color:var(--ink);font-size:13px;font-weight:600;padding:0 13px;cursor:pointer;"
-      : "height:44px;border-radius:999px;border:1px solid var(--hairline-strong);background:transparent;color:var(--ink-3);font-size:13px;font-weight:500;padding:0 13px;cursor:pointer;";
-    return `
-    <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-      <div style="display:flex; align-items:center; gap:6px;">
-        ${mainTipos.map((tp) => `<button type="button" data-tipo="${tp.id}" style="${pillStyle(state.tipo === tp.id)}">${t(tp.labelKey)}</button>`).join("")}
-        <button type="button" id="reg-type-more" aria-label="${escAttr(t("registro.type.more"))}" aria-expanded="${extraOpen ? "true" : "false"}"
-          style="width:30px;height:30px;border-radius:999px;border:1px solid var(--hairline-strong);background:transparent;color:var(--ink-3);display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;cursor:pointer;">
-          ${icon("chevronDown", { size: 16 })}
-        </button>
-      </div>
-      ${extraOpen ? `
-      <div class="chips">
-        ${extraTipos.map((tp) => `<button type="button" data-tipo="${tp.id}" class="chip${state.tipo === tp.id ? " active" : ""}">${t(tp.labelKey)}</button>`).join("")}
+  /** Devolución y ajuste (fuera del Segmented de la cabecera, que solo cabe con tres): terciario
+   *  que despliega sus dos chips. Abierto solo si se tocó o si el tipo activo es uno de ellos. */
+  function extraTypesHtml() {
+    const active = TIPOS_EXTRA.some((tp) => tp.id === state.tipo);
+    const open = state.typeMoreOpen || active;
+    return `<div class="reg-types-extra">
+      <button type="button" class="btn-tertiary" id="reg-type-more" aria-expanded="${open}">${t("registro.type.others")}</button>
+      ${open ? `<div class="reg-chips" role="group" aria-label="${escAttr(t("registro.type.others"))}">
+        ${TIPOS_EXTRA.map((tp) => filterChipHtml({ label: t(tp.labelKey), selected: state.tipo === tp.id, check: true, data: { tipo: tp.id } })).join("")}
       </div>` : ""}
     </div>`;
   }
@@ -510,191 +629,93 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
   function render() {
     const cats = categoriesFor();
     const { mine: myCents, partner: partnerCents } = state.isShared ? splitCents(state.cents, state.sharePct) : { mine: state.cents, partner: 0 };
-    // §1 principio 2: un solo acento. El CTA es SIEMPRE lima, ya no toma el color de la categoría.
-    const saveStyle = needsCategory(state.tipo) && state.categoryId
-      ? `background:var(--accent);color:var(--accent-ink);`
-      : "";
-    // Registro v2 §4.3: el CTA lleva el importe («Guardar gasto de 45,20 €») SOLO para gasto — es
-    // la clave que trae la spec (registro.save.expenseWithAmount), no una por tipo. Con importe a
-    // 0 se cae al texto de siempre.
-    const saveLabel = state.tipo === "expense" && state.cents > 0
-      ? t("registro.save.expenseWithAmount", { amount: escHtml(fmtMoney(state.cents)) })
-      : t(SAVE_KEY[state.tipo]);
-    // Registro v2 §6: solo un GASTO gasta contra un límite (limit-warning.js no recibe `tipo`:
-    // el gating de qué tipos preguntan es de aquí). amountCents es MI PARTE (myCents), no el
-    // ticket completo — MY_AMOUNT es también el criterio de SQL.spentByRootCategory.
+    // Registro v2 §6: solo un GASTO gasta contra un límite. amountCents es MI PARTE (myCents), no
+    // el ticket completo — MY_AMOUNT es también el criterio de SQL.spentByRootCategory.
     const warning = state.tipo === "expense"
       ? limitWarning({ categoryId: state.categoryId, amountCents: myCents, byId, spentByRoot, budgetByCategory })
       : null;
-    // D13: el héroe de 56px es solo el registro rápido "de verdad" (bloque plegable cerrado); en
-    // cuanto se ve el resto del formulario —modo completo, o modo rápido tras tocar «Más»— la
-    // pantalla ya es visualmente RegistroCompleto.dc.html, con el importe a 36px.
-    const formOpen = detailsOpen({ quick: state.quick, expanded: state.expanded, tipo: state.tipo });
+    const chips = naturalChips();
+    const open = formOpen();
 
     container.innerHTML = `
-      ${subHeaderHtml({ id: null, title: t("registro.title"), action: { id: "reg-close", icon: "close", label: t("registro.close") } })}
+    <div class="reg">
+      <header class="reg-head">
+        <h1 class="reg-title">${escHtml(t("registro.title"))}</h1>
+        <button type="button" class="icon-btn" id="reg-close" aria-label="${escAttr(t("registro.close"))}">${icon("close")}</button>
+        ${open ? segmentedHtml({ id: "reg-type", name: t("registro.type.label"), value: state.tipo, allowNone: true,
+          options: TIPOS_MAIN.map((tp) => ({ value: tp.id, label: t(tp.labelKey) })) }) : ""}
+      </header>
 
-      ${naturalBoxHtml()}
-
-      ${typeSelectorHtml(formOpen)}
-
-      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px; padding-bottom:10px; border-bottom:2px solid var(--accent);">
-        <span style="font-size:13px; font-weight:500; color:var(--accent);">${t("common.amount")}</span>
-        <div class="amount-display" style="align-items:center;">
-          ${state.tipo === "adjustment" ? `<button type="button" class="icon-btn" id="reg-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;">${state.adjustmentSign}</button>` : ""}
-          <input type="text" inputmode="decimal" id="reg-raw" value="${escAttr(state.raw)}" placeholder="0" autocomplete="off"
-            style="border:0;background:none;color:var(--ink);font:600 ${formOpen ? "36" : "56"}px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
-          <span class="amount-currency">${escHtml(currencySymbol())}</span>
+      <section class="disp reg-disp">
+        <div class="reg-disp-main">
+          <div class="reg-disp-fields">
+            ${open ? `<input type="text" id="reg-merchant" class="reg-merchant-input" list="reg-merchants" value="${escAttr(state.merchant)}"
+              placeholder="${escAttr(t("registro.merchant.placeholder"))}" aria-label="${escAttr(t("common.merchant"))}" autocomplete="off">`
+              : `<span class="disp-label">${escHtml(state.merchant.trim() || t("common.amount"))}</span>`}
+            <div class="num disp-value disp-value-xl reg-amount">
+              ${state.tipo === "adjustment" ? `<button type="button" class="reg-sign" id="reg-sign" aria-label="${escAttr(t("common.changeSign"))}">${state.adjustmentSign === "-" ? "−" : "+"}</button>` : ""}
+              <input type="text" inputmode="decimal" id="reg-raw" class="reg-amount-input" value="${escAttr(state.raw)}" placeholder="0" autocomplete="off"
+                aria-label="${escAttr(t("common.amount"))}" style="width:${amountWidth(state.raw)}">
+              <span class="reg-amount-cur" aria-hidden="true">${escHtml(currencySymbol())}</span>
+            </div>
+          </div>
+          ${micAvailable() && !state.natural.text.trim() && !state.natural.listening ? `<button type="button" class="reg-mic" id="reg-nat-mic" aria-label="${escAttr(t("registro.natural.mic"))}">${icon("mic", { size: 22 })}</button>` : ""}
         </div>
-      </div>
-
-      ${cats.length ? (() => {
-        // Registro v2 §4.3: rejilla estática de 2 filas de 4 en vez del scroll horizontal
-        // (.chips-scroll la siguen usando recurrentes.js/movimientos.js — no se toca esa clase).
-        // «Ver las N» ya tocado (state.allCats) enseña la lista entera; si no, visibleCategories
-        // decide y la seleccionada nunca queda escondida.
-        const { shown, hidden } = state.allCats
-          ? { shown: cats, hidden: 0 }
-          : visibleCategories(cats, state.categoryId, CATS_GRID_LIMIT);
-        return `
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">${t("common.category")}</div>
-        <div class="chips-grid">
-          ${shown.map((c) => {
-            const color = colorForCategory(c.id, byId);
-            const textColor = textColorForCategory(c.id, byId);
-            const categoryEmoji = catSvg(iconForCategory(c.id, byId), { size: "1em" });
-            const active = state.categoryId === c.id;
-            const chipStyle = active
-              ? `--cat:${color};background:color-mix(in srgb, ${color} 16%, transparent);color:${textColor};font-weight:700;`
-              : `--cat:${color};`;
-            // Celda plana (Registro v2 §9.3): SIN la insignia circular de .chip-icon, que es para
-            // la fila horizontal de filtro — aquí el emoji va suelto a 21px, como el artboard.
-            return `<button type="button" class="chip-v${active ? " active" : ""}" data-cat="${c.id}" style="${chipStyle}">
-              <span style="font-size:21px;line-height:1;" aria-hidden="true">${categoryEmoji}</span><span>${escHtml(c.name)}</span>
-            </button>`;
-          }).join("")}
-        </div>
-        ${hidden > 0 ? `
-        <button type="button" id="reg-cats-more" aria-expanded="false" style="border:0;background:transparent;color:var(--text-3);font-size:13px;font-weight:500;padding:0;height:44px;display:flex;align-items:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-          ${t("registro.categories.showAll", { n: cats.length })}
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9.5 12 16l7-6.5"></path></svg>
-        </button>` : ""}
-      </div>`;
-      })() : ""}
-
-      ${warning ? `
-      <div class="limit-band ${warning.level}" id="reg-limit-band" role="status" aria-live="polite">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5 21 19.5H3z"></path><path d="M12 10v4"></path><path d="M12 17h.01"></path></svg>
-        <span id="reg-limit-text">${escHtml(limitBandText(warning))}</span>
-      </div>` : ""}
-
-      ${detailsOpen({ quick: state.quick, expanded: state.expanded, tipo: state.tipo }) ? `
-      ${partnerPaid() ? "" : renderAccountsSection()}
-
-      ${state.tipo === "refund" ? renderRefundPicker() : ""}
-
-      <div style="display:flex; gap:8px; margin-bottom:12px;">
-        <label class="field field-stack" style="flex:1;">
-          <span style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-            <span class="field-label">${t("common.merchant")}</span>
-            ${state.merchantRemembered ? `<span style="font-size:11px; font-weight:500; color:var(--accent);">${t("registro.merchant.remembered")}</span>` : ""}
-          </span>
-          <input type="text" id="reg-merchant" list="reg-merchants" value="${escAttr(state.merchant)}" placeholder="${t("common.optional")}">
-        </label>
-        <label class="field field-stack" style="flex:1;">
-          <span class="field-label">${t("common.date")}</span>
-          <input type="date" id="reg-fecha" value="${state.fecha}">
-        </label>
-      </div>
+        ${displayFootHtml()}
+      </section>
       <datalist id="reg-merchants">
         ${merchantOptions.map((e) => `<option value="${escAttr(e.display)}"></option>`).join("")}
       </datalist>
+      ${chips.length ? `<div class="reg-chips">${chips.join("")}</div>` : ""}
+      ${micAvailable() ? `<p class="reg-help">${t("registro.natural.micNotice")}</p>` : ""}
 
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">${t("movimientos.detail.tagLabel")}</div>
-        ${renderTagControl()}
-      </div>
+      ${state.tipo === "refund" ? refundPickerHtml() : ""}
 
-      ${attachments?.available() ? (() => {
-        // Foto del ticket (N5, §9.3): el módulo devuelve un Blob, nunca una URL — la pantalla es
-        // dueña del par crear/revocar. Se reutiliza la URL ya creada mientras state.photo no
-        // cambie de referencia (evita filtrar una foto por cada repintado); el onchange de
-        // #reg-photo-input (wire()) es quien revoca la anterior al elegir una nueva.
-        if (state.photo && !photoObjectUrl) photoObjectUrl = URL.createObjectURL(state.photo);
-        if (!state.photo && photoObjectUrl) { URL.revokeObjectURL(photoObjectUrl); photoObjectUrl = null; }
-        return `
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:18px;">
-        ${state.photo ? `
-        <div style="position:relative; flex-shrink:0;">
-          <img src="${escAttr(photoObjectUrl)}" alt="" style="width:44px;height:44px;object-fit:cover;background:var(--surface-2);border:1px solid var(--hairline-strong);display:block;">
-          <button type="button" id="reg-photo-remove" aria-label="${escAttr(t("registro.photo.remove"))}"
-            style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:1px solid var(--hairline-strong);background:var(--surface-1);color:var(--ink-3);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;">
-            ${icon("close", { size: 11 })}
-          </button>
-        </div>` : ""}
-        <button type="button" id="reg-photo-btn" style="height:44px;border-radius:999px;border:1px solid var(--hairline-strong);background:transparent;color:var(--ink-3);font-size:13px;font-weight:500;padding:0 14px;display:inline-flex;align-items:center;gap:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-          ${icon("camera", { size: 18 })}${state.photo ? t("registro.photo.replace") : t("registro.photo.add")}
-        </button>
-        <input type="file" id="reg-photo-input" accept="image/*" capture="environment" style="display:none">
-      </div>`;
-      })() : ""}
+      ${cats.length ? `${chosenHtml()}${categoryGridHtml(cats)}` : ""}
 
-      <label class="field field-stack" style="margin-bottom:18px;">
-        <span class="field-label">${t("common.note")}</span>
-        <input type="text" id="reg-note" value="${escAttr(state.note)}" placeholder="${t("common.optional")}">
-      </label>
-
-      ${needsCategory(state.tipo) && state.tipo !== "income" && partnerName ? `
-      <div class="card" style="border-radius:0; padding:0 16px; margin-bottom:18px;">
-        <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
-          <span style="font-size:15px; font-weight:600;">${t("common.sharedWith", { name: escHtml(partnerName) })}</span>
-          <span class="toggle">
-            <input type="checkbox" id="reg-shared" ${state.isShared ? "checked" : ""}>
-            <span class="toggle-track"><span class="toggle-knob"></span></span>
-          </span>
-        </label>
-        ${state.isShared ? `
-        <div style="display:flex; flex-direction:column; gap:10px; padding:0 0 14px;">
-          ${state.tipo === "expense" ? `
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <div class="section-title">${t("common.paidBy.label")}</div>
-            <div class="segmented" style="border-radius:999px;">
-              <button type="button" data-paidby="me" class="${state.paidBy === "me" ? "active" : ""}"
-                style="flex:1;border-radius:999px;${state.paidBy === "me" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("common.paidBy.me")}</button>
-              <button type="button" data-paidby="partner" class="${state.paidBy === "partner" ? "active" : ""}"
-                style="flex:1;border-radius:999px;${state.paidBy === "partner" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("common.paidBy.partner", { name: escHtml(partnerName) })}</button>
-            </div>
-          </div>` : ""}
-          <div style="display:flex; align-items:center; gap:10px;">
-            <div style="flex:1; min-width:0;">
-              <div style="font-size:14px; font-weight:600;">${t("common.split.label")}</div>
-              <div style="font-size:11px; color:var(--text-3);">${t("common.split.hint", { name: escHtml(partnerName), pct: 100 - state.sharePct })}</div>
-            </div>
-            <button type="button" id="reg-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
-            <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${state.sharePct} %</div>
-            <button type="button" id="reg-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
-          </div>
-          <div style="display:flex; gap:8px;">
-            <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
-              <div style="font-size:10px; color:var(--text-3);">${metaHtml([t("common.myShare"), t("common.pctValue", { pct: state.sharePct })])}</div>
-              <div class="num" id="reg-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
-            </div>
-            <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
-              <div style="font-size:10px; color:var(--text-3);">${partnerPaid() ? metaHtml([t("common.paidByName", { name: partnerName }), t("common.paidTotal")]) : metaHtml([partnerName, t("common.pctValue", { pct: 100 - state.sharePct })])}</div>
-              <div class="num" id="reg-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerPaid() ? state.cents : partnerCents)}</div>
-            </div>
-          </div>
-        </div>` : ""}
+      ${warning ? `
+      <div class="reg-limit is-${warning.level}" id="reg-limit-band" role="status" aria-live="polite">
+        ${icon("warn", { size: 18 })}<span id="reg-limit-text">${limitBandHtml(warning)}</span>
       </div>` : ""}
-      ` : moreRowHtml()}
 
-      ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
+      ${open ? `
+      ${accountRowsHtml()}
+      ${extrasRowHtml()}
+      ${sharedDetailHtml(myCents, partnerCents)}
+      ${photoHtml()}
+      ${tagControlHtml()}
+      ${noteVisible() ? fieldHtml({ id: "reg-note", label: t("common.note"), value: state.note }) : ""}
+      ${extraTypesHtml()}` : moreRowHtml()}
 
-      <button type="button" class="btn-primary" id="reg-save" style="${saveStyle}">${saveLabel}</button>
-    `;
+      ${errorMsg ? `<div class="reg-error" role="alert">${icon("warn", { size: 18 })}<span>${escHtml(errorMsg)}</span></div>` : ""}
+
+      <button type="button" class="btn-primary reg-save" id="reg-save">${saveLabelHtml(state.tipo, state.cents)}</button>
+    </div>`;
 
     wire();
+  }
+
+  function setTipo(tipo) {
+    if (tipo === state.tipo) return;
+    state.tipo = tipo;
+    state.categoryId = null;
+    state.openRoot = null;
+    state.refId = "";
+    state.refundPickerOpen = false;
+    state.counterAccountId = "";
+    state.accPicker = null;
+    // Mismo criterio que el guard B4 de ingresos: un 'partner' heredado no puede colarse con el
+    // control oculto (solo se pinta para expense).
+    state.paidBy = "me";
+    // Un touched de un tipo anterior no tiene sentido para el tipo nuevo.
+    state.touched = new Set();
+    state.typeMoreOpen = false;
+    // M-4 (revisión de código): un chip de una interpretación anterior no debe sobrevivir al
+    // cambio de tipo. micOff SÍ sobrevive: es de sesión de pantalla.
+    state.natural = { text: "", parsed: null, listening: false, micOff: state.natural.micOff };
+    lastInterpreted = null;
+    errorMsg = "";
+    render();
   }
 
   function wire() {
@@ -705,10 +726,18 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       onDone();
     };
 
+    // render() rehace el DOM: el foco vuelve al radio elegido para que las flechas sigan (K12).
+    const typeSeg = container.querySelector("#reg-type");
+    if (typeSeg) wireSegmented(typeSeg, (v) => {
+      setTipo(v);
+      container.querySelector(`#reg-type [data-value="${v}"]`)?.focus();
+    });
+    container.querySelectorAll("[data-tipo]").forEach((b) => { b.onclick = () => setTipo(b.dataset.tipo); });
+    const typeMoreBtn = container.querySelector("#reg-type-more");
+    if (typeMoreBtn) typeMoreBtn.onclick = () => { state.typeMoreOpen = !state.typeMoreOpen; render(); };
+
     // PB-1 · Lenguaje natural (Registro v2 §8.6): un único camino de interpretación para el texto,
-    // Enter, blur y el resultado de voz. El oninput de la caja SOLO guarda el texto y NUNCA repinta
-    // ni interpreta — repintar en cada tecla mataría el cursor, mismo criterio que #reg-raw/
-    // #reg-merchant/#reg-tag-new-input.
+    // Enter, blur y el resultado de voz. El oninput SOLO guarda el texto y NUNCA repinta.
     const natInput = container.querySelector("#reg-nat-input");
     if (natInput) {
       natInput.oninput = (e) => { state.natural.text = e.target.value; };
@@ -719,14 +748,9 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         applyNatural(natInput.value);
         focusInput(container.querySelector("#reg-raw"));
       };
-      // D-5 (revisión de código): en el estado interpretado no hay `<input>` (naturalBoxHtml
-      // cambia de rama), así que un `applyNatural` síncrono en el blur reconstruye el `innerHTML`
-      // ANTES de que el click que provocó el blur llegue a su objetivo (importe/categoría/
-      // «Guardar») — el primer toque se perdía. Diferir con un `setTimeout(0)` deja que ese click
-      // termine de despachar sobre el DOM de ahora antes de repintar. `lastInterpreted` evita
-      // reinterpretar (y repintar) un texto que no ha cambiado desde la última vez — así un blur
-      // sin edición real no vuelve a mover nada bajo el dedo. `alive` cubre el caso de haber
-      // cerrado Registro entre el blur y el propio `setTimeout`.
+      // D-5 (revisión de código): un applyNatural síncrono en el blur reconstruye el innerHTML
+      // ANTES de que el click que provocó el blur llegue a su objetivo — el primer toque se perdía.
+      // Diferir con setTimeout(0) deja que ese click termine de despachar.
       natInput.onblur = () => {
         const value = natInput.value;
         if (!value.trim() || value === lastInterpreted) return;
@@ -740,11 +764,13 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
 
     const natMicBtn = container.querySelector("#reg-nat-mic");
     if (natMicBtn) natMicBtn.onclick = () => {
+      // Un segundo toque mientras escucha crearía otro reconocedor (y rompería stop()/micOff): el
+      // botón ni se pinta con `listening`, y esta guarda cubre un doble toque antes del repintado.
+      if (state.natural.listening) return;
       state.natural.listening = true;
       render();
       speech.start(
-        // D-4: guard de vida — un resultado que llega después de cerrar Registro no debe repintar
-        // encima de la pantalla que haya quedado detrás.
+        // D-4: guard de vida — un resultado que llega después de cerrar Registro no repinta.
         (resultText) => {
           if (!alive) return;
           state.natural.listening = false;
@@ -764,102 +790,86 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
 
     const natReset = container.querySelector("#reg-nat-reset");
     if (natReset) natReset.onclick = () => {
-      // micOff NO se resetea: es de sesión de pantalla (spec §8.6), sobrevive a «Borrar». Tampoco
-      // deshace lo que ya rellenó en el formulario — eso lo edita el usuario campo a campo.
+      // micOff NO se resetea (es de sesión de pantalla). Tampoco deshace lo ya rellenado.
       state.natural = { text: "", parsed: null, listening: false, micOff: state.natural.micOff };
       lastInterpreted = null;
       render();
+      focusInput(container.querySelector("#reg-nat-input"));
     };
 
     container.querySelectorAll("[data-nat-chip]").forEach((b) => {
       b.onclick = () => {
         const field = b.dataset.natChip;
-        // Solo comercio y compartido viven dentro del bloque plegable de "Más" (registro.js real:
-        // la rejilla de categorías y el importe están SIEMPRE visibles, nunca detrás de "Más" —
-        // desviación de la redacción literal de la spec §8.6 respecto al código real, que pide
-        // "despliega Más si hace falta" también para el chip de categoría; se resuelve a favor del
-        // código, que ya garantiza la categoría elegida visible vía visibleCategories, :429).
-        const needsExpand = (field === "merchant" || field === "shared")
-          && !detailsOpen({ quick: state.quick, expanded: state.expanded, tipo: state.tipo });
-        if (needsExpand) state.expanded = true;
-        render();
-        if (field === "amount") {
-          focusInput(container.querySelector("#reg-raw"));
-        } else if (field === "category" && state.categoryId) {
-          container.querySelector(`[data-cat="${state.categoryId}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
-        } else if (field === "merchant") {
-          focusInput(container.querySelector("#reg-merchant"));
-        } else if (field === "shared") {
-          container.querySelector("#reg-shared")?.scrollIntoView({ block: "nearest" });
-        }
+        // Comercio y compartido viven tras «Más» en el registro rápido plegado: se despliega.
+        if ((field === "merchant" || field === "shared") && !formOpen()) { state.expanded = true; render(); }
+        if (field === "amount") focusInput(container.querySelector("#reg-raw"));
+        else if (field === "category") container.querySelector(".ent-chosen, .reg-grid-wrap")?.scrollIntoView({ block: "nearest" });
+        else if (field === "merchant") focusInput(container.querySelector("#reg-merchant"));
+        else if (field === "shared") container.querySelector("#reg-shared-row")?.scrollIntoView({ block: "nearest" });
       };
     });
 
-    container.querySelectorAll("[data-tipo]").forEach((b) => {
+    // Rejilla: una raíz sin hijas se elige; una con hijas despliega o pliega su panel.
+    container.querySelectorAll("[data-root]").forEach((b) => {
       b.onclick = () => {
-        state.tipo = b.dataset.tipo;
-        state.categoryId = null;
-        state.refId = "";
-        state.refundPickerOpen = false;
-        state.counterAccountId = "";
-        // Mismo criterio que el guard B4 de ingresos: un 'partner' heredado no puede colarse con el
-        // control oculto (solo se pinta para expense).
-        state.paidBy = "me";
-        // Un touched de un tipo anterior (p.ej. categoryId de un gasto) no tiene sentido para el
-        // tipo nuevo — categoryId ya se acaba de borrar dos líneas arriba.
-        state.touched = new Set();
-        // Cierra el desplegable manual: typeSelectorHtml lo reabre solo si el tipo elegido es uno
-        // de los tres que vive dentro de él.
-        state.typeMoreOpen = false;
-        // M-4 (revisión de código): un chip de una interpretación anterior no debe sobrevivir al
-        // cambio de tipo — apuntaría a una categoryId que el guard de arriba acaba de poner a
-        // null. micOff SÍ sobrevive: es de sesión de pantalla, mismo criterio que #reg-nat-reset.
-        state.natural = { text: "", parsed: null, listening: false, micOff: state.natural.micOff };
-        lastInterpreted = null;
-        errorMsg = "";
+        const root = b.dataset.root;
+        const group = categoryGroups(categoriesFor()).find((g) => g.root === root);
+        if (group?.direct) {
+          state.categoryId = root;
+          state.openRoot = "";
+          state.touched.add("categoryId");
+          state.merchantRemembered = false;
+          errorMsg = "";
+        } else {
+          const isOpen = b.getAttribute("aria-expanded") === "true";
+          state.openRoot = isOpen ? "" : root;
+        }
         render();
       };
     });
-
-    const typeMoreBtn = container.querySelector("#reg-type-more");
-    if (typeMoreBtn) typeMoreBtn.onclick = () => {
-      state.typeMoreOpen = !state.typeMoreOpen;
-      render();
-    };
-
     container.querySelectorAll("[data-cat]").forEach((b) => {
       b.onclick = () => {
         state.categoryId = b.dataset.cat;
+        state.openRoot = null;
         state.touched.add("categoryId");
+        state.merchantRemembered = false;
         errorMsg = "";
         render();
       };
     });
 
-    container.querySelectorAll("[data-paidby]").forEach((b) => {
+    container.querySelectorAll("[data-acc-toggle]").forEach((b) => {
       b.onclick = () => {
-        // state.accountId NO se borra: volver a «Pagué yo» recupera la cuenta ya seleccionada.
-        state.paidBy = b.dataset.paidby;
-        state.touched.add("paidBy");
-        errorMsg = "";
+        const which = b.dataset.accToggle;
+        state.accPicker = state.accPicker === which ? null : which;
         render();
       };
     });
-
     container.querySelectorAll("[data-acc]").forEach((b) => {
       b.onclick = () => {
         state.accountId = b.dataset.acc;
         state.touched.add("accountId");
         if (state.counterAccountId === state.accountId) state.counterAccountId = "";
+        state.accPicker = null;
+        render();
+      };
+    });
+    container.querySelectorAll("[data-counter-acc]").forEach((b) => {
+      b.onclick = () => {
+        state.counterAccountId = b.dataset.counterAcc;
+        state.accPicker = null;
         render();
       };
     });
 
-    container.querySelectorAll("[data-counter-acc]").forEach((b) => {
-      b.onclick = () => {
-        state.counterAccountId = b.dataset.counterAcc;
-        render();
-      };
+    const paidBySeg = container.querySelector("#reg-paidby");
+    if (paidBySeg) wireSegmented(paidBySeg, (v) => {
+      // state.accountId NO se borra: volver a «Pagué yo» recupera la cuenta ya seleccionada.
+      state.paidBy = v;
+      state.touched.add("paidBy");
+      errorMsg = "";
+      render();
+      container.querySelector(`#reg-paidby [data-value="${v}"]`)?.focus();
     });
 
     const signBtn = container.querySelector("#reg-sign");
@@ -872,6 +882,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       state.raw = e.target.value;
       state.cents = parseCentsRaw(state.raw);
       errorMsg = "";
+      e.target.style.width = amountWidth(state.raw);
       const { mine: myCents, partner: partnerCents } = splitCents(state.cents, state.sharePct);
       const mineEl = container.querySelector("#reg-split-mine");
       const partnerEl = container.querySelector("#reg-split-partner");
@@ -879,23 +890,15 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         mineEl.textContent = fmtMoney(myCents);
         partnerEl.textContent = fmtMoney(partnerPaid() ? state.cents : partnerCents);
       }
-      // Registro v2 §4.3: el CTA lleva el importe en vivo — nunca un render() completo aquí
-      // (mataría el cursor del input, mismo criterio que el reparto de arriba).
-      if (state.tipo === "expense") {
-        container.querySelector("#reg-save").textContent = state.cents > 0
-          ? t("registro.save.expenseWithAmount", { amount: fmtMoney(state.cents) })
-          : t(SAVE_KEY.expense);
-      }
-      // Registro v2 §6.2: la banda de límite se recalcula en el oninput y se PARCHEA (texto +
-      // clase), igual que el reparto de arriba — nunca render() completo aquí. La banda solo
-      // existe ya en el DOM si categoría+límite estaban puestos en el último render(): typing el
-      // importe nunca hace aparecer ni desaparecer la banda, solo cambia su contenido.
+      // El CTA lleva el importe en vivo — nunca un render() completo aquí (mataría el cursor).
+      container.querySelector("#reg-save").innerHTML = saveLabelHtml(state.tipo, state.cents);
+      // Registro v2 §6.2: la banda de límite se PARCHEA (texto + clase), nunca render() aquí.
       const limitBandEl = container.querySelector("#reg-limit-band");
       if (limitBandEl && state.tipo === "expense") {
         const w = limitWarning({ categoryId: state.categoryId, amountCents: state.isShared ? myCents : state.cents, byId, spentByRoot, budgetByCategory });
         if (w) {
-          limitBandEl.className = `limit-band ${w.level}`;
-          limitBandEl.querySelector("#reg-limit-text").textContent = limitBandText(w);
+          limitBandEl.className = `reg-limit is-${w.level}`;
+          limitBandEl.querySelector("#reg-limit-text").innerHTML = limitBandHtml(w);
         }
       }
     };
@@ -905,41 +908,45 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       state.refundPickerOpen = !state.refundPickerOpen;
       render();
     };
-
     container.querySelectorAll("[data-refund-row]").forEach((b) => {
       b.onclick = () => {
         const row = refundCandidates.find((r) => r.id === b.dataset.refundRow);
         if (row) selectRefundRow(row);
       };
     });
-
     const unlinkBtn = container.querySelector("#reg-refund-unlink");
     if (unlinkBtn) unlinkBtn.onclick = () => clearRefundLink();
 
-    // Registro v2 §4.3: los tres viven dentro del bloque que se pliega tras «Más» en modo rápido
-    // — sin el guard, wire() lanzaría al no encontrar el elemento con el bloque plegado.
+    const catsMoreBtn = container.querySelector("#reg-cats-more");
+    if (catsMoreBtn) catsMoreBtn.onclick = () => { state.allCats = true; render(); };
+    const moreToggle = container.querySelector("#reg-more-toggle");
+    if (moreToggle) moreToggle.onclick = () => {
+      state.expanded = true;
+      render();
+      // Invariante de foco (§4.5): SOLO desde el handler, nunca desde render().
+      focusInput(container.querySelector("#reg-merchant"));
+    };
+
     const merchantInput = container.querySelector("#reg-merchant");
     if (merchantInput) merchantInput.oninput = (e) => {
       state.merchant = e.target.value;
-      // Registro v2 §5.4: casar EXACTO por valor normalizado, nunca por prefijo (rellenaría la
-      // categoría a media palabra). Todo lo rellenado es editable y respeta `touched`
-      // (memoryPatch). Un render() completo hace falta porque el parche puede tocar categoría,
-      // cuenta y el toggle de compartido a la vez — se refoca el propio campo desde AQUÍ, nunca
-      // desde render() (mismo criterio que el «Más», §4.5).
+      // Registro v2 §5.4: casar EXACTO por valor normalizado, nunca por prefijo. Todo lo rellenado
+      // es editable y respeta `touched` (memoryPatch). Un render() completo hace falta porque el
+      // parche puede tocar categoría, cuenta y compartido a la vez — se refoca el propio campo
+      // desde AQUÍ, nunca desde render().
       const entry = merchantMemoryMap[normalizeMerchant(state.merchant)];
       if (entry) {
         // merchantHistory mezcla expense/income/refund del mismo comercio: la categoría recordada
-        // puede ser de un tipo distinto al que se está rellenando ahora (merchant-memory.js#memoryPatch).
+        // puede ser de un tipo distinto al que se está rellenando (memoryPatch lo filtra).
         const patch = memoryPatch(entry, state.touched, categoriesFor().map((c) => c.id));
-        // Sin pareja, el toggle de compartido ni se pinta (línea 408): un isShared/paidBy/sharePct
-        // recordado de cuando SÍ había pareja (partnerName cambiado o borrado desde entonces)
-        // colaría un partnerPaid() falso y ocultaría la cuenta como obligatoria sin decirlo.
+        // Sin pareja, el interruptor de compartido ni se pinta: un isShared/paidBy/sharePct
+        // recordado de cuando SÍ había pareja colaría un partnerPaid() falso.
         if (!partnerName) { delete patch.isShared; delete patch.paidBy; delete patch.sharePct; }
         Object.assign(state, patch);
-        // share_pct_override llega crudo de la BD (REAL, puede venir fuera de rango): se normaliza
-        // igual que cualquier otro pct que entra desde fuera del propio stepper.
+        if ("categoryId" in patch) state.openRoot = null;
+        // share_pct_override llega crudo de la BD (REAL, puede venir fuera de rango).
         if ("sharePct" in patch) state.sharePct = normalizePct(patch.sharePct, state.sharePct);
-        state.merchantRemembered = true;
+        state.merchantRemembered = "categoryId" in patch;
         render();
         focusInput(container.querySelector("#reg-merchant"));
       } else if (state.merchantRemembered) {
@@ -948,14 +955,24 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         focusInput(container.querySelector("#reg-merchant"));
       }
     };
+
     const noteInput = container.querySelector("#reg-note");
     if (noteInput) noteInput.oninput = (e) => { state.note = e.target.value; };
-    const fechaInput = container.querySelector("#reg-fecha");
-    if (fechaInput) fechaInput.onchange = (e) => { state.fecha = e.target.value || hoyISO(); };
+    const noteBtn = container.querySelector("#reg-note-btn");
+    if (noteBtn) noteBtn.onclick = () => {
+      state.noteOpen = !noteVisible();
+      render();
+      if (state.noteOpen) focusInput(container.querySelector("#reg-note"));
+    };
 
-    // Foto del ticket (N5, Registro v2 §9.4): el botón dispara el input oculto (patrón exacto de
-    // #btn-n26-import/#n26-file-input, ajustes.js), que comprime la foto elegida y la guarda en
-    // state.photo — el fichero no se escribe en OPFS hasta el guardado (ver el handler de abajo).
+    const fechaInput = container.querySelector("#reg-fecha");
+    if (fechaInput) fechaInput.onchange = (e) => { state.fecha = e.target.value || hoyISO(); render(); };
+    // En escritorio el input de fecha transparente solo abre el calendario desde su icono: se pide
+    // explícitamente. Donde showPicker no existe, el toque nativo ya lo abre.
+    if (fechaInput) fechaInput.onclick = () => { try { fechaInput.showPicker?.(); } catch { /* sin gesto válido */ } };
+
+    // Foto del ticket (N5, Registro v2 §9.4): el botón dispara el input oculto, que comprime la
+    // foto elegida y la guarda en state.photo — no se escribe en OPFS hasta el guardado.
     const photoBtn = container.querySelector("#reg-photo-btn");
     if (photoBtn) photoBtn.onclick = () => container.querySelector("#reg-photo-input").click();
     const photoInput = container.querySelector("#reg-photo-input");
@@ -967,9 +984,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         const compressed = await compressImage(file);
         // D-4: compressImage es async — si Registro se cerró mientras comprimía, no repintar.
         if (!alive) return;
-        // Reemplazar una foto ya elegida ("Otra foto"): la URL vieja apunta al Blob viejo y
-        // render() no la recrearía sola (solo lo hace cuando photoObjectUrl está a null) — sin
-        // esto la miniatura se queda enseñando la foto anterior mientras se guarda la nueva.
+        // Reemplazar una foto ya elegida: la URL vieja apunta al Blob viejo.
         if (photoObjectUrl) { URL.revokeObjectURL(photoObjectUrl); photoObjectUrl = null; }
         state.photo = compressed;
         render();
@@ -982,12 +997,10 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     const photoRemoveBtn = container.querySelector("#reg-photo-remove");
     if (photoRemoveBtn) photoRemoveBtn.onclick = () => { state.photo = null; render(); };
 
-    // Selector de etiqueta (Task 13): mismo criterio que movimientos.js#wireDetail — puro estado
-    // de UI hasta guardar. Invariante del foco (§4.5): SOLO el handler de «Nueva etiqueta» pide
-    // foco tras su propio render(), nunca desde render() en sí — el foco de #reg-raw al arrancar
-    // la pantalla (línea final de renderRegistro) no debe volver a robarse en cada repintado.
-    const tagChip = container.querySelector("#reg-tag-chip");
-    if (tagChip) tagChip.onclick = () => { state.tagPickerOpen = true; render(); };
+    // Selector de etiqueta (Task 13): puro estado de UI hasta guardar. SOLO el handler de «Nueva
+    // etiqueta» pide foco tras su propio render(), nunca desde render() en sí.
+    const tagBtn = container.querySelector("#reg-tag-btn");
+    if (tagBtn) tagBtn.onclick = () => { state.tagPickerOpen = !state.tagPickerOpen; state.newTagDraft = null; render(); };
     container.querySelectorAll("[data-tag-pick]").forEach((b) => {
       b.onclick = () => {
         state.tagId = b.dataset.tagPick || null;
@@ -1004,8 +1017,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     };
     const tagNewInput = container.querySelector("#reg-tag-new-input");
     if (tagNewInput) {
-      // Sin render() en oninput (perdería el foco, mismo motivo que #reg-raw/#reg-merchant): el
-      // valor tecleado solo se lee al pulsar guardar o Enter, ver submitNewTag.
+      // Sin render() en oninput (perdería el foco): el valor solo se lee al guardar o con Enter.
       tagNewInput.oninput = (e) => { state.newTagDraft = e.target.value; };
       tagNewInput.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); submitNewTag(); } };
     }
@@ -1029,29 +1041,16 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       }
     }
 
-    const catsMoreBtn = container.querySelector("#reg-cats-more");
-    if (catsMoreBtn) catsMoreBtn.onclick = () => {
-      state.allCats = true;
-      render();
-    };
-
-    const moreToggle = container.querySelector("#reg-more-toggle");
-    if (moreToggle) moreToggle.onclick = () => {
-      state.expanded = true;
-      render();
-      // Invariante de foco (§4.5): SOLO desde el handler, nunca desde render() — si no, cada
-      // repintado (p.ej. tocar un chip de categoría) robaría el foco al importe.
-      focusInput(container.querySelector("#reg-merchant"));
-    };
-
-    const sharedToggle = container.querySelector("#reg-shared");
-    if (sharedToggle) sharedToggle.onchange = (e) => {
-      state.isShared = e.target.checked;
+    // Interruptor de compartido: toda la píldora lo acciona (el switch es su parte visible).
+    const sharedRow = container.querySelector("#reg-shared-row");
+    if (sharedRow) sharedRow.onclick = () => {
+      state.isShared = !state.isShared;
       state.touched.add("isShared");
-      // Desmarcar compartido devuelve el gasto a «Pagué yo»: sin esto un 'partner' heredado
+      // Apagar compartido devuelve el gasto a «Pagué yo»: sin esto un 'partner' heredado
       // sobreviviría con el control oculto y la cuenta volvería a ser obligatoria sin decirlo.
       state.paidBy = "me";
       render();
+      container.querySelector("#reg-shared")?.focus();
     };
 
     const pctDown = container.querySelector("#reg-pct-down");
@@ -1088,10 +1087,8 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
           counterAccountId: state.tipo === "transfer" ? state.counterAccountId : "",
           merchant: state.merchant,
           note: state.note,
-          // B4 ruling: el reparto ya no se OFRECE para ingresos (incomeOfPeriod sigue contando
-          // al 100%, ver sql.js) — este guard evita que un isShared heredado (p.ej. prefill de
-          // una regla recurrente marcada compartida, inicio.js) se cuele en el guardado aunque
-          // el toggle esté oculto para tipo=income.
+          // B4 ruling: el reparto ya no se OFRECE para ingresos — este guard evita que un isShared
+          // heredado (p.ej. prefill de una regla recurrente) se cuele en el guardado.
           isShared: effectiveIsShared,
           sharePctOverride: effectiveIsShared ? state.sharePct : null,
           paidBy: partnerPaid() ? "partner" : "me",
@@ -1099,54 +1096,24 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
           ruleId: state.ruleId,
           tagId: state.tagId || "",
         });
-        // Foto del ticket (N5, §9.4): SIEMPRE DESPUÉS de que newId exista y ANTES de onDone() (la
-        // pantalla ya cedió el sitio después). Orden que protege lo que importa: si la foto falla,
-        // el gasto YA está guardado — addTransaction se llamó sin hasAttachment (default false).
+        // Foto del ticket (N5, §9.4): SIEMPRE DESPUÉS de que newId exista y ANTES de onDone(). Si
+        // la foto falla, el gasto YA está guardado (addTransaction sin hasAttachment).
         if (state.photo) {
           try {
             await attachments.put(newId, state.photo);
             await setAttachmentFlag(newId, true);
           } catch { showToast(t("registro.photo.savedWithout")); }
         }
-        // D-3/D-4: guardar con éxito es el otro punto de salida de la pantalla (el primero es
-        // #reg-close, arriba) — se apaga la vida y se sueltan el reconocedor y la URL del Blob.
+        const periodLines = await receiptPeriodLines();
+        // Si se cerró Registro mientras se leían las cifras del periodo, no se toca `container`
+        // (ya es otra pantalla): el gasto está guardado igual.
+        if (!alive) return;
+        // D-3/D-4: guardar con éxito es el otro punto de salida de la pantalla.
         alive = false;
         speech?.stop();
         releasePhotoUrl();
-        onDone();   // primero: el ticket cae sobre la pantalla ya repintada (ReciboGuardado.dc.html)
-        const [y, m, d] = state.fecha.split("-");
-        const now = new Date();
-        const pad = (n) => String(n).padStart(2, "0");
-        showReceipt({
-          dateTime: `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}  ${pad(now.getHours())}:${pad(now.getMinutes())}`,
-          lines: [
-            { label: t("common.merchant"), value: state.merchant || "" },
-            { label: t("common.category"), value: withCategory ? (byId[state.categoryId]?.name ?? "") : "" },
-            { label: t("common.account"), value: accountsAll.find((a) => a.id === effectiveAccountId)?.name ?? "" },
-            { label: t("common.date"), value: `${d}/${m}/${y}` },
-            { label: t("recibo.tagLabel"), value: state.tagId ? tagName(state.tagId) : "" },
-            { label: t("common.split.label"), value: effectiveIsShared ? `${partnerName} ${state.sharePct} %` : "" },
-            { label: t("recibo.myPart"), value: effectiveIsShared ? fmtMoney(splitCents(state.cents, state.sharePct).mine) : "" },
-          ],
-          total: fmtMoneyParts(state.cents),
-          stampDate: `${fmtDiaCorto(hoyISO()).toUpperCase()} ${now.getFullYear()}`,
-          labels: { brand: "BaseCero", stamp: t("recibo.stamp"), total: t("recibo.total"), undo: t("recibo.undo") },
-          onUndo: async () => {
-            try {
-              // Borrado LÓGICO (softDeleteTransaction), NUNCA un DELETE: si lo que se acaba de
-              // guardar era una devolución/ajuste enlazado por refId, addTransaction ya puso
-              // settled=1 en el gasto que enlaza (repo.js) — solo la rama refund/adjustment de
-              // softDeleteTransaction (repo.js:399-403) deshace ese settled con
-              // unsettleIfNoActiveSettlements. Un DELETE dejaría ese gasto marcado como liquidado
-              // por un apunte que ya no existe.
-              await softDeleteTransaction(newId);
-              showToast(t("recibo.undone"));
-              onUndone?.();
-            } catch (e) {
-              showToast(t("recibo.undoFailed", { error: userMessage(e) }));
-            }
-          },
-        });
+        onDone();   // primero: el ticket cae sobre la pantalla ya repintada
+        showReceipt({ ...receiptData(newId, withCategory, effectiveIsShared, effectiveAccountId), periodLines });
       } catch (e) {
         btn.disabled = false;
         errorMsg = t("common.saveFailed", { error: userMessage(e) });
@@ -1155,14 +1122,86 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     };
   }
 
+  /** «Quedan en septiembre» y «Hoy puedes gastar» del recibo (B-Recibo): las MISMAS cuentas que el
+   *  Display de Inicio (disponibleHtml) —límites del periodo menos lo gastado, y
+   *  inicio-logic#dailyAllowanceCents con lo comprometido de previsionOfPeriod—, leídas DESPUÉS de
+   *  guardar para que incluyan este gasto y coincidan con el Inicio que se repinta detrás. Sin
+   *  límites (Inicio tampoco pinta el disponible) o si algo falla, no hay líneas: el recibo nunca
+   *  bloquea el guardado. */
+  async function receiptPeriodLines() {
+    if (!period) return [];
+    try {
+      const [spentNow, budgetsNow, prevision] = await Promise.all([
+        spentOfPeriod(period.id), budgetsOfPeriod(period.id), previsionOfPeriod(period),
+      ]);
+      const budgetTotal = Object.values(budgetMap(budgetsNow)).reduce((s, c) => s + c, 0);
+      if (!budgetTotal) return [];
+      const hoy = hoyISO();
+      const disponible = budgetTotal - spentNow;
+      const allowance = dailyAllowanceCents(disponible, prevision.comprometidoCents, period.start_date, hoy);
+      const monthIdx = periodMonth(period.start_date, period.end_date) - 1;
+      const month = new Date(2000, monthIdx, 15).toLocaleDateString(appLocale(), { month: "long" });
+      return [
+        // C4: un disponible negativo es un «−» que avisa → la cifra en --neg, como el aviso de límite.
+        { label: t("recibo.left", { month }), value: fmtMoney(disponible), num: true, neg: disponible < 0 },
+        // Mismo suelo que Inicio: sin margen se enseña 0, no una cifra negativa por día.
+        { label: t("recibo.today"), value: fmtMoney(Math.max(0, allowance)), num: true },
+      ];
+    } catch {
+      return [];
+    }
+  }
+
+  /** Datos del recibo (B-Recibo): comercio y tipo, la ficha de la categoría, cuenta con su muestra,
+   *  fecha, etiqueta y reparto. */
+  function receiptData(newId, withCategory, effectiveIsShared, effectiveAccountId) {
+    const [y, m, d] = state.fecha.split("-");
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const cat = withCategory ? byId[state.categoryId] : null;
+    const root = cat ? rootOf(cat.id, byId) : null;
+    const catPath = cat ? (root && root !== cat.id && byId[root] ? `${byId[root].name} › ${cat.name}` : cat.name) : "";
+    const fam = cat ? catFam(cat.id) : null;
+    const typeLabel = t(TIPO_LABEL[state.tipo]);
+    const account = accountsAll.find((a) => a.id === effectiveAccountId);
+    const counter = state.tipo === "transfer" ? accountsAll.find((a) => a.id === state.counterAccountId) : null;
+    const merchant = state.merchant.trim();
+    return {
+      dateTime: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+      title: merchant || cat?.name || typeLabel,
+      subtitle: typeLabel,
+      badge: cat ? { fam, income: state.tipo === "income", icon: iconForCategory(cat.id, byId), label: catPath } : null,
+      lines: [
+        { label: state.tipo === "transfer" ? t("common.from") : t("common.account"), value: account?.name ?? "", fam: accountFam(account) },
+        { label: t("common.to"), value: counter?.name ?? "", fam: accountFam(counter) },
+        { label: t("common.date"), value: state.fecha === hoyISO() ? t("registro.date.today") : `${d}/${m}/${y}` },
+        { label: t("recibo.tagLabel"), value: state.tagId ? tagName(state.tagId) : "" },
+        { label: t("common.split.label"), value: effectiveIsShared ? `${partnerName} ${state.sharePct} %` : "" },
+        { label: t("recibo.myPart"), value: effectiveIsShared ? fmtMoney(splitCents(state.cents, state.sharePct).mine) : "", num: true },
+      ],
+      total: fmtMoneyParts(state.cents),
+      stampDate: `${fmtDiaCorto(hoyISO())} ${now.getFullYear()}`,
+      stampFam: fam,
+      labels: { brand: "BaseCero", stamp: t("recibo.stamp"), total: t("recibo.total"), undo: t("recibo.undo") },
+      onUndo: async () => {
+        try {
+          // Borrado LÓGICO (softDeleteTransaction), NUNCA un DELETE: si lo que se acaba de guardar
+          // era una devolución/ajuste enlazado por refId, addTransaction ya puso settled=1 en el
+          // gasto que enlaza — solo la rama refund/adjustment de softDeleteTransaction deshace ese
+          // settled con unsettleIfNoActiveSettlements.
+          await softDeleteTransaction(newId);
+          showToast(t("recibo.undone"));
+          onUndone?.();
+        } catch (e) {
+          showToast(t("recibo.undoFailed", { error: userMessage(e) }));
+        }
+      },
+    };
+  }
+
   render();
   // Foco en el importe SOLO tras el primer pintado: render() se repite en cada cambio de estado y
-  // enfocar ahí robaría el foco a cada toque de chip.
-  // Siempre, sin olfatear si la pantalla es táctil: en escritorio no hay teclado del sistema que
-  // abrir y las heurísticas de "pointer: coarse" fallan justo donde importa (portátil táctil,
-  // móvil con teclado bluetooth). En el móvil el teclado probablemente NO salte: esto corre tras
-  // seis consultas, muy lejos del gesto que abrió la pantalla, y iOS solo levanta el teclado para
-  // un focus() dentro del contexto de activación del usuario. Lo que arregla "hay que subir para
-  // escribir el importe" es el scroll (Task 2); esto es escritorio y accesibilidad.
+  // enfocar ahí robaría el foco a cada toque. En el móvil el teclado probablemente NO salte (iOS
+  // solo lo levanta dentro del gesto del usuario); esto es escritorio y accesibilidad.
   focusInput(container.querySelector("#reg-raw"));
 }

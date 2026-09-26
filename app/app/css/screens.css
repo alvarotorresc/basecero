@@ -748,6 +748,392 @@
 /* === fin: recurrentes === */
 
 /* === pantalla: registro === */
+/* Crear gasto (B-Gasto/BD-Gasto) y su Recibo (B-Recibo/BD-Recibo, js/recibo.js). */
+.reg { display: flex; flex-direction: column; gap: var(--sp-12); }
+
+/* Cabecera propia: cerrar 44 + Segmented Gasto · Ingreso · Transferencia. */
+.reg-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); }
+.reg-head .ctl-segmented { flex: 0 1 auto; min-width: 0; }
+/* El h1 de la pantalla («Registrar») existe para el lector de pantalla y la navegación por
+   encabezados (K12), pero B-Gasto no lo pinta: se oculta a la vista, no al árbol de accesibilidad. */
+.reg-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.reg-head .ctl-segmented [role="radio"] { flex: none; }
+
+/* Display xl de entrada (F-48): comercio arriba como etiqueta, importe, «o dicta…» en el pie. */
+.reg-disp { gap: var(--sp-8); }
+.reg-disp-main { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); }
+.reg-disp-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.reg-merchant-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--disp-ink);
+  font-family: var(--font-body);
+  font-size: var(--fs-input);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  /* Área de toque de 44 (K10) sin engordar la etiqueta: los márgenes negativos devuelven el alto. */
+  height: 44px;
+  margin: calc(-1 * var(--sp-12)) 0 calc(-1 * var(--sp-8));
+}
+.reg-merchant-input::placeholder { color: var(--disp-dim); }
+.reg-amount { display: flex; align-items: baseline; gap: var(--sp-12); min-width: 0; }
+.reg-amount-input {
+  min-width: 44px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-shadow: inherit;
+}
+/* El foco se dibuja alrededor de la cifra entera (input + moneda), no del input suelto. */
+.reg-amount-input:focus-visible { outline: none; }
+.reg-amount:has(.reg-amount-input:focus-visible) { outline: var(--focus); outline-offset: var(--focus-offset); border-radius: var(--radius-xs); }
+.reg-amount-input::placeholder { color: inherit; opacity: .45; }
+.reg-amount-cur { flex: none; }
+.reg-sign {
+  flex: none;
+  align-self: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--disp-line);
+  color: var(--disp-ink);
+  font-family: var(--font-mono);
+  font-size: var(--fs-20);
+  font-weight: 600;
+  text-shadow: none;
+}
+.reg-mic {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--disp-line);
+  color: var(--disp-ink);
+}
+.reg-disp-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: 44px;
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--disp-line);
+}
+.reg-nat-input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--disp-ink);
+  font-family: var(--font-body);
+  font-size: var(--fs-input);
+  font-weight: 500;
+}
+.reg-nat-input::placeholder { color: var(--disp-dim); }
+.reg-nat-status,
+.reg-nat-quote { flex: 1; min-width: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--disp-ink); }
+.reg-nat-status { color: var(--disp-dim); }
+.reg-nat-reset {
+  flex: none;
+  min-height: 44px;
+  padding: 0 var(--sp-4);
+  border: 0;
+  background: none;
+  color: var(--disp-dim);
+  font-family: var(--font-body);
+  font-size: var(--fs-13);
+  font-weight: 600;
+}
+.reg-help { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+.reg-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+
+/* Rejilla de familias: baldosas de 56 en filas de 3; el panel de subcategorías cuelga de la fila de
+   la baldosa desplegada, con la flecha centrada en su columna (--col, geometría dinámica). */
+.reg-grid-wrap { display: flex; flex-direction: column; gap: var(--sp-8); }
+.reg-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-8); }
+.reg-subs {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  padding: var(--sp-8);
+  border-radius: var(--radius);
+  background: var(--ft);
+}
+.reg-subs-neutral { background: var(--well); }
+.reg-subs::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: calc(var(--col, 0) * ((100% - 2 * var(--sp-8)) / 3 + var(--sp-8)) + (100% - 2 * var(--sp-8)) / 6 - 6px);
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  border-radius: var(--radius-xs);
+  transform: rotate(45deg);
+}
+.reg-subs .ent-chip.ent-neutral { position: relative; }
+.reg-subs .ent-chip.ent-neutral[aria-pressed="false"] { background: var(--lift); box-shadow: inset 0 0 0 1px var(--border); }
+:root[data-theme="dark"] .reg-subs .ent-chip.ent-neutral[aria-pressed="false"] { box-shadow: inset 0 0 0 1px var(--border-strong); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .reg-subs .ent-chip.ent-neutral[aria-pressed="false"] { box-shadow: inset 0 0 0 1px var(--border-strong); }
+}
+
+/* Aviso de límite (Registro v2 §6.2), igual que en Gasto por categoría (S7): texto con el icono de
+   aviso, en tinta cuando avisa, y SOLO la cifra excedida en --neg (C4). La clase y el texto los
+   reescribe el oninput del importe. */
+.reg-limit {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: 24px;
+  padding: 0 var(--sp-4);
+  color: var(--text-dim);
+  font-size: var(--fs-13);
+  font-weight: 500;
+  line-height: var(--lh-body);
+}
+.reg-limit svg { flex: none; }
+.reg-limit.is-warn,
+.reg-limit.is-over { color: var(--text); font-weight: 600; }
+.reg-limit-over { color: var(--neg); }
+
+/* Registro rápido plegado: «Ver las N categorías» y la fila «Más» (fila de 60 en --raised con
+   borde: «Más» 15/600, resumen 13/500 dim con el divisor de metaHtml, chevron). */
+.reg-cats-more { align-self: flex-start; }
+.reg-more {
+  width: 100%;
+  min-height: 60px;
+  padding: var(--sp-8) var(--sp-12) var(--sp-8) var(--sp-16);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  border-radius: var(--radius);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.reg-more-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.reg-more-label { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); }
+.reg-more-sum { font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+
+/* Filas de cuenta y fecha, y «Con Marta 50 %» (F-20): píldoras de 48 en --raised con borde. */
+.reg-row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.reg-pill {
+  position: relative;
+  min-width: 0;
+  height: 48px;
+  padding: 0 var(--sp-8) 0 var(--sp-12);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  border-radius: var(--radius-pill);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-15);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.reg-pill-wide { width: 100%; }
+.reg-pill-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reg-pill-pre { flex: none; font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+.reg-pill-chev,
+.reg-pill-ico { flex: none; color: var(--text-dim); }
+.reg-date-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+  font-size: var(--fs-input);
+}
+.reg-date:has(.reg-date-input:focus-visible) { outline: var(--focus); outline-offset: var(--focus-offset); }
+.reg-extras { display: flex; align-items: center; gap: var(--sp-8); }
+.reg-shared { flex: 1; padding: 0 var(--sp-8) 0 var(--sp-16); }
+.reg-shared-pct { font-weight: 500; color: var(--text-dim); }
+.reg-round {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.reg-round[aria-expanded="true"] { color: var(--text); border-color: var(--border-strong); }
+.reg-file { display: none; }
+
+/* Reparto encendido: quién pagó, paso a paso del % y las dos partes (bloque neutro, C11). */
+.reg-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.reg-block-sec { display: flex; flex-direction: column; gap: var(--sp-8); }
+.reg-block-label { padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }
+.reg-split-row { display: flex; align-items: center; gap: var(--sp-12); }
+.reg-split-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.reg-block-title { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+.reg-block-hint { font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
+.reg-split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.reg-split-cell { display: flex; flex-direction: column; gap: var(--sp-4); padding: var(--sp-8) var(--sp-12); border-radius: var(--radius); background: var(--well); }
+.reg-split-label { font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
+.reg-split-value { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+
+/* Foto, etiqueta, nota y «Devolución o ajuste». */
+.reg-photo { display: flex; align-items: center; gap: var(--sp-12); }
+.reg-photo-img { width: 44px; height: 44px; object-fit: cover; border-radius: var(--radius); background: var(--well); border: 1px solid var(--border); }
+.reg-tag-current { display: flex; }
+.reg-newtag { display: inline-flex; align-items: center; gap: var(--sp-8); }
+.reg-newtag-field { height: 44px; }
+.reg-types-extra { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-8); }
+
+/* Selector «¿Devuelve un gasto?» y gasto enlazado. */
+.reg-refund { display: flex; flex-direction: column; gap: var(--sp-8); }
+.reg-refund-list {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.reg-refund-done { opacity: .55; }
+.reg-empty { margin: 0; padding: var(--sp-12); font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+.reg-linked {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.reg-linked-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.reg-linked-label { font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
+.reg-linked-meta { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+
+.reg-error {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-12);
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: var(--fs-14);
+  font-weight: 600;
+  line-height: var(--lh-body);
+}
+.reg-error svg { flex: none; }
+.reg-save { margin-top: var(--sp-12); }
+
+/* --- Recibo (js/recibo.js, B-Recibo): papel --raised con zigzag sobre el velo, Display con el
+   total, comercio y sello, ficha de 28 y líneas con guía de puntos. Entra como un aviso (§10:
+   250 ms ease-out) y se va más rápido (180 ms ease-in); nada rebota. --- */
+#recibo {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-16);
+  padding: var(--sp-16);
+  background: var(--scrim);
+  animation: bc-recibo-veil 150ms ease-out;
+}
+.recibo-ticket { width: 310px; max-width: 100%; filter: drop-shadow(var(--sh-alert)); animation: bc-recibo-in 250ms ease-out; }
+.recibo-edge { display: block; width: 100%; height: 10px; color: var(--raised); }
+.recibo-body { display: flex; flex-direction: column; gap: var(--sp-12); padding: var(--sp-16); background: var(--raised); color: var(--text); }
+.recibo-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
+.recibo-brand { font-family: var(--font-display); font-size: var(--fs-13); font-weight: 700; line-height: var(--lh-title); letter-spacing: -.01em; }
+.recibo-time { font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
+.recibo-body .disp { padding: var(--sp-12) var(--sp-16); border-radius: var(--radius); }
+.recibo-id { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); min-height: 60px; }
+.recibo-id-text { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.recibo-title { font-size: var(--fs-20); font-weight: 700; line-height: var(--lh-title); overflow-wrap: anywhere; }
+.recibo-sub { font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+.recibo-stamp {
+  flex: none;
+  padding: var(--sp-2);
+  border: 2px solid currentColor;
+  border-radius: var(--radius);
+  color: var(--fx, var(--text));
+  transform: rotate(-8deg);
+  animation: bc-recibo-stamp 200ms ease-out 250ms backwards;
+}
+.recibo-stamp-in { display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); padding: var(--sp-4) var(--sp-12); border: 1px solid currentColor; border-radius: var(--radius-xs); }
+.recibo-stamp-label { font-family: var(--font-display); font-size: var(--fs-13); font-weight: 700; line-height: var(--lh-title); }
+/* C7: la fecha es una cifra y va en tinta, aunque el sello lleve el color de su familia. */
+.recibo-stamp-date { font-size: var(--fs-12); font-weight: 600; color: var(--text); }
+.recibo-badge { display: flex; }
+.recibo-perf { border-top: 1px dashed var(--border); }
+.recibo-lines { display: flex; flex-direction: column; gap: var(--sp-12); }
+.recibo-line { display: flex; align-items: baseline; gap: var(--sp-8); }
+.recibo-label { flex: none; font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+.recibo-dots { flex: 1; min-width: 12px; border-bottom: 2px dotted var(--border); transform: translateY(-4px); }
+.recibo-value { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--sp-8); font-size: var(--fs-14); font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.recibo-value.is-neg { color: var(--neg); }
+.recibo-swatch { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--fb); }
+#recibo.is-leaving { animation: bc-recibo-out 180ms ease-in forwards; }
+@keyframes bc-recibo-veil { from { opacity: 0; } }
+@keyframes bc-recibo-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes bc-recibo-stamp { from { opacity: 0; } }
+@keyframes bc-recibo-out { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  /* Sin desplazamiento ni sello animado: solo fundidos cortos (§10, K13). */
+  .recibo-ticket, .recibo-stamp { animation: none; }
+  #recibo { animation: bc-recibo-veil 120ms linear; }
+  #recibo.is-leaving { animation: bc-recibo-out 120ms linear forwards; }
+}
 /* === fin: registro === */
 
 /* === pantalla: semana === */

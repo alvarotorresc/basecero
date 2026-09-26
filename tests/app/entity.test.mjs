@@ -159,3 +159,10 @@ test("familySwatchesHtml: solo la elegida lleva el check; sin radios (aria-check
   assert.match(html, /aria-label="A &quot;B&quot;"/);
   assert.match(html, /aria-label="&lt;x&gt;"/);
 });
+
+test("pickTileHtml: expanded pone aria-expanded solo si es booleano (desplegar no es seleccionar)", () => {
+  assert.match(pickTileHtml({ fam: "res", label: "Restauración", expanded: true }), /aria-expanded="true"/);
+  assert.match(pickTileHtml({ fam: "res", label: "Restauración", expanded: false }), /aria-expanded="false"/);
+  assert.doesNotMatch(pickTileHtml({ fam: "res", label: "Restauración" }), /aria-expanded/);
+  assert.match(pickTileHtml({ fam: "res", label: "Restauración", expanded: true }), /aria-pressed="false"/);
+});
