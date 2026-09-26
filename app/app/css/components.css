@@ -911,6 +911,8 @@ button.ent-chosen { cursor: pointer; }
 .ent-chip-tag { border: 1px solid var(--border); }
 .ent-chip[aria-pressed="true"] { box-shadow: var(--ring-sel); font-weight: 700; }
 .ent-chip.ent-neutral[aria-pressed="true"] { box-shadow: none; border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+/* Check detrás de la etiqueta (filterChipHtml `trailCheck`, B-Movimientos-Filtros): 16 en --accent-text. */
+.ent-chip[aria-pressed="true"] .ent-chip-trail { flex: none; display: flex; color: var(--accent-text); }
 
 /* --- Fila de movimiento (§9, B-Movimientos): 60; baldosa 40 · nombre 15/600 · línea 2 12/500
    --fx · cifra mono 15/600 en tinta, «+» en --pos (C4, C7). Pulsar: fondo, no escala. --- */
@@ -1019,6 +1021,9 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
 .ent-set-value.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 /* Valor en el -x de su familia (settingRowHtml `valueInFam`; I-61 retirada fuera de lo aprobado). */
 .ent-set-value.is-fam-ink { color: var(--fx); }
+/* Icono delante del valor (settingRowHtml `valueIcon`): 16 en dim, a 6 del valor (la fila separa 12). */
+.ent-set-vicon { flex: none; display: flex; color: var(--text-dim); }
+.ent-set-vicon + .ent-set-value { margin-left: -6px; }
 /* Cifra suelta en su familia (entity.js#famNumHtml): mono, hereda tamaño y peso salvo que se pida. */
 .ent-fam-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .ent-fam-num.is-fam-ink { color: var(--fx); }
@@ -1193,7 +1198,7 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
 @keyframes bc-modal-in { from { opacity: 0; transform: scale(.96); } }
 @keyframes bc-modal-out { to { opacity: 0; transform: scale(.96); } }
 
-.modal-content { box-sizing: border-box; display: flex; flex-direction: column; gap: var(--sp-16); padding: var(--sp-24) var(--sp-16) var(--sp-16); }
+.modal-content { box-sizing: border-box; display: flex; flex-direction: column; gap: var(--sp-16); padding: var(--sp-20) var(--sp-16) var(--sp-16); }
 .modal-title {
   margin: 0;
   padding: 0 var(--sp-4);
@@ -1207,12 +1212,17 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
 /* Vista previa de la fila (opcional, DESIGN.md §9): pozo con la anatomía de una baldosa de icono
    más su cifra — el contenido (icono, nombre, importe…) lo trae YA ESCAPADO quien llama
    (modal.js#modalHtml), como cualquier otro `preview`/`html` de confianza del proyecto. */
-.modal-preview { display: flex; align-items: center; gap: var(--sp-12); padding: var(--sp-8) var(--sp-12); border-radius: var(--radius-lg); background: var(--well); box-shadow: var(--sh-well); }
+.modal-preview { display: flex; align-items: center; gap: var(--sp-12); padding: 10px var(--sp-12); border-radius: var(--radius-lg); background: var(--well); box-shadow: var(--sh-well); }
 .modal-text { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-14); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 /* Rejilla de dos columnas, NO column-reverse: Cancelar ya va primero en el DOM (modal.js), así que
    aparece a la izquierda sin reordenar nada — antes salía apilado y con las alturas descuadradas
-   (Cancelar 48 vs. Borrar 52); ahora los dos son 48/15 (F-24 de inventario-B.md). */
+   (Cancelar 48 vs. Borrar 52). Los dos van a 52 de alto, como en B-Borrar (F-24 retirada, Álvaro
+   2026-09-27: igual que el mockup). La letra se queda en 15: el 16 del mockup no tiene token de
+   escala (--fs-input es solo de campos, R-FS). */
 .modal-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.modal-actions .btn-secondary,
+.modal-actions .btn-danger-confirm { min-height: 52px; }
+.modal-actions .btn-danger-confirm { box-shadow: var(--sh-key); }
 
 /* Confirmación destructiva (D-1, C5): la ÚNICA excepción a «rojo solo en cifras» — relleno --neg,
    texto --on-neg. 48/15, igual que el secundario de al lado. */

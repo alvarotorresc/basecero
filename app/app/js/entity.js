@@ -165,15 +165,19 @@ export function chosenCategoryHtml({ fam = null, icon: key = "", name, path = ""
  *  @param {boolean} [o.check]   Solo neutro: check delante al estar seleccionado.
  *  @param {string} [o.id]
  *  @param {object} [o.data]
+ *  @param {boolean} [o.trailCheck]  Check de 16 DETRÁS de la etiqueta, en --accent-text, al estar
+ *                               seleccionado (la categoría elegida de B-Movimientos-Filtros). Vale
+ *                               con familia; no cambia el `check` delantero del chip neutro.
  *  @returns {string} HTML */
-export function filterChipHtml({ fam = null, label, selected = false, tag = false, check = false, id = "", data = null }) {
+export function filterChipHtml({ fam = null, label, selected = false, tag = false, check = false, id = "", data = null, trailCheck = false }) {
   const fc = tag ? "" : famClass(fam);
   const lead = fc
     ? '<span class="ent-swatch" aria-hidden="true"></span>'
     : tag ? catIcon("tag", { size: 16 })
       : check && selected ? icon("check", { size: 18, width: 2.2 }) : "";
   return `<button type="button" class="${cls("ent-chip", fc, !fc && "ent-neutral", tag && "ent-chip-tag")}" aria-pressed="${selected ? "true" : "false"}"${attrs({ id, data })}>`
-    + `${lead}<span class="ent-chip-label">${escHtml(label)}</span></button>`;
+    + `${lead}<span class="ent-chip-label">${escHtml(label)}</span>`
+    + `${trailCheck && selected ? `<span class="ent-chip-trail" aria-hidden="true">${icon("check", { size: 16, width: 2.4 })}</span>` : ""}</button>`;
 }
 
 const SIGNS = {
@@ -200,8 +204,11 @@ const SIGNS = {
  *                                  (F-34 retirada, Álvaro 2026-09-27).
  *  @param {500|600} [o.amountWeight]  Peso de la cifra. Por defecto 600; 500 es el de B-Home,
  *                                  B-Movimientos, B-Cuenta y B-Semana.
+ *  @param {string} [o.amountNoteHtml]  Como `amountNote` pero HTML de confianza (ya escapado por
+ *                                  quien llama) y gana a él: el «con Marta, de <mono>24,00</mono>»
+ *                                  de B-Movimientos, con la cifra en mono.
  *  @returns {string} HTML */
-export function txRowHtml({ fam = null, icon: key = "", title, line2 = "", amountHtml, sign = "expense", amountNote = "", id = "", data = null, height = 60, amountWeight = 600 }) {
+export function txRowHtml({ fam = null, icon: key = "", title, line2 = "", amountHtml, sign = "expense", amountNote = "", id = "", data = null, height = 60, amountWeight = 600, amountNoteHtml = "" }) {
   const s = Object.hasOwn(SIGNS, sign) ? SIGNS[sign] : SIGNS.expense;
   const fc = famClass(fam);
   return `<button type="button" class="${cls("ent-row", Number(height) === 52 && "ent-row-52", Number(amountWeight) === 500 && "ent-row-w500", fc, !fc && "ent-neutral")}"${attrs({ id, data })}>`
@@ -209,7 +216,7 @@ export function txRowHtml({ fam = null, icon: key = "", title, line2 = "", amoun
     + `<span class="ent-body"><span class="ent-name">${escHtml(title)}</span>`
     + `${line2 ? `<span class="ent-line2">${escHtml(line2)}</span>` : ""}</span>`
     + `<span class="ent-amount-col"><span class="${cls("ent-amount", "num", s.cls)}">${s.ch}${amountHtml ?? ""}</span>`
-    + `${amountNote ? `<span class="ent-amount-note">${escHtml(amountNote)}</span>` : ""}</span></button>`;
+    + `${amountNoteHtml || amountNote ? `<span class="ent-amount-note">${amountNoteHtml || escHtml(amountNote)}</span>` : ""}</span></button>`;
 }
 
 /** Fila de ajuste (§9, B-Ajustes): 48 (60 con `sub`); baldosa 32 opcional · etiqueta 15/500 ·
@@ -246,8 +253,11 @@ export function txRowHtml({ fam = null, icon: key = "", title, line2 = "", amoun
  *  @param {string} [o.trailHtml]   HTML decorativo ya hecho entre el valor y el chevron, sin
  *                                  convertir la fila en div (a diferencia de `controlHtml`): las
  *                                  muestras de color de «Categorías» en B-Ajustes. Tal cual.
+ *  @param {string} [o.valueIcon]   Clave de icons.js: icono de 16 en dim delante del valor, a 6 de
+ *                                  él (la etiqueta de B-Movimiento-Detalle: «Oficina»). Sin valor,
+ *                                  no se pinta.
  *  @returns {string} HTML */
-export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", value = "", valueNum = false, valueFam = null, chevron, controlHtml = "", expanded, controls = "", disabled = false, id = "", data = null, tileFilled = false, valueInFam = false, trailHtml = "" }) {
+export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", value = "", valueNum = false, valueFam = null, chevron, controlHtml = "", expanded, controls = "", disabled = false, id = "", data = null, tileFilled = false, valueInFam = false, trailHtml = "", valueIcon = "" }) {
   const tag = controlHtml ? "div" : "button";
   const showChev = !controlHtml && (chevron ?? true);
   const labelId = controlHtml && id ? ` id="${escAttr(id + "-label")}"` : "";
@@ -263,6 +273,7 @@ export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", va
     + `<span class="ent-set-body"><span class="ent-set-label"${labelId}>${escHtml(label)}</span>`
     + `${sub ? `<span class="ent-set-sub">${escHtml(sub)}</span>` : ""}</span>`
     + `${value !== "" && value != null && famClass(valueFam) ? `<span class="ent-swatch ${famClass(valueFam)}" aria-hidden="true"></span>` : ""}`
+    + `${value !== "" && value != null && valueIcon ? `<span class="ent-set-vicon">${catIcon(valueIcon, { size: 16 })}</span>` : ""}`
     + `${value !== "" && value != null ? `<span class="${cls("ent-set-value", valueNum && "num", valueInFam && famClass(fam), valueInFam && famClass(fam) && "is-fam-ink")}">${escHtml(value)}</span>` : ""}`
     + `${trailHtml}`
     + `${controlHtml}`

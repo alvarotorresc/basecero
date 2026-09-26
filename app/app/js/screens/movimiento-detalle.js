@@ -24,7 +24,7 @@ import { escHtml, escAttr } from "../esc.js";
 
 // Detalle de un movimiento (S6 del rediseño B: B-Movimiento-Detalle, B-Borrar y el visor de foto
 // de DESIGN.md §9). Dos estados en la misma pantalla:
-//  - VISTA (el mockup): Display l con el comercio arriba y la cifra con signo, tarjeta de la
+//  - VISTA (el mockup): Display de 48 con el comercio arriba y la cifra con signo, tarjeta de la
 //    categoría elegida, filas de ajuste (cuenta, fecha, compartido, etiqueta), la nota con la foto
 //    y, abajo, «Editar» (el primario de la vista, a todo el ancho) y debajo «Borrar» (entrada
 //    destructiva, C5), solo en su fila porque «Duplicar» está bloqueado (B-5).
@@ -50,6 +50,10 @@ const TIPO_KEY = {
 };
 
 const MINUS = "−"; // «−» tipográfico, el mismo ancho que «+» en la mono tabular (entity.js).
+
+/** Cifra del Display en px (B-Movimiento-Detalle y B-Borrar): la misma en vista y en edición, para
+ *  que entrar a editar no la haga saltar de tamaño. */
+const DISP_PX = 48;
 
 /** Ancho del input del importe en el Display de edición: tantos caracteres como lleva (mismo
  *  criterio que registro.js#amountWidth), para que el símbolo de moneda vaya pegado. */
@@ -232,9 +236,10 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
 
   // ---- Display -------------------------------------------------------------------------------
 
-  /** Vista: Display l con el comercio arriba (15/600 en --disp-ink, I-65) y la cifra con signo. */
+  /** Vista: Display con el comercio arriba (15/600 en --disp-ink, `labelStrong`) y la cifra con
+   *  signo a 48, como en B-Movimiento-Detalle. */
   function displayViewHtml(d) {
-    return `<div class="mdet-disp-view">${displayHtml({ label: titleOf(d), value: signedAmount(d), size: "l" })}</div>`;
+    return `<div class="mdet-disp-view">${displayHtml({ label: titleOf(d), value: signedAmount(d), size: DISP_PX, labelStrong: true })}</div>`;
   }
 
   /** Edición: el comercio y el importe son los campos (patrón de B-Gasto, registro.js). El importe
@@ -246,7 +251,7 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
     return `<section class="disp mdet-disp" id="mdet-disp-edit" tabindex="-1">
       <input type="text" id="mdet-merchant" class="mdet-merchant-input" value="${escAttr(d.merchant)}"
         placeholder="${escAttr(t("common.merchant"))}" aria-label="${escAttr(t("common.merchant"))}" autocomplete="off">
-      <div class="num disp-value disp-value-l mdet-amount${amountLocked ? " is-locked" : ""}">
+      <div class="num disp-value disp-value-free mdet-amount${amountLocked ? " is-locked" : ""}" style="--disp-fs:${DISP_PX}px">
         ${sign}
         <input type="text" inputmode="decimal" id="mdet-raw" class="mdet-amount-input" value="${escAttr(d.raw)}" placeholder="0" autocomplete="off"
           aria-label="${escAttr(t("common.amount"))}"${amountLocked ? " disabled" : ""} style="width:${amountWidth(d.raw)}">
@@ -257,7 +262,8 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
 
   // ---- Categoría -----------------------------------------------------------------------------
 
-  /** Tarjeta de categoría elegida (§9, F-42): nombre de la hoja y, debajo, su raíz. Sin categoría,
+  /** Tarjeta de categoría elegida (variante «detail», B-Movimiento-Detalle): su raíz arriba en -x y,
+   *  debajo, el nombre de la hoja a 17/700, con borde de su familia. Sin categoría,
    *  neutra con «Sin categorizar». Siempre es un botón: en la vista entra en edición y abre la hoja. */
   function chosenHtml(d) {
     const c = d.categoryId ? byId[d.categoryId] : null;
@@ -266,7 +272,7 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
     }
     const root = rootOf(c.id, byId);
     const path = root && root !== c.id ? (byId[root]?.name ?? "") : "";
-    return chosenCategoryHtml({ fam: catFam(c.id), icon: iconForCategory(c.id, byId), name: c.name, path, id: "mdet-cat" });
+    return chosenCategoryHtml({ fam: catFam(c.id), icon: iconForCategory(c.id, byId), name: c.name, path, id: "mdet-cat", variant: "detail" });
   }
 
   // ---- Filas de ajuste -----------------------------------------------------------------------
@@ -333,7 +339,7 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
     const label = t("movimientos.detail.tagLabel");
     const open = d.editing && d.tagPickerOpen;
     const rowHtml = settingRowHtml({
-      label, value: d.tagId ? tagName(d.tagId) : t("movimientos.detail.noTag"), id: "mdet-tag",
+      label, value: d.tagId ? tagName(d.tagId) : t("movimientos.detail.noTag"), valueIcon: d.tagId ? "tag" : "", id: "mdet-tag",
       ...(d.editing ? { expanded: open, controls: "mdet-tag-panel" } : {}),
     });
     if (!open) return rowHtml;
@@ -453,7 +459,7 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
 
     container.innerHTML = `
     <div class="mdet${d.editing ? " is-editing" : ""}">
-      ${subHeaderHtml({ id: "mdet-back", title: t(TIPO_KEY[d.type]) })}
+      ${subHeaderHtml({ id: "mdet-back", title: t(TIPO_KEY[d.type]), center: true })}
       ${d.editing && locked ? `<p class="mdet-locked" role="note">${icon("lock", { size: 18 })}<span>${escHtml(t("movimientos.detail.lockedNote"))}</span></p>` : ""}
       ${d.editing ? displayEditHtml(d, amountLocked) : displayViewHtml(d)}
       ${linkedHtml(d)}
@@ -616,6 +622,7 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
       message: t("movimientos.delete.body"),
       preview: deletePreviewHtml(d),
       destructive: true,
+      confirmIcon: "trash",
       cancelText: t("common.cancel"),
       confirmText: t("common.delete"),
       onConfirm: async () => {

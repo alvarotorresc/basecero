@@ -142,6 +142,22 @@ test("modalHtml: destructive:false — el confirmar es un secundario normal", ()
   assert.ok(confirmBtn.includes('id="modal-confirm"'));
 });
 
+test("modalHtml: confirmIcon pone el icono delante del texto de confirmar; por defecto, sin icono", () => {
+  const conIcono = modalHtml({ ...OPTS, confirmIcon: "trash" });
+  const confirmar = conIcono.slice(conIcono.indexOf('id="modal-confirm"'));
+  assert.match(confirmar, /^id="modal-confirm"><svg[^>]*width="18"[\s\S]*?<\/svg><span>/);
+  const cancelar = conIcono.slice(conIcono.indexOf('id="modal-cancel"'), conIcono.indexOf('id="modal-confirm"'));
+  assert.ok(!cancelar.includes("<svg"), "Cancelar sigue sin icono");
+  const sin = modalHtml(OPTS);
+  assert.ok(!sin.slice(sin.indexOf('id="modal-confirm"')).includes("<svg"));
+});
+
+test("confirm: pasa confirmIcon al interior del aviso", () => {
+  const { modal } = harness();
+  const dlg = modal.confirm({ ...OPTS, confirmIcon: "trash" });
+  assert.match(dlg.innerHTML.slice(dlg.innerHTML.indexOf('id="modal-confirm"')), /^id="modal-confirm"><svg/);
+});
+
 test("modalHtml: Cancelar siempre es un secundario, destructivo o no", () => {
   for (const destructive of [true, false]) {
     const html = modalHtml({ ...OPTS, destructive });

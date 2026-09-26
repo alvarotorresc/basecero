@@ -314,6 +314,9 @@ export const ES = {
       title: "Filtros",
       clear: "Quitar filtros",
       category: "Categoría",
+      // Título de la sección de la hoja (B-Movimientos-Filtros): «Categorías» y, con una elegida,
+      // su cuenta al lado.
+      categories: "Categorías",
       tag: "Etiqueta",
       apply: { one: "Ver {n} movimiento", other: "Ver {n} movimientos" },
     },
@@ -373,7 +376,10 @@ export const ES = {
       fallbackName: "la contraparte",
       fallbackLabel: "Contraparte",
     },
-    row: { partnerPaid: ", pagó {name}, tu parte {amount}" },
+    // partnerPaid: prosa que Inicio y Semana concatenan al comercio. paidBy y sharedOf: la nota
+    // bajo la cifra de una fila compartida de Movimientos (B-Movimientos), donde la cifra es mi
+    // parte; {amount} es el ticket entero, sin símbolo y ya envuelto en mono por movimientos.js.
+    row: { partnerPaid: ", pagó {name}, tu parte {amount}", paidBy: "pagó {name}", sharedOf: "con {name}, de {amount}" },
     delete: {
       button: "Borrar",
       title: "¿Borrar este movimiento?",

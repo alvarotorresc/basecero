@@ -299,6 +299,8 @@ export const EN = {
       title: "Filters",
       clear: "Clear filters",
       category: "Category",
+      // Sheet section title (B-Movimientos-Filtros): «Categories» and, with one picked, its count.
+      categories: "Categories",
       tag: "Tag",
       apply: { one: "Show {n} transaction", other: "Show {n} transactions" },
     },
@@ -357,7 +359,10 @@ export const EN = {
       fallbackName: "the other party",
       fallbackLabel: "Other party",
     },
-    row: { partnerPaid: ", {name} paid, your share {amount}" },
+    // partnerPaid: prose that Inicio and Semana append to the merchant. paidBy and sharedOf: the
+    // note under a shared Movimientos row's figure (B-Movimientos), where the figure is my share;
+    // {amount} is the whole receipt, without symbol and already wrapped in mono by movimientos.js.
+    row: { partnerPaid: ", {name} paid, your share {amount}", paidBy: "{name} paid", sharedOf: "with {name}, of {amount}" },
     delete: {
       button: "Delete",
       title: "Delete this transaction?",

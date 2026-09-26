@@ -2,10 +2,10 @@ import {
   listPeriods, listAllByDay, countUncategorized, allCategoriesById, listAccounts,
   getMetaAll, tagTotals, tagTotalsOfPeriod, spentOfPeriod, budgetsOfPeriod,
 } from "../repo.js";
-import { familyForCategory, iconForCategory, rootOf } from "../category-colors.js";
+import { FAMILIES, familyForCategory, iconForCategory, rootOf } from "../category-colors.js";
 import { budgetMap } from "../category-spend.js";
 import { matchesFilter, isUncategorized, groupByDay, daySpentCents } from "../movimientos-filter.js";
-import { fmtMoney, moneyPartsHtml, hoyISO, prevDayIso } from "../format.js";
+import { fmtMoney, fmtMoneyParts, moneyPartsHtml, hoyISO, prevDayIso } from "../format.js";
 import { t } from "../i18n/index.js";
 import { rootHeaderHtml, buttonHtml } from "../ui.js";
 import { icon } from "../icons.js";
@@ -24,15 +24,22 @@ const needsCategory = (tipo) => tipo === "expense" || tipo === "income" || tipo 
 const dayNumber = (iso) => new Date(iso + "T12:00:00").getDate();
 const weekdayShort = (iso) => t(`movimientos.weekdayShort.${new Date(iso + "T12:00:00").getDay()}`);
 
-/** Cabecera de día (B-Movimientos): «Hoy dom 13», «Ayer sáb 12»; más atrás, «vie 11». El total es
- *  lo gastado ese día entre las filas visibles (movimientos-filter.js#daySpentCents); sin gasto,
- *  sin total. */
+/** Cabecera de día (B-Movimientos): «Hoy dom 13», «Ayer sáb 12»; más atrás, «Vie 11» (el día
+ *  solo empieza en mayúscula, como en el mockup). El total es lo gastado ese día entre las filas
+ *  visibles (movimientos-filter.js#daySpentCents); sin gasto, sin total. */
 function dayHeaderFor(date, hoy, totalCents) {
   const short = `${weekdayShort(date)} ${dayNumber(date)}`;
   const totalHtml = totalCents ? moneyPartsHtml(totalCents) : "";
   if (date === hoy) return dayHeaderHtml({ label: t("common.today"), date: short, totalHtml });
   if (date === prevDayIso(hoy)) return dayHeaderHtml({ label: t("movimientos.yesterday"), date: short, totalHtml });
-  return dayHeaderHtml({ label: short, totalHtml });
+  return dayHeaderHtml({ label: short.charAt(0).toLocaleUpperCase() + short.slice(1), totalHtml });
+}
+
+/** «24,00» del «con Marta, de 24,00» (B-Movimientos): la cifra sin el símbolo de moneda cuando va
+ *  detrás; si el locale lo pone delante, se queda (va dentro de `main`). */
+function bareAmount(cents) {
+  const { main, cents: c } = fmtMoneyParts(Math.abs(cents));
+  return `${main}${c}`.trim();
 }
 
 /** «Casa › Supermercado» (B-Movimientos, línea 2 de la fila): la raíz y la hoja, o solo la raíz. */
@@ -44,13 +51,14 @@ function categoryPath(catId, byId) {
 }
 
 /** Fila de movimiento (entity.js#txRowHtml, B-Movimientos): SIEMPRE un botón, toda fila abre el
- *  detalle. Importe en valor absoluto; el signo va por `sign`. Los cinco tipos:
+ *  detalle. Importe en valor absoluto a peso 500; el signo va por `sign`. Los cinco tipos:
  *   - gasto: familia de su raíz (C6), «−» en tinta (C7);
  *   - ingreso: sin familia, «+» en --pos (C9);
  *   - devolución: familia de su categoría de gasto, «+» (vuelve dinero);
  *   - transferencia y ajuste: no son entidad (C11), sin familia y con icono de UI.
- *  Sin categoría: baldosa neutra con «+» y «toca para categorizar» en la línea 2. Compartido: el
- *  ticket entero en la cifra y la nota de siempre debajo (mismo patrón que Semana). */
+ *  Sin categoría: baldosa neutra con «+» y «toca para categorizar» en la línea 2. Compartido (como
+ *  en el mockup): la cifra es MI parte —la misma que suma el total del día— y debajo «con Marta,
+ *  de 24,00» (el ticket entero) o, si pagó ella, «pagó Marta». */
 function movRowHtml(r, byId, accById, partnerName) {
   const data = { tx: r.id };
   if (r.type === "transfer") {
@@ -58,32 +66,34 @@ function movRowHtml(r, byId, accById, partnerName) {
     const to = accById[r.counter_account_id]?.name ?? "?";
     return txRowHtml({
       fam: null, icon: "transfer", title: `${from} → ${to}`, line2: r.merchant || r.note || t("movimientos.type.transfer"),
-      amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)), sign: "none", data,
+      amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)), sign: "none", amountWeight: 500, data,
     });
   }
   if (r.type === "adjustment") {
     return txRowHtml({
       fam: null, icon: "pencil", title: t("common.type.adjustment"), line2: r.merchant || r.note || "",
-      amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)), sign: r.amount_cents < 0 ? "expense" : "income", data,
+      amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)), sign: r.amount_cents < 0 ? "expense" : "income", amountWeight: 500, data,
     });
   }
   const uncategorized = isUncategorized(r);
   const catName = byId[r.category_id]?.name ?? "";
   const isExpense = r.type === "expense";
   const fam = uncategorized || r.type === "income" ? null : familyForCategory(r.category_id, byId);
-  const shareNote = !r.is_shared ? ""
+  const shared = !!r.is_shared;
+  const who = escHtml(partnerName || t("movimientos.shared.fallbackName"));
+  const shareNoteHtml = !shared ? ""
     : r.paid_by === "partner"
-      ? t("movimientos.row.partnerPaid", { name: partnerName || t("movimientos.shared.fallbackName"), amount: fmtMoney(r.my_amount_cents) })
-      : t("common.myPartSuffix", { amount: fmtMoney(r.my_amount_cents) });
+      ? t("movimientos.row.paidBy", { name: who })
+      : t("movimientos.row.sharedOf", { name: who, amount: `<span class="num">${escHtml(bareAmount(r.amount_cents))}</span>` });
   return txRowHtml({
     fam,
     icon: uncategorized ? "plus" : iconForCategory(r.category_id, byId),
     title: r.merchant || catName || t("movimientos.uncategorized"),
     line2: uncategorized ? t("movimientos.tapToCategorize") : categoryPath(r.category_id, byId),
-    amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)),
+    amountHtml: moneyPartsHtml(Math.abs(shared ? r.my_amount_cents : r.amount_cents)),
     sign: isExpense ? "expense" : "income",
-    // La nota va debajo de la cifra: sin el separador de prosa con el que se concatenaba al nombre.
-    amountNote: shareNote.replace(/^,\s*/, ""),
+    amountWeight: 500,
+    amountNoteHtml: shareNoteHtml,
     data,
   });
 }
@@ -178,8 +188,8 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     return state.tagTotalsAll.filter((tg) => (periodById[tg.id]?.n ?? 0) > 0 || tg.id === activeId);
   }
 
-  const rootChipHtml = (catId, selected) => filterChipHtml({
-    fam: familyForCategory(catId, byId), label: byId[catId]?.name ?? "", selected, data: { chipCat: catId },
+  const rootChipHtml = (catId, selected, trailCheck = false) => filterChipHtml({
+    fam: familyForCategory(catId, byId), label: byId[catId]?.name ?? "", selected, data: { chipCat: catId }, trailCheck,
   });
   const uncatChipHtml = (selected) => filterChipHtml({
     label: t("movimientos.uncategorizedChip", { n: state.uncategorizedCount }), selected, data: { chipUncat: "1" },
@@ -407,16 +417,21 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     const count = () => state.rows.filter((r) => matchesFilter(r, { ...state.filter, ...draft }, byId)).length;
 
     const bodyHtml = () => {
-      const cats = presentRootCats().map((id) => rootChipHtml(id, draft.rootCatId === id));
+      // En la hoja van en el orden de las familias (Casa, Alimentación, Restauración…; las que no
+      // tienen familia, al final), no en el de aparición, y la elegida lleva además su check
+      // detrás (B-Movimientos-Filtros). sort es estable: a igual familia, el orden de aparición.
+      const order = (id) => { const i = FAMILIES.indexOf(familyForCategory(id, byId)); return i < 0 ? FAMILIES.length : i; };
+      const cats = [...presentRootCats()].sort((a, b) => order(a) - order(b))
+        .map((id) => rootChipHtml(id, draft.rootCatId === id, true));
       if (state.uncategorizedCount > 0) cats.push(uncatChipHtml(draft.uncat));
       const tags = visibleTags(draft.tagId).map((tg) => tagChipHtml(tg, draft.tagId === tg.id));
-      const section = (id, title, chips) => (chips.length ? `
+      const section = (id, title, chips, count = 0) => (chips.length ? `
         <section class="mov-flt-sec" aria-labelledby="${id}">
-          <h3 class="mov-flt-label" id="${id}">${escHtml(title)}</h3>
+          <h3 class="mov-flt-label" id="${id}">${escHtml(title)}${count ? ` <span class="num mov-flt-count">${count}</span>` : ""}</h3>
           <div class="mov-flt-chips" role="group" aria-labelledby="${id}">${chips.join("")}</div>
         </section>` : "");
       return `
-        ${section("mov-flt-cat", t("movimientos.filter.category"), cats)}
+        ${section("mov-flt-cat", t("movimientos.filter.categories"), cats, draft.rootCatId || draft.uncat ? 1 : 0)}
         ${section("mov-flt-tag", t("movimientos.filter.tag"), tags)}
         <div class="mov-flt-foot">${buttonHtml({ kind: "primary", id: "mov-flt-apply", label: t("movimientos.filter.apply", { n: count() }) })}</div>`;
     };
