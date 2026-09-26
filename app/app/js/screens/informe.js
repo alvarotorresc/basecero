@@ -70,7 +70,7 @@ function headerHtml(report, periods) {
 function downloadHtml(state) {
   return `
   <div style="margin-bottom:20px;">
-    <button type="button" class="btn-primary" id="informe-download" ${state.downloading ? "disabled" : ""}>${state.downloading ? t("informe.downloading") : `${icon("download", { size: 20, width: 2, style: "vertical-align:-4px;margin-right:6px;" })}${t("informe.download")}`}</button>
+    <button type="button" class="btn-primary" id="informe-download" ${state.downloading ? "disabled" : ""}>${state.downloading ? t("informe.downloading") : `<span style="display:inline-block;vertical-align:-4px;margin-right:6px;line-height:0;">${icon("download", { size: 20, width: 2 })}</span>${t("informe.download")}`}</button>
     <div style="font-size:11px;color:var(--text-3);margin-top:8px;">${t("informe.downloadHint")}</div>
     ${state.downloadError ? `<div class="banner-aviso red" style="margin-top:10px;">${escHtml(state.downloadError)}</div>` : ""}
   </div>`;

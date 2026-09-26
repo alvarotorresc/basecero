@@ -47,12 +47,12 @@ export const ICON_PATHS = {
  *  del contenedor (dentro de una insignia tintada, por ejemplo); por defecto currentColor, que es
  *  lo que quiere §3. `width` es el grosor de trazo: 1.75 salvo la casilla (2.6) y la flecha de
  *  tendencia (2.2), los dos valores que los artboards escriben a mano. */
-export function icon(name, { size = 20, width = 1.75, stroke = "currentColor", cls = "", style = "" } = {}) {
+export function icon(name, { size = 20, width = 1.75, stroke = "currentColor", cls = "" } = {}) {
   const d = ICON_PATHS[name];
   if (!d) return "";           // defensivo: un nombre mal escrito no debe romper la pantalla
   return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="${stroke}"`
     + ` stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"`
-    + `${cls ? ` class="${cls}"` : ""}${style ? ` style="${style}"` : ""}>${d}</svg>`;
+    + `${cls ? ` class="${cls}"` : ""}>${d}</svg>`;
 }
 
 // ---- Iconos de categoría (PR-04) --------------------------------------------------------------

@@ -279,7 +279,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
       <div style="display:flex; flex-direction:column; gap:11px; padding:16px; background:var(--accent-tint);">
         <div style="display:flex; align-items:flex-start; gap:11px;">
-          ${icon("mic", { size: 20, stroke: "var(--accent)", style: "flex-shrink:0;margin-top:1px;" })}
+          <span style="flex-shrink:0;margin-top:1px;display:flex;">${icon("mic", { size: 20, stroke: "var(--accent)" })}</span>
           <span style="font-size:15px; line-height:1.4; color:var(--ink); flex:1; min-width:0;">${chips.length ? `«${escHtml(text)}»` : escHtml(t("registro.natural.notUnderstood"))}</span>
           <button type="button" id="reg-nat-reset" style="border:0; background:transparent; color:var(--ink-3); font-size:13px; font-weight:500; padding:0; height:24px; flex-shrink:0; cursor:pointer;">${t("registro.natural.reset")}</button>
         </div>
