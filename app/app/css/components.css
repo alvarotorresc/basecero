@@ -876,8 +876,20 @@ button.ent-set:active { transform: none; background: var(--raised); }
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.ent-set-sub { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+/* Sin white-space:nowrap, text-overflow:ellipsis no hace nada (el texto envuelve en su lugar): una
+   fila con un control ancho al lado (B-PeriodoNuevo, categorías largas como «Impuestos y tasas»)
+   partía el nombre en 2-3 líneas y estiraba la fila entera. */
+.ent-set-sub {
+  font-size: var(--fs-13);
+  font-weight: 500;
+  line-height: var(--lh-title);
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .ent-set-value { flex: none; font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); }
 .ent-set-value.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .ent-chev { flex: none; display: flex; color: var(--text-dim); }
