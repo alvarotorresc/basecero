@@ -1059,6 +1059,7 @@ export const EN = {
     downloading: "Generating…",
     // downloadNote: the one note under the primary button (F-11, B-Informe).
     downloadNote: { one: "Made on your phone, with {n} transaction.", other: "Made on your phone, with all {n} transactions." },
+    downloadNoteEmpty: "Made on your phone.",
     selector: { label: "Period" },
     older: {
       label: "Earlier",

@@ -1130,6 +1130,7 @@ export const ES = {
     downloading: "Generando…",
     // downloadNote: la única nota bajo el primario (F-11, B-Informe).
     downloadNote: { one: "Se genera en tu móvil, con {n} movimiento.", other: "Se genera en tu móvil, con los {n} movimientos." },
+    downloadNoteEmpty: "Se genera en tu móvil.",
     selector: { label: "Periodo" },
     older: {
       label: "Anteriores",

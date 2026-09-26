@@ -76,11 +76,11 @@ function periodsHtml(periods, selectedId, olderOpen) {
   return segmentedHtml({ id: "informe-periods", name: t("informe.selector.label"), options, value });
 }
 
-/** Lista desplegada de «Anteriores»: TODOS los periodos cerrados, cada uno una fila de ajuste con
- *  sus fechas; el que se está viendo lo dice en el valor. Así se abre y se exporta cualquier
- *  informe antiguo. */
+/** Lista desplegada de «Anteriores»: los periodos cerrados que NO están ya en el Segmented (los
+ *  tres más recientes no se repiten), cada uno una fila de ajuste con sus fechas; el que se está
+ *  viendo lo dice en el valor. Así se abre y se exporta cualquier informe antiguo. */
 function olderListHtml(periods, selectedId) {
-  const closed = periods.filter((p) => p.status === "closed");
+  const closed = periods.slice(SEGMENTED_PERIODS).filter((p) => p.status === "closed");
   const rows = closed.length
     ? closed.map((p) => settingRowHtml({
       label: p.name,
@@ -225,7 +225,7 @@ function downloadHtml(state, report) {
     ${buttonHtml({
       kind: "primary", id: "informe-download", icon: state.downloading ? "" : "download",
       label: state.downloading ? t("informe.downloading") : t("informe.download"),
-      note: t("informe.downloadNote", { n: report.movements.count }),
+      note: report.movements.count ? t("informe.downloadNote", { n: report.movements.count }) : t("informe.downloadNoteEmpty"),
       disabled: state.downloading,
     })}
     ${state.downloadError ? `<div class="banner-aviso red">${escHtml(state.downloadError)}</div>` : ""}
@@ -259,9 +259,11 @@ export async function renderInforme(container, onBack, { periodId } = {}) {
     const report = state.report;
     const curName = shortName(report.meta.name);
     const prevName = shortName(state.prevPeriodName);
-    // Periodo sin movimientos: estado vacío (§9) en vez de un Display a cero y un PDF en blanco.
+    // Periodo sin movimientos: estado vacío (§9) en vez de un Display a cero, pero el PDF se
+    // sigue pudiendo descargar, como el de cualquier otro periodo.
     const body = report.movements.count === 0
-      ? emptyStateHtml({ title: t("informe.empty.title"), text: t("informe.empty.text") })
+      ? `${emptyStateHtml({ title: t("informe.empty.title"), text: t("informe.empty.text") })}
+        ${downloadHtml(state, report)}`
       : `${displayBlockHtml(report, prevName)}
         ${splitHtml(report)}
         ${compareHtml(report, curName, prevName)}
