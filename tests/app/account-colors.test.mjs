@@ -271,3 +271,24 @@ test("deleteEmptyAccount (reproducido): una cuenta que NO se borra (referenciada
   assert.equal(deleted, false);
   assert.deepEqual(getAccountStyleReproduced(db), { "acc-revolut": { fam: "sus" } }, "sigue existiendo: su override se conserva");
 });
+
+// ---- La hucha conserva imp al pausar su objetivo (revisión final B) --------------------------
+// listGoals filtra is_active=1: un objetivo pausado no llega a familyForAccount, así que la hucha
+// solo conserva imp si createGoal le guarda la familia como override (misma vía que el onboarding).
+
+test("hucha creada por createGoal: con su objetivo pausado (fuera de listGoals) sigue en imp", () => {
+  const db = openDb();
+  seedMinimal(db);
+  const hucha = { id: "acc-hucha-nueva", type: "savings" };
+  const style = setAccountFamilyReproduced(db, hucha.id, "imp");
+  // Objetivo pausado: listGoals no lo devuelve, la lista de objetivos llega vacía.
+  assert.equal(familyForAccount(hucha, style, []), "imp");
+  // Sin el override, la misma cuenta caería al ali por defecto de savings (el defecto que se arregla).
+  assert.equal(familyForAccount(hucha, {}, []), "ali");
+});
+
+test("repo.createGoal guarda imp como override de la hucha que crea", () => {
+  const src = readFileSync(new URL("../../app/app/js/repo.js", import.meta.url), "utf8");
+  const body = src.slice(src.indexOf("export async function createGoal"), src.indexOf("export async function updateGoal"));
+  assert.match(body, /setAccountFamily\(accountId, "imp"\)/);
+});

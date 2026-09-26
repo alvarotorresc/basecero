@@ -1016,8 +1016,10 @@ export async function createGoal(fields) {
   const goalId = bcUlid();
   const stmts = [];
   let accountId = fields.accountId || "";
+  let newHucha = false;
   if (HUCHA_GOAL_TYPES.has(fields.type) && !accountId) {
     accountId = bcUlid();
+    newHucha = true;
     // El "·" aquí es una excepción deliberada a la prohibición de SISTEMA.md §1: no es chrome de
     // pantalla, es el NOMBRE de una cuenta que se persiste en la BD — cambiarlo dejaría a las
     // huchas ya creadas con un separador distinto al de las nuevas sin una migración de datos,
@@ -1037,6 +1039,10 @@ export async function createGoal(fields) {
     ],
   });
   await execMany(stmts);
+  // La hucha nueva se guarda con la familia imp como override (misma vía que el onboarding):
+  // listGoals solo trae objetivos activos, así que sin override una hucha cuyo objetivo se pausa
+  // volvería al ali por defecto de savings.
+  if (newHucha) await setAccountFamily(accountId, "imp");
   return goalId;
 }
 

@@ -475,9 +475,10 @@ export async function renderPatrimonio(container) {
         }
         await setAccountLoan(accountId, monthlyCents);
         // Familia (C8): solo se escribe si se eligió a mano. Si coincide con la de su tipo, se
-        // borra el override para que siga al tipo.
+        // borra el override para que siga al tipo. El tipo se mira sin objetivos: el imp de una
+        // hucha se guarda siempre como override, porque listGoals no trae los objetivos pausados.
         if (f.famTouched) {
-          const byDefault = defaultFamilyForAccount({ id: accountId, type: f.type }, rawGoals());
+          const byDefault = defaultFamilyForAccount({ id: accountId, type: f.type }, []);
           await setAccountFamily(accountId, f.fam === byDefault ? null : f.fam);
         }
         await loadData();
