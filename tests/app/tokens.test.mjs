@@ -111,3 +111,7 @@ test("app.css: html y body pintan con los tokens del sistema B", () => {
   assert.match(app, /body\s*\{[^}]*font-family:\s*var\(--font-body\)[^}]*color:\s*var\(--text\)/);
   assert.match(app, /\.num\s*\{[^}]*font-variant-numeric:\s*tabular-nums/);
 });
+
+test("app.css: el cuerpo pesa 500 (DESIGN §7: el 400 no se usa; Instrument Sans real va de 400 a 700)", () => {
+  assert.match(app, /body\s*\{[^}]*font-weight:\s*500/);
+});

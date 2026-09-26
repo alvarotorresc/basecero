@@ -9,7 +9,8 @@
 :root { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
 html { background: var(--bg); }
-body { font-family: var(--font-body); color: var(--text); background: var(--bg); }
+/* 500 = secundario, el peso base de todo texto (DESIGN §7: el 400 no se usa). */
+body { font-family: var(--font-body); font-weight: 500; color: var(--text); background: var(--bg); }
 .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 /* ===== estructura general ===== */
