@@ -1089,6 +1089,9 @@
 .mov { display: flex; flex-direction: column; gap: var(--sp-12); }
 .mov-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); }
 .mov-head .root-header { flex: 1; min-width: 0; margin-bottom: 0; padding: 0 0 0 var(--sp-4); }
+/* El nombre del periodo es texto libre («Septiembre 2026»): en una línea junto a las flechas, a 20
+   para que quepa a 390 (el 24 de la cabecera de raíz lo partía), y con elipsis si aun así no cabe. */
+.mov-head .root-header-title { font-size: var(--fs-20); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mov-period-nav { flex: none; display: flex; gap: var(--sp-8); }
 
 /* Display m: «de X» a la derecha de la cifra, abajo; el medidor de 8 debajo, a todo el ancho. */
