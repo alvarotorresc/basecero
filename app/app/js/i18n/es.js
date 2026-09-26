@@ -406,6 +406,7 @@ export const ES = {
       dayMark: "día {day}",
     },
     noSpend: "Sin gasto: {names}",
+    noSpendMore: "Sin gasto: {names} y {n} más",
     byCategory: {
       title: "Por categoría",
       empty: "No tienes ninguna categoría de gasto activa.",

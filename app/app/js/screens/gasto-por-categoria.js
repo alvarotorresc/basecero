@@ -205,20 +205,24 @@ export async function renderGastoPorCategoria(container, onBack) {
    *  eran filas atenuadas; es el caso más habitual de poner uno). */
   function idleLineHtml(idleRows) {
     if (!idleRows.length) return "";
-    const names = idleRows.map((r) => r.name).join(", ");
+    // Tres nombres como mucho y «y N más»: con las 12 raíces la línea ocupaba 4+ renglones. El
+    // botón sigue desplegando todas.
+    const names = idleRows.slice(0, 3).map((r) => r.name).join(", ");
+    const rest = idleRows.length - 3;
     // Como mucho tres muestras (B-GastoCategoria): con más, la fila de muestras se come la línea.
     const swatches = idleRows.slice(0, 3).map((r) => `<span class="gc-idle-swatch ${famClass(familyForCategory(r.root_id, byId))}"></span>`).join("");
     return `
       <button type="button" class="gc-idle" id="gc-idle" aria-expanded="${state.showIdle ? "true" : "false"}">
         <span class="gc-idle-swatches" aria-hidden="true">${swatches}</span>
-        <span class="gc-idle-text">${escHtml(t("gastoCategoria.noSpend", { names }))}</span>
+        <span class="gc-idle-text">${escHtml(rest > 0 ? t("gastoCategoria.noSpendMore", { names, n: rest }) : t("gastoCategoria.noSpend", { names }))}</span>
         <span class="gc-chev" aria-hidden="true">${icon(state.showIdle ? "chevronDown" : "chevronRight", { size: 16 })}</span>
       </button>`;
   }
 
   function render() {
     const rows = sortRootRows(rootRows, budgetByCategory);
-    const idleRows = rows.filter(isIdle);
+    // Una raíz sin gasto que se ha desplegado ya está en la lista: no se repite en «Sin gasto:».
+    const idleRows = rows.filter((r) => isIdle(r) && !state.expanded.has(r.root_id));
     const listed = rows.filter((r) => !isIdle(r) || state.showIdle || state.expanded.has(r.root_id));
     // Una sola escala para toda la lista: la mayor entre gasto y límite, así ninguna marca de
     // límite se sale de su pista.
