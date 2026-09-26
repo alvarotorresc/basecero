@@ -1,9 +1,10 @@
 // modalHtml es puro (devuelve un string, como skeletonHtml): el contrato de accesibilidad se
-// verifica sobre el string. createModal(doc, {pushBack, goBack, win}) recibe sus dependencias por
-// parámetro —mismo patrón que createToaster(doc) en toast.js— para probarlo en Node con un
-// document falso. El fake de <dialog> reproduce lo que importa del elemento nativo: showModal()
-// exige estar en el documento, y close() sobre un diálogo ya cerrado es un no-op que NO vuelve a
-// emitir "close" (de eso depende que el gesto atrás tardío sea inocuo).
+// verifica sobre el string. createModal(doc, {pushBack, goBack, win, wait}) recibe sus
+// dependencias por parámetro —mismo patrón que createToaster(doc) en toast.js— para probarlo en
+// Node con un document falso. El fake de <dialog> reproduce lo que importa del elemento nativo:
+// showModal() exige estar en el documento, close() sobre un diálogo ya cerrado es un no-op que NO
+// vuelve a emitir "close" (de eso depende que el gesto atrás tardío sea inocuo), y "cancel"
+// (Escape) es un evento aparte que llega ANTES de close().
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { modalHtml, createModal } from "../../app/app/js/modal.js";
@@ -14,9 +15,15 @@ function fakeDoc() {
   function node(tag) {
     const listeners = {};
     const kids = {};
+    const classes = new Set();
     const self = {
       tag, className: "", innerHTML: "", attrs: {}, open: false, inBody: false,
       focusCount: 0, focusOpts: null,
+      classList: {
+        add(c) { classes.add(c); },
+        remove(c) { classes.delete(c); },
+        contains(c) { return classes.has(c); },
+      },
       setAttribute(k, v) { this.attrs[k] = v; },
       addEventListener(type, fn) { listeners[type] = fn; },
       showModal() {
@@ -27,6 +34,10 @@ function fakeDoc() {
       remove() { body.children = body.children.filter((c) => c !== this); this.inBody = false; },
       focus(o) { this.focusCount += 1; this.focusOpts = o; doc.activeElement = this; },
       querySelector(sel) { return (kids[sel] ??= node("button")); },
+      // Simuladores de eventos que no tienen un método nativo equivalente en este fake (a
+      // diferencia de close(), que SÍ es un método real del <dialog>).
+      fireCancel() { listeners.cancel?.({ preventDefault() { this.defaultPrevented = true; } }); },
+      fireClickOn(target) { listeners.click?.({ target }); },
     };
     return self;
   }
@@ -46,7 +57,12 @@ function fakeWin() {
   };
 }
 
-function harness() {
+// wait síncrono (ejecuta el callback en el acto): así las 250/180 ms de la animación de salida
+// (components.css, DESIGN.md §10) no meten temporizadores reales en los tests — el comportamiento
+// que importa es que TODO pase por requestClose(), no cuánto tarde el reloj.
+const SYNC_WAIT = (ms, fn) => fn();
+
+function harness({ wait = SYNC_WAIT } = {}) {
   const doc = fakeDoc();
   const backs = [];
   const backOpts = [];
@@ -56,6 +72,7 @@ function harness() {
     pushBack: (cb, opts) => { backs.push(cb); backOpts.push(opts); calls.push("pushBack"); },
     goBack: () => calls.push("goBack"),
     win,
+    wait,
   });
   return { doc, backs, backOpts, calls, modal, win };
 }
@@ -87,13 +104,47 @@ test("modalHtml: sin mensaje no pinta el parrafo", () => {
   assert.ok(!html.includes('id="modal-text"'));
 });
 
-test("confirm: cuelga el dialog del body ANTES de showModal, con role, aria-modal y aria-labelledby", () => {
+test("modalHtml: sin preview no pinta el pozo", () => {
+  const html = modalHtml(OPTS);
+  assert.ok(!html.includes("modal-preview"));
+});
+
+test("modalHtml: con preview lo inserta tal cual, UNA sola vez, dentro del pozo", () => {
+  const preview = '<span class="mi-fila">Bar Pepe</span>';
+  const html = modalHtml({ ...OPTS, preview });
+  const primera = html.indexOf(preview);
+  assert.ok(primera >= 0);
+  assert.equal(html.indexOf(preview, primera + 1), -1, "no se duplica");
+  assert.ok(/class="modal-preview">\s*<span class="mi-fila">/.test(html), "vive dentro de .modal-preview");
+});
+
+test("modalHtml: destructive por defecto (true) — btn-danger-confirm, D-1/C5", () => {
+  const html = modalHtml(OPTS);
+  assert.ok(html.includes("btn-danger-confirm"));
+  assert.ok(!/id="modal-confirm"[^>]*class="btn-secondary"/.test(html));
+});
+
+test("modalHtml: destructive:false — el confirmar es un secundario normal", () => {
+  const html = modalHtml({ ...OPTS, destructive: false });
+  assert.ok(!html.includes("btn-danger-confirm"));
+  const confirmBtn = html.slice(html.indexOf("modal-actions"));
+  assert.ok(confirmBtn.includes('id="modal-confirm"'));
+});
+
+test("modalHtml: Cancelar siempre es un secundario, destructivo o no", () => {
+  for (const destructive of [true, false]) {
+    const html = modalHtml({ ...OPTS, destructive });
+    assert.match(html, /class="btn-secondary" id="modal-cancel"/);
+  }
+});
+
+test("confirm: cuelga el dialog del body ANTES de showModal, con role alertdialog, aria-modal y aria-labelledby", () => {
   const { doc, modal } = harness();
   const dlg = modal.confirm(OPTS);
   assert.equal(doc.body.children.length, 1);
   assert.equal(dlg.tag, "dialog");
   assert.equal(dlg.className, "modal");
-  assert.equal(dlg.attrs.role, "dialog");
+  assert.equal(dlg.attrs.role, "alertdialog");
   assert.equal(dlg.attrs["aria-modal"], "true");
   assert.equal(dlg.attrs["aria-labelledby"], "modal-title");
   assert.equal(dlg.attrs["aria-describedby"], "modal-text");
@@ -131,6 +182,20 @@ test("cancelar: cierra, desmonta, deshace la entrada y NO ejecuta onConfirm", ()
   assert.equal(hecho, 0);
 });
 
+test("cancelar: pasa por requestClose — añade is-leaving antes de cerrar de verdad", () => {
+  const pendientes = [];
+  const { doc, modal } = harness({ wait: (ms, fn) => pendientes.push(fn) });
+  const dlg = modal.confirm(OPTS);
+  dlg.querySelector("#modal-cancel").onclick();
+  assert.ok(dlg.classList.contains("is-leaving"), "la animación de salida debe verse ANTES del cierre real");
+  assert.equal(dlg.open, true, "el cierre real espera a que termine la animación (EXIT_MS)");
+  assert.equal(doc.body.children.length, 1, "sigue montado mientras dura la animación");
+  assert.equal(pendientes.length, 1);
+  pendientes[0]();                         // termina la animación → cierre real
+  assert.equal(dlg.open, false);
+  assert.equal(doc.body.children.length, 0);
+});
+
 test("confirmar: cierra, desmonta, deshace la entrada y ejecuta onConfirm UNA vez", () => {
   const { doc, calls, modal } = harness();
   let hecho = 0;
@@ -139,6 +204,52 @@ test("confirmar: cierra, desmonta, deshace la entrada y ejecuta onConfirm UNA ve
   assert.equal(doc.body.children.length, 0);
   assert.deepEqual(calls, ["pushBack", "goBack"]);
   assert.equal(hecho, 1);
+});
+
+test("Escape (cancel): se intercepta con preventDefault y pasa por requestClose, no confirma", () => {
+  const { doc, calls, modal } = harness();
+  let hecho = 0;
+  const dlg = modal.confirm({ ...OPTS, onConfirm: () => { hecho += 1; } });
+  dlg.fireCancel();
+  assert.equal(dlg.open, false, "con wait síncrono, la animación ya terminó y cerró de verdad");
+  assert.equal(doc.body.children.length, 0);
+  assert.deepEqual(calls, ["pushBack", "goBack"]);
+  assert.equal(hecho, 0);
+});
+
+test("Escape (cancel): con la animación en curso, el <dialog> sigue abierto (el navegador NO lo cierra por su cuenta)", () => {
+  const pendientes = [];
+  const { modal } = harness({ wait: (ms, fn) => pendientes.push(fn) });
+  const dlg = modal.confirm(OPTS);
+  dlg.fireCancel();
+  assert.ok(dlg.classList.contains("is-leaving"));
+  assert.equal(dlg.open, true, "preventDefault() evita que Escape cierre de golpe, sin animación");
+});
+
+test("clic en el velo (target===dlg): cierra sin confirmar, igual que Cancelar", () => {
+  const { doc, calls, modal } = harness();
+  let hecho = 0;
+  const dlg = modal.confirm({ ...OPTS, onConfirm: () => { hecho += 1; } });
+  dlg.fireClickOn(dlg);
+  assert.equal(dlg.open, false);
+  assert.deepEqual(calls, ["pushBack", "goBack"]);
+  assert.equal(hecho, 0);
+});
+
+test("clic dentro del contenido (target !== dlg): NO cierra", () => {
+  const { modal } = harness();
+  const dlg = modal.confirm(OPTS);
+  dlg.fireClickOn(dlg.querySelector("#modal-cancel"));
+  assert.equal(dlg.open, true);
+});
+
+test("requestClose es idempotente: un segundo disparo (Escape tras el clic en el velo) no reprograma el cierre", () => {
+  const pendientes = [];
+  const { modal } = harness({ wait: (ms, fn) => pendientes.push(fn) });
+  const dlg = modal.confirm(OPTS);
+  dlg.fireClickOn(dlg);
+  dlg.fireCancel();
+  assert.equal(pendientes.length, 1, "closing ya estaba a true: no se programa un segundo wait");
 });
 
 test("gesto atras del sistema: cierra el modal sin deshacer una segunda entrada", () => {
@@ -180,6 +291,7 @@ test("cancelar: si pushBack lanzó (pushState rechazado), no deshace la pantalla
     pushBack: () => { throw new Error("límite de Safari"); },
     goBack: () => calls.push("goBack"),
     win: fakeWin(),
+    wait: SYNC_WAIT,
   });
   const dlg = modal.confirm(OPTS);
   dlg.querySelector("#modal-cancel").onclick();
@@ -198,7 +310,7 @@ test("Escape: el evento close desmonta, sincroniza el historial y no confirma", 
   const { doc, calls, modal } = harness();
   let hecho = 0;
   const dlg = modal.confirm({ ...OPTS, onConfirm: () => { hecho += 1; } });
-  dlg.close();                      // es lo que hace Escape en un <dialog> modal
+  dlg.close();                      // cierre real directo (p. ej. si el navegador lo cerrara sin pasar por "cancel")
   assert.equal(doc.body.children.length, 0);
   assert.deepEqual(calls, ["pushBack", "goBack"]);
   assert.equal(hecho, 0);
@@ -219,4 +331,13 @@ test("cancelar: devuelve el foco a quien abrio el modal", () => {
   const dlg = modal.confirm(OPTS);
   dlg.querySelector("#modal-cancel").onclick();
   assert.equal(abridor.focusCount, 1);
+});
+
+test("createModal sin `wait`: usa setTimeout por defecto (no revienta si el llamador no lo pasa)", () => {
+  const doc = fakeDoc();
+  const modal = createModal(doc, { pushBack: () => {}, goBack: () => {}, win: fakeWin() });
+  const dlg = modal.confirm(OPTS);
+  dlg.querySelector("#modal-cancel").onclick();
+  assert.ok(dlg.classList.contains("is-leaving"));
+  assert.equal(dlg.open, true, "con setTimeout real, el cierre no es síncrono");
 });

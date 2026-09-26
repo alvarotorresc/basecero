@@ -71,21 +71,24 @@ const BUTTON_CLASS = {
   tertiary: "btn-tertiary",
   "danger-entry": "btn-danger",
   "tertiary-danger": "btn-tertiary btn-tertiary-danger",
+  "danger-confirm": "btn-danger-confirm",
 };
 
-/** Botón del sistema (DESIGN.md §9): Primario, Secundario M/S, Terciario y destructivo de entrada.
+/** Botón del sistema (DESIGN.md §9): Primario, Secundario M/S, Terciario y destructivo (entrada y
+ *  confirmación).
  *
  *   primary       56 píldora --accent 17/700 --sh-key, ancho completo. `note` → 12/500 dim DEBAJO
  *                 (I-67); entonces devuelve un contenedor .btn-stack con el botón y la nota.
  *   secondary     M 48/15 (por defecto) · S 44/14 (`size:"s"`), --raised con borde.
  *   tertiary      Texto 13/600 dim con alto de toque 44.
- *   danger-entry  Forma de secundario con texto y borde --neg (D-1, C5). La confirmación roja
- *                 rellena vive en el aviso (PR-09), no aquí.
+ *   danger-entry  Forma de secundario con texto y borde --neg (D-1, C5).
+ *   danger-confirm  Confirmación del aviso (D-1, C5, modal.js): relleno --neg, texto --on-neg,
+ *                 48/15 — la ÚNICA excepción a «rojo solo en cifras».
  *   tertiary-danger  Terciario con texto --neg (D-1: destructivo rojo en todas partes), p. ej.
  *                 «Borrar objetivo» de B-Objetivo.
  *
  *  @param {object} o
- *  @param {"primary"|"secondary"|"tertiary"|"danger-entry"|"tertiary-danger"} [o.kind]  Por defecto "secondary".
+ *  @param {"primary"|"secondary"|"tertiary"|"danger-entry"|"danger-confirm"|"tertiary-danger"} [o.kind]  Por defecto "secondary".
  *  @param {"m"|"s"} [o.size]    Solo secundario y entrada destructiva. Por defecto "m".
  *  @param {string}  [o.id]
  *  @param {string}  o.label     Se escapa aquí.

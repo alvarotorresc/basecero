@@ -971,6 +971,176 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
 
 /* ===== Hoja inferior, aviso y toast (PR-09) ===== */
 
+/* --- Movimiento común (§10): entran 250ms ease-out y salen 180ms ease-in; con movimiento
+   reducido, solo fundido (K13) — ni deslizamiento ni escalado. La hoja y el aviso comparten este
+   fundido para su velo y, en reducido, para sí mismos (sustituye a su deslizamiento/escalado). --- */
+@keyframes bc-fade-in { from { opacity: 0; } }
+@keyframes bc-fade-out { to { opacity: 0; } }
+
+/* --- Hoja inferior (§9, B-Movimientos-Filtros / B-Categorias-Nueva): <dialog> nativo como
+   modal.js — trampa de foco, Escape y velo inerte los da el navegador. Se reancla abajo (en vez
+   del centrado que trae de fábrica) y con padding:0: el relleno real vive en .sheet-content, su
+   único hijo, para que un clic en el velo (fuera de esa caja) llegue con target=dlg (sheet.js). --- */
+.sheet {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 480px;         /* mismo tope que .tabbar */
+  max-height: 92vh;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: var(--surface);
+  box-shadow: var(--sh-sheet);
+  animation: bc-sheet-in 250ms ease-out;
+}
+.sheet.is-leaving { animation: bc-sheet-out 180ms ease-in forwards; }
+.sheet::backdrop { background: var(--scrim); animation: bc-fade-in 250ms ease-out; }
+.sheet.is-leaving::backdrop { animation: bc-fade-out 180ms ease-in forwards; }
+@keyframes bc-sheet-in { from { transform: translateY(100%); } }
+@keyframes bc-sheet-out { to { transform: translateY(100%); } }
+
+/* height:100% resuelve contra el alto de .sheet: auto si el contenido cabe, max-height si no —
+   así .sheet-body puede repartirse lo que sobre y hacer scroll solo él. */
+.sheet-content {
+  box-sizing: border-box;
+  height: 100%;
+  padding: var(--sp-8) var(--sp-16) calc(var(--sp-24) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+}
+.sheet-handle { flex: none; align-self: center; width: 36px; height: 4px; border-radius: var(--radius-pill); background: var(--border); }
+.sheet-header { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); padding-left: var(--sp-4); }
+.sheet-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-17);
+  line-height: var(--lh-title);
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+.sheet-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--sp-16); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet { animation: bc-fade-in 120ms linear; }
+  .sheet.is-leaving { animation: bc-fade-out 120ms linear forwards; }
+  .sheet::backdrop { animation: bc-fade-in 120ms linear; }
+  .sheet.is-leaving::backdrop { animation: bc-fade-out 120ms linear forwards; }
+}
+
+/* --- Aviso de confirmación (§9, B-Borrar): margen 8, --radius-xl, --sh-alert; título 17, vista
+   previa opcional en pozo, una línea de ayuda dim y dos botones 48/15 en rejilla — Cancelar
+   primero en el DOM (foco inicial y salida segura). Mismo padding:0 + envoltorio que .sheet y por
+   el mismo motivo (clic en el velo, modal.js). "Aparece": sin deslizamiento, solo fundido+escala. --- */
+.modal {
+  left: var(--sp-8);
+  right: var(--sp-8);
+  bottom: var(--sp-8);
+  top: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--sh-alert);
+  animation: bc-modal-in 250ms ease-out;
+}
+.modal.is-leaving { animation: bc-modal-out 180ms ease-in forwards; }
+.modal::backdrop { background: var(--scrim); animation: bc-fade-in 250ms ease-out; }
+.modal.is-leaving::backdrop { animation: bc-fade-out 180ms ease-in forwards; }
+@keyframes bc-modal-in { from { opacity: 0; transform: scale(.96); } }
+@keyframes bc-modal-out { to { opacity: 0; transform: scale(.96); } }
+
+.modal-content { box-sizing: border-box; display: flex; flex-direction: column; gap: var(--sp-16); padding: var(--sp-24) var(--sp-16) var(--sp-16); }
+.modal-title {
+  margin: 0;
+  padding: 0 var(--sp-4);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-17);
+  line-height: var(--lh-title);
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+/* Vista previa de la fila (opcional, DESIGN.md §9): pozo con la anatomía de una baldosa de icono
+   más su cifra — el contenido (icono, nombre, importe…) lo trae YA ESCAPADO quien llama
+   (modal.js#modalHtml), como cualquier otro `preview`/`html` de confianza del proyecto. */
+.modal-preview { display: flex; align-items: center; gap: var(--sp-12); padding: var(--sp-8) var(--sp-12); border-radius: var(--radius-lg); background: var(--well); box-shadow: var(--sh-well); }
+.modal-text { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-14); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+/* Rejilla de dos columnas, NO column-reverse: Cancelar ya va primero en el DOM (modal.js), así que
+   aparece a la izquierda sin reordenar nada — antes salía apilado y con las alturas descuadradas
+   (Cancelar 48 vs. Borrar 52); ahora los dos son 48/15 (F-24 de inventario-B.md). */
+.modal-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+
+/* Confirmación destructiva (D-1, C5): la ÚNICA excepción a «rojo solo en cifras» — relleno --neg,
+   texto --on-neg. 48/15, igual que el secundario de al lado. */
+.btn-danger-confirm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-8);
+  min-height: 48px;
+  padding: 0 var(--sp-16);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--neg);
+  color: var(--on-neg);
+  font-family: var(--font-body);
+  font-size: var(--fs-15);
+  font-weight: 700;
+  line-height: var(--lh-title);
+  cursor: pointer;
+}
+.btn-danger-confirm:disabled { opacity: .5; cursor: default; }
+
+@media (prefers-reduced-motion: reduce) {
+  .modal { animation: bc-fade-in 120ms linear; }
+  .modal.is-leaving { animation: bc-fade-out 120ms linear forwards; }
+  .modal::backdrop { animation: bc-fade-in 120ms linear; }
+  .modal.is-leaving::backdrop { animation: bc-fade-out 120ms linear forwards; }
+}
+
+/* --- Toast (toast.js): acuse de recibo, un único nodo colgado de <body>, por encima de la barra
+   de pestañas (z-index 20) y por debajo de la franja de aviso de almacenamiento (30).
+   pointer-events:none — es un acuse, no un control: no intercepta el toque siguiente. Con una
+   subpantalla abierta (body.subscreen) no hay tab bar que esquivar: baja casi hasta el borde. --- */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-real) + var(--sp-16));
+  z-index: 25;
+  box-sizing: border-box;
+  width: calc(100% - 2 * var(--sp-16));
+  max-width: 440px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  padding: var(--sp-12) var(--sp-16);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-size: var(--fs-15);
+  font-weight: 500;
+  line-height: var(--lh-body);
+  text-align: left;
+  box-shadow: var(--sh-alert);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%) translateY(var(--sp-8));
+  transition: opacity .18s ease, transform .18s ease;
+}
+body.subscreen #toast { bottom: calc(var(--sp-16) + env(safe-area-inset-bottom, 0px)); }
+#toast.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  #toast { transition: opacity .12s linear; }
+}
+
 /* ===== Familias de cuenta (PR-10) ===== */
 /* Deuda (C8): la cuenta de tipo pasivo se pinta con la trama --stripe-debt (sobre ella, el icono
    en --fx). La barra apilada ya la usa en .sbar-seg.is-debt; aquí la llevan la baldosa y lo que
