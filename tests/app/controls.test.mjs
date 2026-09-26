@@ -326,3 +326,31 @@ test("fieldHtml: `lead` va dentro del pozo, delante del input; sin él, el marca
   const plain = fieldHtml({ id: "a", label: "Nombre" });
   assert.match(plain, /<span class="ctl-field"><input/);
 });
+
+// ---------- variantes de fidelidad al mockup (2026-09-27) ----------
+
+const CSS_CTL = (await import("node:fs")).readFileSync(new URL("../../app/app/css/components.css", import.meta.url), "utf8");
+
+test("switchHtml: `accent` añade is-accent (naranja encendido, B-Movimientos-Filtros); por defecto, no", () => {
+  assert.doesNotMatch(switchHtml({ id: "s", checked: true, label: "x" }), /is-accent/);
+  const on = switchHtml({ id: "s", checked: true, label: "x", accent: true });
+  assert.match(on, /class="ctl-switch is-accent"/);
+  assert.match(on, /aria-checked="true"/);
+  assert.match(CSS_CTL, /\.ctl-switch\.is-accent\[aria-checked="true"\]\s*\{\s*background:\s*var\(--accent\)/);
+});
+
+test("checkboxHtml: `accent` añade is-accent (marcada en naranja, B-Liquidar); por defecto, no", () => {
+  assert.doesNotMatch(checkboxHtml({ id: "c", checked: true, label: "x" }), /is-accent/);
+  assert.match(checkboxHtml({ id: "c", checked: true, label: "x", accent: true }), /class="ctl-checkbox is-accent"/);
+  assert.match(CSS_CTL, /\.ctl-checkbox\.is-accent\[aria-checked="true"\] \.ctl-checkbox-box\s*\{[^}]*background:\s*var\(--accent\)[^}]*color:\s*var\(--on-accent\)/);
+});
+
+test("fieldHtml: `pill` pone el pozo en píldora y `hideLabel` deja la etiqueta solo para el lector; por defecto, nada", () => {
+  const base = fieldHtml({ id: "q", label: "Buscar" });
+  assert.doesNotMatch(base, /is-pill|is-hidden/);
+  const html = fieldHtml({ id: "q", label: "Buscar", type: "search", pill: true, hideLabel: true });
+  assert.match(html, /class="ctl-field is-pill"/);
+  assert.match(html, /class="ctl-field-label is-hidden">Buscar</);
+  assert.match(html, /<label class="ctl-field-wrap" for="q">/, "sigue siendo la etiqueta del input");
+  assert.match(CSS_CTL, /\.ctl-field\.is-pill\s*\{\s*border-radius:\s*var\(--radius-pill\)/);
+});

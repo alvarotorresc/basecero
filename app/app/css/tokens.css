@@ -10,9 +10,11 @@
 
   /* Escala de cuerpo (el 16 solo en <input>, para que iOS no haga zoom) */
   --fs-12:12px;--fs-13:13px;--fs-14:14px;--fs-15:15px;--fs-input:16px;--fs-17:17px;--fs-20:20px;--fs-24:24px;
+  --fs-30:30px; /* cifra grande de un bloque con familia (B-Home «Ahorras 47 %») */
   --lh-title:1.2;--lh-body:1.5;
 
-  /* Cifra del Display: hero (Inicio, Patrimonio, Bienvenida, Gasto) · subpantalla · compacta (Movimientos) */
+  /* Cifra del Display: hero · subpantalla · compacta. Son los tamaños por defecto: cada pantalla puede
+     pedir el suyo (--disp-fs en línea) para quedar igual que su mockup (Álvaro 2026-09-27). */
   --disp-xl:52px;--disp-l:44px;--disp-m:34px;--lh-disp:1.05;
 
   /* Espaciado: rejilla 2/4/8/12/16/24; el 20 solo dentro del Display */
@@ -54,33 +56,40 @@
   --ring-sel:inset 0 0 0 2px var(--accent);
   --focus:2px solid var(--accent);--focus-offset:2px;
 
-  /* Familias (paleta-familias.md): -t tinte (qué es) · -b barra (cuánto) · -x texto e icono (de qué) */
+  /* Familias (paleta-familias.md): -t tinte (qué es) · -b barra (cuánto) · -x texto e icono (de qué).
+     Retocadas solo las dos parejas aprobadas (Casa~Alimentación, Salud~Transporte); Coche, Ropa e
+     Impuestos vuelven a sus valores de antes del retoque (Álvaro 2026-09-27: igual que el mockup). */
   --f-casa-t:#E4DACA;--f-casa-b:#A8895F;--f-casa-x:#614A26; /* arena */
   --f-ali-t:#D4DDD0;--f-ali-b:#557556;--f-ali-x:#325936;    /* salvia */
   --f-res-t:#E6DDB4;--f-res-b:#BE9E3A;--f-res-x:#5E4A0C;    /* mostaza */
   --f-tra-t:#D4DCEB;--f-tra-b:#759ADF;--f-tra-x:#2F4B83;    /* cielo */
-  --f-coc-t:#D5DAE2;--f-coc-b:#8B9FBE;--f-coc-x:#39465C;    /* pizarra */
+  --f-coc-t:#D6DAE0;--f-coc-b:#7D8797;--f-coc-x:#3D4656;    /* pizarra */
   --f-sal-t:#CFDEE0;--f-sal-b:#4D8E98;--f-sal-x:#1F5A62;    /* agua */
   --f-sus-t:#DDD8EA;--f-sus-b:#8878C0;--f-sus-x:#4B3F8A;    /* lavanda */
   --f-oci-t:#E8D5DE;--f-oci-b:#B86A8C;--f-oci-x:#7F2F52;    /* rosa */
-  --f-rop-t:#E0D7E6;--f-rop-b:#805E98;--f-rop-x:#583770;    /* ciruela */
+  --f-rop-t:#E2D6E4;--f-rop-b:#9A6FA4;--f-rop-x:#5E3569;    /* ciruela */
   --f-reg-t:#EAD3D3;--f-reg-b:#B8676A;--f-reg-x:#82333A;    /* arcilla */
-  --f-imp-t:#E0DCC4;--f-imp-b:#857929;--f-imp-x:#5A500E;    /* oliva */
+  --f-imp-t:#DEDDC6;--f-imp-b:#8E8B4A;--f-imp-x:#555219;    /* oliva */
   --f-otr-t:#DEDCD7;--f-otr-b:#9A968C;--f-otr-x:#4F4C45;    /* piedra */
 
   /* Cuentas (D-2): eligen familia como una categoría; la deuda se pinta rayada sobre su familia */
   --stripe-debt:repeating-linear-gradient(135deg,var(--f-coc-b) 0 5px,var(--f-coc-t) 5px 8px);
+
+  /* Tinta sobre el sólido de familia (-b): el icono de la baldosa rellena (B-Ajustes, B-Categorias) */
+  --on-fam:#F8F7F4;
 }
 
 :root[data-theme="dark"]{
+  /* Oscuro «grafito» (V3 de DARK-propuestas.md, Álvaro 2026-09-27): capas sobre un grafito medio,
+     bordes e --idle visibles, --text-dim más claro; el pozo y el Display siguen hundidos. */
   /* Base Instrumento */
-  --bg:#161719;--surface:#1E1F22;--raised:#28292D;--well:#131416;
-  --border:#393A3F;--border-strong:#4A4B51;
-  --text:#EDECE8;--text-dim:#A09F9B;
-  --chip:#161719;--lift:#393A3F;--idle:#6B6A66;
+  --bg:#1D1E20;--surface:#292A2D;--raised:#38393D;--well:#131416;
+  --border:#66686D;--border-strong:#828389;
+  --text:#F3F2EE;--text-dim:#CAC9C4;
+  --chip:#1D1E20;--lift:#494A4F;--idle:#8B8A85;
 
   /* Acción */
-  --accent:#FF5A1F;--on-accent:#161719;--accent-text:#FF7B47;
+  --accent:#FF5A1F;--on-accent:#161719;--accent-text:#FE885A;
 
   /* Display */
   --disp:#0E0F10;--disp-line:#26272B;--disp-text:#FFC266;--disp-dim:#9A8D74;--disp-ink:#EDECE8;
@@ -92,9 +101,9 @@
   /* Velo */
   --scrim:rgba(0,0,0,.6);
 
-  /* Sombras y anillos (en oscuro los hundidos llevan anillo de borde) */
+  /* Sombras y anillos (en oscuro los hundidos llevan anillo de borde; el del pozo, --border-strong) */
   --sh-display:inset 0 2px 6px rgba(0,0,0,.6),inset 0 0 0 1px var(--disp-line);
-  --sh-well:inset 0 1px 2px rgba(0,0,0,.4),inset 0 0 0 1px var(--border);
+  --sh-well:inset 0 1px 2px rgba(0,0,0,.4),inset 0 0 0 1px var(--border-strong);
   --sh-thumb:0 1px 2px rgba(0,0,0,.45);
   --sh-knob:0 1px 2px rgba(0,0,0,.5);
   --sh-key:0 2px 0 rgba(0,0,0,.4);
@@ -102,19 +111,25 @@
   --sh-alert:0 4px 16px rgba(0,0,0,.5);
   --disp-glow:0 0 12px rgba(255,194,102,.25);
 
-  /* Familias, oscuro */
-  --f-casa-t:#2F251D;--f-casa-b:#C0A389;--f-casa-x:#E1CDB8;
-  --f-ali-t:#202B22;--f-ali-b:#628D6C;--f-ali-x:#B9DBBD;
-  --f-res-t:#2D2716;--f-res-b:#BA9B39;--f-res-x:#E7DEBD;
-  --f-tra-t:#1F2838;--f-tra-b:#799EE3;--f-tra-x:#BBD1FC;
-  --f-coc-t:#22282F;--f-coc-b:#8AA1BE;--f-coc-x:#C5D2E5;
-  --f-sal-t:#182B2E;--f-sal-b:#4C9DA6;--f-sal-x:#A7DCE2;
-  --f-sus-t:#272538;--f-sus-b:#8F81D3;--f-sus-x:#D0CAFD;
-  --f-oci-t:#33222A;--f-oci-b:#C5749C;--f-oci-x:#F4C0D5;
-  --f-rop-t:#2D2332;--f-rop-b:#A27CBA;--f-rop-x:#E1C5EF;
-  --f-reg-t:#352221;--f-reg-b:#C17676;--f-reg-x:#F6C2C1;
-  --f-imp-t:#272A1A;--f-imp-b:#828D50;--f-imp-x:#D1D6A9;
-  --f-otr-t:#292724;--f-otr-b:#98958E;--f-otr-x:#D4D0C8;
+  /* Familias, oscuro: tintes con L +0,085 y croma ×1,7 y textos con croma ×1,5 sobre su tono (V3);
+     barras sin cambios. Casa sigue retocada (pareja Casa~Alimentación, aprobada por daltonismo); Coche
+     parte de su valor de antes del retoque; el texto de
+     Restauración no cambia (V3 lo deja quieto para no acercarlo al ámbar). */
+  --f-casa-t:#4B382A;--f-casa-b:#C0A389;--f-casa-x:#E9CBAB;
+  --f-ali-t:#2F4333;--f-ali-b:#628D6C;--f-ali-x:#ACE0B3;
+  --f-res-t:#473C1B;--f-res-b:#BA9B39;--f-res-x:#DAD3A6;
+  --f-tra-t:#2D3D5A;--f-tra-b:#799EE3;--f-tra-x:#BAD1FF;
+  --f-coc-t:#353E4A;--f-coc-b:#7C8FAB;--f-coc-x:#C0D2EF;
+  --f-sal-t:#1E4349;--f-sal-b:#4C9DA6;--f-sal-x:#8DE1EB;
+  --f-sus-t:#3C385B;--f-sus-b:#8F81D3;--f-sus-x:#D0CAFF;
+  --f-oci-t:#513241;--f-oci-b:#C5749C;--f-oci-x:#FEBAD6;
+  --f-rop-t:#473550;--f-rop-b:#A27CBA;--f-rop-x:#E9BEFE;
+  --f-reg-t:#553231;--f-reg-b:#C17676;--f-reg-x:#FEBEBD;
+  --f-imp-t:#3C4123;--f-imp-b:#828D50;--f-imp-x:#D1D893;
+  --f-otr-t:#3F3C39;--f-otr-b:#98958E;--f-otr-x:#D4D0C8;
+
+  /* Tinta sobre el sólido de familia: en oscuro, el fondo (BD-Ajustes) */
+  --on-fam:#1D1E20;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -147,15 +162,18 @@
      inset 0 0 0 2px var(--accent)                       → var(--ring-sel)
      0 0 0 2px var(--surface), 0 0 0 4px var(--accent)   → var(--ring-sel)   (anillo exterior eliminado)
      outline 2px var(--accent) / anillo 0 0 0 2px var(--text) de foco → outline:var(--focus);outline-offset:var(--focus-offset)
-     inset 0 0 0 1px var(--<fam>-s) (borde de tarjeta elegida) → quitar (sin borde)
+     inset 0 0 0 1px var(--<fam>-s) (borde de tarjeta elegida) → RETIRADO (Álvaro 2026-09-27: igual que
+       el mockup): la tarjeta lleva borde 1px --f-<fam>-b donde el original lo pinta
      repeating-linear-gradient(135deg, var(--coc-s) 0 5px, var(--coc-t) 5px 8px) → var(--stripe-debt)
-     otr-s / otr-t usados como gris de gráfico           → var(--idle)
+     otr-s / otr-t usados como gris de gráfico           → RETIRADO (Álvaro 2026-09-27): --f-otr-b donde
+       el original lo pinta
 
    Radios y cifras:
      border-radius 24px                                  → var(--radius-xl)
      border-radius 2-6px en barras, columnas, segmentos  → var(--radius-xs)
      border-radius 8px y 14px                            → var(--radius)
-     cifra del Display 52|56|64 (hero) / 44|48 / 34      → var(--disp-xl) / var(--disp-l) / var(--disp-m)
+     cifra del Display 52|56|64 (hero) / 44|48 / 34      → RETIRADO (Álvaro 2026-09-27): el tamaño de su
+       mockup (--disp-fs); xl/l/m quedan como atajos de 52/44/34
      line-height de la cifra del Display 1|1.1           → var(--lh-disp)
 
    Decisiones aplicadas:

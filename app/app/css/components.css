@@ -92,6 +92,13 @@
   overflow-wrap: anywhere;
 }
 .sub-header-sub { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+/* Centrada (subHeaderHtml `center`, B-Movimiento-Detalle/B-Borrar): 44 · título 15 centrado · 44.
+   Baldosa delante del título (`leadHtml`, B-Cuenta). F-15 retirada (Álvaro 2026-09-27). */
+.sub-header.is-center { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; }
+.sub-header.is-center .sub-header-body { align-items: center; text-align: center; }
+.sub-header.is-center .sub-header-title { font-size: var(--fs-15); }
+.sub-header-spacer { width: 44px; height: 44px; }
+.sub-header-lead { flex: none; display: flex; }
 
 /* --- Botón icono (§9): 44 redondo, raised con borde. --- */
 .icon-btn {
@@ -340,6 +347,9 @@
   transform: translateX(18px);
 }
 .ctl-switch:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+/* Variante naranja (switchHtml `accent`, B-Movimientos-Filtros): encendido en --accent. F-04
+   retirada (Álvaro 2026-09-27: igual que el mockup); apagado, igual que el de tinta. */
+.ctl-switch.is-accent[aria-checked="true"] { background: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .ctl-switch-knob { transition: none; } }
 
 /* Casilla (§9): 24 de radio 7 (única excepción al radio de tokens, K10) dentro de un área de toque
@@ -371,6 +381,9 @@
   box-shadow: none;
 }
 .ctl-checkbox:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+/* Variante naranja (checkboxHtml `accent`, B-Liquidar): marcada en --accent con el check en
+   --on-accent. F-05 retirada (Álvaro 2026-09-27: igual que el mockup). */
+.ctl-checkbox.is-accent[aria-checked="true"] .ctl-checkbox-box { background: var(--accent); color: var(--on-accent); }
 
 /* Paso a paso (§9): pozo píldora con relleno 4, teclas de 44 en --raised + --sh-thumb, valor mono
    17/600. */
@@ -475,6 +488,18 @@
   font-weight: 600;
 }
 .ctl-field-input.is-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+/* En píldora (fieldHtml `pill`, B-Movimientos búsqueda e importes de Filtros; F-29 retirada). */
+.ctl-field.is-pill { border-radius: var(--radius-pill); }
+/* Etiqueta solo para el lector de pantalla (fieldHtml `hideLabel`): el original no la pinta. */
+.ctl-field-label.is-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 /* Con baldosa delante (opción `lead`, B-Categorias-Nueva): relleno 8 a la izquierda, hueco 12. */
 .ctl-field.has-lead { padding: 0 var(--sp-12) 0 var(--sp-8); gap: var(--sp-12); }
 .ctl-field-lead { flex: none; display: flex; }
@@ -525,7 +550,10 @@
 }
 .disp-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); min-width: 0; }
 .disp-label { display: inline-flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--disp-dim); }
-/* C2: la cifra que manda es la única en ámbar; K9: solo 52/44/34. */
+/* Etiqueta fuerte (displayHtml `labelStrong`, B-Movimiento-Detalle «Bar Pepe»): 15/600 en tinta. */
+.disp-label.is-strong { font-size: var(--fs-15); font-weight: 600; color: var(--disp-ink); }
+/* La cifra que manda, en ámbar con brillo. Tamaño: atajo 52/44/34 o el px de su mockup (--disp-fs,
+   en línea; la escala de tres se retiró, Álvaro 2026-09-27). */
 .disp-value {
   font-weight: 500;
   line-height: var(--lh-disp);
@@ -536,8 +564,16 @@
 .disp-value-xl { font-size: var(--disp-xl); }
 .disp-value-l { font-size: var(--disp-l); }
 .disp-value-m { font-size: var(--disp-m); }
+.disp-value-free { font-size: var(--disp-fs); }
 .disp-foot { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--disp-dim); }
 .disp-ink { color: var(--disp-ink); }
+/* Ámbar dentro del Display (dispInkHtml tone:"amber"; F-13 retirada, Álvaro 2026-09-27): cifras
+   secundarias, rótulos y rellenos que el original pinta en ámbar. Solo dentro de .disp. */
+.disp-ink.disp-amber,
+.disp-amber { color: var(--disp-text); }
+.disp-amber-fill { background: var(--disp-text); }
+/* Verde del LED en una secundaria (dispInkHtml tone:"ok", B-Patrimonio «+737,51 €»). */
+.disp-ink.disp-ok { color: var(--ok); }
 /* Corner del Display (instrument.js#displayHtml `aside`, B-PeriodoNuevo): texto plano junto al
    label cuando no hay LED — un rango de fechas, no un estado. */
 .disp-aside { font-size: var(--fs-12); font-weight: 500; color: var(--disp-dim); }
@@ -623,6 +659,9 @@ circle.disp-today { fill: var(--disp-text); stroke: var(--disp); }
 .bento-tint .bento-label { color: var(--fx); }
 .bento-body { display: flex; flex-direction: column; gap: var(--sp-2); }
 .bento-figure { font-size: var(--fs-20); font-weight: 600; line-height: var(--lh-title); color: var(--text); }
+/* Variantes del original (B-Home «Ahorras 47 %»): cifra de 30 y cifra en -x de su familia. */
+.bento-figure.is-l { font-size: var(--fs-30); line-height: 1; }
+.bento-figure.is-fam-ink { color: var(--fx); }
 .bento-foot { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
 
 /* --- Contenedor (inventario-B · instrument.js#containerHtml): --surface con borde; relleno 16 en
@@ -702,6 +741,8 @@ circle.disp-today { fill: var(--disp-text); stroke: var(--disp); }
 .col-bar { flex: none; width: 100%; border-radius: var(--radius-xs) var(--radius-xs) 0 0; background: var(--idle); }
 .col.is-today .col-bar { background: var(--text); }
 .col.is-today.has-fam .col-bar { background: var(--fb); }
+/* Resto de días en la barra de una familia (columnsHtml `restFam`, B-Home: Otros). */
+.col.has-rest-fam .col-bar { background: var(--fb); }
 .col-amt { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); white-space: nowrap; color: var(--text); }
 .cols-labels { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); text-align: center; color: var(--text-dim); }
 .cols-labels .is-today { color: var(--text); }
@@ -752,6 +793,9 @@ circle.disp-today { fill: var(--disp-text); stroke: var(--disp); }
 .ent-tile-32 { width: 32px; height: 32px; }
 .ent-tile.ent-neutral { background: var(--well); color: var(--text); }
 .ent-tile.ent-on-tint { background: var(--chip); }
+/* Rellena (tileHtml `filled`, B-Ajustes/B-Categorias): el sólido -b con el icono en --on-fam.
+   F-08/F-39 retiradas (Álvaro 2026-09-27: igual que el mockup). */
+.ent-tile.ent-tile-filled { background: var(--fb); color: var(--on-fam); }
 
 /* --- Baldosa seleccionable (§9, B-Gasto): 56, tinte, icono --fx, nombre 13/600 --text. --- */
 .ent-pick {
@@ -822,6 +866,17 @@ circle.disp-today { fill: var(--disp-text); stroke: var(--disp); }
 button.ent-chosen { cursor: pointer; }
 .ent-chosen.ent-neutral { background: var(--well); }
 .ent-chosen.ent-neutral .ent-line2 { color: var(--text-dim); }
+/* Variantes del mockup (chosenCategoryHtml `variant`; F-42 retirada, Álvaro 2026-09-27): borde 1px
+   en el sólido de la familia. «pick» (B-Gasto): relleno 10 12, nombre 15/700. «detail»
+   (B-Movimiento-Detalle): ruta 13/600 -x arriba y nombre 17/700 debajo. */
+.ent-chosen-pick,
+.ent-chosen-detail { border: 1px solid var(--fb); }
+.ent-chosen-pick { padding: 10px var(--sp-12); }
+.ent-chosen-pick .ent-name { font-weight: 700; }
+.ent-chosen-detail .ent-line2 { font-size: var(--fs-13); font-weight: 600; }
+.ent-chosen-detail .ent-name { font-size: var(--fs-17); font-weight: 700; }
+.ent-chosen-pick.ent-neutral,
+.ent-chosen-detail.ent-neutral { border-color: transparent; }
 
 /* --- Chip de filtro (§9, B-Movimientos-Filtros): 44 píldora. Con familia: tinte + muestra 10
    --fb + 14/600 --text; neutro: --raised 14/500; etiqueta: + borde e icono (C10). --- */
@@ -903,6 +958,10 @@ button.ent-chosen { cursor: pointer; }
 .ent-amount .money-cents,
 .ent-amount .money-cur { font-size: inherit; color: inherit; margin-left: 0; }
 .ent-amount-note { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+/* Fila de 52 y cifra a 500 (txRowHtml `height:52` / `amountWeight:500`; B-Home, B-Movimientos,
+   B-Cuenta, B-Semana; F-34 retirada, Álvaro 2026-09-27). */
+.ent-row.ent-row-52 { min-height: 52px; padding-top: var(--sp-4); padding-bottom: var(--sp-4); }
+.ent-row.ent-row-w500 .ent-amount { font-weight: 500; }
 /* Sin familia (ingreso, sin categoría): la línea 2 en dim aunque la fila cuelgue de un contenedor
    con familia (no hereda su --fx), como .ent-chosen.ent-neutral. */
 .ent-row.ent-neutral .ent-line2 { color: var(--text-dim); }
@@ -951,6 +1010,13 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
 }
 .ent-set-value { flex: none; font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); }
 .ent-set-value.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+/* Valor en el -x de su familia (settingRowHtml `valueInFam`; I-61 retirada fuera de lo aprobado). */
+.ent-set-value.is-fam-ink { color: var(--fx); }
+/* Cifra suelta en su familia (entity.js#famNumHtml): mono, hereda tamaño y peso salvo que se pida. */
+.ent-fam-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.ent-fam-num.is-fam-ink { color: var(--fx); }
+.ent-fam-num.is-w500 { font-weight: 500; }
+.ent-fam-num.is-w600 { font-weight: 600; }
 .ent-chev { flex: none; display: flex; color: var(--text-dim); }
 
 /* --- Cabecera de día (§9): 24; «Hoy» 13/700 + fecha 13/500 dim; total mono 14/600. Sin familia. --- */
@@ -994,6 +1060,12 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
 .ent-sec-group { padding: 0 var(--sp-4); }
 .ent-sec-group .ent-sec-text { font-family: var(--font-body); font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }
 .ent-sec-count { font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+/* Variantes del mockup (sectionHeaderHtml `fam`/`ttl`/`dim`; F-37 y el encabezado de F-08
+   retirados, Álvaro 2026-09-27): texto en -x; el grupo en Unbounded 13 como en B-Ajustes. */
+.ent-sec.is-fam .ent-sec-text { color: var(--fx); }
+.ent-sec-group.is-ttl .ent-sec-text { font-family: var(--font-display); font-weight: 700; letter-spacing: -.01em; }
+.ent-sec-group.is-ttl:not(.is-fam) .ent-sec-text { color: var(--text); }
+.ent-sec.is-dim .ent-sec-text { color: var(--text-dim); }
 
 /* ===== Hoja inferior, aviso y toast (PR-09) ===== */
 
