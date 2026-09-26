@@ -157,7 +157,9 @@
 .gc-name { min-width: 0; font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gc-amt { flex: none; font-size: var(--fs-14); font-weight: 500; color: var(--text); }
 .gc-foot { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
-.gc-foot.is-over { color: var(--neg); }
+.gc-foot.is-alert { display: flex; align-items: center; gap: var(--sp-4); font-weight: 600; color: var(--text); }
+.gc-foot.is-alert svg { flex: none; }
+.gc-over { color: var(--neg); }
 .gc-chev { flex: none; display: flex; color: var(--text-dim); }
 
 /* Bloque desplegado: tinte de la familia (C6), sin borde; nombre 600 y cifra 17/600 (C3: ≤ 20). */

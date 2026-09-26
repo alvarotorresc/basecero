@@ -420,6 +420,8 @@ export const ES = {
       // Pie de la fila (B-GastoCategoria): el límite puesto, o el exceso si se ha pasado (sustituye
       // a la línea del límite: no se pintan las dos a la vez).
       limit: "límite {limit}",
+      // Aviso al 85 % (category-spend.js#budgetStatus, nivel warn): neutro, con icono de aviso.
+      nearLimit: "llevas el {pct} de {limit}",
       overBy: "superado por {over}",
     },
     detail: {

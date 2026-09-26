@@ -3,7 +3,7 @@ import {
   allCategoriesById, upsertBudget, deleteBudget, rootSpendHistory,
 } from "../repo.js";
 import { familyForCategory, iconForCategory, famClass } from "../category-colors.js";
-import { pctOf, sortRootRows, budgetMap, compareRoots } from "../category-spend.js";
+import { budgetStatus, pctOf, sortRootRows, budgetMap, compareRoots } from "../category-spend.js";
 import { eurToCents } from "../contract.js";
 import { fmtMoney, hoyISO, currencySymbol, fmtPct } from "../format.js";
 import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
@@ -29,6 +29,8 @@ const meterInline = (o) => meterHtml(o).replace(/^<div/, "<span").replace(/<\/di
 // Flechas "tendencia sube"/"tendencia baja" del repertorio (icons.js), NUNCA un chevron rotado.
 const ICON_TREND_UP = icon("trendUp", { size: 14, width: 2.2 });
 const ICON_TREND_DOWN = icon("trendDown", { size: 14, width: 2.2 });
+// Aviso de límite (≥ 85 % o superado): el icono de aviso del repertorio, en tinta.
+const ICON_WARN = icon("warn", { size: 14 });
 
 /** Pantalla «Gasto por categoría» (B-GastoCategoria): Display con el gasto del periodo, su medidor
  *  frente al presupuesto y la marca del día; debajo, cada raíz de gasto como medidor con nombre,
@@ -147,12 +149,20 @@ export async function renderGastoPorCategoria(container, onBack) {
    *  cifra 17/600). */
   function headHtml(row, fam, scaleMax, expanded) {
     const limitCents = limitOf(row.root_id);
-    const over = limitCents > 0 && row.spent_cents > limitCents;
-    const foot = limitCents > 0
-      ? over
-        ? `<span class="gc-foot is-over">${escHtml(t("gastoCategoria.row.overBy", { over: fmtMoney(row.spent_cents - limitCents) }))}</span>`
-        : `<span class="gc-foot">${escHtml(t("gastoCategoria.row.limit", { limit: fmtMoney(limitCents) }))}</span>`
-      : "";
+    // Mismo umbral de siempre (budgetStatus: warn >= 85 %, over > 100 %), sin ámbar: el aviso es
+    // texto en tinta con el icono de aviso; solo la cifra superada va en --neg (C4, «−» que avisa).
+    const st = budgetStatus(row.spent_cents, limitCents);
+    let foot = "";
+    if (st?.level === "over") {
+      const over = escHtml(fmtMoney(row.spent_cents - limitCents));
+      const text = escHtml(t("gastoCategoria.row.overBy", { over: fmtMoney(row.spent_cents - limitCents) }))
+        .replace(over, `<span class="num gc-over">${over}</span>`);
+      foot = `<span class="gc-foot is-alert">${ICON_WARN}<span>${text}</span></span>`;
+    } else if (st?.level === "warn") {
+      foot = `<span class="gc-foot is-alert">${ICON_WARN}<span>${escHtml(t("gastoCategoria.row.nearLimit", { pct: fmtPctInt(st.pct), limit: fmtMoney(limitCents) }))}</span></span>`;
+    } else if (st) {
+      foot = `<span class="gc-foot">${escHtml(t("gastoCategoria.row.limit", { limit: fmtMoney(limitCents) }))}</span>`;
+    }
     return `
       <button type="button" class="gc-head" data-root="${escAttr(row.root_id)}" aria-expanded="${expanded ? "true" : "false"}">
         ${tileHtml({ fam, icon: iconForCategory(row.root_id, byId), size: 32, onTint: expanded })}

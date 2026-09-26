@@ -396,6 +396,7 @@ export const EN = {
     },
     row: {
       limit: "limit {limit}",
+      nearLimit: "{pct} of {limit} used",
       overBy: "over by {over}",
     },
     detail: {
