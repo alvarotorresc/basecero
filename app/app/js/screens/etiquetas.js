@@ -1,6 +1,7 @@
 import { tagTotals, tagSpendByCategory, allCategoriesById, createTag, updateTag, setTagArchived } from "../repo.js";
 import { familyForCategory, famClass } from "../category-colors.js";
 import { eurToCents } from "../contract.js";
+import { netPositiveParts } from "../category-spend.js";
 import { fmtMoney, currencySymbol } from "../format.js";
 import { t } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
@@ -169,14 +170,16 @@ export async function renderEtiquetas(container, onBack) {
   }
 
   /** Tramos de la barra de una etiqueta, de mayor a menor: la barra -b de la familia de la raíz de
-   *  cada categoría; lo que no tiene familia (sin categoría) va en --idle, con su nombre (C11, C12). */
+   *  cada categoría; lo que no tiene familia (sin categoría) va en --idle, con su nombre (C11, C12).
+   *  Una categoría con neto negativo (más devoluciones que gasto) no tiene tramo, pero resta: los
+   *  demás se escalan para que la barra sume el total de la tarjeta (netPositiveParts). */
   function segmentsOf(row) {
-    return (byTag.get(row.id) ?? [])
-      .filter((r) => r.spent_cents > 0)
-      .sort((a, b) => b.spent_cents - a.spent_cents)
-      .map((r) => {
-        const fam = familyForCategory(r.category_id, byId);
-        return { fam, idle: !fam, value: r.spent_cents, name: catPath(r.category_id) };
+    const parts = (byTag.get(row.id) ?? []).map((r) => ({ catId: r.category_id, value: r.spent_cents }));
+    return netPositiveParts(parts, row.spent_cents)
+      .sort((a, b) => b.value - a.value)
+      .map((p) => {
+        const fam = familyForCategory(p.catId, byId);
+        return { fam, idle: !fam, value: p.value, name: catPath(p.catId) };
       });
   }
 
@@ -194,7 +197,7 @@ export async function renderEtiquetas(container, onBack) {
     const bar = segs.length ? stackedBarHtml(segs, { size: 8, legend: false, label: row.name, max: hasLimit ? row.budget_cents : 0 }) : "";
     const left = hasLimit ? row.budget_cents - row.spent_cents : 0;
     const legend = segs.map((s) => `<span class="et-key ${s.idle ? "is-idle" : famClass(s.fam)}"><span class="et-muestra" aria-hidden="true"></span>${escHtml(s.name)}</span>`).join("")
-      + (hasLimit && left > 0 ? `<span class="et-key is-rest">${escHtml(t("etiquetas.row.left"))} <span class="num">${escHtml(fmtMoney(left))}</span></span>` : "")
+      + (hasLimit && left >= 0 ? `<span class="et-key is-rest">${escHtml(t("etiquetas.row.left"))} <span class="num">${escHtml(fmtMoney(left))}</span></span>` : "")
       // Pasarse del límite: «quedan −X», con la cifra y su «−» en --neg (C4: el «−» que avisa).
       + (hasLimit && left < 0 ? `<span class="et-key is-rest">${escHtml(t("etiquetas.row.left"))} <span class="num is-over">−${escHtml(fmtMoney(-left))}</span></span>` : "");
     return `<button type="button" class="et-card" data-tag-open="${escAttr(row.id)}">
