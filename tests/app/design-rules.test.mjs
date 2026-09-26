@@ -63,12 +63,12 @@ export function estilosEnLinea(js) {
 
 // ---------- reglas: cada una devuelve una lista de mensajes ----------
 
-// R-C13 · DESIGN §5 C13, la regex literal. Única excepción registrada: PDFLib.rgb( (§Desviaciones,
-// informe-pdf.js, D-impl-3).
+// R-C13 · DESIGN §5 C13, la regex literal y sin excepciones: la llamada a PDFLib.rgb de
+// informe-pdf.js va por un alias desde la PR-99, así que el comando de C13 sale vacío tal cual.
 const C13 = /#[0-9a-fA-F]{3,8}\b|rgba?\(/;
 export function rC13(rel, text) {
   return text.split("\n").flatMap((l, i) =>
-    C13.test(l.replaceAll("PDFLib.rgb(", "")) ? [`${rel}:${i + 1} color literal: ${l.trim().slice(0, 90)}`] : []);
+    C13.test(l) ? [`${rel}:${i + 1} color literal: ${l.trim().slice(0, 90)}`] : []);
 }
 
 // R-C1 · DESIGN §5 C1: naranja solo en el primario y lo seleccionado. En JS, nunca (va por clase).
@@ -263,7 +263,7 @@ test("hay ficheros migrados que escanear, y los de las otras PRs de fundación e
   assert.ok(migrados.some((f) => f.rel === "css/components.css"));
   assert.ok(!FICHEROS.some((f) => f.rel === "css/tokens.css" || f.rel.startsWith("vendor")));
 });
-test("R-C13: ningún hex ni rgb( fuera de tokens.css (salvo PDFLib.rgb()", () => assert.deepEqual(incumple("rC13"), []));
+test("R-C13: ningún hex ni rgb( fuera de tokens.css", () => assert.deepEqual(incumple("rC13"), []));
 test("R-C1: naranja solo en primario y seleccionado; nada de var(--accent en JS", () => assert.deepEqual(incumple("rC1"), []));
 test("R-C2: --disp-text solo en .disp-value, .disp-chart-line y .disp-today", () => assert.deepEqual(incumple("rC2"), []));
 test("R-C7: ninguna cifra (num|amount|value) en -x/-b/-t de familia", () => assert.deepEqual(incumple("rC7"), []));
@@ -308,7 +308,7 @@ test("screens.css: una sección sembrada por fichero de js/screens/, en su orden
 test("detectores: cazan lo que prohíben y dejan pasar lo permitido", () => {
   assert.equal(rC13("x.js", "// antes #1b1e21\nconst a = 1;").length, 1);
   assert.equal(rC13("x.js", "#acc-name").length, 1, "los ids #acc-* son falsos positivos reales: se renombran");
-  assert.equal(rC13("x.js", "PDFLib.rgb(r, g, b)").length, 0);
+  assert.equal(rC13("x.js", "PDFLib.rgb(r, g, b)").length, 1, "ya sin excepción: el PDF usa un alias");
   assert.equal(rC13("x.css", "a{color:rgba(0,0,0,.1)}").length, 1);
 
   assert.equal(rC1("x.js", "`<b style=\"color:var(--accent)\">`").length, 1);

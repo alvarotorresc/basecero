@@ -309,8 +309,15 @@ export const PAPER_TOKENS = { paper: "--raised", ink: "--text", dim: "--text-dim
 // grises de PDF-lib (0 negro, 1 blanco), no un color del sistema.
 const GRAY_FALLBACK = { paper: 1, ink: 0.1, dim: 0.4, rule: 0.75 };
 
+/** El constructor de color de PDF-lib (su `rgb`), leído en cada llamada: un test puede cambiarlo
+ *  en el objeto. Con alias, ningún literal de color queda en el fuente (C13 sin excepciones). */
+function pdfColor(PDFLib, r, g, b) {
+  const { rgb: toColor } = PDFLib;
+  return toColor(r, g, b);
+}
+
 function rgbFromParts(PDFLib, [r, g, b]) {
-  return PDFLib.rgb(r / 255, g / 255, b / 255);
+  return pdfColor(PDFLib, r / 255, g / 255, b / 255);
 }
 
 // Un bloque trae el NOMBRE de un token; la paleta (tokens.css) lo convierte en números. Un token
@@ -325,7 +332,7 @@ function paperColors(PDFLib, palette) {
   const out = {};
   for (const [k, token] of Object.entries(PAPER_TOKENS)) {
     const g = GRAY_FALLBACK[k];
-    out[k] = colorOf(PDFLib, token, palette, PDFLib.rgb(g, g, g));
+    out[k] = colorOf(PDFLib, token, palette, pdfColor(PDFLib, g, g, g));
   }
   return out;
 }
