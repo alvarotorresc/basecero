@@ -298,6 +298,8 @@
 .ctl-seg-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ctl-seg-muestra { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--fb); }
 .ctl-segmented [role="radio"]:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+/* Contador detrás del texto (opción `count`, B-Categorias): mono 500 dim, también en el activo. */
+.ctl-seg-count { font-weight: 500; color: var(--text-dim); }
 @media (prefers-reduced-motion: reduce) { .ctl-segmented [role="radio"] { transition: none; } }
 
 /* Interruptor (§9): 44×26, pomo 20. Apagado: pista --well + --sh-well, pomo --idle. Encendido:
@@ -471,6 +473,9 @@
   font-weight: 600;
 }
 .ctl-field-input.is-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+/* Con baldosa delante (opción `lead`, B-Categorias-Nueva): relleno 8 a la izquierda, hueco 12. */
+.ctl-field.has-lead { padding: 0 var(--sp-12) 0 var(--sp-8); gap: var(--sp-12); }
+.ctl-field-lead { flex: none; display: flex; }
 .ctl-field-input::placeholder { color: var(--text-dim); font-weight: 500; }
 .ctl-field-suffix { flex: none; margin-left: var(--sp-8); font-size: var(--fs-15); font-weight: 600; color: var(--text-dim); }
 /* El foco va en el input, no en el pozo que lo envuelve (R-C1 exige que un var(--focus) viva

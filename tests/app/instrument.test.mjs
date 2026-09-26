@@ -295,3 +295,12 @@ test("instrument.js: ningún color en el HTML; en línea solo geometría", () =>
   assert.doesNotMatch(all, /#[0-9a-f]{3,8}\b|rgba?\(|var\(--/i);
   for (const m of all.matchAll(/style="([^"]*)"/g)) assert.match(m[1], /^(--[a-z]+|width|height|flex-basis):[^;]+$/);
 });
+
+test("stackedBarHtml: `max` por encima de la suma deja el hueco en la pista; por debajo no cambia nada", () => {
+  const segs = [{ fam: "casa", value: 2100, name: "Casa" }, { fam: "otr", value: 240, name: "Otros" }];
+  const html = stackedBarHtml(segs, { size: 8, legend: false, max: 3000 });
+  assert.match(html, /flex-basis:70%/);
+  assert.match(html, /flex-basis:8%/);
+  const sin = stackedBarHtml(segs, { size: 8, legend: false, max: 1000 });
+  assert.equal(sin, stackedBarHtml(segs, { size: 8, legend: false }));
+});

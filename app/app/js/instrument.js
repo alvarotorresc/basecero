@@ -148,8 +148,10 @@ export function containerHtml({ title = "", total = "", body, kind = "chart", la
  *  @param {24|8} [o.size]          Por defecto 24.
  *  @param {boolean} [o.legend]     Por defecto true.
  *  @param {string} [o.label]       Nombre de la gráfica para el aria-label.
+ *  @param {number} [o.max]         Tope de la barra (p. ej. un límite): con él por encima de la suma,
+ *                                  el hueco hasta el tope se queda en la pista.
  *  @returns {string} HTML ("" si ningún segmento tiene valor > 0) */
-export function stackedBarHtml(segments, { size = 24, legend = true, label = "" } = {}) {
+export function stackedBarHtml(segments, { size = 24, legend = true, label = "", max = 0 } = {}) {
   if (size !== 24 && size !== 8) throw new Error(`stackedBarHtml: size ${size} no es 24 ni 8`);
   const segs = segments ?? [];
   for (const s of segs) {
@@ -159,7 +161,11 @@ export function stackedBarHtml(segments, { size = 24, legend = true, label = "" 
   const total = vivos.reduce((a, s) => a + Number(s.value), 0);
   if (!(total > 0)) return "";
   const segCls = (s) => (s.debt ? "is-debt" : s.idle || !isFamily(s.fam) ? "is-idle" : famClass(s.fam));
-  const pct = (v) => Number(((v / total) * 100).toFixed(3));
+  // `max` (S10, B-Etiquetas: gasto de una etiqueta frente a su límite): si supera la suma, los
+  // segmentos se miden contra él y lo que falta hasta el límite queda como pista (--well de la
+  // barra fina). Menor o igual que la suma, o ausente, no cambia nada.
+  const denom = Number(max) > total ? Number(max) : total;
+  const pct = (v) => Number(((v / denom) * 100).toFixed(3));
   const aria = [label, ...vivos.map((s) => (s.amount ? `${s.name} ${s.amount}` : s.name))].filter(Boolean).join(", ");
   const bar = `<div class="sbar sbar-${size}" role="img" aria-label="${escAttr(aria)}">${vivos
     .map((s) => `<span class="sbar-seg ${segCls(s)}" style="flex-basis:${pct(Number(s.value))}%"></span>`).join("")}</div>`;

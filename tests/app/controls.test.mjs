@@ -298,3 +298,31 @@ test("segmentedHtml: allowNone con un valor fuera del grupo no marca ninguno y d
   // Con allowNone y un valor que SÍ está, marca ese.
   assert.match(segmentedHtml({ name: "Tipo", options: opts, value: "income", allowNone: true }), /aria-checked="true" tabindex="0" data-value="income"/);
 });
+
+test("neutralChipHtml: data-*, aria-label, icono y clase extra opcionales (S10, subcategorías)", () => {
+  const html = neutralChipHtml({ label: "Gas", data: { cat: "cat-gas", dragKid: "x\"y" }, ariaLabel: "Gas, archivada", icon: "archive", cls: "cat-kid is-archived" });
+  assert.match(html, /class="ctl-chip cat-kid is-archived"/);
+  assert.match(html, /data-cat="cat-gas"/);
+  assert.match(html, /data-drag-kid="x&quot;y"/);
+  assert.match(html, /aria-label="Gas, archivada"/);
+  assert.match(html, /<svg/);
+  const plain = neutralChipHtml({ label: "Luz", data: { cat: null } });
+  assert.ok(!plain.includes("data-"));
+  assert.ok(!plain.includes("aria-label"));
+});
+
+test("segmentedHtml: `count` pinta la cifra mono detrás del texto; sin él, nada", () => {
+  const html = segmentedHtml({ name: "Tipo", value: "expense", options: [
+    { value: "expense", label: "Gasto", count: 12 }, { value: "income", label: "Ingreso", count: 0 }, { value: "x", label: "Otro" },
+  ] });
+  assert.match(html, /Gasto <span class="ctl-seg-count num">12<\/span>/);
+  assert.match(html, /Ingreso <span class="ctl-seg-count num">0<\/span>/, "el 0 también se pinta");
+  assert.equal((html.match(/ctl-seg-count/g) ?? []).length, 2);
+});
+
+test("fieldHtml: `lead` va dentro del pozo, delante del input; sin él, el marcado de siempre", () => {
+  const html = fieldHtml({ id: "cf-name", label: "Nombre", lead: '<span class="ent-tile">x</span>' });
+  assert.match(html, /<span class="ctl-field has-lead"><span class="ctl-field-lead" aria-hidden="true"><span class="ent-tile">x<\/span><\/span><input/);
+  const plain = fieldHtml({ id: "a", label: "Nombre" });
+  assert.match(plain, /<span class="ctl-field"><input/);
+});

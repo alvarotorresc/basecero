@@ -102,9 +102,212 @@
 /* === fin: ajustes === */
 
 /* === pantalla: categorias === */
+/* S10 · B-Categorias / B-Categorias-Nueva: Segmented Gasto · Ingreso con su número, un bloque por
+   categoría en el tinte de su familia (C6) con baldosa sobre --chip, «+» y asa de 44; subcategorías
+   como chips neutros (F-43), la archivada con borde discontinuo -b. Pila de 12 (§8). */
+.cat { display: flex; flex-direction: column; gap: var(--sp-12); }
+.cat > .sub-header { margin-bottom: 0; }
+.cat-hint { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+.cat-list { display: flex; flex-direction: column; gap: var(--sp-8); }
+.cat-empty { margin: 0; padding: var(--sp-16); font-size: var(--fs-13); font-weight: 500; text-align: center; color: var(--text-dim); }
+
+/* Bloque: tinte sin borde, relleno 8. Un ingreso no tiene familia (C9): --well. La archivada se
+   queda sin fondo, con el borde discontinuo en la barra de su familia (C6). */
+.cat-block { padding: var(--sp-8); border-radius: var(--radius-lg); background: var(--ft); display: flex; flex-direction: column; gap: var(--sp-8); }
+.cat-block.is-plain { background: var(--well); }
+.cat-block.is-archived { background: transparent; border: 1.5px dashed var(--fb); }
+.cat-block.is-plain.is-archived { border-color: var(--border-strong); }
+.cat-head { display: flex; align-items: center; gap: var(--sp-4); min-height: 44px; }
+.cat-name-btn {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.cat-nm { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.cat-name { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); overflow-wrap: anywhere; }
+.cat-sub { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--fx); }
+.cat-block.is-plain .cat-sub { color: var(--text-dim); }
+.cat-ib {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--fx);
+  cursor: pointer;
+}
+.cat-block.is-plain .cat-ib { color: var(--text-dim); }
+.cat-grip { cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; }
+.cat-name-btn:focus-visible,
+.cat-ib:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+.cat-kids { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+.cat-kid { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.cat-kid.is-archived { background: transparent; border: 1.5px dashed var(--fb); color: var(--fx); }
+.cat-block.is-plain .cat-kid.is-archived { border-color: var(--border-strong); color: var(--text-dim); }
+
+/* Arrastre: lo que se mueve sube con la sombra del aviso; el destino, filete discontinuo en tinta
+   dim (no es foco ni selección: ni --focus ni naranja). Solo el transform va en línea (JS). */
+.cat-block.is-dragging,
+.cat-kid.is-dragging { position: relative; z-index: 5; box-shadow: var(--sh-alert); }
+.cat-block.is-drop-target,
+.cat-kid.is-drop-target { outline: 2px dashed var(--text-dim); outline-offset: 2px; }
+
+/* Hoja «Nueva / Editar categoría»: pila de 16; etiquetas 13/600 dim y una nota por sección. El
+   relleno de 4 deja ver el anillo de foco dentro del scroll de .sheet-body. */
+.cat-form { display: flex; flex-direction: column; gap: var(--sp-16); padding: 0 var(--sp-4) var(--sp-4); }
+.cat-style { display: flex; flex-direction: column; gap: var(--sp-16); }
+.cat-style:empty { display: none; }
+.cat-sec { display: flex; flex-direction: column; gap: var(--sp-8); }
+.cat-label { padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.cat-note { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+.cat-note-fam { font-weight: 700; color: var(--fx); }
+.cat-parents { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+
+/* Selector de icono: rejilla de 6, 44 de alto, --raised con borde e icono dim; el elegido, en el
+   tinte de la familia con el icono -x y --ring-sel (F-17). */
+.cat-icons { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sp-8); }
+.cat-icon-pick {
+  min-width: 0;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--raised);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.cat-icon-pick[aria-pressed="true"] { border-color: var(--ft); background: var(--ft); color: var(--fx); box-shadow: var(--ring-sel); }
+.cat-icon-pick:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+
+/* Error: neutro en --raised con el icono de aviso (C4: nada de rojo fuera de cifras). */
+.cat-error {
+  margin: 0;
+  padding: var(--sp-12);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--raised);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  line-height: var(--lh-body);
+  color: var(--text);
+}
+.cat-error svg { flex: none; }
 /* === fin: categorias === */
 
 /* === pantalla: etiquetas === */
+/* S10 · B-Etiquetas: una línea de ayuda, Abiertas como tarjetas neutras (C10: --raised con borde,
+   sin color propio) con la barra por familia y su leyenda con nombre (C12), Archivadas en filas de
+   borde discontinuo y el primario al final. Pila de 12 (§8). */
+.et { display: flex; flex-direction: column; gap: var(--sp-12); }
+.et > .sub-header { margin-bottom: 0; }
+.et-hint { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+.et-sec { display: flex; flex-direction: column; gap: var(--sp-12); }
+/* Cabecera de sección (B-Etiquetas): título a la izquierda y cuántas a la derecha. */
+.et-sec > .ent-sec { justify-content: space-between; padding: var(--sp-4) var(--sp-4) 0; }
+
+/* Tarjeta: el agujero de 8 de la etiqueta a la izquierda (pozo en --bg), nombre y total arriba,
+   barra fina y leyenda debajo. Toda la tarjeta es un botón que abre el formulario. */
+.et-card {
+  position: relative;
+  width: 100%;
+  padding: var(--sp-16) var(--sp-16) var(--sp-16) var(--sp-24);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--raised);
+  color: var(--text);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.et-hole { position: absolute; left: 9px; top: 22px; width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--bg); box-shadow: var(--sh-well); }
+.et-top { display: flex; align-items: flex-start; gap: var(--sp-12); }
+.et-nm { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.et-name { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); overflow-wrap: anywhere; }
+.et-sub { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+.et-amt { flex: none; font-size: var(--fs-17); font-weight: 600; line-height: var(--lh-title); color: var(--text); }
+.et-bar { display: block; }
+.et-card .sbar { width: 100%; }
+
+/* Leyenda (C12): muestra de 10 en la barra -b y el nombre en el -x de su familia (C6); sin familia,
+   en --idle y dim. «quedan» en dim con la cifra en tinta (C7); pasado el límite, «−X» en --neg (C4). */
+.et-legend { display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-16); font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); }
+.et-key { display: flex; align-items: center; gap: var(--sp-4); color: var(--fx); }
+.et-muestra { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--fb); }
+.et-key.is-idle { color: var(--text-dim); }
+.et-key.is-idle .et-muestra { background: var(--idle); }
+.et-key.is-rest { color: var(--text-dim); }
+.et-key.is-rest .num { color: var(--text); }
+.et-key.is-rest .num.is-over { color: var(--neg); }
+
+/* Archivada: fila de 56 sin fondo, borde discontinuo y todo en dim. */
+.et-arch {
+  width: 100%;
+  min-height: 56px;
+  padding: 0 var(--sp-16);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.et-arch svg { flex: none; }
+.et-arch .et-name { color: var(--text-dim); }
+.et-arch .et-amt { font-size: var(--fs-15); font-weight: 500; color: var(--text-dim); }
+.et-card:focus-visible,
+.et-arch:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+
+/* Formulario (subpantalla): nombre, límite con la unidad (se oculta con el campo vacío), primario y,
+   al editar, «Ver sus movimientos» y archivar. */
+.et-form { display: flex; flex-direction: column; gap: var(--sp-16); }
+.et-form-more { display: flex; flex-direction: column; gap: var(--sp-8); }
+.et-form .ctl-field-input:placeholder-shown + .ctl-field-suffix { display: none; }
+.et-form .ctl-field-input { -moz-appearance: textfield; }
+.et-form .ctl-field-input::-webkit-outer-spin-button,
+.et-form .ctl-field-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.et-error {
+  margin: 0;
+  padding: var(--sp-12);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--raised);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  line-height: var(--lh-body);
+  color: var(--text);
+}
+.et-error svg { flex: none; }
 /* === fin: etiquetas === */
 
 /* === pantalla: gasto-por-categoria === */

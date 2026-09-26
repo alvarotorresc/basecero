@@ -71,6 +71,8 @@ export const ICON_PATHS = {
   chevronLeft:  '<path d="M14.5 5 8 12l6.5 7"/>',
   search:       '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
   filterLines:  '<path d="M4 6.5h16M7 12h10M10 17.5h4"/>',
+  // (B-Categorias, B-Etiquetas) archivada: la caja de archivo del chip y de la fila discontinuos
+  archive:      '<path d="M4 5h16v4H4zM5.5 9v10h13V9M10 13h4"/>',
 };
 
 /** SVG listo para pegar. `size` en px (20 dentro de fila o botón, 24 en cabecera, 16 dentro de la
