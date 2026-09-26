@@ -1189,6 +1189,8 @@ export const ES = {
     undone: "Movimiento deshecho",
     myPart: "Tu parte",
     tagLabel: "Etiqueta",
+    left: "Quedan en {month}",
+    today: "Hoy puedes gastar",
     undoFailed: "No se pudo deshacer: {error}",
   },
   // Informe del periodo (F1). screens/informe.js.

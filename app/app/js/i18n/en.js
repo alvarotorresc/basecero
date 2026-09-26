@@ -1117,6 +1117,8 @@ export const EN = {
     myPart: "Your share",
     tagLabel: "Tag",
     undoFailed: "Could not undo: {error}",
+    left: "Left in {month}",
+    today: "You can spend today",
   },
   // Period report (F1). screens/informe.js.
   informe: {

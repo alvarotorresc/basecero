@@ -2,15 +2,17 @@ import {
   addTransaction, getOpenPeriod, listExpenseLeafCategories, listIncomeCategories,
   listAccounts, allCategoriesById, recentForRefund, getMetaAll, softDeleteTransaction,
   loadMerchantMemory, spentByRootCategory, budgetsOfPeriod, listTags, createTag, setAttachmentFlag,
-  listGoals,
+  listGoals, spentOfPeriod, previsionOfPeriod,
 } from "../repo.js";
 import { attachments, compressImage } from "../attachments.js";
 import { familyForCategory, iconForCategory, rootOf, famClass } from "../category-colors.js";
 import { familyForAccount, parseAccountStyle } from "../account-colors.js";
 import { budgetMap } from "../category-spend.js";
 import { limitWarning } from "../limit-warning.js";
-import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
+import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw, appLocale } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
+import { dailyAllowanceCents } from "../inicio-logic.js";
+import { periodMonth } from "../prevision.js";
 import { icon } from "../icons.js";
 import { t, activeLang } from "../i18n/index.js";
 import { metaHtml } from "../ui.js";
@@ -1043,18 +1045,48 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
             await setAttachmentFlag(newId, true);
           } catch { showToast(t("registro.photo.savedWithout")); }
         }
+        const periodLines = await receiptPeriodLines();
         // D-3/D-4: guardar con éxito es el otro punto de salida de la pantalla.
         alive = false;
         speech?.stop();
         releasePhotoUrl();
         onDone();   // primero: el ticket cae sobre la pantalla ya repintada
-        showReceipt(receiptData(newId, withCategory, effectiveIsShared, effectiveAccountId));
+        showReceipt({ ...receiptData(newId, withCategory, effectiveIsShared, effectiveAccountId), periodLines });
       } catch (e) {
         btn.disabled = false;
         errorMsg = t("common.saveFailed", { error: userMessage(e) });
         render();
       }
     };
+  }
+
+  /** «Quedan en septiembre» y «Hoy puedes gastar» del recibo (B-Recibo): las MISMAS cuentas que el
+   *  Display de Inicio (disponibleHtml) —límites del periodo menos lo gastado, y
+   *  inicio-logic#dailyAllowanceCents con lo comprometido de previsionOfPeriod—, leídas DESPUÉS de
+   *  guardar para que incluyan este gasto y coincidan con el Inicio que se repinta detrás. Sin
+   *  límites (Inicio tampoco pinta el disponible) o si algo falla, no hay líneas: el recibo nunca
+   *  bloquea el guardado. */
+  async function receiptPeriodLines() {
+    if (!period) return [];
+    try {
+      const [spentNow, budgetsNow, prevision] = await Promise.all([
+        spentOfPeriod(period.id), budgetsOfPeriod(period.id), previsionOfPeriod(period),
+      ]);
+      const budgetTotal = Object.values(budgetMap(budgetsNow)).reduce((s, c) => s + c, 0);
+      if (!budgetTotal) return [];
+      const hoy = hoyISO();
+      const disponible = budgetTotal - spentNow;
+      const allowance = dailyAllowanceCents(disponible, prevision.comprometidoCents, period.start_date, hoy);
+      const monthIdx = periodMonth(period.start_date, period.end_date) - 1;
+      const month = new Date(2000, monthIdx, 15).toLocaleDateString(appLocale(), { month: "long" });
+      return [
+        { label: t("recibo.left", { month }), value: fmtMoney(disponible), num: true },
+        // Mismo suelo que Inicio: sin margen se enseña 0, no una cifra negativa por día.
+        { label: t("recibo.today"), value: fmtMoney(Math.max(0, allowance)), num: true },
+      ];
+    } catch {
+      return [];
+    }
   }
 
   /** Datos del recibo (B-Recibo): comercio y tipo, la ficha de la categoría, cuenta con su muestra,
@@ -1082,7 +1114,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         { label: t("common.date"), value: state.fecha === hoyISO() ? t("registro.date.today") : `${d}/${m}/${y}` },
         { label: t("recibo.tagLabel"), value: state.tagId ? tagName(state.tagId) : "" },
         { label: t("common.split.label"), value: effectiveIsShared ? `${partnerName} ${state.sharePct} %` : "" },
-        { label: t("recibo.myPart"), value: effectiveIsShared ? fmtMoney(splitCents(state.cents, state.sharePct).mine) : "" },
+        { label: t("recibo.myPart"), value: effectiveIsShared ? fmtMoney(splitCents(state.cents, state.sharePct).mine) : "", num: true },
       ],
       total: fmtMoneyParts(state.cents),
       stampDate: `${fmtDiaCorto(hoyISO())} ${now.getFullYear()}`,

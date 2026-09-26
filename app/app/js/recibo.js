@@ -47,20 +47,29 @@ const ZIGZAG_BOTTOM = edge(false);
  *  @param {object|null} [o.badge]      Ficha de 28 (entity.js#badgeHtml): {fam, income, icon, label}.
  *  @param {Array<{label:string, value:string, fam?:string|null}>} [o.lines]  `fam` pinta la
  *                                      muestra de 10 de una cuenta delante del valor.
+ *                                      `num` pone el valor en la mono tabular (importes).
+ *  @param {Array<{label:string, value:string, num?:boolean}>} [o.periodLines]  Segundo grupo, tras otra
+ *                                      perforación: «Quedan en septiembre», «Hoy puedes gastar».
  *  @param {{main:string, cents:string, suffix:string}} o.total  fmtMoneyParts.
  *  @param {string} o.stampDate
  *  @param {string|null} [o.stampFam]   Familia del sello (la de la categoría); sin ella, tinta.
  *  @param {{brand:string, stamp:string, total:string}} o.labels */
-export function ticketHtml({ dateTime, title = "", subtitle = "", badge = null, lines, total, stampDate, stampFam = null, labels }) {
-  const rows = (lines ?? []).filter((l) => l?.value).map((l) => {
+export function ticketHtml({ dateTime, title = "", subtitle = "", badge = null, lines, periodLines = [], total, stampDate, stampFam = null, labels }) {
+  const linesHtml = (list) => (list ?? []).filter((l) => l?.value).map((l) => {
     const fc = famClass(l.fam);
     return `
         <div class="recibo-line">
           <span class="recibo-label">${escHtml(l.label)}</span>
           <span class="recibo-dots"></span>
-          <span class="recibo-value">${fc ? `<span class="recibo-swatch ${fc}" aria-hidden="true"></span>` : ""}${escHtml(l.value)}</span>
+          <span class="recibo-value${l.num ? " num" : ""}">${fc ? `<span class="recibo-swatch ${fc}" aria-hidden="true"></span>` : ""}${escHtml(l.value)}</span>
         </div>`;
   }).join("");
+  const group = (list) => {
+    const html = linesHtml(list);
+    return html ? `<div class="recibo-perf"></div>
+      <div class="recibo-lines">${html}
+      </div>` : "";
+  };
   const totalText = `${total?.main ?? ""}${total?.cents ?? ""}${total?.suffix ?? ""}`;
   const stampCls = famClass(stampFam);
   return `${ZIGZAG_TOP}
@@ -83,9 +92,8 @@ export function ticketHtml({ dateTime, title = "", subtitle = "", badge = null, 
         </div>
       </div>
       ${badge?.label ? `<div class="recibo-badge">${badgeHtml(badge)}</div>` : ""}
-      ${rows ? `<div class="recibo-perf"></div>
-      <div class="recibo-lines">${rows}
-      </div>` : ""}
+      ${group(lines)}
+      ${group(periodLines)}
     </div>
     ${ZIGZAG_BOTTOM}`;
 }
