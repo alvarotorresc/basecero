@@ -2,7 +2,7 @@ import {
   getOpenPeriod, spentByRootCategory, spentByChildCategory, budgetsOfPeriod,
   allCategoriesById, upsertBudget, deleteBudget, rootSpendHistory,
 } from "../repo.js";
-import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
+import { colorForCategory, familyForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
 import { budgetStatus, pctOf, relativeWidth, sortRootRows, budgetMap, compareRoots, spentSeriesByRoot } from "../category-spend.js";
 import { trendSvg } from "../charts.js";
 import { eurToCents } from "../contract.js";
@@ -178,8 +178,7 @@ export async function renderGastoPorCategoria(container, onBack) {
     if (!prevPeriod) return "";
     const cmp = cmpByRoot[row.root_id];
     if (!cmp) return "";
-    const color = colorForCategory(row.root_id, byId);
-    const spark = trendSvg(seriesByRoot[row.root_id] ?? [], color);
+    const spark = trendSvg(seriesByRoot[row.root_id] ?? [], familyForCategory(row.root_id, byId));
     const showArrow = cmp.direction === "up" || cmp.direction === "down";
     const trendColor = cmp.direction === "up" ? "var(--danger)" : cmp.direction === "down" ? "var(--pos)" : "var(--text-2)";
     const arrowIcon = cmp.direction === "up" ? ICON_TREND_UP : cmp.direction === "down" ? ICON_TREND_DOWN : "";

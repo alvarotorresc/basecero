@@ -12,39 +12,55 @@ const T = "2026-08-24T18:00:00Z";
 // consumidor desde que la Task 9 sustituyó el donut y el flujo de gasto de Inicio por la espina y
 // las barras horizontales — ver el comentario de cabecera de charts.js.
 
-// ---- sparklineSvg --------------------------------------------------------
+// ---- sparklineSvg (la línea del Display, PR-07) -------------------------------------------
 
-test("sparklineSvg: N puntos → polyline con N pares de coordenadas", () => {
+test("sparklineSvg: N puntos → polyline con N pares, área con N+2 y el punto de hoy", () => {
   const points = [10, 40, 25, 60, 55, 80];
-  const svg = sparklineSvg(points, ["a", "b", "c", "d", "e", "f"]);
-  const m = svg.match(/<polyline points="([^"]+)"/);
-  assert.ok(m, "debe incluir un <polyline>");
+  const html = sparklineSvg(points);
+  const m = html.match(/<polyline class="disp-chart-line" points="([^"]+)"/);
+  assert.ok(m, "la línea es un <polyline> con la clase de la línea del Display");
   const pairs = m[1].trim().split(/\s+/);
   assert.equal(pairs.length, points.length);
   pairs.forEach((p) => assert.match(p, /^-?[\d.]+,-?[\d.]+$/));
-
-  const pg = svg.match(/<polygon points="([^"]+)"/);
-  assert.ok(pg, "debe incluir el polígono de relleno");
-  // el polígono cierra el área bajo la línea: base-izquierda + N puntos + base-derecha = N+2
+  const pg = html.match(/<polygon class="disp-chart-line is-area" points="([^"]+)"/);
+  assert.ok(pg, "el área bajo la línea");
   assert.equal(pg[1].trim().split(/\s+/).length, points.length + 2);
-
-  assert.ok(svg.match(/<circle[^>]*\/?>/), "debe incluir el círculo del último punto");
+  assert.equal((html.match(/<circle class="disp-today"/g) || []).length, 1, "un solo punto de hoy");
 });
 
-test("sparklineSvg: un único punto no revienta (sin división por cero)", () => {
-  const svg = sparklineSvg([50], ["a"]);
-  assert.ok(!svg.includes("NaN"));
+test("sparklineSvg: ningún color en el HTML (ni atributo fill con var() ni style de color)", () => {
+  const html = sparklineSvg([1, 3, 2], { labels: ["jul", "ago", "sep"], dots: true });
+  assert.doesNotMatch(html, /(fill|stroke)="var\(/);
+  assert.doesNotMatch(html, /style="[^"]*(fill|stroke|color|background)/);
+  assert.doesNotMatch(html, /#[0-9a-f]{3,8}\b/i);
 });
 
-// ---- netWorthBarsHtml -----------------------------------------------------
+test("sparklineSvg: eje de meses con la última etiqueta como hoy, escapado", () => {
+  const html = sparklineSvg([1, 2, 3], { labels: ["Jul", "Ago", "<Sep>"] });
+  assert.match(html, /class="disp-chart-axis num" style="--n:3"/);
+  assert.match(html, /<span class="disp-today">&lt;Sep&gt;<\/span>/);
+});
 
-test("netWorthBarsHtml: hasta 6 barras planas, la última en lima, etiquetas capitalizadas (no mayúsculas)", () => {
+test("sparklineSvg: dots pinta un punto por valor además del de hoy", () => {
+  const html = sparklineSvg([1, 2, 3, 4], { dots: true });
+  assert.equal((html.match(/is-dot/g) || []).length, 3);
+});
+
+test("sparklineSvg: un único punto o ninguno no revienta (sin NaN)", () => {
+  assert.ok(!sparklineSvg([50]).includes("NaN"));
+  assert.ok(!sparklineSvg([]).includes("NaN"));
+});
+
+// ---- netWorthBarsHtml (compatibilidad de Patrimonio, sobre columnsHtml) ---------------------
+
+test("netWorthBarsHtml: hasta 6 columnas, la última es hoy (tinta) y las demás --idle; etiquetas capitalizadas", () => {
   const series = ["mar", "abr", "may", "jun", "jul", "ago", "sep"].map((label, i) => ({ label, cents: (i + 1) * 100000 }));
   const html = netWorthBarsHtml(series);
-  assert.equal((html.match(/border-radius:var\(--r-0\)/g) || []).length, 6); // 7 puntos → 6 barras
-  assert.ok(html.includes("var(--accent)"));
+  assert.equal((html.match(/class="col-bar"/g) || []).length, 6); // 7 puntos → 6 columnas
+  assert.equal((html.match(/class="col is-today"/g) || []).length, 1);
   assert.ok(html.includes(">Sep<") && !html.includes(">SEP<"), "la etiqueta capitaliza, no grita");
   assert.ok(!html.includes(">Mar<") && !html.includes(">mar<")); // slice(-6) descarta el más viejo
+  assert.doesNotMatch(html, /var\(--(accent|red|card2|r-0)/);
 });
 
 test("netWorthBarsHtml: oculto con menos de 2 puntos", () => {
@@ -52,23 +68,12 @@ test("netWorthBarsHtml: oculto con menos de 2 puntos", () => {
   assert.equal(netWorthBarsHtml([]), "");
 });
 
-// Task 7 (5a): un patrimonio negativo se tiñe de rojo, prioridad sobre el verde de "última barra".
-test("netWorthBarsHtml: un punto con cents negativo pinta esa barra en rojo (aunque sea la última)", () => {
-  const series = [
-    { label: "jul", cents: 50000 },
-    { label: "ago", cents: -20000 },
-  ];
-  const html = netWorthBarsHtml(series);
-  assert.ok(html.includes("var(--red)"), "la barra negativa debe usar var(--red)");
-});
-
-test("netWorthBarsHtml: serie toda positiva no pinta ninguna barra en rojo", () => {
-  const series = [
-    { label: "jul", cents: 50000 },
-    { label: "ago", cents: 70000 },
-  ];
-  const html = netWorthBarsHtml(series);
-  assert.ok(!html.includes("var(--red)"), "sin puntos negativos no debe aparecer var(--red)");
+// Sistema B (C4): el rojo solo va en cifras. Un cierre negativo mide por su valor absoluto.
+test("netWorthBarsHtml: un cierre negativo no pinta ningún rojo y mide por su valor absoluto", () => {
+  const html = netWorthBarsHtml([{ label: "jul", cents: 50000 }, { label: "ago", cents: -50000 }]);
+  assert.doesNotMatch(html, /--red|--neg/);
+  const hs = [...html.matchAll(/style="height:(\d+)%"/g)].map((m) => Number(m[1]));
+  assert.deepEqual(hs, [76, 76]);
 });
 
 // ---- SQL.spentByDay -------------------------------------------------------
@@ -147,19 +152,27 @@ test("barRowsGeometry: es determinista — mismo input, misma geometria", () => 
   assert.deepEqual(barRowsGeometry(rows, opts), barRowsGeometry(rows, opts));
 });
 
-test("categoryBarsSvg: un rect por fila con el color de su categoria", () => {
+test("categoryBarsSvg: un rect por fila con la clase de su familia; sin familia, --idle (C11)", () => {
   const rows = [
-    { key: "a", value: 50, max: 100, color: "#ff0000" },
-    { key: "b", value: 30, max: 100, color: "#00ff00" },
+    { key: "a", value: 50, max: 100, fam: "casa" },
+    { key: "b", value: 30, max: 100, fam: "otr" },
+    { key: "c", value: 20, max: 100, fam: null },
   ];
   const svg = categoryBarsSvg(rows, { width: 200, rowH: 20, barH: 12, gap: 4 });
-  const rects = [...svg.matchAll(/<rect[^>]*style="fill:([^"]+)"[^>]*>/g)].map((m) => m[1]);
-  assert.deepEqual(rects, ["#ff0000", "#00ff00"]);
+  const cls = [...svg.matchAll(/<rect class="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(cls, ["chart-bar fam-casa", "chart-bar fam-otr", "chart-bar is-idle"]);
+  assert.doesNotMatch(svg, /style=|fill="/, "el color lo pone components.css, no el SVG");
+});
+
+test("barRowsGeometry: pasa fam y color tal cual (pantalla con fam, PDF con color)", () => {
+  const [g] = barRowsGeometry([{ key: "a", value: 1, max: 2, fam: "ali", color: "rgb-del-pdf" }], { width: 10, rowH: 4, barH: 2 });
+  assert.equal(g.fam, "ali");
+  assert.equal(g.color, "rgb-del-pdf");
 });
 
 test("comparisonBarsSvg: las dos barras a la MISMA escala (el maximo de ambos periodos)", () => {
   const svg = comparisonBarsSvg(
-    [{ key: "a", value: 80, prevValue: 100, color: "#3366ff" }],
+    [{ key: "a", value: 80, prevValue: 100, fam: "tra" }],
     { width: 200, rowH: 40, barH: 14, gap: 4 },
   );
   const widths = [...svg.matchAll(/<rect[^>]*width="(\d+(?:\.\d+)?)"/g)].map((m) => Number(m[1]));
@@ -169,9 +182,19 @@ test("comparisonBarsSvg: las dos barras a la MISMA escala (el maximo de ambos pe
   assert.equal(prevW, 200, "100/100 del maximo compartido: la barra llena el ancho entero");
 });
 
+test("comparisonBarsSvg: la actual en su familia y la anterior en --idle (C11: comparativas en gris)", () => {
+  const svg = comparisonBarsSvg(
+    [{ key: "a", value: 80, prevValue: 100, fam: "tra" }],
+    { width: 200, rowH: 40, barH: 14, gap: 4 },
+  );
+  const cls = [...svg.matchAll(/<rect class="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(cls, ["chart-bar fam-tra", "chart-bar is-idle"]);
+  assert.doesNotMatch(svg, /style=|fill="/);
+});
+
 test("comparisonBarsSvg: sin periodo anterior no emite la segunda barra", () => {
   const svg = comparisonBarsSvg(
-    [{ key: "a", value: 80, prevValue: null, color: "#3366ff" }],
+    [{ key: "a", value: 80, prevValue: null, fam: "tra" }],
     { width: 200, rowH: 40, barH: 14, gap: 4 },
   );
   const rectCount = (svg.match(/<rect/g) || []).length;
@@ -222,17 +245,23 @@ test("trendOf: 2 valores -> 2 alturas", () => {
   assert.deepEqual(t.heights, [9, 18]);
 });
 
-test("trendSvg: una barra por valor, la última a opacidad 1 y las demás a .45, con el color recibido", () => {
-  const svg = trendSvg([23100, 23800, 24560], "#ff0000");
+test("trendSvg: una barra por valor, la última a opacidad 1 y las demás a .45, en la familia recibida", () => {
+  const svg = trendSvg([23100, 23800, 24560], "sal");
   const rects = svg.match(/<rect[^>]*>/g);
   assert.equal(rects.length, 3);
   assert.match(rects[0], /fill-opacity="0\.45"/);
   assert.match(rects[1], /fill-opacity="0\.45"/);
   assert.doesNotMatch(rects[2], /fill-opacity/, "la última va a opacidad 1: sin fill-opacity, o 1 explícito");
-  for (const r of rects) assert.match(r, /style="fill:#ff0000"/);
+  for (const r of rects) assert.match(r, /class="chart-bar fam-sal"/);
+  assert.doesNotMatch(svg, /style=/);
+});
+
+test("trendSvg: sin familia (o una clave desconocida) pinta en --idle, nunca en otr", () => {
+  assert.match(trendSvg([1, 2], null), /class="chart-bar is-idle"/);
+  assert.match(trendSvg([1, 2], "zzz"), /class="chart-bar is-idle"/);
 });
 
 test("trendSvg: devuelve \"\" cuando trendOf da null", () => {
-  assert.equal(trendSvg([1000], "#ff0000"), "");
-  assert.equal(trendSvg([0, 0], "#ff0000"), "");
+  assert.equal(trendSvg([1000], "casa"), "");
+  assert.equal(trendSvg([0, 0], "casa"), "");
 });

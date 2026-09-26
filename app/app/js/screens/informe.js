@@ -158,13 +158,13 @@ function categoriesHtml(report, prevPeriodName) {
   const c = report.categories;
   const maxSpent = Math.max(0, ...c.rows.map((x) => x.spentCents));
   const rows = c.rows.map((r) => {
-    const bar = categoryBarsSvg([{ key: r.rootId, value: r.spentCents, max: maxSpent, color: famColor(r.fam) }],
+    const bar = categoryBarsSvg([{ key: r.rootId, value: r.spentCents, max: maxSpent, fam: r.fam }],
       { width: 260, rowH: 8, barH: 8 });
     // Mini tendencia (SISTEMA §4.19): las dos barras —actual y anterior, atenuada— a la MISMA
     // escala (comparisonBarsSvg, D3): es la garantía de que esta miniatura y la barra principal
     // de arriba nunca puedan divergir, porque las dos salen de barRowsGeometry.
     const miniTrend = c.hasPrev && r.prevCents != null
-      ? comparisonBarsSvg([{ key: r.rootId, value: r.spentCents, prevValue: r.prevCents, color: famColor(r.fam) }],
+      ? comparisonBarsSvg([{ key: r.rootId, value: r.spentCents, prevValue: r.prevCents, fam: r.fam }],
         { width: 22, rowH: 14, barH: 6 })
       : "";
     // D4: la tendencia plana no lleva flecha, solo el porcentaje en --ink-3 — §4.19 solo define

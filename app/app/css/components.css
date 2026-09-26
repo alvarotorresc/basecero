@@ -462,6 +462,216 @@
 
 /* ===== Instrumento: Display, LED, bento, barras, medidor (PR-07) ===== */
 
+/* --- Display (§9, B-Home, B-Movimientos · instrument.js#displayHtml): panel hundido, relleno
+   16 20 (el único 20 del sistema, §8). Alto por contenido: con la letra al 200 % crece (§11). --- */
+.disp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+  padding: var(--sp-16) var(--sp-20);
+  border-radius: var(--radius-lg);
+  background: var(--disp);
+  box-shadow: var(--sh-display);
+  color: var(--disp-ink);
+}
+.disp-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); min-width: 0; }
+.disp-label { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--disp-dim); }
+/* C2: la cifra que manda es la única en ámbar; K9: solo 52/44/34. */
+.disp-value {
+  font-weight: 500;
+  line-height: var(--lh-disp);
+  color: var(--disp-text);
+  text-shadow: var(--disp-glow);
+  overflow-wrap: anywhere;
+}
+.disp-value-xl { font-size: var(--disp-xl); }
+.disp-value-l { font-size: var(--disp-l); }
+.disp-value-m { font-size: var(--disp-m); }
+.disp-foot { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--disp-dim); }
+.disp-ink { color: var(--disp-ink); }
+.disp-slot { min-width: 0; }
+
+/* Línea del Display (charts.js#sparklineSvg): ámbar en la línea, su área y el punto de hoy (C2). */
+.disp-chart { margin-top: var(--sp-8); }
+.disp-chart-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.disp-chart-base { stroke: var(--disp-line); }
+.disp-chart-line { stroke: var(--disp-text); }
+.disp-chart-line.is-area,
+.disp-chart-line.is-dot { fill: var(--disp-text); stroke: none; }
+circle.disp-today { fill: var(--disp-text); stroke: var(--disp); }
+/* Eje de meses: cada etiqueta centrada bajo su punto (los puntos van de PAD=--sp-4 a ancho−PAD). */
+.disp-chart-axis {
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+  margin-inline: calc((100% - 2 * var(--sp-4)) / (var(--n) - 1) / -2 + var(--sp-4));
+  font-size: var(--fs-12);
+  line-height: var(--lh-title);
+  text-align: center;
+  color: var(--disp-dim);
+}
+.disp-chart-axis .disp-today { color: var(--disp-text); }
+
+/* --- LED (§9, B-Suscripciones · instrument.js#ledHtml): punto 8 + texto 12/500. ok · idle ·
+   espera (solo en el Display). Fuera del Display, «ok» es un punto --pos sin brillo. --- */
+.led {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  font-size: var(--fs-12);
+  font-weight: 500;
+  line-height: var(--lh-title);
+  color: var(--disp-dim);
+}
+.led-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--idle);
+  transition: background-color 160ms ease-out, box-shadow 400ms ease-out;
+}
+.led-ok .led-dot { background: var(--ok); box-shadow: var(--led-glow); }
+.led-wait .led-dot { background: var(--disp-text); box-shadow: var(--led-glow-wait); }
+.led-out { color: var(--text-dim); }
+.led-out.led-ok .led-dot { background: var(--pos); box-shadow: none; }
+@media (prefers-reduced-motion: reduce) { .led-dot { transition: none; } }
+
+/* --- Bloque bento (§9, B-Home, B-Patrimonio · instrument.js#bentoHtml): --raised con borde, o el
+   tinte de su familia (C6) sin borde. Cifra mono 20/600 en tinta (C3, C7). --- */
+.bento {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  min-width: 0;
+  padding: var(--sp-16);
+  border-radius: var(--radius-lg);
+  background: var(--raised);
+  border: 1px solid var(--border);
+}
+.bento-tint { background: var(--ft); border-color: transparent; }
+.bento-head { display: flex; align-items: center; gap: var(--sp-8); min-width: 0; }
+.bento-ico {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  background: var(--chip);
+  color: var(--text);
+}
+.bento-label { font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.bento-tint .bento-ico,
+.bento-tint .bento-label { color: var(--fx); }
+.bento-body { display: flex; flex-direction: column; gap: var(--sp-2); }
+.bento-figure { font-size: var(--fs-20); font-weight: 600; line-height: var(--lh-title); color: var(--text); }
+.bento-foot { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+
+/* --- Contenedor (inventario-B · instrument.js#containerHtml): --surface con borde; relleno 16 en
+   gráficos y 4 en listas. Título de sección 15 en Unbounded y total mono 15/600. --- */
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  min-width: 0;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.box-chart { padding: var(--sp-16); }
+.box-list { padding: var(--sp-4); gap: var(--sp-4); }
+.box-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
+.box-list .box-head { padding: var(--sp-8) var(--sp-12) 0; }
+.box-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-15);
+  font-weight: 700;
+  line-height: var(--lh-title);
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+.box-total { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+
+/* --- Barra apilada (§9, B-Home, B-Patrimonio · instrument.js#stackedBarHtml): grande 24 radio
+   --radius, fina 8 píldora sobre pozo; 2 de separación. Leyenda con nombre (C12). --- */
+.sbar-wrap { display: flex; flex-direction: column; gap: var(--sp-12); }
+.sbar { display: flex; gap: var(--sp-2); overflow: hidden; }
+.sbar-24 { height: 24px; border-radius: var(--radius); }
+.sbar-8 { height: 8px; border-radius: var(--radius-pill); background: var(--well); }
+.sbar-seg { flex-grow: 0; flex-shrink: 1; min-width: var(--sp-2); }
+.sbar-seg,
+.sbar-muestra { background: var(--fb); }
+.sbar-seg.is-idle,
+.sbar-muestra.is-idle { background: var(--idle); }
+.sbar-seg.is-debt,
+.sbar-muestra.is-debt { background: var(--stripe-debt); }
+.sbar-legend { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); }
+.sbar-key { display: flex; align-items: center; gap: var(--sp-8); min-height: 24px; }
+.sbar-muestra { flex: none; width: 10px; height: 10px; border-radius: 3px; }
+.sbar-name { flex: 1; min-width: 0; font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-title); color: var(--text); }
+.sbar-amt { font-size: var(--fs-14); font-weight: 500; color: var(--text); }
+.sbar-key.is-rest .sbar-name,
+.sbar-key.is-rest .sbar-amt { color: var(--text-dim); }
+
+/* --- Medidor (§9, B-GastoCategoria · instrument.js#meterHtml): 8 píldora. Pista --well, --chip
+   sobre tinte, --disp-line en el Display. Relleno -b (C6); sin familia en el Display, la línea
+   ámbar del Display (C2); sin familia fuera, --idle. Límite: 2 px que sobresale 3. --- */
+.meter { position: relative; height: 8px; border-radius: var(--radius-pill); background: var(--well); }
+.meter-on-tint { background: var(--chip); }
+.meter-on-disp { background: var(--disp-line); }
+.meter-fill { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--fb); }
+.meter-fill.is-idle { background: var(--idle); }
+.meter-fill.disp-chart-line { background: var(--disp-text); }
+.meter-limit {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: calc(var(--at) - 1px);
+  width: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--text);
+}
+.meter-on-disp .meter-limit { background: var(--disp-ink); }
+
+/* --- Columnas (§9, B-Home «Esta semana», B-Semana · instrument.js#columnsHtml): radio xs arriba;
+   hoy en --text (o en la barra de su familia), el resto en --idle (C11); cifra 12/600 encima. --- */
+.cols-wrap { display: flex; flex-direction: column; gap: var(--sp-8); }
+.cols,
+.cols-labels { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: var(--sp-8); }
+.cols { height: 72px; align-items: end; }
+.col { height: 100%; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: var(--sp-4); }
+.col-bar { flex: none; width: 100%; border-radius: var(--radius-xs) var(--radius-xs) 0 0; background: var(--idle); }
+.col.is-today .col-bar { background: var(--text); }
+.col.is-today.has-fam .col-bar { background: var(--fb); }
+.col-amt { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); white-space: nowrap; color: var(--text); }
+.cols-labels { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); text-align: center; color: var(--text-dim); }
+.cols-labels .is-today { color: var(--text); }
+
+/* Barras SVG de charts.js (Informe, Gasto por categoría): la familia (-b) o --idle (C11). */
+.chart-bar { fill: var(--fb); }
+.chart-bar.is-idle { fill: var(--idle); }
+
+/* --- Estado vacío (§9, B-Inicio-Vacio · instrument.js#emptyStateHtml): filas fantasma en pozo,
+   15/600 + 13/500 dim, flecha discontinua hacia el botón de añadir. --- */
+.empty { display: flex; flex-direction: column; align-items: center; gap: var(--sp-12); }
+.ghost-rows { align-self: stretch; display: flex; flex-direction: column; gap: var(--sp-8); }
+.ghost-row { display: flex; align-items: center; gap: var(--sp-12); }
+.ghost-row.is-faded { opacity: .6; }
+.ghost { display: block; border-radius: var(--radius-xs); background: var(--well); box-shadow: var(--sh-well); }
+.ghost-ico { flex: none; width: 40px; height: 40px; border-radius: var(--radius); }
+.ghost-lines { flex: 1; display: flex; flex-direction: column; gap: var(--sp-8); }
+.ghost-l1 { width: 46%; height: 10px; }
+.ghost-l2 { width: 30%; height: 8px; opacity: .7; }
+.ghost-amt { flex: none; width: 58px; height: 10px; }
+.empty-copy { display: flex; flex-direction: column; gap: var(--sp-4); padding-top: var(--sp-4); text-align: center; }
+.empty-title { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); }
+.empty-text { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+.empty-arrow { display: block; color: var(--text-dim); fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
 /* ===== Entidad: baldosas, ficha, filas, chips, cabeceras (PR-08) ===== */
 /* Marcado en js/entity.js. Prefijo único .ent-* (las clases viejas .tx-*, .chip, .list-row… siguen
    en app.css para las pantallas sin migrar). La familia llega como .fam-<k> y aquí solo se leen
