@@ -26,8 +26,8 @@ test("parseRootTokens no lee el bloque oscuro ni lo que venga detrás de :root",
   assert.deepEqual(parseRootTokens(css), { "--f-casa-b": "#111111" }, "solo hex; nada del bloque oscuro");
   const real = parseRootTokens(TOKENS);
   const dark = TOKENS.slice(TOKENS.indexOf(':root[data-theme="dark"]'));
-  assert.ok(dark.includes(`--f-casa-b:${"#"}C0A389`), "precondición: el oscuro trae otro valor");
-  assert.notEqual(real["--f-casa-b"].toUpperCase(), "#C0A389");
+  assert.ok(dark.includes(`--f-casa-b:${"#"}AE8A69`), "precondición: el oscuro trae otro valor");
+  assert.notEqual(real["--f-casa-b"].toUpperCase(), "#AE8A69");
 });
 
 test("parseRootTokens: entrada vacía o sin :root da {}", () => {
