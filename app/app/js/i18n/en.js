@@ -293,7 +293,28 @@ export const EN = {
     uncategorizedChip: "No category {n}",
     chipAll: "All",
     // filter.toggle replaces search.toggle (funnel instead of magnifier, Movimientos.dc.html:24).
-    filter: { toggle: "Filter" },
+    // Filter sheet (S5, B-Movimientos-Filtros) with the usual semantics: one root category,
+    // «no category» and one tag. apply counts the transactions the chosen filter would keep.
+    filter: {
+      toggle: "Filter",
+      title: "Filters",
+      clear: "Clear filters",
+      category: "Category",
+      tag: "Tag",
+      apply: { one: "Show {n} transaction", other: "Show {n} transactions" },
+    },
+    // System B (S5, B-Movimientos): root header with the period on screen and a compact Display.
+    header: {
+      sub: { one: "Day {day} of {total}, {n} day left", other: "Day {day} of {total}, {n} days left" },
+      closed: "Closed period",
+    },
+    display: {
+      label: "Spent this period",
+      of: "of {amount}",
+      meter: "Spent against the period limits",
+    },
+    yesterday: "Yesterday",
+    weekdayShort: { 0: "Sun", 1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat" },
     // Replace <select id="mov-period"> (Movimientos.dc.html:30-40): aria-label of the two 40px
     // circular buttons that move state.periodId by index over `periods`.
     period: { prev: "Previous period", next: "Next period" },

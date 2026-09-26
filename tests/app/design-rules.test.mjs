@@ -24,7 +24,6 @@ export const PENDIENTES = new Set([
   "js/screens/categorias.js",
   "js/screens/etiquetas.js",
   "js/screens/movimiento-detalle.js", // S5 lo separa de movimientos.js; la S6 lo migra
-  "js/screens/movimientos.js",
   "js/screens/onboarding.js",
   "js/screens/periodo-nuevo.js",
   "js/screens/recurrentes.js",

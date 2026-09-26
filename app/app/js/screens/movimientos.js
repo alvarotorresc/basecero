@@ -1,160 +1,137 @@
 import {
-  listPeriods, listAllByDay, getTransaction, updateTransaction, softDeleteTransaction, countUncategorized,
-  listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById, hasActiveLinkedSettlement,
-  getMetaAll, listTags, createTag, tagTotals, tagTotalsOfPeriod,
+  listPeriods, listAllByDay, countUncategorized, allCategoriesById, listAccounts,
+  getMetaAll, tagTotals, tagTotalsOfPeriod, spentOfPeriod, budgetsOfPeriod,
 } from "../repo.js";
-import { attachments } from "../attachments.js";
-import { colorForCategory, iconForCategory, textColorForCategory, rootOf } from "../category-colors.js";
-import { budgetStatus } from "../category-spend.js";
-import { matchesFilter, isUncategorized } from "../movimientos-filter.js";
-import { fmtMoney, moneyPartsHtml, fmtDiaLargo, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw, appLocale } from "../format.js";
-import { resolveAccountId } from "../account-defaults.js";
+import { familyForCategory, iconForCategory, rootOf } from "../category-colors.js";
+import { budgetMap } from "../category-spend.js";
+import { matchesFilter, isUncategorized, groupByDay, daySpentCents } from "../movimientos-filter.js";
+import { fmtMoney, moneyPartsHtml, hoyISO, prevDayIso } from "../format.js";
 import { t } from "../i18n/index.js";
-import { metaHtml, subHeaderHtml } from "../ui.js";
-import { icon, catIcon as catSvg } from "../icons.js";
+import { rootHeaderHtml, buttonHtml } from "../ui.js";
+import { icon } from "../icons.js";
+import { displayHtml, dispInkHtml, meterHtml, emptyStateHtml } from "../instrument.js";
+import { filterChipHtml, txRowHtml, dayHeaderHtml } from "../entity.js";
 import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
-import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { skeletonHtml } from "../skeleton.js";
+import { showSheet } from "../sheet.js";
 import { renderMovimientoDetalle } from "./movimiento-detalle.js";
-import { showConfirm } from "../modal.js";
-import { showToast } from "../toast.js";
-
 import { escHtml, escAttr } from "../esc.js";
+
 const needsCategory = (tipo) => tipo === "expense" || tipo === "income" || tipo === "refund";
 
-/** Agrupa las filas de listAllByDay (ya vienen ordenadas por date DESC) en bloques por día,
- *  preservando el orden de llegada (mismo patrón que inicio.js). */
-function groupByDay(rows) {
-  const groups = [];
-  let current = null;
-  for (const r of rows) {
-    if (!current || current.date !== r.date) {
-      current = { date: r.date, rows: [] };
-      groups.push(current);
-    }
-    current.rows.push(r);
-  }
-  return groups;
+const dayNumber = (iso) => new Date(iso + "T12:00:00").getDate();
+const weekdayShort = (iso) => t(`movimientos.weekdayShort.${new Date(iso + "T12:00:00").getDay()}`);
+
+/** Cabecera de día (B-Movimientos): «Hoy dom 13», «Ayer sáb 12»; más atrás, «vie 11». El total es
+ *  lo gastado ese día entre las filas visibles (movimientos-filter.js#daySpentCents); sin gasto,
+ *  sin total. */
+function dayHeaderFor(date, hoy, totalCents) {
+  const short = `${weekdayShort(date)} ${dayNumber(date)}`;
+  const totalHtml = totalCents ? moneyPartsHtml(totalCents) : "";
+  if (date === hoy) return dayHeaderHtml({ label: t("common.today"), date: short, totalHtml });
+  if (date === prevDayIso(hoy)) return dayHeaderHtml({ label: t("movimientos.yesterday"), date: short, totalHtml });
+  return dayHeaderHtml({ label: short, totalHtml });
 }
 
-// Toda anchura de barra de la tarjeta de etiqueta activa pasa por aquí, mismo criterio que
-// etiquetas.js#clampPct/gasto-por-categoria.js#clampPct: budgetStatus() no capa su `.pct`, y
-// `width:120%`/`width:-8%` es CSS inválido que el navegador descarta (la barra se queda vacía).
-const clampPct = (pct) => Math.min(100, Math.max(0, pct));
+/** «Casa › Supermercado» (B-Movimientos, línea 2 de la fila): la raíz y la hoja, o solo la raíz. */
+function categoryPath(catId, byId) {
+  const cat = catId ? byId[catId] : null;
+  if (!cat) return "";
+  const parent = cat.parent_id ? byId[cat.parent_id] : null;
+  return parent ? `${parent.name} › ${cat.name}` : cat.name;
+}
 
+/** Fila de movimiento (entity.js#txRowHtml, B-Movimientos): SIEMPRE un botón, toda fila abre el
+ *  detalle. Importe en valor absoluto; el signo va por `sign`. Los cinco tipos:
+ *   - gasto: familia de su raíz (C6), «−» en tinta (C7);
+ *   - ingreso: sin familia, «+» en --pos (C9);
+ *   - devolución: familia de su categoría de gasto, «+» (vuelve dinero);
+ *   - transferencia y ajuste: no son entidad (C11), sin familia y con icono de UI.
+ *  Sin categoría: baldosa neutra con «+» y «toca para categorizar» en la línea 2. Compartido: el
+ *  ticket entero en la cifra y la nota de siempre debajo (mismo patrón que Semana). */
 function movRowHtml(r, byId, accById, partnerName) {
+  const data = { tx: r.id };
   if (r.type === "transfer") {
     const from = accById[r.account_id]?.name ?? "?";
     const to = accById[r.counter_account_id]?.name ?? "?";
-    return `
-    <button type="button" class="tx-row" data-tx="${r.id}" style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-      <div class="dotico" style="--cat:var(--card2);">${icon("transfer", { size: 16, stroke: "var(--ink-3)" })}</div>
-      <div class="tx-body">
-        <div class="tx-title">${escHtml(from)} → ${escHtml(to)}</div>
-        <div class="tx-sub">${escHtml(r.merchant || r.note || t("movimientos.type.transfer"))}</div>
-      </div>
-      <div class="tx-amount num">${moneyPartsHtml(r.amount_cents)}</div>
-    </button>`;
+    return txRowHtml({
+      fam: null, icon: "transfer", title: `${from} → ${to}`, line2: r.merchant || r.note || t("movimientos.type.transfer"),
+      amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)), sign: "none", data,
+    });
   }
   if (r.type === "adjustment") {
-    const isNeg = r.amount_cents < 0;
-    return `
-    <button type="button" class="tx-row" data-tx="${r.id}" style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-      <div class="dotico" style="--cat:var(--card2);">⚖️</div>
-      <div class="tx-body">
-        <div class="tx-title">${t("common.type.adjustment")}</div>
-        <div class="tx-sub">${escHtml(r.merchant || r.note || "")}</div>
-      </div>
-      <div class="tx-amount num ${isNeg ? "negative" : "positive"}">${isNeg ? "-" : "+"}${moneyPartsHtml(Math.abs(r.amount_cents))}</div>
-    </button>`;
+    return txRowHtml({
+      fam: null, icon: "pencil", title: t("common.type.adjustment"), line2: r.merchant || r.note || "",
+      amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)), sign: r.amount_cents < 0 ? "expense" : "income", data,
+    });
   }
-  const cat = byId[r.category_id];
-  const catName = cat?.name ?? "";
   const uncategorized = isUncategorized(r);
-  const color = uncategorized ? "var(--card2)" : colorForCategory(r.category_id, byId);
-  // catIcon, no `icon`: ese nombre queda para la función importada de icons.js, y un `const icon`
-  // local aquí la taparía con un error de TDZ en la propia línea (uncategorized ? icon(...) : ...).
-  const catIcon = uncategorized ? icon("plus", { size: 15, width: 2, stroke: "var(--ink-3)" }) : catSvg(iconForCategory(r.category_id, byId), { size: "1em" });
-  const dashedStyle = uncategorized ? "border:1.5px dashed var(--rule);" : "";
-  const title = r.merchant || catName || t("movimientos.uncategorized");
-  const subBase = uncategorized ? t("movimientos.tapToCategorize") : (catName || t("movimientos.uncategorized"));
-  const shareSuffix = !r.is_shared ? ""
+  const catName = byId[r.category_id]?.name ?? "";
+  const isExpense = r.type === "expense";
+  const fam = uncategorized || r.type === "income" ? null : familyForCategory(r.category_id, byId);
+  const shareNote = !r.is_shared ? ""
     : r.paid_by === "partner"
       ? t("movimientos.row.partnerPaid", { name: partnerName || t("movimientos.shared.fallbackName"), amount: fmtMoney(r.my_amount_cents) })
       : t("common.myPartSuffix", { amount: fmtMoney(r.my_amount_cents) });
-  const isExpense = r.type === "expense";
-  // Un gasto que pagó la contraparte enseña el ticket entero (coherencia con el resto de la lista)
-  // pero ATENUADO, no en rojo: ese dinero no salió de ninguna cuenta mía.
-  const partnerPaidRow = isExpense && !!r.is_shared && r.paid_by === "partner";
-  const amountClass = partnerPaidRow ? "" : isExpense ? "negative" : "positive";
-  const amountStyle = partnerPaidRow ? ' style="color:var(--text-3);"' : "";
-  const sign = isExpense ? "-" : "+";
-  // filter/join en vez de interpolar amountClass directo: cuando está vacío (fila pagada por la
-  // contraparte) no deja el atributo con un espacio final ("tx-amount num ").
-  const amountClasses = ["tx-amount", "num", amountClass].filter(Boolean).join(" ");
-  return `
-  <button type="button" class="tx-row" data-tx="${r.id}" style="width:100%;text-align:left;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-    <div class="dotico" style="--cat:${color};${dashedStyle}">${catIcon}</div>
-    <div class="tx-body">
-      <div class="tx-title">${escHtml(title)}</div>
-      <div class="tx-sub" style="${uncategorized ? "color:var(--amber);" : ""}">${escHtml(subBase)}${escHtml(shareSuffix)}</div>
-    </div>
-    <div class="${amountClasses}"${amountStyle}>${sign}${moneyPartsHtml(r.amount_cents)}</div>
-  </button>`;
+  return txRowHtml({
+    fam,
+    icon: uncategorized ? "plus" : iconForCategory(r.category_id, byId),
+    title: r.merchant || catName || t("movimientos.uncategorized"),
+    line2: uncategorized ? t("movimientos.tapToCategorize") : categoryPath(r.category_id, byId),
+    amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)),
+    sign: isExpense ? "expense" : "income",
+    // La nota va debajo de la cifra: sin el separador de prosa con el que se concatenaba al nombre.
+    amountNote: shareNote.replace(/^,\s*/, ""),
+    data,
+  });
 }
 
-/** Pantalla Movimientos: selector de periodo, bandeja de sin-categorizar y lista agrupada por día
- *  (los 5 tipos). Tocar una fila abre el detalle (movimiento-detalle.js) en este mismo contenedor. */
+/** Pantalla Movimientos (B-Movimientos): cabecera de raíz con ‹ › de periodo, Display compacto
+ *  «Gastado en el periodo», buscador, chips de categoría y lista por día. «Filtrar» abre la hoja
+ *  de filtros (B-Movimientos-Filtros) con la semántica de siempre (matchesFilter): una categoría
+ *  raíz o «sin categoría», y una etiqueta. Tocar una fila abre el detalle (movimiento-detalle.js)
+ *  en este mismo contenedor.
+ *  `tagId` (Etiquetas, N11) llega de nav("movimientos", { tagId }) al entrar desde Etiquetas. */
 export async function renderMovimientos(container, { tagId = null } = {}) {
-  // Silueta gris mientras llega la primera consulta (mismo criterio que inicio.js): selector de
-  // periodo, fila de chips y lista. Solo en el PRIMER pintado de esta pantalla — el testigo
-  // container.dataset.screen lo escriben SOLO Inicio y Movimientos.
+  // Silueta gris mientras llega la primera consulta (mismo criterio que inicio.js). Solo en el
+  // PRIMER pintado de esta pantalla — el testigo container.dataset.screen lo escriben SOLO Inicio y
+  // Movimientos.
   if (container.dataset.screen !== "movimientos") {
     container.dataset.screen = "movimientos";
-    container.innerHTML = skeletonHtml([72, 56, 320]);
+    container.innerHTML = skeletonHtml([72, 96, 56, 320]);
   }
-  let periods, expenseCats, incomeCats, accountsAll, byId, meta, tagsAll;
+  let periods, accountsAll, byId, meta;
   try {
-    [periods, expenseCats, incomeCats, accountsAll, byId, meta, tagsAll] = await Promise.all([
-      listPeriods(), listExpenseLeafCategories(), listIncomeCategories(), listAccounts(), allCategoriesById(),
-      getMetaAll(), listTags(),
-    ]);
+    [periods, accountsAll, byId, meta] = await Promise.all([listPeriods(), listAccounts(), allCategoriesById(), getMetaAll()]);
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso red">${t("movimientos.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
   if (periods.length === 0) {
-    container.innerHTML = `<header class="screen-header"><h1 style="font: var(--t-title); letter-spacing:-.01em;">${t("common.movements")}</h1></header>
-      <div class="banner-aviso red">${t("movimientos.noPeriods")}</div>`;
+    container.innerHTML = `<div class="mov">${rootHeaderHtml({ title: t("common.movements") })}
+      ${emptyStateHtml({ title: t("movimientos.noPeriods"), rows: 2 })}</div>`;
     return;
   }
   const accById = Object.fromEntries(accountsAll.map((a) => [a.id, a]));
   const partnerName = (meta.partner_name || "").trim();
-  // Cabecera §4.1: el subtítulo «día N de M» siempre describe el periodo ABIERTO, no el que se
-  // esté navegando con el selector de flechas — dayIndexOfPeriod cuenta días desde hoy, así que
-  // solo tiene sentido para el periodo en curso (un periodo cerrado daría un "día 47 de 31").
-  const openPeriod = periods.find((p) => p.status === "open") ?? null;
 
   const state = {
     periodId: periods.find((p) => p.status === "open")?.id ?? periods[0].id,
     rows: [],
+    rowsById: {},
     uncategorizedCount: 0,
+    spentCents: 0,
+    budgetCents: 0,
     tagTotalsPeriod: [], // Task 12: n/spent_cents por etiqueta EN ESTE periodo (chips + línea de la tarjeta)
     tagTotalsAll: [], // Task 12: total de SIEMPRE por etiqueta (D7) — nombre, límite y barra de la tarjeta
-    // Task 4: filtro cliente sobre state.rows (buscador + chips por categoría raíz). Los tres
-    // campos se combinan con AND en matchesFilter (movimientos-filter.js); la UI garantiza que
-    // rootCatId y uncat no estén activos a la vez (chips de selección única, ver wireList).
-    // «Todos» = los tres en su valor neutro. tagId (Etiquetas, N11) llega de nav("movimientos",
-    // { tagId }) al entrar desde la pantalla Etiquetas — D13: NUNCA se autolimpia (a diferencia de
-    // rootCatId, ver loadPeriodData) y sobrevive a un cambio de periodo (ver el onchange de
-    // #mov-period): una etiqueta es transversal por definición.
+    // Task 4: filtro cliente sobre state.rows (buscador + categoría raíz + sin categoría + etiqueta).
+    // Las cuatro condiciones se combinan con AND en matchesFilter (movimientos-filter.js); la UI
+    // garantiza que rootCatId y uncat no estén activos a la vez (selección única). «Todos» = sin
+    // categoría ni «sin categoría». tagId: D13, NUNCA se autolimpia (a diferencia de rootCatId, ver
+    // loadPeriodData) y sobrevive a un cambio de periodo: una etiqueta es transversal por definición.
     filter: { query: "", rootCatId: null, uncat: false, tagId },
-    // Muestra/oculta el input de búsqueda bajo la lupa del header — no forma parte del filtro en
-    // sí (tener texto buscado con el input oculto sería confuso, así que cerrar limpia
-    // filter.query, ver wireList#mov-search-toggle).
-    searchOpen: false,
     opening: false, // apertura de detalle en curso (ver openDetail)
   };
   let errorMsg = "";
@@ -162,28 +139,26 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
   let disposeDetail = null;
 
   async function loadPeriodData() {
-    [state.rows, state.uncategorizedCount, state.tagTotalsPeriod, state.tagTotalsAll] = await Promise.all([
+    let budgets;
+    [state.rows, state.uncategorizedCount, state.tagTotalsPeriod, state.tagTotalsAll, state.spentCents, budgets] = await Promise.all([
       listAllByDay(state.periodId), countUncategorized(state.periodId),
-      tagTotalsOfPeriod(state.periodId), tagTotals(),
+      tagTotalsOfPeriod(state.periodId), tagTotals(), spentOfPeriod(state.periodId), budgetsOfPeriod(state.periodId),
     ]);
+    state.rowsById = Object.fromEntries(state.rows.map((r) => [r.id, r]));
+    // El «de» del Display: la suma de los límites del periodo, mismo cálculo que Inicio.
+    state.budgetCents = Object.values(budgetMap(budgets)).reduce((s, c) => s + c, 0);
     // sin esto, categorizar/borrar el último movimiento sin categorizar con el filtro activo
     // deja la lista vacía sin forma de volver: el chip desaparece (count=0) pero el filtro seguía activo.
     if (state.uncategorizedCount === 0) state.filter.uncat = false;
-    // mismo invariante para la chip de categoría raíz activa: si el último movimiento de esa raíz
-    // se recategoriza/borra, su chip desaparece de presentRootCats() (ya no hay nada que mostrar
-    // en ella) pero el filtro seguía activo — la lista se quedaría vacía con ninguna chip marcada.
+    // mismo invariante para la categoría raíz activa: si el último movimiento de esa raíz se
+    // recategoriza/borra, su chip desaparece de presentRootCats() pero el filtro seguía activo.
     if (state.filter.rootCatId && !presentRootCats().includes(state.filter.rootCatId)) state.filter.rootCatId = null;
-    // D13: filter.tagId NUNCA se autolimpia aquí, a propósito — a diferencia de rootCatId arriba.
-    // Una etiqueta es transversal a los periodos (D7): que en ESTE periodo no quede ningún
-    // movimiento con esa etiqueta no significa que el filtro "esté mal", solo que la lista sale
-    // vacía (mismo mensaje que cualquier otro filtro sin resultados) — el usuario decide si lo
-    // quita, igual que decide si cambia de periodo con una búsqueda de texto puesta.
+    // D13: filter.tagId NUNCA se autolimpia aquí, a propósito (ver el comentario de state.filter).
   }
 
-  /** Categorías raíz presentes en las rows cargadas del periodo (Task 4): una chip por cada una,
-   *  en orden de primera aparición (listAllByDay ya viene ordenado por fecha desc). transfer/
-   *  adjustment y filas sin categoría quedan fuera — no aportan chip de categoría (las sin
-   *  categoría tienen su propia chip "Sin categoría · N", ver renderList). */
+  /** Categorías raíz presentes en las rows cargadas del periodo (Task 4): un chip por cada una, en
+   *  orden de primera aparición. transfer/adjustment y filas sin categoría quedan fuera (las sin
+   *  categoría tienen su propio chip «Sin categoría N»). */
   function presentRootCats() {
     const seen = new Set();
     const out = [];
@@ -195,81 +170,61 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     return out;
   }
 
-  /** Segunda fila de chips (Task 12, artboard Movimientos.dc.html:50-59): una por etiqueta con
-   *  movimientos EN ESTE PERIODO, más siempre la activa (aunque su periodo dé n=0, para que el
-   *  filtro puesto siga teniendo una chip que lo represente y se pueda quitar tocándola). No es
-   *  is_archived quien decide si aparece: tagTotalsOfPeriod ya incluye archivadas a propósito (un
-   *  movimiento del periodo puede llevar una que se archivó después), ver su comentario en sql.js. */
-  function tagChipsHtml() {
-    const activeId = state.filter.tagId;
+  /** Etiquetas con movimientos EN ESTE PERIODO, más siempre la activa (aunque aquí dé n=0, para
+   *  que el filtro puesto tenga un chip que lo represente y se pueda quitar). tagTotalsOfPeriod ya
+   *  incluye archivadas a propósito, ver su comentario en sql.js. */
+  function visibleTags(activeId) {
     const periodById = Object.fromEntries(state.tagTotalsPeriod.map((tg) => [tg.id, tg]));
-    const visible = state.tagTotalsAll.filter((tg) => (periodById[tg.id]?.n ?? 0) > 0 || tg.id === activeId);
-    if (visible.length === 0) return "";
-    return `<div class="chips-row" style="margin-bottom:14px;">
-      ${visible.map((tg) => {
-        const active = tg.id === activeId;
-        return `<button type="button" class="chip${active ? " active" : ""}" data-chip-tag="${escAttr(tg.id)}"
-          style="padding:0 14px;display:inline-flex;align-items:center;gap:7px;">${icon("tag", { size: 14 })}${escHtml(tg.name)}</button>`;
-      }).join("")}
-    </div>`;
+    return state.tagTotalsAll.filter((tg) => (periodById[tg.id]?.n ?? 0) > 0 || tg.id === activeId);
   }
 
-  /** Tarjeta de la etiqueta activa (Task 12, artboard Movimientos.dc.html:61-83): nombre + nº de
-   *  movimientos de SIEMPRE (tagTotalsAll, D7), total global con barra SOLO si tiene límite, y la
-   *  línea del periodo abierto (tagTotalsPeriod). Nada si no hay ninguna etiqueta activa o si la
-   *  etiqueta activa ya no existe (borrado real, fuera del alcance de esta app — ver D5: solo se
-   *  archiva — pero una FK huérfana no debe reventar el render). */
+  const rootChipHtml = (catId, selected) => filterChipHtml({
+    fam: familyForCategory(catId, byId), label: byId[catId]?.name ?? "", selected, data: { chipCat: catId },
+  });
+  const uncatChipHtml = (selected) => filterChipHtml({
+    label: t("movimientos.uncategorizedChip", { n: state.uncategorizedCount }), selected, data: { chipUncat: "1" },
+  });
+  const tagChipHtml = (tg, selected) => filterChipHtml({ tag: true, label: tg.name, selected, data: { chipTag: tg.id } });
+
+  /** Tarjeta de la etiqueta activa (Task 12): nombre y nº de movimientos de SIEMPRE (tagTotalsAll,
+   *  D7), total global con medidor SOLO si tiene límite, y la línea del periodo que se mira. Nada
+   *  sin etiqueta activa o si ya no existe (FK huérfana: no debe reventar el pintado). Etiqueta
+   *  neutra (C10): sin color propio, el medidor en --idle. */
   function tagCardHtml() {
-    const tagId = state.filter.tagId;
-    if (!tagId) return "";
-    const tag = state.tagTotalsAll.find((tg) => tg.id === tagId);
+    const id = state.filter.tagId;
+    if (!id) return "";
+    const tag = state.tagTotalsAll.find((tg) => tg.id === id);
     if (!tag) return "";
-    const periodTag = state.tagTotalsPeriod.find((tg) => tg.id === tagId) ?? { n: 0, spent_cents: 0 };
-    const hasLimit = tag.budget_cents > 0;
+    const periodTag = state.tagTotalsPeriod.find((tg) => tg.id === id) ?? { n: 0, spent_cents: 0 };
     const periodName = periods.find((p) => p.id === state.periodId)?.name ?? "";
-    let limitHtml = "";
-    if (hasLimit) {
-      const st = budgetStatus(tag.spent_cents, tag.budget_cents);
-      limitHtml = `
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;">
-          <span class="num" style="font-size:20px;font-weight:700;">${fmtMoney(tag.spent_cents)}</span>
-          <span class="num" style="font-size:13px;color:var(--text-3);">${t("movimientos.tagCard.ofLimit", { limit: fmtMoney(tag.budget_cents) })}</span>
-        </div>
-        <div class="bar" style="--cat:var(--ink-2);"><i style="width:${clampPct(st.pct)}%;"></i></div>
-      </div>`;
-    }
-    return `
-    <div class="card" style="display:flex;flex-direction:column;gap:12px;margin-bottom:14px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="display:flex;align-items:center;gap:7px;">
-          <span style="display:flex;color:var(--text-2);">${icon("tag", { size: 14 })}</span>
-          <span style="font-size:15px;font-weight:600;">${escHtml(tag.name)}</span>
-        </div>
-        <span style="font-size:11px;font-weight:500;color:var(--text-3);">${t("movimientos.tagCard.movements", { n: tag.n })}</span>
+    const limit = tag.budget_cents > 0 ? `
+      <div class="mov-tag-limit">
+        <span class="num mov-tag-amt">${escHtml(fmtMoney(tag.spent_cents))}</span>
+        <span class="mov-tag-of">${escHtml(t("movimientos.tagCard.ofLimit", { limit: fmtMoney(tag.budget_cents) }))}</span>
       </div>
-      ${limitHtml}
-      <span style="font-size:13px;font-weight:500;color:var(--text-3);">${t("movimientos.tagCard.periodLine", { amount: fmtMoney(periodTag.spent_cents), period: escHtml(periodName), n: periodTag.n })}</span>
-    </div>`;
+      ${meterHtml({ value: tag.spent_cents, max: tag.budget_cents })}` : "";
+    return `
+      <section class="mov-tag" aria-label="${escAttr(tag.name)}">
+        <div class="mov-tag-head">
+          <span class="mov-tag-name">${icon("tag", { size: 16 })}<span>${escHtml(tag.name)}</span></span>
+          <span class="mov-tag-count">${escHtml(t("movimientos.tagCard.movements", { n: tag.n }))}</span>
+        </div>
+        ${limit}
+        <span class="mov-tag-period">${escHtml(t("movimientos.tagCard.periodLine", { amount: fmtMoney(periodTag.spent_cents), period: periodName, n: periodTag.n }))}</span>
+      </section>`;
   }
 
-  /** Nota de cierre del filtro de etiqueta (Movimientos.dc.html:146-148): cuántos movimientos de
-   *  la etiqueta activa quedan FUERA de este periodo — tagTotalsAll.n (de siempre) menos
-   *  tagTotalsPeriod.n (de este periodo). Solo se pinta con una etiqueta activa y resto > 0: es
-   *  el mismo dato que ya calcula tagCardHtml, sin cargar nada nuevo. */
+  /** Nota de cierre del filtro de etiqueta: cuántos movimientos de la etiqueta activa quedan FUERA
+   *  de este periodo (tagTotalsAll.n menos tagTotalsPeriod.n). Solo con resto > 0. */
   function tagOlderNoteHtml() {
-    const tagId = state.filter.tagId;
-    if (!tagId) return "";
-    const tag = state.tagTotalsAll.find((tg) => tg.id === tagId);
+    const id = state.filter.tagId;
+    if (!id) return "";
+    const tag = state.tagTotalsAll.find((tg) => tg.id === id);
     if (!tag) return "";
-    const periodTag = state.tagTotalsPeriod.find((tg) => tg.id === tagId);
-    const older = tag.n - (periodTag?.n ?? 0);
+    const older = tag.n - (state.tagTotalsPeriod.find((tg) => tg.id === id)?.n ?? 0);
     if (older <= 0) return "";
     const periodName = periods.find((p) => p.id === state.periodId)?.name ?? "";
-    return `
-    <div style="padding-top:22px;">
-      <span style="font:var(--t-label);color:var(--ink-3);line-height:1.45;display:block;">${t("movimientos.tag.olderNote", { n: older, tag: escHtml(tag.name), period: escHtml(periodName) })}</span>
-    </div>`;
+    return `<p class="mov-note">${escHtml(t("movimientos.tag.olderNote", { n: older, tag: tag.name, period: periodName }))}</p>`;
   }
 
   async function openDetail(id) {
@@ -278,7 +233,7 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     if (state.opening) return;
     state.opening = true;
     try {
-      // El detalle vive en movimiento-detalle.js (S5). Apunta la entrada de «atrás» solo si el
+      // El detalle vive en movimiento-detalle.js. Apunta la entrada de «atrás» solo si el
       // movimiento existe (onOpen); tras guardar o borrar recarga el periodo antes de volver.
       const dispose = await renderMovimientoDetalle(container, id, {
         onOpen: () => { pushBack(backToList); errorMsg = ""; },
@@ -302,19 +257,15 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     render();
   }
 
-
-  /** Cuerpo de la lista (día a día o vacío) filtrado con matchesFilter — Task 4. Vive en su propio
-   *  contenedor (#mov-list-body, ver renderList) para poder refrescarlo solo a él desde el
-   *  buscador sin recrear cabecera/chips/input: eso es lo que mantiene el foco/cursor del input
-   *  mientras se escribe (mismo motivo que el parche puntual de #mov-raw más abajo). */
+  /** Cuerpo de la lista (día a día o vacío) filtrado con matchesFilter. Vive en su propio
+   *  contenedor (#mov-list-body) para poder refrescarlo solo a él desde el buscador sin recrear el
+   *  campo: eso es lo que mantiene el foco/cursor mientras se escribe. */
   function listBodyHtml() {
     const hoy = hoyISO();
     const visible = state.rows.filter((r) => matchesFilter(r, state.filter, byId));
-
     if (visible.length === 0) {
-      // query primero: si hay texto buscado, "no hay coincidencias" es el mensaje relevante aunque
-      // la chip "Sin categoría" también esté activa (query+uncat se combinan con AND en
-      // matchesFilter) — solo sin query el vacío se atribuye a la chip de categoría.
+      // query primero: si hay texto buscado, «ninguno coincide» es el mensaje relevante aunque el
+      // chip «Sin categoría» también esté activo — solo sin query el vacío se atribuye al chip.
       const msg = state.rows.length === 0
         ? t("movimientos.empty.noPeriod")
         : state.filter.query
@@ -322,16 +273,13 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
           : state.filter.uncat
             ? t("movimientos.empty.noUncategorized")
             : t("movimientos.empty.noResults");
-      return `<div class="card" style="text-align:center;color:var(--text-3)"><p>${msg}</p></div>`;
+      return emptyStateHtml({ title: msg, rows: 2 });
     }
-    return `<div class="card" style="display:flex;flex-direction:column;gap:16px;">
-        <div style="display:flex;flex-direction:column;gap:12px;">
-          ${groupByDay(visible).map((g) => `
-            <div class="day-label" style="font:var(--t-label);font-weight:600;color:var(--ink);">${g.date === hoy ? t("common.today") : fmtDiaCorto(g.date)}</div>
-            ${g.rows.map((r) => movRowHtml(r, byId, accById, partnerName)).join("")}
-          `).join("")}
-        </div>
-      </div>`;
+    return groupByDay(visible).map((g) => `
+      <section class="mov-day">
+        ${dayHeaderFor(g.date, hoy, daySpentCents(g.rows, state.rowsById))}
+        <div class="mov-card">${g.rows.map((r) => movRowHtml(r, byId, accById, partnerName)).join('<div class="mov-hr" aria-hidden="true"></div>')}</div>
+      </section>`).join("");
   }
 
   function wireListBody() {
@@ -340,8 +288,6 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     });
   }
 
-  /** Refresca SOLO #mov-list-body (sin tocar cabecera/chips/input de búsqueda) — ver comentario de
-   *  listBodyHtml. Es lo que llama el oninput del buscador en vez de render(). */
   function refreshListBody() {
     const body = container.querySelector("#mov-list-body");
     if (!body) return;
@@ -349,160 +295,236 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     wireListBody();
   }
 
-  function renderList() {
-    const rootCats = presentRootCats();
-    const allActive = !state.filter.rootCatId && !state.filter.uncat;
-    // Índice de state.periodId en `periods` (ORDER BY start_date DESC, sql.js#listPeriods): el
-    // índice 0 es el más reciente. "Periodo anterior" (icon back, izquierda) avanza el índice
-    // hacia atrás en el tiempo → +1; "Periodo siguiente" (chevronRight, derecha) → -1.
-    const periodIdx = periods.findIndex((p) => p.id === state.periodId);
-    const currentPeriod = periods[periodIdx] ?? periods[0];
-
-    // Chips por categoría raíz (artboard Movimientos.dc.html:32-35): activa = tinta invertida
-    // (.chip.active del sistema); inactiva = texto en --ink-2 neutro (el color de .chip por
-    // defecto), SOLO el emoji lleva el tinte de la categoría — el artboard aquí es texto plano
-    // con el emoji delante, sin tinte de fondo (a diferencia de .chip-icon, que sí lleva círculo).
-    // Por eso el color va en un <span> alrededor del emoji, nunca en el botón entero: un color
-    // inline en el botón SIEMPRE ganaría sobre .chip.active y rompería la inversión al activarse.
-    const catChipsHtml = rootCats.map((catId) => {
-      const active = state.filter.rootCatId === catId;
-      // catIcon: mismo criterio que movRowHtml — deja el nombre `icon` libre para la función
-      // importada de icons.js, que esta misma función renderList ya usa más abajo.
-      const catIcon = catSvg(iconForCategory(catId, byId), { size: "1em" });
-      const name = byId[catId]?.name ?? "";
-      const color = textColorForCategory(catId, byId);
-      return `<button type="button" class="chip${active ? " active" : ""}" data-chip-cat="${catId}" style="padding:0 14px;">
-        <span style="${active ? "" : `color:${color};`}">${catIcon}</span> ${escHtml(name)}
-      </button>`;
-    }).join("");
-
-    // Chip "Sin categoría · N" (artboard Movimientos.dc.html:35): activa = tinta invertida;
-    // inactiva = borde discontinuo --rule, padding simétrico porque no lleva icono (mismo criterio
-    // que ya tenía antes de Task 4).
-    const uncatChipHtml = state.uncategorizedCount > 0
-      ? `<button type="button" data-chip-uncat class="chip${state.filter.uncat ? " active" : ""}" style="padding:0 14px;${state.filter.uncat ? "" : "background:transparent;border:1px dashed var(--rule);"}">${t("movimientos.uncategorizedChip", { n: state.uncategorizedCount })}</button>`
-      : "";
-
-    container.innerHTML = `
-      <header class="screen-header" style="flex-direction:row;align-items:flex-start;justify-content:space-between;">
-        <div style="display:flex;flex-direction:column;gap:3px;">
-          <h1 style="font: var(--t-title); letter-spacing:-.01em;">${t("common.movements")}</h1>
-          ${openPeriod ? `<span style="font:var(--t-label);color:var(--ink-3);">${t("inicio.header.dayOf", { period: escHtml(openPeriod.name), day: dayIndexOfPeriod(openPeriod.start_date, hoyISO()), total: expectedPeriodDays(openPeriod.start_date) })}</span>` : ""}
-        </div>
-        <button type="button" class="icon-btn" id="mov-search-toggle" aria-label="${t("movimientos.filter.toggle")}">${icon("filter")}</button>
-      </header>
-
-      ${state.searchOpen ? `
-      <label class="field field-stack" style="margin-bottom:14px;">
-        <span class="field-label">${t("movimientos.search.label")}</span>
-        <input type="text" id="mov-search-input" value="${escAttr(state.filter.query)}" placeholder="${t("movimientos.search.placeholder")}">
-      </label>` : ""}
-
-      <div class="period-picker">
-        <button type="button" id="mov-period-prev" aria-label="${t("movimientos.period.prev")}" ${periodIdx >= periods.length - 1 ? "disabled" : ""}>${icon("back", { size: 18 })}</button>
-        <div style="display:flex;align-items:center;gap:8px;">
-          ${icon("calendar", { size: 17, stroke: "var(--ink-3)" })}
-          <span style="font-size:15px;font-weight:600;color:var(--ink);">${escHtml(currentPeriod.name)}</span>
-        </div>
-        <button type="button" id="mov-period-next" aria-label="${t("movimientos.period.next")}" ${periodIdx <= 0 ? "disabled" : ""}>${icon("chevronRight", { size: 18 })}</button>
-      </div>
-
-      <div class="chips-row" style="margin-bottom:14px;">
-        <button type="button" data-chip-all class="chip${allActive ? " active" : ""}" style="padding:0 14px;">${t("movimientos.chipAll")}</button>
-        ${catChipsHtml}
-        ${uncatChipHtml}
-      </div>
-
-      ${tagChipsHtml()}
-      ${tagCardHtml()}
-
-      ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
-
-      <div id="mov-list-body">${listBodyHtml()}</div>
-      ${tagOlderNoteHtml()}
-    `;
-    wireList();
+  /** Display m (B-Movimientos): lo gastado en el periodo (spentOfPeriod, mi parte y devoluciones
+   *  restadas, como Inicio) y, si el periodo tiene límites, «de X» con el medidor de 8. */
+  function displayBlockHtml() {
+    const budget = state.budgetCents;
+    return `<div class="mov-disp">${displayHtml({
+      label: t("movimientos.display.label"),
+      value: fmtMoney(state.spentCents),
+      size: "m",
+      footHtml: budget > 0 ? t("movimientos.display.of", { amount: dispInkHtml(fmtMoney(budget)) }) : "",
+      slot: budget > 0 ? meterHtml({ value: Math.max(0, state.spentCents), max: budget, onDisplay: true, label: t("movimientos.display.meter") }) : "",
+    })}</div>`;
   }
 
-  async function changePeriod(id) {
+  /** Fila de chips (B-Movimientos): «Todos» neutro (relleno --accent al estar elegido), una por
+   *  categoría raíz presente con su muestra -b, «Sin categoría N» si hay, y la etiqueta activa
+   *  (si la hay) para poder quitarla de un toque. Selección única, como siempre. */
+  function chipsRowHtml() {
+    const f = state.filter;
+    const activeTag = f.tagId ? state.tagTotalsAll.find((tg) => tg.id === f.tagId) : null;
+    const others = [
+      ...presentRootCats().map((id) => rootChipHtml(id, f.rootCatId === id)),
+      state.uncategorizedCount > 0 ? uncatChipHtml(f.uncat) : "",
+      activeTag ? tagChipHtml(activeTag, true) : "",
+    ].filter(Boolean);
+    // Sin nada que elegir (periodo vacío), un «Todos» solo no dice nada: no se pinta la fila.
+    if (others.length === 0) return "";
+    const chips = [
+      filterChipHtml({ label: t("movimientos.chipAll"), selected: !f.rootCatId && !f.uncat, data: { chipAll: "1" } }),
+      ...others,
+    ];
+    return `<div class="mov-chips" role="group" aria-label="${escAttr(t("movimientos.filter.category"))}">${chips.join("")}</div>`;
+  }
+
+  function renderList({ focus = "" } = {}) {
+    const periodIdx = periods.findIndex((p) => p.id === state.periodId);
+    const current = periods[periodIdx] ?? periods[0];
+    const hoy = hoyISO();
+    // Subtítulo: «Día N de M, quedan K días» solo para el periodo ABIERTO que se mira
+    // (dayIndexOfPeriod cuenta desde hoy: en un periodo cerrado daría un «día 47 de 31»).
+    let subtitle = t("movimientos.header.closed");
+    if (current.status === "open") {
+      const total = expectedPeriodDays(current.start_date);
+      const day = dayIndexOfPeriod(current.start_date, hoy);
+      subtitle = t("movimientos.header.sub", { day, total, n: Math.max(0, total - day) });
+    }
+    // Índice de state.periodId en `periods` (ORDER BY start_date DESC): 0 es el más reciente.
+    // ‹ (anterior) avanza el índice hacia atrás en el tiempo → +1; › (siguiente) → -1.
+    const nothingToFilter = presentRootCats().length === 0 && state.uncategorizedCount === 0 && visibleTags(state.filter.tagId).length === 0;
+
+    container.innerHTML = `
+      <div class="mov">
+        <div class="mov-head">
+          ${rootHeaderHtml({ title: current.name, subtitle })}
+          <div class="mov-period-nav">
+            <button type="button" class="icon-btn" id="mov-period-prev" aria-label="${escAttr(t("movimientos.period.prev"))}" ${periodIdx >= periods.length - 1 ? "disabled" : ""}>${icon("chevronLeft")}</button>
+            <button type="button" class="icon-btn" id="mov-period-next" aria-label="${escAttr(t("movimientos.period.next"))}" ${periodIdx <= 0 ? "disabled" : ""}>${icon("chevronRight")}</button>
+          </div>
+        </div>
+
+        ${displayBlockHtml()}
+
+        <div class="mov-tools">
+          <label class="mov-search">
+            ${icon("search")}
+            <input type="search" id="mov-search-input" class="mov-search-input" value="${escAttr(state.filter.query)}"
+              aria-label="${escAttr(t("movimientos.search.label"))}" placeholder="${escAttr(t("movimientos.search.placeholder"))}" enterkeyhint="search" autocomplete="off">
+          </label>
+          <button type="button" class="icon-btn mov-filter-btn" id="mov-filter" aria-haspopup="dialog"
+            aria-label="${escAttr(t("movimientos.filter.toggle"))}" ${nothingToFilter ? "disabled" : ""}>${icon("filterLines")}</button>
+        </div>
+
+        ${chipsRowHtml()}
+        ${tagCardHtml()}
+
+        ${errorMsg ? `<div class="banner-aviso red">${escHtml(errorMsg)}</div>` : ""}
+
+        <div id="mov-list-body" class="mov-list">${listBodyHtml()}</div>
+        ${tagOlderNoteHtml()}
+      </div>`;
+    wireList();
+    // K12: el innerHTML se lleva el foco al <body>; se devuelve al control que se acaba de pulsar
+    // (o al primero de la lista de selectores que exista).
+    for (const sel of [focus].flat().filter(Boolean)) {
+      const el = container.querySelector(sel);
+      if (el) { el.focus(); break; }
+    }
+  }
+
+  async function changePeriod(id, focus) {
     state.periodId = id;
     // D13: tagId sobrevive a un cambio de periodo (una etiqueta es transversal, D7) — el resto
     // del filtro sí es intrínseco al periodo que se deja atrás y se resetea como siempre.
     state.filter = { query: "", rootCatId: null, uncat: false, tagId: state.filter.tagId };
-    state.searchOpen = false;
     try {
       await loadPeriodData();
     } catch (err) {
       errorMsg = t("movimientos.error.loadPeriod", { error: userMessage(err) });
     }
-    render();
+    // En un extremo el botón pulsado queda disabled y no puede recibir el foco: se da al otro.
+    renderList({ focus: [`${focus}:not(:disabled)`, ".mov-period-nav .icon-btn:not(:disabled)"] });
+  }
+
+  /** Hoja de filtros (B-Movimientos-Filtros, sheet.js) con la semántica de siempre. Trabaja sobre
+   *  un BORRADOR: «Ver N movimientos» lo aplica; el velo, Escape o el atrás del sistema lo
+   *  descartan. N cuenta las filas que dejaría el borrador (búsqueda incluida). Solo se pintan las
+   *  secciones que la lógica actual sabe filtrar (B-2, filtros múltiples, queda fuera). */
+  function openFilters() {
+    const draft = { rootCatId: state.filter.rootCatId, uncat: state.filter.uncat, tagId: state.filter.tagId };
+    let apply = false;
+    const count = () => state.rows.filter((r) => matchesFilter(r, { ...state.filter, ...draft }, byId)).length;
+
+    const bodyHtml = () => {
+      const cats = presentRootCats().map((id) => rootChipHtml(id, draft.rootCatId === id));
+      if (state.uncategorizedCount > 0) cats.push(uncatChipHtml(draft.uncat));
+      const tags = visibleTags(draft.tagId).map((tg) => tagChipHtml(tg, draft.tagId === tg.id));
+      const section = (id, title, chips) => (chips.length ? `
+        <section class="mov-flt-sec" aria-labelledby="${id}">
+          <h3 class="mov-flt-label" id="${id}">${escHtml(title)}</h3>
+          <div class="mov-flt-chips" role="group" aria-labelledby="${id}">${chips.join("")}</div>
+        </section>` : "");
+      return `
+        ${section("mov-flt-cat", t("movimientos.filter.category"), cats)}
+        ${section("mov-flt-tag", t("movimientos.filter.tag"), tags)}
+        <div class="mov-flt-foot">${buttonHtml({ kind: "primary", id: "mov-flt-apply", label: t("movimientos.filter.apply", { n: count() }) })}</div>`;
+    };
+
+    const dlg = showSheet({
+      title: t("movimientos.filter.title"),
+      action: buttonHtml({ kind: "tertiary", id: "mov-flt-clear", label: t("movimientos.filter.clear") }),
+      body: bodyHtml(),
+    });
+    if (!dlg) return;
+    dlg.classList.add("mov-flt");
+    const body = dlg.querySelector(".sheet-body");
+
+    const repaint = (focus) => {
+      body.innerHTML = bodyHtml();
+      wireSheet();
+      if (focus) dlg.querySelector(focus)?.focus();
+    };
+    function wireSheet() {
+      body.querySelectorAll("[data-chip-cat]").forEach((b) => {
+        b.onclick = () => {
+          const id = b.dataset.chipCat;
+          draft.rootCatId = draft.rootCatId === id ? null : id;
+          draft.uncat = false;
+          repaint(`[data-chip-cat="${id}"]`);
+        };
+      });
+      const uncat = body.querySelector("[data-chip-uncat]");
+      if (uncat) uncat.onclick = () => {
+        draft.uncat = !draft.uncat;
+        if (draft.uncat) draft.rootCatId = null;
+        repaint("[data-chip-uncat]");
+      };
+      body.querySelectorAll("[data-chip-tag]").forEach((b) => {
+        b.onclick = () => {
+          const id = b.dataset.chipTag;
+          draft.tagId = draft.tagId === id ? null : id;
+          repaint(`[data-chip-tag="${id}"]`);
+        };
+      });
+      body.querySelector("#mov-flt-apply").onclick = () => { apply = true; goBack(); };
+    }
+    dlg.querySelector("#mov-flt-clear").onclick = () => {
+      draft.rootCatId = null;
+      draft.uncat = false;
+      draft.tagId = null;
+      repaint("");
+    };
+    wireSheet();
+    // Tras el "close" de sheet.js (que ya devolvió el foco al botón «Filtrar»): mientras la hoja
+    // sigue abierta el resto de la página es inerte, así que el repintado espera a este momento.
+    dlg.addEventListener("close", () => {
+      if (!apply) return;
+      Object.assign(state.filter, draft);
+      renderList({ focus: "#mov-filter" });
+    });
   }
 
   function wireList() {
-    // Los botones ya llegan `disabled` en el extremo correspondiente (ver renderList): un botón
-    // disabled no dispara click, así que no hace falta repetir aquí la comprobación de índice.
+    // Los botones ya llegan `disabled` en el extremo correspondiente: un botón disabled no dispara
+    // click, así que no hace falta repetir aquí la comprobación de índice.
     container.querySelector("#mov-period-prev").onclick = () => {
       const idx = periods.findIndex((p) => p.id === state.periodId);
-      if (idx < periods.length - 1) changePeriod(periods[idx + 1].id);
+      if (idx < periods.length - 1) changePeriod(periods[idx + 1].id, "#mov-period-prev");
     };
     container.querySelector("#mov-period-next").onclick = () => {
       const idx = periods.findIndex((p) => p.id === state.periodId);
-      if (idx > 0) changePeriod(periods[idx - 1].id);
+      if (idx > 0) changePeriod(periods[idx - 1].id, "#mov-period-next");
     };
 
-    const searchToggle = container.querySelector("#mov-search-toggle");
-    if (searchToggle) searchToggle.onclick = () => {
-      const opening = !state.searchOpen;
-      state.searchOpen = opening;
-      // cerrar sin limpiar dejaría un filtro activo invisible (el input desaparece pero
-      // filter.query seguiría filtrando la lista sin ninguna pista de por qué).
-      if (!opening) state.filter.query = "";
-      render();
-      if (opening) container.querySelector("#mov-search-input")?.focus();
-    };
-
-    const searchInput = container.querySelector("#mov-search-input");
-    if (searchInput) searchInput.oninput = (e) => {
+    container.querySelector("#mov-search-input").oninput = (e) => {
       state.filter.query = e.target.value;
-      // NO se llama a render() aquí (perdería el foco/cursor del input mientras se escribe, mismo
-      // motivo que el oninput de #mov-raw en wireDetail): se refresca solo #mov-list-body.
+      // NO se repinta la pantalla (perdería el foco/cursor del campo): solo #mov-list-body.
       refreshListBody();
     };
+
+    container.querySelector("#mov-filter").onclick = () => openFilters();
 
     const chipAll = container.querySelector("[data-chip-all]");
     if (chipAll) chipAll.onclick = () => {
       state.filter.rootCatId = null;
       state.filter.uncat = false;
-      render();
+      renderList({ focus: "[data-chip-all]" });
     };
 
-    container.querySelectorAll("[data-chip-cat]").forEach((b) => {
+    container.querySelectorAll(".mov-chips [data-chip-cat]").forEach((b) => {
       b.onclick = () => {
         const id = b.dataset.chipCat;
-        // tocar la chip ya activa vuelve a «Todos» (mismo toggle que ya tenía "Sin categoría").
+        // tocar el chip ya activo vuelve a «Todos» (mismo toggle que «Sin categoría»).
         state.filter.rootCatId = state.filter.rootCatId === id ? null : id;
         state.filter.uncat = false;
-        render();
+        renderList({ focus: `.mov-chips [data-chip-cat="${id}"]` });
       };
     });
 
-    const chipUncat = container.querySelector("[data-chip-uncat]");
+    const chipUncat = container.querySelector(".mov-chips [data-chip-uncat]");
     if (chipUncat) chipUncat.onclick = () => {
       state.filter.uncat = !state.filter.uncat;
       if (state.filter.uncat) state.filter.rootCatId = null;
-      render();
+      renderList({ focus: ".mov-chips [data-chip-uncat]" });
     };
 
-    // Chips de etiqueta (Task 12): filtro independiente de categoría/sin-categoría — se combinan
-    // con AND en matchesFilter, ninguno toca al otro. Tocar la ya activa vuelve a "Todas" (mismo
-    // toggle que la chip "Sin categoría"); no hay chip "Todas" propia de esta fila.
-    container.querySelectorAll("[data-chip-tag]").forEach((b) => {
-      b.onclick = () => {
-        const id = b.dataset.chipTag;
-        state.filter.tagId = state.filter.tagId === id ? null : id;
-        render();
-      };
-    });
+    // Chip de la etiqueta activa: tocarlo quita el filtro de etiqueta (se elige en la hoja).
+    const chipTag = container.querySelector(".mov-chips [data-chip-tag]");
+    if (chipTag) chipTag.onclick = () => {
+      state.filter.tagId = null;
+      renderList({ focus: ["[data-chip-all]", "#mov-filter"] });
+    };
 
     wireListBody();
   }
