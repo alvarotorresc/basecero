@@ -315,14 +315,17 @@ export function columnsHtml(days, { label = "", labels = true, restFam = null } 
  *  @param {string} [o.text]
  *  @param {number} [o.rows]       Filas fantasma (0-3). Por defecto 2.
  *  @param {boolean} [o.arrow]
+ *  @param {number} [o.arrowHeight]  Largo de la flecha en px (entero 40-200). Por defecto 72; B-Inicio-
+ *                                 Vacio la baja 120, hasta el botón de añadir. Fuera de rango, 72.
  *  @returns {string} HTML */
-export function emptyStateHtml({ title, text = "", rows = 2, arrow = false }) {
+export function emptyStateHtml({ title, text = "", rows = 2, arrow = false, arrowHeight = 72 }) {
   const n = Math.max(0, Math.min(3, rows | 0));
   const ghosts = Array.from({ length: n }, (_, i) => `<div class="ghost-row${i ? " is-faded" : ""}">`
     + `<span class="ghost ghost-ico"></span><span class="ghost-lines"><span class="ghost ghost-l1"></span><span class="ghost ghost-l2"></span></span>`
     + `<span class="ghost ghost-amt"></span></div>`).join("");
+  const ah = Number.isInteger(arrowHeight) && arrowHeight >= 40 && arrowHeight <= 200 ? arrowHeight : 72;
   const flecha = arrow
-    ? `<svg class="empty-arrow" width="40" height="72" viewBox="0 0 40 72" aria-hidden="true"><path d="M20 2 L20 64" stroke-dasharray="3 5"></path><path d="M13 57 L20 65 L27 57"></path></svg>`
+    ? `<svg class="empty-arrow" width="40" height="${ah}" viewBox="0 0 40 ${ah}" aria-hidden="true"><path d="M20 2 L20 ${ah - 8}" stroke-dasharray="3 5"></path><path d="M13 ${ah - 15} L20 ${ah - 7} L27 ${ah - 15}"></path></svg>`
     : "";
   return `<div class="empty">
     ${n ? `<div class="ghost-rows" aria-hidden="true">${ghosts}</div>` : ""}

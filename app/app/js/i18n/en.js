@@ -192,7 +192,6 @@ export const EN = {
       lastMovements: "Latest transactions",
       emptyTitle: "No transactions yet",
       emptyText: "Log your first expense with the button below.",
-      yesterday: "Yesterday",
       weekdayShort: { 0: "Sun", 1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat" },
       renewalTitle: "{name} renews on {date}",
       renewalAsk: "Still using it?",

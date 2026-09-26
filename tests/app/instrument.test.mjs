@@ -366,3 +366,17 @@ test("columnsHtml: restFam pinta los días que no son hoy en la barra de esa fam
   assert.doesNotMatch(columnsHtml(days, { restFam: "nada" }), /has-rest-fam/);
   assert.equal(decl(".col.has-rest-fam .col-bar", "background"), "var(--fb)");
 });
+
+test("emptyStateHtml: arrowHeight alarga la flecha (B-Inicio-Vacio, 120) y por defecto sigue en 72", () => {
+  const def = emptyStateHtml({ title: "x", arrow: true });
+  assert.match(def, /<svg class="empty-arrow" width="40" height="72" viewBox="0 0 40 72"/);
+  assert.match(def, /d="M20 2 L20 64"/);
+  assert.match(def, /d="M13 57 L20 65 L27 57"/);
+  const larga = emptyStateHtml({ title: "x", arrow: true, arrowHeight: 120 });
+  assert.match(larga, /height="120" viewBox="0 0 40 120"/);
+  assert.match(larga, /d="M20 2 L20 112"/);
+  assert.match(larga, /d="M13 105 L20 113 L27 105"/);
+  for (const bad of [10, 500, 12.5, "120", NaN]) {
+    assert.match(emptyStateHtml({ title: "x", arrow: true, arrowHeight: bad }), /height="72"/, String(bad));
+  }
+});

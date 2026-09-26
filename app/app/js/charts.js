@@ -129,7 +129,9 @@ export function periodChartSvg({ days, today, values = null, max = 0, todayLabel
     + `<polygon class="disp-chart-line is-area" points="${area}" fill-opacity="0.12"></polygon>`
     + `<polyline class="disp-chart-line" points="${line}" fill="none" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"></polyline>`
     + `<circle class="disp-today" cx="${lastX}" cy="${lastY}" r="4.5" stroke-width="3"></circle>`
-    + label(nearEnd ? lastX - 11 : lastX + 11, r2(lastY + 4), todayLabel, nearEnd ? "end" : "start")
+    // El rótulo va a la altura del punto, sin bajar del cero: con la línea a sangre (Inicio, el
+    // Display recorta por abajo) un punto en el suelo no se lleva el «hoy» fuera del panel.
+    + label(nearEnd ? lastX - 11 : lastX + 11, r2(Math.min(lastY + 4, BURN.BOTTOM)), todayLabel, nearEnd ? "end" : "start")
     + (nearEnd ? "" : label(width - PERIOD_PAD, BURN.BOTTOM - 8, endLabel, "end"))
     + `</svg></div>`;
 }
