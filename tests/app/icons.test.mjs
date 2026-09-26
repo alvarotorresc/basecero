@@ -21,7 +21,10 @@ test("icons: los paths críticos son los de SISTEMA.md §3, verbatim", () => {
 test("icons: el repertorio cubre todo lo que emite la app", () => {
   for (const name of ["back", "close", "chevronRight", "chevronDown", "plus", "minus", "check",
     "warn", "tag", "calendar", "download", "trash", "pencil", "repeat", "filter", "lock",
-    "trendUp", "trendDown", "camera", "mic", "drag", "file", "transfer"]) {
+    "trendUp", "trendDown", "camera", "mic", "drag", "file", "transfer",
+    // Filas de Ajustes (S4, B-Ajustes)
+    "people", "split", "periodNext", "theme", "bolt", "currency", "format", "globe", "screen",
+    "grid", "table", "bank", "chart"]) {
     assert.ok(ICON_PATHS[name], `falta el icono ${name}`);
   }
 });
