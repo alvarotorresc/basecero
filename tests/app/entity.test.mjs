@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   tileHtml, pickTileHtml, badgeHtml, chosenCategoryHtml, filterChipHtml,
-  txRowHtml, settingRowHtml, dayHeaderHtml, sectionHeaderHtml, familySwatchesHtml,
+  txRowHtml, settingRowHtml, dayHeaderHtml, sectionHeaderHtml, familySwatchesHtml, famNumHtml,
 } from "../../app/app/js/entity.js";
 
 const AMOUNT = '12,50<span class="money-cents"></span><span class="money-cur"> €</span>';
@@ -201,4 +201,66 @@ test("pickTileHtml: expanded pone aria-expanded solo si es booleano (desplegar n
   assert.match(pickTileHtml({ fam: "res", label: "Restauración", expanded: false }), /aria-expanded="false"/);
   assert.doesNotMatch(pickTileHtml({ fam: "res", label: "Restauración" }), /aria-expanded/);
   assert.match(pickTileHtml({ fam: "res", label: "Restauración", expanded: true }), /aria-pressed="false"/);
+});
+
+// ---- Variantes de fidelidad al mockup (2026-09-27) ----------------------------------------
+
+test("tileHtml: filled rellena con el sólido -b y el icono en --on-fam; sin familia, neutra; por defecto, no", () => {
+  assert.doesNotMatch(tileHtml({ fam: "tra", icon: "casa" }), /ent-tile-filled/);
+  assert.match(tileHtml({ fam: "tra", icon: "casa", size: 32, filled: true }), /class="ent-tile ent-tile-32 fam-tra ent-tile-filled"/);
+  assert.match(tileHtml({ fam: "tra", filled: true, onTint: true }), /class="ent-tile fam-tra ent-tile-filled"/, "filled gana a onTint");
+  assert.match(tileHtml({ filled: true }), /class="ent-tile ent-neutral"/);
+  assert.equal(decl(".ent-tile.ent-tile-filled", "background"), "var(--fb)");
+  assert.equal(decl(".ent-tile.ent-tile-filled", "color"), "var(--on-fam)");
+});
+
+test("settingRowHtml: tileFilled y valueInFam (grupos del original de B-Ajustes); por defecto, nada", () => {
+  const base = settingRowHtml({ icon: "casa", fam: "tra", label: "Reparto", value: "50 %" });
+  assert.doesNotMatch(base, /ent-tile-filled|is-fam-ink/);
+  const html = settingRowHtml({ icon: "casa", fam: "tra", label: "Reparto", value: "50 %", valueNum: true, tileFilled: true, valueInFam: true });
+  assert.match(html, /ent-tile-filled/);
+  assert.match(html, /class="ent-set-value num fam-tra is-fam-ink">50 %/);
+  assert.doesNotMatch(settingRowHtml({ label: "x", value: "1", valueInFam: true }), /is-fam-ink/, "sin fam no hay -x");
+  assert.equal(decl(".ent-set-value.is-fam-ink", "color"), "var(--fx)");
+});
+
+test("chosenCategoryHtml: variant pick (B-Gasto) y detail (B-Movimiento-Detalle) con borde -b y su jerarquía", () => {
+  const base = chosenCategoryHtml({ fam: "res", name: "Bares", path: "Restauración" });
+  assert.doesNotMatch(base, /ent-chosen-/);
+  const pick = chosenCategoryHtml({ fam: "res", name: "Restauración › Bares y cafés", path: "La que usas en Bar Pepe", variant: "pick" });
+  assert.match(pick, /class="ent-chosen ent-chosen-pick fam-res"/);
+  assert.ok(pick.indexOf("ent-name") < pick.indexOf("ent-line2"), "pick: nombre arriba");
+  const det = chosenCategoryHtml({ fam: "res", name: "Bares y cafés", path: "Restauración", variant: "detail", id: "cat" });
+  assert.match(det, /class="ent-chosen ent-chosen-detail fam-res" id="cat"/);
+  assert.ok(det.indexOf("ent-line2") < det.indexOf("ent-name"), "detail: ruta arriba");
+  assert.doesNotMatch(chosenCategoryHtml({ fam: "res", name: "x", variant: "otra" }), /ent-chosen-/);
+  assert.equal(decl(".ent-chosen-pick", "border"), "1px solid var(--fb)");
+  assert.equal(decl(".ent-chosen-detail .ent-name", "font-size"), "var(--fs-17)");
+  assert.equal(decl(".ent-chosen-pick .ent-name", "font-weight"), "700");
+});
+
+test("txRowHtml: height 52 y amountWeight 500 (B-Home); por defecto, 60 y 600", () => {
+  const base = txRowHtml({ fam: "ali", title: "Mercadona", amountHtml: AMOUNT });
+  assert.doesNotMatch(base, /ent-row-52|ent-row-w500/);
+  assert.match(txRowHtml({ fam: "ali", title: "M", amountHtml: AMOUNT, height: 52, amountWeight: 500 }), /class="ent-row ent-row-52 ent-row-w500 fam-ali"/);
+  assert.equal(decl(".ent-row.ent-row-52", "min-height"), "52px");
+  assert.equal(decl(".ent-row.ent-row-w500 .ent-amount", "font-weight"), "500");
+});
+
+test("sectionHeaderHtml: fam (texto -x; en grupo, Unbounded), ttl y dim; por defecto, sin modificadores", () => {
+  assert.equal(sectionHeaderHtml({ title: "Activas" }).includes("is-"), false);
+  assert.match(sectionHeaderHtml({ title: "Activas", fam: "sus" }), /class="ent-sec ent-sec-title fam-sus is-fam"/);
+  assert.match(sectionHeaderHtml({ title: "Periodo", level: "group", fam: "tra" }), /class="ent-sec ent-sec-group fam-tra is-fam is-ttl"/);
+  assert.match(sectionHeaderHtml({ title: "A tu favor", level: "group", ttl: true }), /class="ent-sec ent-sec-group is-ttl"/);
+  assert.match(sectionHeaderHtml({ title: "Archivadas", dim: true }), /class="ent-sec ent-sec-title is-dim"/);
+  assert.doesNotMatch(sectionHeaderHtml({ title: "x", fam: "nada" }), /is-fam/);
+  assert.equal(decl(".ent-sec.is-fam .ent-sec-text", "color"), "var(--fx)");
+  assert.equal(decl(".ent-sec-group.is-ttl .ent-sec-text", "font-family"), "var(--font-display)");
+});
+
+test("famNumHtml: cifra mono en -x de su familia, escapada; familia desconocida, en tinta", () => {
+  assert.equal(famNumHtml("−4.300,00 €", "coc"), '<span class="num ent-fam-num fam-coc is-fam-ink">−4.300,00 €</span>');
+  assert.equal(famNumHtml("<b>", "nada"), '<span class="num ent-fam-num">&lt;b&gt;</span>');
+  assert.match(famNumHtml("1.250", "imp", { weight: 600 }), /is-w600/);
+  assert.equal(decl(".ent-fam-num.is-fam-ink", "color"), "var(--fx)");
 });

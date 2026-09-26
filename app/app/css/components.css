@@ -786,6 +786,9 @@ circle.disp-today { fill: var(--disp-text); stroke: var(--disp); }
 .ent-tile-32 { width: 32px; height: 32px; }
 .ent-tile.ent-neutral { background: var(--well); color: var(--text); }
 .ent-tile.ent-on-tint { background: var(--chip); }
+/* Rellena (tileHtml `filled`, B-Ajustes/B-Categorias): el sólido -b con el icono en --on-fam.
+   F-08/F-39 retiradas (Álvaro 2026-09-27: igual que el mockup). */
+.ent-tile.ent-tile-filled { background: var(--fb); color: var(--on-fam); }
 
 /* --- Baldosa seleccionable (§9, B-Gasto): 56, tinte, icono --fx, nombre 13/600 --text. --- */
 .ent-pick {
@@ -856,6 +859,17 @@ circle.disp-today { fill: var(--disp-text); stroke: var(--disp); }
 button.ent-chosen { cursor: pointer; }
 .ent-chosen.ent-neutral { background: var(--well); }
 .ent-chosen.ent-neutral .ent-line2 { color: var(--text-dim); }
+/* Variantes del mockup (chosenCategoryHtml `variant`; F-42 retirada, Álvaro 2026-09-27): borde 1px
+   en el sólido de la familia. «pick» (B-Gasto): relleno 10 12, nombre 15/700. «detail»
+   (B-Movimiento-Detalle): ruta 13/600 -x arriba y nombre 17/700 debajo. */
+.ent-chosen-pick,
+.ent-chosen-detail { border: 1px solid var(--fb); }
+.ent-chosen-pick { padding: 10px var(--sp-12); }
+.ent-chosen-pick .ent-name { font-weight: 700; }
+.ent-chosen-detail .ent-line2 { font-size: var(--fs-13); font-weight: 600; }
+.ent-chosen-detail .ent-name { font-size: var(--fs-17); font-weight: 700; }
+.ent-chosen-pick.ent-neutral,
+.ent-chosen-detail.ent-neutral { border-color: transparent; }
 
 /* --- Chip de filtro (§9, B-Movimientos-Filtros): 44 píldora. Con familia: tinte + muestra 10
    --fb + 14/600 --text; neutro: --raised 14/500; etiqueta: + borde e icono (C10). --- */
@@ -937,6 +951,10 @@ button.ent-chosen { cursor: pointer; }
 .ent-amount .money-cents,
 .ent-amount .money-cur { font-size: inherit; color: inherit; margin-left: 0; }
 .ent-amount-note { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+/* Fila de 52 y cifra a 500 (txRowHtml `height:52` / `amountWeight:500`; B-Home, B-Movimientos,
+   B-Cuenta, B-Semana; F-34 retirada, Álvaro 2026-09-27). */
+.ent-row.ent-row-52 { min-height: 52px; padding-top: var(--sp-4); padding-bottom: var(--sp-4); }
+.ent-row.ent-row-w500 .ent-amount { font-weight: 500; }
 /* Sin familia (ingreso, sin categoría): la línea 2 en dim aunque la fila cuelgue de un contenedor
    con familia (no hereda su --fx), como .ent-chosen.ent-neutral. */
 .ent-row.ent-neutral .ent-line2 { color: var(--text-dim); }
@@ -985,6 +1003,13 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
 }
 .ent-set-value { flex: none; font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); }
 .ent-set-value.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+/* Valor en el -x de su familia (settingRowHtml `valueInFam`; I-61 retirada fuera de lo aprobado). */
+.ent-set-value.is-fam-ink { color: var(--fx); }
+/* Cifra suelta en su familia (entity.js#famNumHtml): mono, hereda tamaño y peso salvo que se pida. */
+.ent-fam-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.ent-fam-num.is-fam-ink { color: var(--fx); }
+.ent-fam-num.is-w500 { font-weight: 500; }
+.ent-fam-num.is-w600 { font-weight: 600; }
 .ent-chev { flex: none; display: flex; color: var(--text-dim); }
 
 /* --- Cabecera de día (§9): 24; «Hoy» 13/700 + fecha 13/500 dim; total mono 14/600. Sin familia. --- */
@@ -1028,6 +1053,12 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
 .ent-sec-group { padding: 0 var(--sp-4); }
 .ent-sec-group .ent-sec-text { font-family: var(--font-body); font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }
 .ent-sec-count { font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+/* Variantes del mockup (sectionHeaderHtml `fam`/`ttl`/`dim`; F-37 y el encabezado de F-08
+   retirados, Álvaro 2026-09-27): texto en -x; el grupo en Unbounded 13 como en B-Ajustes. */
+.ent-sec.is-fam .ent-sec-text { color: var(--fx); }
+.ent-sec-group.is-ttl .ent-sec-text { font-family: var(--font-display); font-weight: 700; letter-spacing: -.01em; }
+.ent-sec-group.is-ttl:not(.is-fam) .ent-sec-text { color: var(--text); }
+.ent-sec.is-dim .ent-sec-text { color: var(--text-dim); }
 
 /* ===== Hoja inferior, aviso y toast (PR-09) ===== */
 
