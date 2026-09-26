@@ -39,8 +39,9 @@ function movRowHtml(r, byId, partnerName) {
   const parent = cat?.parent_id ? byId[cat.parent_id] : null;
   const path = !cat ? t("semana.uncategorized") : parent ? `${parent.name} › ${cat.name}` : cat.name;
   const isExpense = r.type === "expense";
-  // C9: los ingresos y «sin categoría» van sin familia (--well, icono en tinta).
-  const fam = isExpense && cat ? familyForCategory(r.category_id, byId) : null;
+  // C9: los ingresos y «sin categoría» van sin familia (--well, icono en tinta). Una devolución
+  // lleva la familia de su categoría de gasto, como en Movimientos e Inicio.
+  const fam = (isExpense || r.type === "refund") && cat ? familyForCategory(r.category_id, byId) : null;
   const shareNote = !r.is_shared ? ""
     : r.paid_by === "partner"
       ? t("movimientos.row.partnerPaid", { name: partnerName || t("movimientos.shared.fallbackName"), amount: fmtMoney(r.my_amount_cents) })
