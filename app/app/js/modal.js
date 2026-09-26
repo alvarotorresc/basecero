@@ -122,8 +122,13 @@ export function createModal(doc, { pushBack, goBack, win, wait = (ms, fn) => set
       // showModal() va ANTES que esto: si pushBack lanza, el diálogo ya está abierto y Cancelar
       // debe poder cerrarlo igual (arriba, con pushed=false, sin tocar goBack()).
       try { pushBack(() => { byBack = true; requestClose(); }, { scroll: false, chrome: false }); pushed = true; } catch {}
-      dlg.querySelector("#modal-cancel").onclick = () => requestClose();
-      dlg.querySelector("#modal-confirm").onclick = () => { confirmed = true; requestClose(); };
+      // El guard `closing` va TAMBIÉN aquí, no solo dentro de requestClose(): con la animación de
+      // salida, el <dialog> sigue abierto (y sus botones, tocables) durante 180ms. Sin este guard,
+      // Cancelar y luego Borrar dentro de esa ventana pondría confirmed=true DESPUÉS de que
+      // requestClose() ya hubiera empezado a cerrar por Cancelar — y el cierre real acabaría
+      // ejecutando onConfirm() aunque la primera acción hubiera sido cancelar.
+      dlg.querySelector("#modal-cancel").onclick = () => { if (closing) return; requestClose(); };
+      dlg.querySelector("#modal-confirm").onclick = () => { if (closing) return; confirmed = true; requestClose(); };
       dlg.querySelector("#modal-cancel").focus();
       return dlg;
     },

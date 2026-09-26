@@ -995,19 +995,35 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   background: var(--surface);
   box-shadow: var(--sh-sheet);
+  /* El navegador pone overflow:auto en dialog:modal (para que el <dialog> entero haga scroll si no
+     cabe): lo anulamos porque el scroll real tiene que quedarse dentro de .sheet-body, no arrastrar
+     el asa y la cabecera con él (ver [open] más abajo). */
+  overflow: hidden;
   animation: bc-sheet-in 250ms ease-out;
 }
-.sheet.is-leaving { animation: bc-sheet-out 180ms ease-in forwards; }
+/* display:flex en el propio <dialog> (no en .sheet-content vía height:100%, que NO resuelve contra
+   el alto recortado por max-height — un alto "fit-content" cuenta como "no explícito" a efectos de
+   porcentajes, CSS2.1 §10.5 — así que un height:100% en el hijo se quedaría en auto y el scroll
+   recaería en el <dialog> entero). Con flex-direction:column, .sheet-content (su único hijo, con
+   flex:1;min-height:0) se reparte exactamente el alto ya recortado del <dialog>, y solo su propio
+   .sheet-body hace scroll. Con [open]: si el <dialog> no estuviera abierto, manda dialog:not([open])
+   {display:none} del navegador, no esto. */
+.sheet[open] { display: flex; flex-direction: column; }
+/* pointer-events:none: durante los 180ms de salida el <dialog> sigue abierto (y tocable) —
+   sin esto, un segundo toque ahí dentro podría disparar una acción aunque la hoja ya se esté yendo. */
+.sheet.is-leaving { animation: bc-sheet-out 180ms ease-in forwards; pointer-events: none; }
 .sheet::backdrop { background: var(--scrim); animation: bc-fade-in 250ms ease-out; }
 .sheet.is-leaving::backdrop { animation: bc-fade-out 180ms ease-in forwards; }
 @keyframes bc-sheet-in { from { transform: translateY(100%); } }
 @keyframes bc-sheet-out { to { transform: translateY(100%); } }
 
-/* height:100% resuelve contra el alto de .sheet: auto si el contenido cabe, max-height si no —
-   así .sheet-body puede repartirse lo que sobre y hacer scroll solo él. */
+/* flex:1;min-height:0 (no height:100%, ver el comentario de .sheet[open]): se reparte el alto que
+   el <dialog> ya tenga (intrínseco si el contenido cabe, recortado a max-height si no), y dentro,
+   .sheet-body es quien hace scroll — el asa y la cabecera (flex:none) se quedan fijos arriba. */
 .sheet-content {
   box-sizing: border-box;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   padding: var(--sp-8) var(--sp-16) calc(var(--sp-24) + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
@@ -1043,6 +1059,13 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
   bottom: var(--sp-8);
   top: auto;
   margin: 0;
+  /* El navegador da al <dialog> width:fit-content y a dialog:modal max-width:calc(100% - 6px - 2em):
+     sin anularlos, left+right (arriba) quedan sobreconstreñidos y el navegador ignora uno de los
+     dos — el aviso saldría encogido a su contenido y pegado a un lado, no estirado de borde a
+     borde con 8px de margen. width:auto (con left, right y margin ya fijos) sí activa el reparto
+     de CSS2.1 §10.3.7: el ancho se calcula para llenar exactamente ese hueco. */
+  width: auto;
+  max-width: none;
   padding: 0;
   border: 0;
   border-radius: var(--radius-xl);
@@ -1050,7 +1073,10 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
   box-shadow: var(--sh-alert);
   animation: bc-modal-in 250ms ease-out;
 }
-.modal.is-leaving { animation: bc-modal-out 180ms ease-in forwards; }
+/* pointer-events:none: durante los 180ms de salida el <dialog> sigue abierto (y tocable) — sin
+   esto, un segundo toque en Cancelar/Borrar dentro de esa ventana podría alcanzarlos igual (el
+   guard `closing` de modal.js ya lo bloquea en lógica; esto lo bloquea también en el toque). */
+.modal.is-leaving { animation: bc-modal-out 180ms ease-in forwards; pointer-events: none; }
 .modal::backdrop { background: var(--scrim); animation: bc-fade-in 250ms ease-out; }
 .modal.is-leaving::backdrop { animation: bc-fade-out 180ms ease-in forwards; }
 @keyframes bc-modal-in { from { opacity: 0; transform: scale(.96); } }
@@ -1135,7 +1161,9 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
   transform: translateX(-50%) translateY(var(--sp-8));
   transition: opacity .18s ease, transform .18s ease;
 }
-body.subscreen #toast { bottom: calc(var(--sp-16) + env(safe-area-inset-bottom, 0px)); }
+/* body.subscreen (subpantalla abierta) y body.onboarding (asistente inicial) esconden la tabbar
+   por caminos distintos (back.js / app.css) — ninguno de los dos deja tab bar que esquivar. */
+body.subscreen #toast, body.onboarding #toast { bottom: calc(var(--sp-16) + env(safe-area-inset-bottom, 0px)); }
 #toast.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
 @media (prefers-reduced-motion: reduce) {
   #toast { transition: opacity .12s linear; }

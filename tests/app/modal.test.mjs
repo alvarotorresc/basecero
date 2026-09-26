@@ -243,6 +243,30 @@ test("clic dentro del contenido (target !== dlg): NO cierra", () => {
   assert.equal(dlg.open, true);
 });
 
+test("cancelar y luego tocar Borrar DENTRO de la ventana de animación: NO confirma (el guard va también en los onclick, no solo en requestClose)", () => {
+  const pendientes = [];
+  const { doc, calls, modal } = harness({ wait: (ms, fn) => pendientes.push(fn) });
+  let hecho = 0;
+  const dlg = modal.confirm({ ...OPTS, onConfirm: () => { hecho += 1; } });
+  dlg.querySelector("#modal-cancel").onclick();     // empieza a cerrar (is-leaving, wait pendiente)
+  dlg.querySelector("#modal-confirm").onclick();    // toque tardío mientras se desvanece
+  assert.equal(pendientes.length, 1, "el segundo onclick no reprograma un cierre nuevo");
+  pendientes[0]();                                  // termina la animación → cierre real
+  assert.equal(hecho, 0, "la primera acción fue cancelar: no debe confirmar");
+  assert.deepEqual(calls, ["pushBack", "goBack"]);
+});
+
+test("confirmar y luego tocar Cancelar dentro de la ventana de animación: SÍ confirma (gana la primera acción)", () => {
+  const pendientes = [];
+  const { modal } = harness({ wait: (ms, fn) => pendientes.push(fn) });
+  let hecho = 0;
+  const dlg = modal.confirm({ ...OPTS, onConfirm: () => { hecho += 1; } });
+  dlg.querySelector("#modal-confirm").onclick();
+  dlg.querySelector("#modal-cancel").onclick();
+  pendientes[0]();
+  assert.equal(hecho, 1);
+});
+
 test("requestClose es idempotente: un segundo disparo (Escape tras el clic en el velo) no reprograma el cierre", () => {
   const pendientes = [];
   const { modal } = harness({ wait: (ms, fn) => pendientes.push(fn) });
