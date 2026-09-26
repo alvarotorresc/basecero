@@ -247,6 +247,248 @@
 /* ===== Instrumento: Display, LED, bento, barras, medidor (PR-07) ===== */
 
 /* ===== Entidad: baldosas, ficha, filas, chips, cabeceras (PR-08) ===== */
+/* Marcado en js/entity.js. Prefijo único .ent-* (las clases viejas .tx-*, .chip, .list-row… siguen
+   en app.css para las pantallas sin migrar). La familia llega como .fam-<k> y aquí solo se leen
+   --ft (tinte), --fb (barra/muestra) y --fx (icono y texto pequeño que la nombra), C6. Sin familia
+   (.ent-neutral: ingreso, «sin categoría», lo que no es entidad) → --well y tinta (C9, C11).
+   Alturas MÍNIMAS: con la letra al 200 % la pieza crece en vez de recortar. */
+
+/* --- Baldosa de icono (§9): 40 / 32, radio 10, tinte + icono --fx; sobre tinte --chip. --- */
+.ent-tile {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  background: var(--ft);
+  color: var(--fx);
+}
+.ent-tile-32 { width: 32px; height: 32px; }
+.ent-tile.ent-neutral { background: var(--well); color: var(--text); }
+.ent-tile.ent-on-tint { background: var(--chip); }
+
+/* --- Baldosa seleccionable (§9, B-Gasto): 56, tinte, icono --fx, nombre 13/600 --text. --- */
+.ent-pick {
+  min-width: 0;
+  min-height: 56px;
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--ft);
+  color: var(--fx);
+  font-family: var(--font-body);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  text-align: center;
+  cursor: pointer;
+}
+.ent-pick svg { flex: none; }
+.ent-pick-label { max-width: 100%; color: var(--text); overflow-wrap: anywhere; }
+.ent-pick.ent-neutral { background: var(--well); color: var(--text); }
+/* Seleccionado (§9): sobre tinte, anillo --ring-sel + 700; sobre neutro, relleno --accent. */
+.ent-pick[aria-pressed="true"] { box-shadow: var(--ring-sel); font-weight: 700; }
+.ent-pick.ent-neutral[aria-pressed="true"] { box-shadow: none; background: var(--accent); color: var(--on-accent); }
+.ent-pick.ent-neutral[aria-pressed="true"] .ent-pick-label { color: var(--on-accent); }
+
+/* --- Ficha (§9, B-Importar): 28 píldora, estática; tinte + icono 14 y texto 12/600 --fx.
+   Ingreso (C9): --well sin borde, tinta. Etiqueta (C10): --raised con borde. --- */
+.ent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  max-width: 100%;
+  min-height: 28px;
+  padding: 0 var(--sp-12) 0 var(--sp-8);
+  border-radius: var(--radius-pill);
+  background: var(--ft);
+  color: var(--fx);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  white-space: nowrap;
+}
+.ent-badge svg { flex: none; }
+.ent-badge-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ent-badge-income { background: var(--well); color: var(--text); }
+.ent-badge-tag { background: var(--raised); color: var(--text); border: 1px solid var(--border); }
+
+/* --- Tarjeta de categoría elegida (§9, F-42): tinte, --radius-lg, SIN borde; baldosa 40 sobre
+   --chip; nombre 15/600 arriba y ruta 12/500 --fx debajo; chevron dim. --- */
+.ent-chosen {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--ft);
+  color: var(--text);
+  font-family: var(--font-body);
+  text-align: left;
+}
+button.ent-chosen { cursor: pointer; }
+.ent-chosen.ent-neutral { background: var(--well); }
+.ent-chosen.ent-neutral .ent-line2 { color: var(--text-dim); }
+
+/* --- Chip de filtro (§9, B-Movimientos-Filtros): 44 píldora. Con familia: tinte + muestra 10
+   --fb + 14/600 --text; neutro: --raised 14/500; etiqueta: + borde e icono (C10). --- */
+.ent-chip {
+  flex: none;
+  min-height: 44px;
+  padding: 0 calc(var(--sp-12) + var(--sp-2)) 0 var(--sp-12);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--ft);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-14);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ent-chip svg { flex: none; }
+.ent-swatch { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--fb); }
+.ent-chip.ent-neutral { padding: 0 calc(var(--sp-12) + var(--sp-2)); background: var(--raised); font-weight: 500; }
+.ent-chip-tag { border: 1px solid var(--border); }
+.ent-chip[aria-pressed="true"] { box-shadow: var(--ring-sel); font-weight: 700; }
+.ent-chip.ent-neutral[aria-pressed="true"] { box-shadow: none; border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+
+/* --- Fila de movimiento (§9, B-Movimientos): 60; baldosa 40 · nombre 15/600 · línea 2 12/500
+   --fx · cifra mono 15/600 en tinta, «+» en --pos (C4, C7). Pulsar: fondo, no escala. --- */
+.ent-row {
+  width: 100%;
+  min-height: 60px;
+  padding: var(--sp-8) var(--sp-12);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.ent-row:active { transform: none; background: var(--raised); }
+.ent-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.ent-name {
+  font-size: var(--fs-15);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ent-line2 {
+  font-size: var(--fs-12);
+  font-weight: 500;
+  line-height: var(--lh-title);
+  color: var(--fx, var(--text-dim));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ent-amount-col { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-2); }
+.ent-amount {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-15);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  color: var(--text);
+  white-space: nowrap;
+}
+.ent-amount.pos { color: var(--pos); }
+.ent-amount.neg { color: var(--neg); }
+/* format.js#moneyPartsHtml no se toca: aquí la cifra es plana (mismo tamaño y color). */
+.ent-amount .money-cents,
+.ent-amount .money-cur { font-size: inherit; color: inherit; margin-left: 0; }
+.ent-amount-note { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+
+/* --- Fila de ajuste (§9, B-Ajustes): 48 (60 con dos líneas); baldosa 32 opcional · etiqueta
+   15/500 · valor 15/600 --text (nunca familia, I-61) · chevron 16 dim o control. --- */
+.ent-set {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--sp-8);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  text-align: left;
+}
+button.ent-set { cursor: pointer; }
+button.ent-set:active { transform: none; background: var(--raised); }
+.ent-set-2 { min-height: 60px; }
+.ent-set-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.ent-set-label {
+  font-size: var(--fs-15);
+  font-weight: 500;
+  line-height: var(--lh-title);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ent-set-sub { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+.ent-set-value { flex: none; font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); }
+.ent-set-value.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.ent-chev { flex: none; display: flex; color: var(--text-dim); }
+
+/* --- Cabecera de día (§9): 24; «Hoy» 13/700 + fecha 13/500 dim; total mono 14/600. Sin familia. --- */
+.ent-day {
+  min-height: 24px;
+  padding: 0 var(--sp-4);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+.ent-day-label { font-size: var(--fs-13); font-weight: 700; line-height: var(--lh-title); color: var(--text); }
+.ent-day-date { font-weight: 500; color: var(--text-dim); }
+.ent-day-total {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-14);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  color: var(--text);
+  white-space: nowrap;
+}
+.ent-day-total .money-cents,
+.ent-day-total .money-cur { font-size: inherit; color: inherit; margin-left: 0; }
+
+/* --- Encabezado de sección (§9, I-42): ttl 15 --text + contador 13 dim, o 13/600 dim sobre un
+   grupo. Nunca en color de familia (C6). --- */
+.ent-sec { display: flex; align-items: baseline; gap: var(--sp-8); }
+.ent-sec-text { margin: 0; line-height: var(--lh-title); color: var(--text); }
+.ent-sec-title .ent-sec-text {
+  font-family: var(--font-display);
+  font-size: var(--fs-15);
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+.ent-sec-group { padding: 0 var(--sp-4); }
+.ent-sec-group .ent-sec-text { font-family: var(--font-body); font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }
+.ent-sec-count { font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
 
 /* ===== Hoja inferior, aviso y toast (PR-09) ===== */
 
