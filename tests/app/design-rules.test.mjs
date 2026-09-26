@@ -24,7 +24,6 @@ export const PENDIENTES = new Set([
   "js/screens/categorias.js",
   "js/screens/etiquetas.js",
   "js/screens/movimientos.js",
-  "js/screens/onboarding.js",
   "js/screens/recurrentes.js",
   "js/screens/suscripciones.js",
   // Módulos con plantilla o paleta propia, que migran con su pantalla o con su PR de fundación.
@@ -87,8 +86,11 @@ export function rC13(rel, text) {
 // R-C1 · DESIGN §5 C1: naranja solo en el primario y lo seleccionado. En JS, nunca (va por clase).
 // En CSS, la regla que lee --accent/--accent-text/--ring-sel tiene un selector de la lista blanca, y
 // --focus (que es naranja) solo se lee en :focus-visible (§11).
+// Única desviación registrada fuera de primario y seleccionado: el logo del onboarding (D-impl-5,
+// DESIGN §Desviaciones «Logo de onboarding en tokens»): es marca, no sistema, y su fondo es el
+// naranja. Se retira cuando se decida P7 (marca/).
 const C1_BLANCA = [/\.btn-primary\b/, /\.tab-add\b/, /\.tab\[aria-current/, /\[aria-selected="?true"?\]/,
-  /\[aria-pressed="?true"?\]/, /:checked\b/, /::selection\b/];
+  /\[aria-pressed="?true"?\]/, /:checked\b/, /::selection\b/, /^\.onb-logo-bg$/];
 // §5 C1: el :checked que pinta naranja es de chip, día o baldosa.
 const C1_CHECKED = /chip|day|dia|tile|baldosa/i;
 export function rC1(rel, text) {
@@ -282,6 +284,9 @@ test("detectores: cazan lo que prohíben y dejan pasar lo permitido", () => {
   assert.equal(rC1("x.css", ".link{color:var(--accent)}").length, 1);
   assert.equal(rC1("x.css", "@media (x){.btn-primary,.h2{color:var(--accent)}}").length, 1);
   assert.equal(rC1("x.css", "button:focus-visible{outline:var(--focus)}").length, 0);
+  assert.equal(rC1("x.css", ".onb-logo-bg{fill:var(--accent)}").length, 0, "logo del onboarding (D-impl-5)");
+  assert.equal(rC1("x.css", ".onb-logo-x{fill:var(--accent)}").length, 1, "solo el fondo del logo, nada más");
+  assert.equal(rC1("x.css", ".onb-title{color:var(--accent)}").length, 1, "el resto del onboarding, no");
   assert.equal(rC1("x.css", ".a:hover{outline:var(--focus)}").length, 1);
 
   assert.equal(rC2("x.css", ".disp-value{color:var(--disp-text)}").length, 0);

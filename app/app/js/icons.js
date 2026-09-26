@@ -63,6 +63,11 @@ export const ICON_PATHS = {
   undo:         '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
   // (B-Gasto) nota del movimiento
   note:         '<path d="M5 4h14v16H5z"/><path d="M8.5 9h7M8.5 12.5h7M8.5 16h4"/>',
+  // (B-Onb-Bienvenida) las tres promesas y el secundario «Importar una hoja o copia»
+  user:         '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
+  offline:      '<path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0"/><path d="M3 3l18 18"/>',
+  phone:        '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>',
+  upload:       '<path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M5 19.5h14"/>',
 };
 
 /** SVG listo para pegar. `size` en px (20 dentro de fila o botón, 24 en cabecera, 16 dentro de la

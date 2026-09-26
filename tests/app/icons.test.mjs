@@ -109,3 +109,10 @@ test("icons: los cuatro de cuenta son los de B-Patrimonio y B-Onb-Cuentas, verba
   assert.equal(ICON_PATHS.piggy, '<path d="M5 11a7 6 0 0 1 13-2h2v4l-2 1v3h-3v-2H9v2H6v-3a6 6 0 0 1-1-3z"/><path d="M10 7.5h3"/>');
   assert.equal(ICON_PATHS.debt, '<path d="M6 4h12v16l-3-2-3 2-3-2-3 2z"/><path d="M9 9h6M9 12.5h4"/>');
 });
+
+test("icons: los cuatro de B-Onb-Bienvenida, verbatim", () => {
+  assert.equal(ICON_PATHS.user, '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>');
+  assert.equal(ICON_PATHS.offline, '<path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0"/><path d="M3 3l18 18"/>');
+  assert.equal(ICON_PATHS.phone, '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>');
+  assert.equal(ICON_PATHS.upload, '<path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M5 19.5h14"/>');
+});
