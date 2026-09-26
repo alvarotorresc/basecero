@@ -59,6 +59,15 @@ const CATS_GRID_LIMIT = 9;
  *  `innerHTML` (render()) lo escapa; quien la use en `textContent` (el oninput del importe) no
  *  necesita, y escaparlo dos veces convertiría un «&» legítimo del nombre de una categoría en
  *  «&amp;amp;». */
+/** La misma copia en HTML (Gasto por categoría, S7): texto en tinta y SOLO la cifra excedida en
+ *  --neg (C4, «−» que avisa). Escapa aquí; sirve para render() y para el parche del oninput. */
+function limitBandHtml(warning) {
+  const text = escHtml(limitBandText(warning));
+  if (warning.level !== "over") return text;
+  const amount = escHtml(fmtMoney(Math.abs(warning.remainingAfterCents)));
+  return text.replace(amount, `<span class="num reg-limit-over">${amount}</span>`);
+}
+
 function limitBandText(warning) {
   const amount = fmtMoney(Math.abs(warning.remainingAfterCents));
   return warning.level === "over"
@@ -672,7 +681,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
 
       ${warning ? `
       <div class="reg-limit is-${warning.level}" id="reg-limit-band" role="status" aria-live="polite">
-        ${icon("warn", { size: 18 })}<span id="reg-limit-text">${escHtml(limitBandText(warning))}</span>
+        ${icon("warn", { size: 18 })}<span id="reg-limit-text">${limitBandHtml(warning)}</span>
       </div>` : ""}
 
       ${open ? `
@@ -892,7 +901,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         const w = limitWarning({ categoryId: state.categoryId, amountCents: state.isShared ? myCents : state.cents, byId, spentByRoot, budgetByCategory });
         if (w) {
           limitBandEl.className = `reg-limit is-${w.level}`;
-          limitBandEl.querySelector("#reg-limit-text").textContent = limitBandText(w);
+          limitBandEl.querySelector("#reg-limit-text").innerHTML = limitBandHtml(w);
         }
       }
     };

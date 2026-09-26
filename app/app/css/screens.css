@@ -903,25 +903,24 @@
   :root:not([data-theme="light"]) .reg-subs .ent-chip.ent-neutral[aria-pressed="false"] { box-shadow: inset 0 0 0 1px var(--border-strong); }
 }
 
-/* Aviso de límite (Registro v2 §6.2): neutro (C4: nada de rojo fuera de cifras); pasarse se dice
-   con el texto y el peso, no con color. La clase la reescribe el oninput del importe. */
+/* Aviso de límite (Registro v2 §6.2), igual que en Gasto por categoría (S7): texto con el icono de
+   aviso, en tinta cuando avisa, y SOLO la cifra excedida en --neg (C4). La clase y el texto los
+   reescribe el oninput del importe. */
 .reg-limit {
   display: flex;
   align-items: center;
   gap: var(--sp-8);
-  min-height: 44px;
-  padding: var(--sp-8) var(--sp-12);
-  border-radius: var(--radius);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  min-height: 24px;
+  padding: 0 var(--sp-4);
   color: var(--text-dim);
   font-size: var(--fs-13);
   font-weight: 500;
   line-height: var(--lh-body);
 }
 .reg-limit svg { flex: none; }
-.reg-limit.is-warn { color: var(--text); }
-.reg-limit.is-over { color: var(--text); font-weight: 700; }
+.reg-limit.is-warn,
+.reg-limit.is-over { color: var(--text); font-weight: 600; }
+.reg-limit-over { color: var(--neg); }
 
 /* Registro rápido plegado: «Ver las N categorías» y la fila «Más» (fila de 60 en --raised con
    borde: «Más» 15/600, resumen 13/500 dim con el divisor de metaHtml, chevron). */
