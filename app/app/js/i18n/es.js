@@ -199,7 +199,6 @@ export const ES = {
       lastMovements: "Últimos movimientos",
       emptyTitle: "Aún no hay movimientos",
       emptyText: "El primer gasto se apunta con el botón de abajo.",
-      yesterday: "Ayer",
       weekdayShort: { 0: "dom", 1: "lun", 2: "mar", 3: "mié", 4: "jue", 5: "vie", 6: "sáb" },
       renewalTitle: "{name} se renueva el {date}",
       renewalAsk: "¿Lo sigues usando?",
