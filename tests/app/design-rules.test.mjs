@@ -80,9 +80,11 @@ export function rC13(rel, text) {
 // Interruptor encendido y casilla marcada en naranja (B-Movimientos-Filtros, B-Liquidar; F-04/F-05
 // RETIRADAS, Álvaro 2026-09-27: igual que el mockup): solo con la variante .is-accent de controls.js
 // (`accent:true`) y en su estado marcado. Un radio del Segmented ([aria-checked] a secas) sigue fuera.
+// Anillo de 2 del bloque desplegado de B-GastoCategoria (F-18 RETIRADA, Álvaro 2026-09-27): solo
+// el selector exacto `.gc-block`, que existe únicamente con la raíz desplegada.
 const C1_BLANCA = [/\.btn-primary\b/, /\.tab-add\b/, /\.tab\[aria-current/, /\[aria-selected="?true"?\]/,
   /\[aria-pressed="?true"?\]/, /:checked\b/, /::selection\b/, /^\.onb-logo-bg$/,
-  /(switch|checkbox|casilla)[\w-]*\.is-accent\[aria-checked="?true"?\]/];
+  /(switch|checkbox|casilla)[\w-]*\.is-accent\[aria-checked="?true"?\]/, /^\.gc-block$/];
 // §5 C1: el :checked que pinta naranja es de chip, día o baldosa.
 const C1_CHECKED = /chip|day|dia|tile|baldosa/i;
 export function rC1(rel, text) {
@@ -359,6 +361,9 @@ test("detectores: cazan lo que prohíben y dejan pasar lo permitido", () => {
   assert.equal(rC1("x.css", ".onb-logo-x{fill:var(--accent)}").length, 1, "solo el fondo del logo, nada más");
   assert.equal(rC1("x.css", ".onb-title{color:var(--accent)}").length, 1, "el resto del onboarding, no");
   assert.equal(rC1("x.css", ".a:hover{outline:var(--focus)}").length, 1);
+  assert.equal(rC1("x.css", ".gc-block{box-shadow:inset 0 0 0 2px var(--accent)}").length, 0, "bloque desplegado (B-GastoCategoria)");
+  assert.equal(rC1("x.css", ".gc-block .gc-name{color:var(--accent)}").length, 1, "solo el anillo del bloque, nada dentro");
+  assert.equal(rC1("x.css", ".gc-head{box-shadow:inset 0 0 0 2px var(--accent)}").length, 1, "la fila plegada, no");
 
   assert.equal(rC2("x.css", ".disp-value{color:var(--disp-text)}").length, 0);
   assert.equal(rC2("x.css", ".disp-foot{color:var(--disp-text)}").length, 1);

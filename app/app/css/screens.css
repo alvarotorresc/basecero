@@ -315,13 +315,19 @@
    nombre · bloque teñido al desplegar · línea «Sin gasto:». Pila de 12 (§8). */
 .gc { display: flex; flex-direction: column; gap: var(--sp-12); }
 .gc > .sub-header { margin-bottom: 0; }
+/* Display del original: relleno 18 20 16 y pila de 6. */
+.gc .disp { padding: 18px var(--sp-20) var(--sp-16); gap: 6px; }
 
 /* Medidor del Display: el relleno ámbar y la marca del día en --disp-ink los pone meterHtml; aquí
    solo la escala de debajo, con «día N» centrado en la marca (--at) y el % a la derecha. */
-.gc-gauge { display: flex; flex-direction: column; gap: var(--sp-4); margin-top: var(--sp-12); }
+.gc-gauge { display: flex; flex-direction: column; gap: 6px; margin-top: var(--sp-12); }
+/* La barra del Display mide 10 y su marca del día sobresale 4 (B-GastoCategoria). */
+.gc-gauge .meter { height: 10px; }
+.gc-gauge .meter-limit { top: -4px; bottom: -4px; }
 .gc-gauge-scale { position: relative; height: 16px; font-size: var(--fs-12); line-height: var(--lh-title); color: var(--disp-dim); }
 .gc-daymark { position: absolute; left: var(--at); transform: translateX(-50%); white-space: nowrap; }
 .gc-pct { position: absolute; right: 0; white-space: nowrap; }
+.gc-gauge.is-late .gc-pct { right: auto; left: 0; }
 
 /* Lista: --surface con borde, relleno 12. */
 .gc-list {
@@ -337,8 +343,7 @@
 .gc-item { display: flex; flex-direction: column; }
 .gc-item.is-idle .gc-head { opacity: .6; }
 
-/* Cabecera de raíz: 56 de alto como mínimo, baldosa 32 · nombre y cifra sobre su medidor · chevron.
-   Desplegar no es seleccionar (F-18): sin anillo ni naranja. */
+/* Cabecera de raíz: 56 de alto como mínimo, baldosa 32 · nombre y cifra sobre su medidor · chevron. */
 .gc-head {
   width: 100%;
   min-height: 56px;
@@ -354,8 +359,10 @@
   text-align: left;
   cursor: pointer;
 }
-.gc-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-8); }
+.gc-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .gc-main .meter { display: block; }
+/* Un gasto pequeño sigue viéndose: el relleno nunca baja de 4 (salvo el cero). */
+.gc .meter-fill:not([style="width:0%"]) { min-width: 4px; }
 .gc-line { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
 .gc-name { min-width: 0; font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gc-amt { flex: none; font-size: var(--fs-14); font-weight: 500; color: var(--text); }
@@ -365,39 +372,44 @@
 .gc-over { color: var(--neg); }
 .gc-chev { flex: none; display: flex; color: var(--text-dim); }
 
-/* Bloque desplegado: tinte de la familia (C6), sin borde; nombre 600 y cifra 17/600 (C3: ≤ 20). */
-.gc-block { gap: var(--sp-12); padding: var(--sp-4) var(--sp-4) var(--sp-16); border-radius: var(--radius-lg); background: var(--ft); }
+/* Bloque desplegado: tinte de la familia (C6) con el anillo naranja de 2 del original (F-18
+   retirada, Álvaro 2026-09-27); nombre 700 y cifra 17/600. */
+.gc-block {
+  gap: 10px;
+  padding: var(--sp-4) var(--sp-4) var(--sp-16);
+  border-radius: var(--radius-lg);
+  background: var(--ft);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
 .gc-block .gc-head { padding-bottom: 0; }
-.gc-block .gc-name { font-weight: 600; }
+.gc-block .gc-name { font-weight: 700; }
 .gc-block .gc-amt { font-size: var(--fs-17); font-weight: 600; }
 .gc-block .gc-chev { color: var(--fx); transform: rotate(180deg); }
-.gc-subs { margin: 0 var(--sp-24) 0 48px; display: flex; flex-direction: column; gap: var(--sp-12); }
-.gc-sub { display: flex; flex-direction: column; gap: var(--sp-4); }
+.gc-subs { margin: 0 32px 0 48px; display: flex; flex-direction: column; gap: 10px; }
+.gc-sub { display: flex; flex-direction: column; gap: 5px; }
+.gc-sub .meter { height: 6px; }
 .gc-sub-line { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
 .gc-sub-name { min-width: 0; font-size: var(--fs-14); font-weight: 500; line-height: var(--lh-title); color: var(--text); }
 .gc-sub-amt { flex: none; font-size: var(--fs-14); font-weight: 500; color: var(--text); }
-/* Pie del bloque con filete --border: comparativa (nombre en -x, cifra en tinta: C7) y el límite
-   en terciario. */
+/* Pie del bloque con filete en la barra de la familia: comparativa entera en -x, delta y el
+   secundario S del límite (B-GastoCategoria). */
 .gc-block-foot {
-  margin: 0 var(--sp-12) 0 52px;
-  padding-top: var(--sp-12);
-  border-top: 1px solid var(--border);
+  margin: 2px var(--sp-12) 0 52px;
+  padding-top: 10px;
+  border-top: 1px solid var(--fb);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-8);
 }
-/* Comparativa en dos líneas (nombre y cifra · delta) para que el límite quepa a su derecha. */
-.gc-cmp-group { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
-.gc-cmp { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--fx); }
-.gc-cmp .num { color: var(--text); }
-.gc-delta { display: flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }
+.gc-cmp { flex: 1; min-width: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--fx); }
+.gc-delta { flex: none; display: flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); white-space: nowrap; }
 .gc-delta.is-up { color: var(--neg); }
 .gc-delta.is-down { color: var(--pos); }
-.gc-block-foot .btn-tertiary { flex: none; margin-left: auto; padding: 0 var(--sp-8); }
+.gc-block-foot .btn-secondary { flex: none; }
 
 /* Editor del límite dentro del bloque: campo hundido, primario y la nota con «Quitar límite». */
-.gc-edit { margin: 0 var(--sp-12) 0 52px; padding-top: var(--sp-12); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--sp-12); }
+.gc-edit { margin: 2px var(--sp-12) 0 52px; padding-top: 10px; border-top: 1px solid var(--fb); display: flex; flex-direction: column; gap: var(--sp-12); }
 /* Con el campo vacío manda el placeholder («Sin límite») y la unidad se oculta. */
 .gc-edit .ctl-field-input:placeholder-shown + .ctl-field-suffix { display: none; }
 .gc-edit .ctl-field-input { -moz-appearance: textfield; }
@@ -416,7 +428,7 @@
   padding: 0 var(--sp-8);
   display: flex;
   align-items: center;
-  gap: var(--sp-8);
+  gap: 10px;
   border: 0;
   border-radius: var(--radius);
   background: none;
@@ -424,7 +436,7 @@
   text-align: left;
   cursor: pointer;
 }
-.gc-idle-swatches { flex: none; display: flex; gap: var(--sp-4); }
+.gc-idle-swatches { flex: none; display: flex; gap: 3px; }
 .gc-idle-swatch { width: 8px; height: 14px; border-radius: var(--radius-xs); background: var(--ft); box-shadow: inset 0 0 0 1px var(--fb); }
 .gc-idle-text { flex: 1; min-width: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 .gc-empty { margin: 0; padding: var(--sp-16); font-size: var(--fs-13); font-weight: 500; text-align: center; color: var(--text-dim); }
