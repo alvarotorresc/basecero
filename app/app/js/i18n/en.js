@@ -559,11 +559,12 @@ export const EN = {
     title: "Recurring",
     empty: "You don’t have any recurring rules yet.",
     hero: {
-      pending: "Pending this period",
+      pending: "Still to pay this period",
       perMonth: "per month",
       pendingCount: { one: "{n} pending", other: "{n} pending" },
       allSettled: "All paid",
       remaining: "You'll have {amount} left",
+      remainingAfter: "After paying it you'll have {amount} left",
       paidLabel: "Paid",
       meterAria: "Pending {pending} of {total} this period",
     },
@@ -575,7 +576,7 @@ export const EN = {
     },
     newRule: "New recurring rule",
     toggle: { aria: "Enable {name}" },
-    footNote: "The switch pauses the rule without deleting it.",
+    footNote: "Turning a rule off pauses it without deleting it: the next charge isn't generated until you turn it back on.",
     type: { transfer: "Transfer" },
     freq: {
       weekly: "Weekly",
@@ -1015,6 +1016,7 @@ export const EN = {
       activeCount: { one: "{n} active", other: "{n} active" },
       chartLabel: "Renewals in the next 30 days",
     },
+    footNote: "They come from your recurring rules marked as a subscription and from charges that repeat with the same amount.",
     notice: {
       title: "{name} renews on {when}",
       question: "Still using it?",
@@ -1028,11 +1030,12 @@ export const EN = {
       cancelled: "Cancelled",
     },
     row: {
-      renewsOn: "renews on {date}",
-      renewsInDays: { one: "renews on {date}, in {n} day", other: "renews on {date}, in {n} days" },
-      renewsWeekly: "renews every week",
+      renewsOn: "Renews on {date}",
+      renewsInDays: { one: "Renews in {n} day", other: "Renews in {n} days" },
+      renewsToday: "Renews today",
+      renewsWeekly: "Renews every week",
       perYear: "/year",
-      noDate: "no renewal date",
+      noDate: "No renewal date",
     },
     candidate: {
       sameAmountOn: "same amount on {dates}",
@@ -1200,6 +1203,7 @@ export const EN = {
     },
     compare: {
       title: "Compared with {name}",
+      note: "{prev} is closed; {cur} is on day {day}.",
       up: "Up",
       down: "Down",
     },

@@ -3,7 +3,7 @@ import {
   createRule, updateRule, softDeleteRule, cancelSubscription, getMetaAll,
   getOpenPeriod, previsionOfPeriod, getAccountStyle, listGoals,
 } from "../repo.js";
-import { familyForCategory, iconForCategory } from "../category-colors.js";
+import { familyForCategory, iconForCategory, famClass } from "../category-colors.js";
 import { familyForAccount } from "../account-colors.js";
 import { fmtMoney, moneyPartsHtml, currencySymbol, parseCentsRaw, centsToRaw, hoyISO } from "../format.js";
 import { annualCents, monthlyCommitmentCents, ruleStateKey, paidThisPeriodCents } from "../subscriptions.js";
@@ -16,7 +16,7 @@ import { renderSuscripciones } from "./suscripciones.js";
 import { subHeaderHtml, buttonHtml } from "../ui.js";
 import { segmentedHtml, wireSegmented, switchHtml, fieldHtml } from "../controls.js";
 import { txRowHtml, pickTileHtml, filterChipHtml, settingRowHtml, sectionHeaderHtml } from "../entity.js";
-import { displayHtml, dispInkHtml, meterHtml, emptyStateHtml, containerHtml } from "../instrument.js";
+import { displayHtml, dispInkHtml, emptyStateHtml, containerHtml } from "../instrument.js";
 
 import { escHtml, escAttr } from "../esc.js";
 
@@ -61,9 +61,12 @@ function ruleSubtitleParts(r, accountsAll) {
     if (from && to) parts.push(t("recurrentes.subtitle.transferRoute", { from, to }));
   }
   if (r.is_shared) parts.push(t("recurrentes.subtitle.shared"));
-  if (r.is_subscription) parts.push(t("recurrentes.badge.subscription"));
+  // «Suscripción» ya no se añade (B-Recurrentes: «Mensual, día 8» en Netflix): la fila va en su
+  // familia y el radar de suscripciones está al pie. Se ve y se cambia en la edición de la regla.
   if (!r.is_active) parts.push(t("recurrentes.subtitle.paused"));
-  return parts.join(", ");
+  const line = parts.join(", ");
+  // Con mayúscula inicial, como el original («Mensual, día 15»).
+  return line.charAt(0).toLocaleUpperCase() + line.slice(1);
 }
 
 /** Fila de regla (§9, B-Recurrentes): fila de movimiento (icono + nombre + importe) HERMANA de un
@@ -92,6 +95,22 @@ function ruleRowHtml(r, item, byId, accountsAll) {
   return `<div class="rec-row${r.is_active ? "" : " rec-row-paused"}">${row}${toggle}</div>`;
 }
 
+/** «Pendiente» (B-Recurrentes): cada regla pendiente en su propia tarjeta sobre el tinte de su
+ *  familia (C6: una entidad, tinte permitido), con la baldosa en --chip y la línea 2 y el
+ *  «pendiente» en su -x. Sin familia (transferencia), la tarjeta va en --surface. */
+function pendingSectionHtml(list, byId, accountsAll) {
+  if (!list.length) return "";
+  const cards = list.map(({ r, item }) => {
+    const fam = r.type === "transfer" ? null : familyForCategory(r.category_id, byId);
+    const fc = famClass(fam);
+    return `<div class="rec-pending-card${fc ? ` ${fc} is-fam-ink` : ""}">${ruleRowHtml(r, item, byId, accountsAll)}</div>`;
+  });
+  return `<div class="rec-section">`
+    + `${sectionHeaderHtml({ title: t("recurrentes.section.pending") })}`
+    + `<div class="rec-pending">${cards.join("")}</div>`
+    + `</div>`;
+}
+
 function sectionHtml(titleKey, list, byId, accountsAll) {
   if (!list.length) return "";
   const rows = list.map(({ r, item }) => ruleRowHtml(r, item, byId, accountsAll));
@@ -101,12 +120,13 @@ function sectionHtml(titleKey, list, byId, accountsAll) {
     + `</div>`;
 }
 
-/** Héroe "Queda por pagar este periodo" (spec §5.1 bloque 2): LED en espera (ámbar, SOLO dentro
- *  del Display, §9 LED) mientras quede algo pendiente, "ok" cuando todo esté liquidado. El pie
- *  dice cuánto quedará después (repo.previsionOfPeriod#disponibleCents ya lo da: el saldo menos
- *  TODO lo comprometido, que es justo "tras pagarlo" cuando eso es lo único que falta). El
- *  medidor compara lo pendiente contra el total real de este periodo (pagado + pendiente, de los
- *  `items` que YA se cargaron) — no el promedio anual de monthlyCommitmentCents, que cuenta reglas
+/** Héroe "Queda por pagar este periodo" (B-Recurrentes, cifra a 48): LED en espera (ámbar, SOLO
+ *  dentro del Display, §9 LED) mientras quede algo pendiente, "ok" cuando todo esté liquidado. El
+ *  pie dice cuánto quedará después, en ámbar como el original (repo.previsionOfPeriod#
+ *  disponibleCents ya lo da: el saldo menos TODO lo comprometido, que es justo "tras pagarlo"
+ *  cuando eso es lo único que falta). La barra parte el total real de este periodo (pagado +
+ *  pendiente, de los `items` que YA se cargaron) en lo pagado (--disp-dim) y lo pendiente (ámbar,
+ *  al menos 14 para que se vea) — no el promedio anual de monthlyCommitmentCents, que cuenta reglas
  *  que ni siquiera aplican este mes (ver subscriptions.js#paidThisPeriodCents). Sin periodo
  *  abierto no hay nada que prever (§5.1): el Display entero se oculta, como antes. */
 function heroHtml(prevision, rules) {
@@ -117,13 +137,12 @@ function heroHtml(prevision, rules) {
   const led = pendingCount > 0
     ? { state: "wait", text: t("recurrentes.hero.pendingCount", { n: pendingCount }) }
     : { state: "ok", text: t("recurrentes.hero.allSettled") };
+  const pendingCents = Math.max(0, prevision.comprometidoCents);
   const meterSlot = total > 0
-    ? meterHtml({
-      // value es lo PENDIENTE (el ámbar del medidor, C2: lo que llama la atención) — el
-      // aria-label tiene que hablar del mismo número, no del pagado (revisión ronda 1).
-      value: prevision.comprometidoCents, max: total, onDisplay: true,
-      label: t("recurrentes.hero.meterAria", { pending: fmtMoney(prevision.comprometidoCents), total: fmtMoney(total) }),
-    })
+    ? `<div class="rec-hero-bar" role="img" aria-label="${escAttr(t("recurrentes.hero.meterAria", { pending: fmtMoney(pendingCents), total: fmtMoney(total) }))}">`
+      + `${paid > 0 ? `<span class="rec-hero-paid" style="flex-basis:${((paid / total) * 100).toFixed(2)}%"></span>` : ""}`
+      + `${pendingCents > 0 ? `<span class="rec-hero-pending disp-amber-fill" style="flex-basis:${((pendingCents / total) * 100).toFixed(2)}%"></span>` : ""}`
+      + `</div>`
     : "";
   const footRow = `<div class="rec-hero-row">
     <span>${escHtml(t("recurrentes.hero.paidLabel"))} ${dispInkHtml(fmtMoney(paid))}</span>
@@ -132,9 +151,10 @@ function heroHtml(prevision, rules) {
   return displayHtml({
     label: t("recurrentes.hero.pending"),
     value: fmtMoney(prevision.comprometidoCents),
-    size: "l",
+    size: 48,
     led,
-    footHtml: t("recurrentes.hero.remaining", { amount: dispInkHtml(fmtMoney(prevision.disponibleCents)) }),
+    footHtml: t(pendingCount > 0 ? "recurrentes.hero.remainingAfter" : "recurrentes.hero.remaining",
+      { amount: dispInkHtml(fmtMoney(prevision.disponibleCents), { tone: "amber" }) }),
     slot: meterSlot ? `<div class="rec-hero-slot">${meterSlot}${footRow}</div>` : footRow,
   });
 }
@@ -279,15 +299,14 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
     // Sin nada pendiente ni pagado (sin periodo abierto, o ninguna regla aplica este mes): una
     // sola lista con todas, en vez de dos secciones vacías y un cajón de "otras" con todo dentro.
     const sections = (pending.length || paid.length)
-      ? `${sectionHtml("recurrentes.section.pending", pending, byId, accountsAll)}`
+      ? `${pendingSectionHtml(pending, byId, accountsAll)}`
         + `${sectionHtml("recurrentes.section.paidPeriod", paid, byId, accountsAll)}`
         + `${sectionHtml("recurrentes.section.other", other, byId, accountsAll)}`
       : sectionHtml("recurrentes.section.all", state.rules.map((r) => ({ r, item: itemFor(r) })), byId, accountsAll);
 
-    // Sin fam: no es una entidad (C11), es un enlace de navegación — baldosa neutra en --well,
-    // aunque su icono sea el mismo trazo que la familia "sus" (revisión ronda 1).
+    // Enlace al radar (B-Recurrentes): baldosa rellena de Suscripciones con el icono claro.
     const radarLink = `<div class="rec-radar-link">${settingRowHtml({
-      icon: "sus", label: t("recurrentes.radarLink"), id: "rec-radar-link",
+      icon: "sus", fam: "sus", tileFilled: true, label: t("recurrentes.radarLink"), id: "rec-radar-link",
     })}</div>`;
 
     container.innerHTML = `
@@ -299,9 +318,10 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
 
         ${state.rules.length === 0
           ? emptyStateHtml({ title: t("recurrentes.empty"), rows: 2 })
-          : `${sections}<p class="rec-foot-note">${escHtml(t("recurrentes.footNote"))}</p>`}
+          : sections}
 
         ${radarLink}
+        ${state.rules.length ? `<p class="rec-foot-note">${escHtml(t("recurrentes.footNote"))}</p>` : ""}
       </div>
     `;
     wireList();

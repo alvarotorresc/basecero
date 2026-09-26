@@ -26,6 +26,15 @@ const fmtPctInt = (pct) => `${Math.round(pct)} %`;
  *  <div> de meterHtml pasa a <span> (display:block en screens.css). Mismo HTML, otra etiqueta. */
 const meterInline = (o) => meterHtml(o).replace(/^<div/, "<span").replace(/<\/div>$/, "</span>");
 
+/** «Agosto 2026» → «Agosto» (B-GastoCategoria: «Agosto 390,00 €»), solo si quitar el año deja
+ *  algo; cualquier otro nombre que escriba el usuario se queda tal cual (mismo criterio que
+ *  informe.js#shortName). */
+function shortName(name) {
+  const s = String(name ?? "").trim();
+  const m = s.match(/^(.+?)\s+\d{4}$/);
+  return m ? m[1] : s;
+}
+
 // Flechas "tendencia sube"/"tendencia baja" del repertorio (icons.js), NUNCA un chevron rotado.
 const ICON_TREND_UP = icon("trendUp", { size: 14, width: 2.2 });
 const ICON_TREND_DOWN = icon("trendDown", { size: 14, width: 2.2 });
@@ -42,8 +51,9 @@ const ICON_WARN = icon("warn", { size: 14 });
  *
  *  La fila tocable es SOLO la cabecera de cada categoría (un <button> de verdad, hermano del bloque
  *  desplegado, nunca su envoltorio): el bloque desplegado contiene a su vez botones y un input, y
- *  un botón dentro de otro es HTML inválido que el navegador desarma. Desplegar NO es seleccionar
- *  (DESIGN §9, F-18): aria-expanded, sin anillo naranja. */
+ *  un botón dentro de otro es HTML inválido que el navegador desarma. El bloque desplegado lleva
+ *  el anillo naranja de 2 y el filete en la barra de su familia, como el original (F-18 retirada,
+ *  Álvaro 2026-09-27: igual que el mockup); el estado lo dice aria-expanded. */
 export async function renderGastoPorCategoria(container, onBack) {
   // rootErrors: rootId → mensaje, para la línea inline de una raíz cuyo desglose no se pudo leer.
   // Se limpia al volver a intentarlo y al plegar. showIdle: la línea «Sin gasto:» desplegada.
@@ -113,9 +123,10 @@ export async function renderGastoPorCategoria(container, onBack) {
       </div>`).join("")}</div>`;
   }
 
-  /** Comparativa con el periodo anterior: «Agosto 390,00 €» (nombre en -x, cifra en tinta, C7) y
-   *  la flecha del repertorio con el delta a un decimal — --neg si se gastó más, --pos si menos
-   *  (C4: señal en cifras). Sin periodo anterior no se pinta nada; "flat"/"new" sin flecha. */
+  /** Comparativa con el periodo anterior (B-GastoCategoria): «Agosto 390,00 €» entero en el -x de
+   *  la familia, y la flecha del repertorio con el delta a un decimal — --neg si se gastó más,
+   *  --pos si menos (C4: señal en cifras). Sin periodo anterior no se pinta nada; "flat"/"new" sin
+   *  flecha. Dos hermanos sueltos del pie, como en el original, junto al secundario del límite. */
   function comparisonHtml(row) {
     if (!prevPeriod) return "";
     const cmp = cmpByRoot[row.root_id];
@@ -124,7 +135,7 @@ export async function renderGastoPorCategoria(container, onBack) {
     const delta = cmp.deltaPct != null
       ? `<span class="num gc-delta${dir ? ` is-${dir}` : ""}">${dir === "up" ? ICON_TREND_UP : dir === "down" ? ICON_TREND_DOWN : ""}${escHtml(fmtPct(Math.abs(cmp.deltaPct) / 100))}</span>`
       : "";
-    return `<span class="gc-cmp-group"><span class="gc-cmp">${escHtml(prevPeriod.name)} <span class="num">${escHtml(fmtMoney(cmp.prevCents))}</span></span>${delta}</span>`;
+    return `<span class="gc-cmp">${escHtml(shortName(prevPeriod.name))} <span class="num">${escHtml(fmtMoney(cmp.prevCents))}</span></span>${delta}`;
   }
 
   function editHtml(row, limitCents) {
@@ -146,7 +157,7 @@ export async function renderGastoPorCategoria(container, onBack) {
 
   /** Cabecera de una raíz: baldosa 32 · nombre y cifra · medidor (límite como marca de 2 px) · pie
    *  con el límite o el exceso · chevron. Desplegada va sobre el tinte (baldosa y pista en --chip,
-   *  cifra 17/600). */
+   *  nombre 700 y cifra 17/600). */
   function headHtml(row, fam, scaleMax, expanded) {
     const limitCents = limitOf(row.root_id);
     // Mismo umbral de siempre (budgetStatus: warn >= 85 %, over > 100 %), sin ámbar: el aviso es
@@ -161,7 +172,11 @@ export async function renderGastoPorCategoria(container, onBack) {
     } else if (st?.level === "warn") {
       foot = `<span class="gc-foot is-alert">${ICON_WARN}<span>${escHtml(t("gastoCategoria.row.nearLimit", { pct: fmtPctInt(st.pct), limit: fmtMoney(limitCents) }))}</span></span>`;
     } else if (st) {
-      foot = `<span class="gc-foot">${escHtml(t("gastoCategoria.row.limit", { limit: fmtMoney(limitCents) }))}</span>`;
+      // «límite 350,00 €» con la cifra en mono, como el original.
+      const lim = escHtml(fmtMoney(limitCents));
+      const text = escHtml(t("gastoCategoria.row.limit", { limit: fmtMoney(limitCents) }))
+        .replace(lim, `<span class="num">${lim}</span>`);
+      foot = `<span class="gc-foot">${text}</span>`;
     }
     return `
       <button type="button" class="gc-head" data-root="${escAttr(row.root_id)}" aria-expanded="${expanded ? "true" : "false"}">
@@ -195,7 +210,7 @@ export async function renderGastoPorCategoria(container, onBack) {
         ${editing ? editHtml(row, limitCents) : `
         <div class="gc-block-foot">
           ${comparisonHtml(row)}
-          ${buttonHtml({ kind: "tertiary", id: `gc-limit-btn-${row.root_id}`, label: limitCents > 0 ? t("gastoCategoria.detail.changeLimit") : t("gastoCategoria.detail.setLimit") })}
+          ${buttonHtml({ kind: "secondary", size: "s", id: `gc-limit-btn-${row.root_id}`, label: limitCents > 0 ? t("gastoCategoria.detail.changeLimit") : t("gastoCategoria.detail.setLimit") })}
         </div>`}
       </div>`;
   }
@@ -235,8 +250,9 @@ export async function renderGastoPorCategoria(container, onBack) {
     const days = expectedPeriodDays(period.start_date);
     const dayFrac = days > 0 ? Math.min(1, Math.max(0, day / days)) : 0;
 
+    // Pasado el 75 % del periodo, «día N» caería encima del % de la derecha: el % pasa a la izquierda.
     const gauge = budgetTotalCents > 0 ? `
-      <div class="gc-gauge" style="--at:${Number((dayFrac * 100).toFixed(2))}%">
+      <div class="gc-gauge${dayFrac > 0.75 ? " is-late" : ""}" style="--at:${Number((dayFrac * 100).toFixed(2))}%">
         ${meterHtml({ value: totalSpent, max: budgetTotalCents, limit: budgetTotalCents * dayFrac, onDisplay: true })}
         <div class="gc-gauge-scale">
           <span class="num gc-daymark">${escHtml(t("gastoCategoria.total.dayMark", { day }))}</span>
@@ -253,7 +269,7 @@ export async function renderGastoPorCategoria(container, onBack) {
 
     container.innerHTML = `
       <div class="gc">
-        ${subHeaderHtml({ id: "gc-back", title: t("gastoCategoria.title"), subtitle: t("gastoCategoria.header.dayOf", { period: period.name, day, total: days }) })}
+        ${subHeaderHtml({ id: "gc-back", title: t("gastoCategoria.title"), subtitle: t("gastoCategoria.header.dayOf", { period: shortName(period.name), day, total: days }) })}
         ${displayHtml({
           label: t("gastoCategoria.total.title"), value: fmtMoney(totalSpent), size: "l",
           ...(budgetTotalCents > 0
