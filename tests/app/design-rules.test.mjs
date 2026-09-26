@@ -115,8 +115,10 @@ export function rC1(rel, text) {
   return errs;
 }
 
-// R-C2 · DESIGN §5 C2: ámbar solo en la cifra principal del Display, su línea y el «hoy».
-const C2_BLANCA = /\.disp-value\b|\.disp-chart-line\b|\.disp-today\b/;
+// R-C2 · DESIGN §5 C2: ámbar solo en la cifra principal del Display, su línea y el «hoy». Más el
+// LED en espera (DESIGN §9 LED: «espera» solo en el Display; inventario-B LED/I-19 y el token
+// --led-glow-wait: su punto es ámbar). Es un punto de 8 dentro del Display, no una cifra.
+const C2_BLANCA = /\.disp-value\b|\.disp-chart-line\b|\.disp-today\b|\.led-wait\b/;
 export function rC2(rel, text) {
   if (rel.endsWith(".js")) return text.includes("--disp-text") ? [`${rel}: --disp-text en JS`] : [];
   const errs = [];
@@ -286,6 +288,8 @@ test("detectores: cazan lo que prohíben y dejan pasar lo permitido", () => {
 
   assert.equal(rC2("x.css", ".disp-value{color:var(--disp-text)}").length, 0);
   assert.equal(rC2("x.css", ".disp-foot{color:var(--disp-text)}").length, 1);
+  assert.equal(rC2("x.css", ".led-wait .led-dot{background:var(--disp-text)}").length, 0);
+  assert.equal(rC2("x.css", ".led-ok .led-dot{background:var(--disp-text)}").length, 1);
 
   assert.equal(rC7("x.css", ".row-amount{color:var(--fx)}").length, 1);
   assert.equal(rC7("x.css", ".row-sub{color:var(--fx)}").length, 0);
