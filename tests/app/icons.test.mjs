@@ -21,7 +21,7 @@ test("icons: los paths críticos son los de SISTEMA.md §3, verbatim", () => {
 test("icons: el repertorio cubre todo lo que emite la app", () => {
   for (const name of ["back", "close", "chevronRight", "chevronDown", "plus", "minus", "check",
     "warn", "tag", "calendar", "download", "trash", "pencil", "repeat", "filter", "lock",
-    "trendUp", "trendDown", "camera", "mic", "drag", "file", "transfer"]) {
+    "trendUp", "trendDown", "camera", "mic", "drag", "file", "transfer", "card", "bank", "piggy", "debt"]) {
     assert.ok(ICON_PATHS[name], `falta el icono ${name}`);
   }
 });
@@ -98,4 +98,11 @@ test("catIcon(): con label deja de ser decorativo (role img + aria-label escapad
 
 test("catIcon(): una clave desconocida devuelve el icono de Otros, no rompe la fila", () => {
   assert.equal(catIcon("noExiste"), catIcon("otr"));
+});
+
+test("icons: los cuatro de cuenta son los de B-Patrimonio y B-Onb-Cuentas, verbatim", () => {
+  assert.equal(ICON_PATHS.card, '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/>');
+  assert.equal(ICON_PATHS.bank, '<path d="M4 20h16M6 20V11M10 20V11M14 20V11M18 20V11M3 8l9-5 9 5z"/>');
+  assert.equal(ICON_PATHS.piggy, '<path d="M5 11a7 6 0 0 1 13-2h2v4l-2 1v3h-3v-2H9v2H6v-3a6 6 0 0 1-1-3z"/><path d="M10 7.5h3"/>');
+  assert.equal(ICON_PATHS.debt, '<path d="M6 4h12v16l-3-2-3 2-3-2-3 2z"/><path d="M9 9h6M9 12.5h4"/>');
 });
