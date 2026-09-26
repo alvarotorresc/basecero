@@ -2,7 +2,7 @@
 // solo importa icons.js y t(), así que se prueba sin Worker ni DOM.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { subHeaderHtml, metaHtml } from "../../app/app/js/ui.js";
+import { subHeaderHtml, metaHtml, themeSegmentedHtml, radioKeyIndex } from "../../app/app/js/ui.js";
 
 test("subHeaderHtml: siempre TRES celdas, para que el título quede centrado de verdad", () => {
   // Es el defecto que arrastran 12 de las 14 subpantallas: sin el hueco de la derecha, el título
@@ -75,4 +75,36 @@ test("metaHtml: escapa cada segmento", () => {
 
 test("metaHtml: acepta una clase extra sin perder meta-row", () => {
   assert.match(metaHtml(["a"], { cls: "foo" }), /class="meta-row foo"/);
+});
+
+// Fila Tema de Ajustes (DESIGN §3, K12). Marcado provisional: la PR-06 lo sustituye por el Segmented
+// canónico, pero el contrato de accesibilidad es el mismo — radiogroup, radios con aria-checked,
+// un solo tabindex=0 (el elegido) y flechas que mueven y eligen.
+test("themeSegmentedHtml: radiogroup con 3 radios y solo el elegido marcado y tabulable", () => {
+  const html = themeSegmentedHtml("dark");
+  assert.match(html, /role="radiogroup"/);
+  assert.match(html, /aria-labelledby="theme-label"/);
+  assert.match(html, /id="theme-label"[^>]*>Tema</);
+  const radios = [...html.matchAll(/<button [^>]*role="radio"[^>]*>([^<]*)</g)];
+  assert.deepEqual(radios.map((m) => m[1]), ["Claro", "Oscuro", "Sistema"]);
+  const marcados = radios.filter((m) => /aria-checked="true"/.test(m[0]));
+  assert.equal(marcados.length, 1);
+  assert.match(marcados[0][0], /data-theme-pref="dark"/);
+  assert.match(marcados[0][0], /tabindex="0"/);
+  assert.equal(radios.filter((m) => /tabindex="-1"/.test(m[0])).length, 2);
+});
+
+test("themeSegmentedHtml: una preferencia desconocida marca Sistema", () => {
+  assert.match(themeSegmentedHtml("sepia"), /aria-checked="true"[^>]*data-theme-pref="system"/);
+});
+
+test("radioKeyIndex: flechas con vuelta, Inicio/Fin, y el resto de teclas no mueven", () => {
+  assert.equal(radioKeyIndex("ArrowRight", 0, 3), 1);
+  assert.equal(radioKeyIndex("ArrowDown", 2, 3), 0);
+  assert.equal(radioKeyIndex("ArrowLeft", 0, 3), 2);
+  assert.equal(radioKeyIndex("ArrowUp", 1, 3), 0);
+  assert.equal(radioKeyIndex("Home", 2, 3), 0);
+  assert.equal(radioKeyIndex("End", 0, 3), 2);
+  assert.equal(radioKeyIndex("Tab", 1, 3), -1);
+  assert.equal(radioKeyIndex("Enter", 1, 3), -1);
 });

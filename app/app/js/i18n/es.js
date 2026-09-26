@@ -1209,4 +1209,11 @@ export const ES = {
     capped: "Como mucho puedes barrer {amount}: es lo que hay en {account}",
     note: "Barrido de fin de periodo",
   },
+  // Tema de la app (DESIGN §3): fila de Ajustes. Las claves de valor son las preferencias de theme.js.
+  theme: {
+    label: "Tema",
+    light: "Claro",
+    dark: "Oscuro",
+    system: "Sistema",
+  },
 };

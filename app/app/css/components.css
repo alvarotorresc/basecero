@@ -1,0 +1,17 @@
+/* BaseCero · componentes canónicos del sistema B (DESIGN.md §9).
+   Vacío a propósito: cada PR de componente (PR-04 a PR-10) rellena su sección. Solo lee tokens
+   con var(); ningún valor de color, radio, sombra o tamaño de letra se escribe aquí en crudo. */
+
+/* ===== Familias de categoría: .fam-* (PR-04) ===== */
+
+/* ===== Chrome: cabeceras, barra de pestañas, botones, foco y pulsación (PR-05) ===== */
+
+/* ===== Controles: Segmented, interruptor, casilla, paso a paso, progreso, campo, chip (PR-06) ===== */
+
+/* ===== Instrumento: Display, LED, bento, barras, medidor (PR-07) ===== */
+
+/* ===== Entidad: baldosas, ficha, filas, chips, cabeceras (PR-08) ===== */
+
+/* ===== Hoja inferior, aviso y toast (PR-09) ===== */
+
+/* ===== Familias de cuenta (PR-10) ===== */

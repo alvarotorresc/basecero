@@ -14,6 +14,12 @@ import { pushBack, goBack, clearBack, resetBack } from "./back.js";
 import { userMessage } from "./errors.js";
 import { scrollScreenTop } from "./viewport.js";
 import { setTabNavigator } from "./tabs.js";
+import { applyTheme, readPref, getStorage, systemDarkQuery } from "./theme.js";
+
+// El script en línea del <head> ya fijó data-theme antes del CSS. Aquí se vuelve a aplicar para
+// dos cosas que él no puede hacer: engancharse al cambio de modo del sistema (con «Sistema») y
+// tomar theme-color del --bg real del CSS.
+applyTheme(document, readPref(getStorage(window)), systemDarkQuery(window));
 
 const screen = document.getElementById("screen");
 const RUTAS = {

@@ -1,83 +1,169 @@
-@import url("../vendor/fonts/fonts.css");
-:root {
-  /* superficies y filetes */
-  --bg: #0B0B0C;
-  --surface: #151517;
-  --surface-2: #1E1E21;
-  --hairline: rgba(244, 244, 242, 0.09);
-  --hairline-strong: rgba(244, 244, 242, 0.18);
-  /* tintas */
-  --ink: #F4F4F2;
-  --ink-2: #A6A6A3;
-  --ink-3: #8E8E92;
-  /* acento y semánticos */
-  --accent: #D4FF3F;
-  --accent-ink: #14180B;
-  --accent-tint: rgba(212, 255, 63, 0.14);
-  --pos: #3DC299;
-  --pos-tint: rgba(61, 194, 153, 0.14);
-  --warn: #FFB13C;
-  --warn-tint: rgba(255, 177, 60, 0.14);
-  --danger: #FF7A6B;
-  --danger-tint: rgba(255, 122, 107, 0.14);
-  /* elevación: UNA sombra y UN velo en todo el sistema */
-  --scrim: rgba(6, 7, 5, 0.76);
-  --shadow-float: 0 10px 34px rgba(5, 6, 4, 0.62);
-  /* material de una sola vez: el papel del recibo */
-  --paper: #EDE6DA;
-  --paper-ink: #1B1A16;
-  --paper-dim: #6B6459;
-  --stamp: #4B5E12;
-  /* forma: SOLO tres radios */
-  --r-0: 0;
-  --r-pill: 999px;
-  --r-circle: 50%;
-  /* espacio */
-  --s-1: 4px;
-  --s-2: 8px;
-  --s-3: 12px;
-  --s-4: 16px;
-  --s-5: 20px;
-  --s-6: 24px;
-  --s-7: 32px;
-  --s-8: 40px;
-  --s-9: 56px;
-  --pad-screen: 22px;
-  --gap-section: 30px;
-  /* tipografía (el tracking va aparte: el shorthand `font` no lo lleva) */
-  --font-sans: 'Schibsted Grotesk', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --t-hero: 600 56px/1 var(--font-mono);         /* + letter-spacing: -.02em  */
-  --t-figure-xl: 600 34px/1 var(--font-mono);    /* + letter-spacing: -.015em */
-  --t-figure-l: 600 22px/1.1 var(--font-mono);   /* + letter-spacing: -.01em  */
-  --t-figure-m: 500 16px/1.2 var(--font-mono);
-  --t-figure-s: 500 13px/1.2 var(--font-mono);
-  --t-title: 600 22px/1.2 var(--font-sans);      /* + letter-spacing: -.01em  */
-  --t-section: 600 15px/1.3 var(--font-sans);
-  --t-body: 400 15px/1.45 var(--font-sans);
-  --t-label: 500 13px/1.35 var(--font-sans);
-  --t-micro: 500 11px/1.3 var(--font-sans);
-  /* chrome */
-  --tabbar-h: 64px;
+/* BaseCero · sistema B (Instrumento + familias) · bloque de tokens CANÓNICO · 2026-09-26
+   Se pega tal cual en el <helmet><style> de cada mockup. Claro en :root, oscuro en :root[data-theme="dark"].
+   Fuentes: inventario-B.md (§1-§3) y paleta-familias.md. Decisiones D-1, D-2 y D-3 de Álvaro aplicadas. */
 
-  /* ---- ALIAS DE COMPATIBILIDAD ----
-     Los nombres viejos que las ~25 pantallas emiten inline. No se borran en esta PR: son lo que
-     permite cambiar la piel sin tocar el markup de ninguna pantalla. */
-  --card: var(--surface);
-  --card2: var(--surface-2);
-  --text: var(--ink);
-  --text-2: var(--ink-2);
-  --text-3: var(--ink-3);
-  --rule: var(--hairline);
-  --red: var(--danger);
-  --green: var(--pos);
-  --amber: var(--warn);
-  --radius: var(--r-0);
-  --radius-sm: var(--r-0);
-  --font-ui: var(--font-sans);
-  --font-num: var(--font-mono);
+:root{
+  /* Tipografía: tres familias (Unbounded solo títulos, Plex Mono solo cifras) */
+  --font-display:'Unbounded',sans-serif;
+  --font-body:'Instrument Sans',sans-serif;
+  --font-mono:'IBM Plex Mono',monospace;
+
+  /* Escala de cuerpo (el 16 solo en <input>, para que iOS no haga zoom) */
+  --fs-12:12px;--fs-13:13px;--fs-14:14px;--fs-15:15px;--fs-input:16px;--fs-17:17px;--fs-20:20px;--fs-24:24px;
+  --lh-title:1.2;--lh-body:1.5;
+
+  /* Cifra del Display: hero (Inicio, Patrimonio, Bienvenida, Gasto) · subpantalla · compacta (Movimientos) */
+  --disp-xl:52px;--disp-l:44px;--disp-m:34px;--lh-disp:1.05;
+
+  /* Espaciado: rejilla 2/4/8/12/16/24; el 20 solo dentro del Display */
+  --sp-2:2px;--sp-4:4px;--sp-8:8px;--sp-12:12px;--sp-16:16px;--sp-20:20px;--sp-24:24px;
+
+  /* Radios: xs barras y columnas · base controles y filas · lg bloques y Display · xl hoja y aviso */
+  --radius-xs:4px;--radius:10px;--radius-lg:18px;--radius-xl:24px;--radius-pill:999px;
+
+  /* Base Instrumento: fondos por elevación tonal, bordes y tinta */
+  --bg:#E3E1DC;--surface:#EEEDE9;--raised:#F8F7F4;--well:#D9D7D1;
+  --border:#C6C3BC;--border-strong:#AFACA4;
+  --text:#1D1E20;--text-dim:#55565A;
+  --chip:#F8F7F4;--lift:#F8F7F4;--idle:#6B6A66;
+
+  /* Acción: naranja solo en el primario y lo seleccionado (accent-text solo sobre surface) */
+  --accent:#FF5419;--on-accent:#1D1E20;--accent-text:#B83A0A;
+
+  /* Display: panel oscuro, ámbar para la cifra que manda, disp-ink para las secundarias */
+  --disp:#1D1E20;--disp-line:#303134;--disp-text:#FFC266;--disp-dim:#A89B80;--disp-ink:#EDECE8;
+  --ok:#2BD46B;
+
+  /* Señal de dinero (+/−) y destructivo (D-1: rojo en entrada y confirmación) */
+  --pos:#17693A;--neg:#B3261E;--on-neg:#FFFFFF;
+
+  /* Velo de hoja y aviso */
+  --scrim:rgba(29,30,32,.55);
+
+  /* Sombras y anillos */
+  --sh-display:inset 0 2px 6px rgba(0,0,0,.35);
+  --sh-well:inset 0 1px 2px rgba(0,0,0,.12);
+  --sh-thumb:0 1px 2px rgba(0,0,0,.15);
+  --sh-knob:0 1px 2px rgba(0,0,0,.25);
+  --sh-key:0 2px 0 rgba(0,0,0,.18);
+  --sh-sheet:0 -2px 12px rgba(0,0,0,.18);
+  --sh-alert:0 4px 16px rgba(0,0,0,.25);
+  --disp-glow:0 0 12px rgba(255,194,102,.2);
+  --led-glow:0 0 6px rgba(43,212,107,.6);
+  --led-glow-wait:0 0 6px rgba(255,194,102,.6);
+  --ring-sel:inset 0 0 0 2px var(--accent);
+  --focus:2px solid var(--accent);--focus-offset:2px;
+
+  /* Familias (paleta-familias.md): -t tinte (qué es) · -b barra (cuánto) · -x texto e icono (de qué) */
+  --f-casa-t:#E4DACA;--f-casa-b:#A8895F;--f-casa-x:#614A26; /* arena */
+  --f-ali-t:#D4DDD0;--f-ali-b:#557556;--f-ali-x:#325936;    /* salvia */
+  --f-res-t:#E6DDB4;--f-res-b:#BE9E3A;--f-res-x:#5E4A0C;    /* mostaza */
+  --f-tra-t:#D4DCEB;--f-tra-b:#759ADF;--f-tra-x:#2F4B83;    /* cielo */
+  --f-coc-t:#D5DAE2;--f-coc-b:#8B9FBE;--f-coc-x:#39465C;    /* pizarra */
+  --f-sal-t:#CFDEE0;--f-sal-b:#4D8E98;--f-sal-x:#1F5A62;    /* agua */
+  --f-sus-t:#DDD8EA;--f-sus-b:#8878C0;--f-sus-x:#4B3F8A;    /* lavanda */
+  --f-oci-t:#E8D5DE;--f-oci-b:#B86A8C;--f-oci-x:#7F2F52;    /* rosa */
+  --f-rop-t:#E0D7E6;--f-rop-b:#805E98;--f-rop-x:#583770;    /* ciruela */
+  --f-reg-t:#EAD3D3;--f-reg-b:#B8676A;--f-reg-x:#82333A;    /* arcilla */
+  --f-imp-t:#E0DCC4;--f-imp-b:#857929;--f-imp-x:#5A500E;    /* oliva */
+  --f-otr-t:#DEDCD7;--f-otr-b:#9A968C;--f-otr-x:#4F4C45;    /* piedra */
+
+  /* Cuentas (D-2): eligen familia como una categoría; la deuda se pinta rayada sobre su familia */
+  --stripe-debt:repeating-linear-gradient(135deg,var(--f-coc-b) 0 5px,var(--f-coc-t) 5px 8px);
 }
-* { box-sizing: border-box; margin: 0; }
-html { background: var(--bg); }
-body { font-family: var(--font-sans); color: var(--ink); background: var(--bg); }
-.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+:root[data-theme="dark"]{
+  /* Base Instrumento */
+  --bg:#161719;--surface:#1E1F22;--raised:#28292D;--well:#131416;
+  --border:#393A3F;--border-strong:#4A4B51;
+  --text:#EDECE8;--text-dim:#A09F9B;
+  --chip:#161719;--lift:#393A3F;--idle:#6B6A66;
+
+  /* Acción */
+  --accent:#FF5A1F;--on-accent:#161719;--accent-text:#FF7B47;
+
+  /* Display */
+  --disp:#0E0F10;--disp-line:#26272B;--disp-text:#FFC266;--disp-dim:#9A8D74;--disp-ink:#EDECE8;
+  --ok:#2BD46B;
+
+  /* Señal y destructivo */
+  --pos:#5BD08A;--neg:#F2766B;--on-neg:#161719;
+
+  /* Velo */
+  --scrim:rgba(0,0,0,.6);
+
+  /* Sombras y anillos (en oscuro los hundidos llevan anillo de borde) */
+  --sh-display:inset 0 2px 6px rgba(0,0,0,.6),inset 0 0 0 1px var(--disp-line);
+  --sh-well:inset 0 1px 2px rgba(0,0,0,.4),inset 0 0 0 1px var(--border);
+  --sh-thumb:0 1px 2px rgba(0,0,0,.45);
+  --sh-knob:0 1px 2px rgba(0,0,0,.5);
+  --sh-key:0 2px 0 rgba(0,0,0,.4);
+  --sh-sheet:0 -2px 12px rgba(0,0,0,.5);
+  --sh-alert:0 4px 16px rgba(0,0,0,.5);
+  --disp-glow:0 0 12px rgba(255,194,102,.25);
+
+  /* Familias, oscuro */
+  --f-casa-t:#2F251D;--f-casa-b:#C0A389;--f-casa-x:#E1CDB8;
+  --f-ali-t:#202B22;--f-ali-b:#628D6C;--f-ali-x:#B9DBBD;
+  --f-res-t:#2D2716;--f-res-b:#BA9B39;--f-res-x:#E7DEBD;
+  --f-tra-t:#1F2838;--f-tra-b:#799EE3;--f-tra-x:#BBD1FC;
+  --f-coc-t:#22282F;--f-coc-b:#8AA1BE;--f-coc-x:#C5D2E5;
+  --f-sal-t:#182B2E;--f-sal-b:#4C9DA6;--f-sal-x:#A7DCE2;
+  --f-sus-t:#272538;--f-sus-b:#8F81D3;--f-sus-x:#D0CAFD;
+  --f-oci-t:#33222A;--f-oci-b:#C5749C;--f-oci-x:#F4C0D5;
+  --f-rop-t:#2D2332;--f-rop-b:#A27CBA;--f-rop-x:#E1C5EF;
+  --f-reg-t:#352221;--f-reg-b:#C17676;--f-reg-x:#F6C2C1;
+  --f-imp-t:#272A1A;--f-imp-b:#828D50;--f-imp-x:#D1D6A9;
+  --f-otr-t:#292724;--f-otr-b:#98958E;--f-otr-x:#D4D0C8;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   TABLA DE BARRIDO: nombre viejo → token canónico
+   ─────────────────────────────────────────────────────────────────────────────
+   Familias (las 12, mismos prefijos; solo cambia el sufijo y se añade f-):
+     --<fam>-t            → --f-<fam>-t        (fam: casa ali res tra coc sal sus oci rop reg imp otr)
+     --<fam>-s            → --f-<fam>-b
+     --<fam>-d            → --f-<fam>-x
+   Borrar de cada fichero: todo el bloque :root / [data-theme] propio (incluido el
+   [data-theme="dark"] heredado de los B-, con otra paleta oscura) y pegar este.
+   BD-*: sus valores oscuros estaban en :root → ahora solo viven en [data-theme="dark"].
+
+   Valores en crudo → token:
+     #17693A (cifra de ingreso, LED fuera del Display)   → var(--pos)   (sin brillo)
+     rgba(29,30,32,.55|.62|.34)                          → var(--scrim)
+     #F8F7F4 usado como fondo de icono sobre tinte        → var(--chip)
+     #F8F7F4 usado como control secundario sobre tinte    → var(--lift)
+     inset 0 2px 6px rgba(0,0,0,.35|.6)[, inset 0 0 0 1px var(--disp-line)] → var(--sh-display)
+     inset 0 1px 2px rgba(0,0,0,.12|.14|.15|.4|.45)[, inset 0 0 0 1px var(--border)]
+       e inset 0 1px 1px rgba(0,0,0,.12)                → var(--sh-well)
+     0 1px 2px rgba(0,0,0,.15|.45)                       → var(--sh-thumb)
+     0 1px 2px rgba(0,0,0,.25|.5)                        → var(--sh-knob)
+     0 2px 0 rgba(0,0,0,.18|.4)                          → var(--sh-key)   (solo primario y añadir)
+     0 -2px 12px rgba(0,0,0,.14|.18)                     → var(--sh-sheet)
+     0 4px 16px rgba(0,0,0,.25)                          → var(--sh-alert)
+     0 0 12px rgba(255,194,102,.2|.25)                   → var(--disp-glow)
+     0 0 6px rgba(43,212,107,.6)                         → var(--led-glow)
+     0 0 6px rgba(255,194,102,.6)                        → var(--led-glow-wait)
+     inset 0 0 0 2px var(--accent)                       → var(--ring-sel)
+     0 0 0 2px var(--surface), 0 0 0 4px var(--accent)   → var(--ring-sel)   (anillo exterior eliminado)
+     outline 2px var(--accent) / anillo 0 0 0 2px var(--text) de foco → outline:var(--focus);outline-offset:var(--focus-offset)
+     inset 0 0 0 1px var(--<fam>-s) (borde de tarjeta elegida) → quitar (sin borde)
+     repeating-linear-gradient(135deg, var(--coc-s) 0 5px, var(--coc-t) 5px 8px) → var(--stripe-debt)
+     otr-s / otr-t usados como gris de gráfico           → var(--idle)
+
+   Radios y cifras:
+     border-radius 24px                                  → var(--radius-xl)
+     border-radius 2-6px en barras, columnas, segmentos  → var(--radius-xs)
+     border-radius 8px y 14px                            → var(--radius)
+     cifra del Display 52|56|64 (hero) / 44|48 / 34      → var(--disp-xl) / var(--disp-l) / var(--disp-m)
+     line-height de la cifra del Display 1|1.1           → var(--lh-disp)
+
+   Decisiones aplicadas:
+     D-1 destructivo: entrada «Borrar» = color:var(--neg) + border-color:var(--neg);
+         confirmación = background:var(--neg); color:var(--on-neg).
+     D-2 cuentas: Corriente → --f-tra-*, Ahorro → --f-ali-*, Hucha → --f-imp-*,
+         Deuda → --f-coc-* con var(--stripe-debt). La familia se asigna en datos, no en CSS.
+     D-3 ingresos: ficha background:var(--well), sin borde, icono color:var(--text),
+         cifra «+» color:var(--pos).
+   Tokens que desaparecen: --bad (spec, no se importa).
+   ───────────────────────────────────────────────────────────────────────────── */
