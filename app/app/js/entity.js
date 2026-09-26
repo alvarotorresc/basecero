@@ -66,12 +66,16 @@ export function tileHtml({ fam = null, icon: key = "", size = 40, onTint = false
  *  @param {string} [o.icon]
  *  @param {string} o.label        Se escapa aquí.
  *  @param {boolean} [o.selected]
+ *  @param {boolean|null} [o.expanded]  Solo si la baldosa despliega algo (las subcategorías de
+ *                                 B-Gasto): aria-expanded. Desplegar NO es seleccionar (§9), así
+ *                                 que no pinta nada: el estado lo lleva aria-pressed. null → sin atributo.
  *  @param {string} [o.id]
  *  @param {object} [o.data]       data-* para el wire() de la pantalla.
  *  @returns {string} HTML */
-export function pickTileHtml({ fam = null, icon: key = "", label, selected = false, id = "", data = null }) {
+export function pickTileHtml({ fam = null, icon: key = "", label, selected = false, expanded = null, id = "", data = null }) {
   const fc = famClass(fam);
-  return `<button type="button" class="${cls("ent-pick", fc, !fc && "ent-neutral")}" aria-pressed="${selected ? "true" : "false"}"${attrs({ id, data })}>`
+  const exp = typeof expanded === "boolean" ? ` aria-expanded="${expanded}"` : "";
+  return `<button type="button" class="${cls("ent-pick", fc, !fc && "ent-neutral")}" aria-pressed="${selected ? "true" : "false"}"${exp}${attrs({ id, data })}>`
     + `${entityIcon(key || (fc ? fam : "otr"), 20)}<span class="ent-pick-label">${escHtml(label)}</span></button>`;
 }
 
