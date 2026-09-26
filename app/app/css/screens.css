@@ -827,14 +827,23 @@
 /* === pantalla: movimiento-detalle === */
 /* Detalle de un movimiento (B-Movimiento-Detalle/BD-), aviso de Borrar (B-Borrar, la vista previa
    de modal.js) y visor de foto (§9, D-impl-4). Vista y edición comparten anatomía. */
-.mdet { display: flex; flex-direction: column; gap: var(--sp-12); }
+/* Llena el alto de la subpantalla (sin tab bar: 12 arriba y 24 abajo de main#screen) para que las
+   acciones queden abajo del todo, como en B-Movimiento-Detalle (.mdet-foot, margin-top:auto). */
+.mdet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  min-height: calc(100dvh - var(--sp-12) - var(--sp-24) - env(safe-area-inset-bottom, 0px));
+}
 
-/* Vista: el comercio es la etiqueta del Display, 15/600 en --disp-ink (I-65), y la cifra con signo. */
+/* Cabecera de 44 pegada a la pila de 12, como en B-Movimiento-Detalle (sin el alto de 48 ni el
+   margen de 16 de la cabecera de subpantalla genérica). */
+.mdet .sub-header { min-height: 44px; margin-bottom: 0; }
+
+/* Vista: el comercio es la etiqueta fuerte del Display (displayHtml `labelStrong`); un nombre largo
+   se recorta en una línea. */
 .mdet-disp-view .disp-label {
   display: block;
-  font-size: var(--fs-15);
-  font-weight: 600;
-  color: var(--disp-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -923,7 +932,12 @@
 .mdet-linked-label { font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
 .mdet-linked-meta { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
 
-/* Filas de ajuste en un contenedor --surface con borde; filetes sangrados 8 (B-Movimiento-Detalle). */
+/* La flecha de la tarjeta de categoría, en el -x de su familia (B-Movimiento-Detalle). */
+.mdet .ent-chosen-detail .ent-chev { color: var(--fx); }
+
+/* Filas de ajuste en un contenedor --surface con borde; filetes sangrados 8, fila con 12 a la
+   izquierda y 8 a la derecha, etiqueta en dim y el pomo apagado en --raised (B-Movimiento-Detalle;
+   F-21 y la etiqueta en tinta de F-35, retiradas, Álvaro 2026-09-27). */
 .mdet-group {
   display: flex;
   flex-direction: column;
@@ -933,6 +947,9 @@
   border: 1px solid var(--border);
 }
 .mdet-div { height: 1px; margin: 0 var(--sp-8); background: var(--border); }
+.mdet-group .ent-set { padding: 0 var(--sp-8) 0 var(--sp-12); }
+.mdet-group .ent-set-label { color: var(--text-dim); }
+.mdet-group .ctl-switch[aria-checked="false"] .ctl-switch-knob { background: var(--raised); }
 /* Valor largo (nombre de cuenta o etiqueta): se recorta en vez de partir la fila. La muestra de la
    cuenta va a 8 del valor, como en el mockup (la fila separa a 12). */
 .mdet-group .ent-set-value { min-width: 0; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1009,10 +1026,10 @@
 .mdet-note-text { font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-body); color: var(--text); overflow-wrap: anywhere; }
 .mdet-note-field { flex: 1; min-width: 0; }
 
-/* Abajo: vista, «Editar» primario a todo el ancho (B-Movimiento-Detalle) y, debajo, «Borrar»
-   (entrada destructiva, C5) solo en su fila: el mockup lo pone junto a «Duplicar», bloqueado (B-5).
-   Edición, «Guardar cambios» y «Cancelar». */
-.mdet-foot { display: flex; flex-direction: column; gap: var(--sp-8); margin-top: var(--sp-12); }
+/* Abajo del todo: vista, «Editar» primario a todo el ancho (B-Movimiento-Detalle) y, debajo,
+   «Borrar» (entrada destructiva, C5, D-1) solo en su fila: el mockup lo pone en una rejilla de dos
+   junto a «Duplicar», bloqueado (B-5). Edición, «Guardar cambios» y «Cancelar». */
+.mdet-foot { display: flex; flex-direction: column; gap: var(--sp-8); margin-top: auto; }
 .mdet-actions { display: flex; flex-direction: column; gap: var(--sp-8); }
 .mdet-actions-edit { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-4); }
 .mdet-actions-edit .btn-tertiary { align-self: center; }
