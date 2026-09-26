@@ -234,7 +234,7 @@ export async function renderEtiquetas(container, onBack) {
           ${open.map(cardHtml).join("")}
         </section>` : ""}
         ${archived.length ? `<section class="et-sec" aria-labelledby="et-arch-h">
-          ${sectionHeaderHtml({ title: t("etiquetas.archived"), count: archived.length, id: "et-arch-h" })}
+          ${sectionHeaderHtml({ title: t("etiquetas.archived"), count: archived.length, id: "et-arch-h", dim: true })}
           ${archived.map(archivedRowHtml).join("")}
         </section>` : ""}`;
     }

@@ -689,7 +689,7 @@ export const ES = {
   },
   etiquetas: {
     title: "Etiquetas de proyecto",
-    hint: "Cruzan categorías: un viaje, una reforma, un cumple.",
+    hint: "Cruzan las categorías: juntan un viaje, una reforma o un cumple caiga donde caiga cada gasto.",
     empty: "Todavía no hay etiquetas.",
     open: "Abiertas",
     archived: "Archivadas",

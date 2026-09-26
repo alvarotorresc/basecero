@@ -661,7 +661,7 @@ export const EN = {
   },
   etiquetas: {
     title: "Project tags",
-    hint: "They cross categories: a trip, a renovation, a birthday.",
+    hint: "They cross categories: they group a trip, a renovation or a birthday no matter which category each expense falls under.",
     empty: "No tags yet.",
     open: "Open",
     archived: "Archived",
