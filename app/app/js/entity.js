@@ -97,14 +97,20 @@ export function pickTileHtml({ fam = null, icon: key = "", label, selected = fal
  *  @param {boolean} [o.tag]
  *  @param {string} [o.icon]   Por defecto: "income", "tag" o la clave de la familia.
  *  @param {string} o.label    Se escapa aquí.
+ *  @param {28|36} [o.size]    Por defecto 28. 36 (B-Recibo, F-41 retirada): píldora de 36, icono 16
+ *                             dentro de un círculo --raised de 26 y texto 13/600, con el mismo color
+ *                             por variante (el ingreso sigue neutro, C9).
  *  @returns {string} HTML */
-export function badgeHtml({ fam = null, income = false, tag = false, icon: key = "", label }) {
+export function badgeHtml({ fam = null, income = false, tag = false, icon: key = "", label, size = 28 }) {
   let variant;
   let iconKey = key;
   if (income) { variant = "ent-badge-income"; iconKey ||= "income"; }
   else if (tag) { variant = "ent-badge-tag"; iconKey ||= "tag"; }
   else if (famClass(fam)) { variant = famClass(fam); iconKey ||= fam; }
   else { variant = "ent-badge-income"; iconKey ||= "otr"; }
+  if (size === 36) {
+    return `<span class="ent-badge ent-badge-36 ${variant}"><span class="ent-badge-ico">${entityIcon(iconKey, 16)}</span><span class="ent-badge-label">${escHtml(label)}</span></span>`;
+  }
   return `<span class="ent-badge ${variant}">${entityIcon(iconKey, 14)}<span class="ent-badge-label">${escHtml(label)}</span></span>`;
 }
 
