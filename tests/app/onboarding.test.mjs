@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { needsOnboarding, canLeaveAccounts, accountDraft } from "../../app/app/js/onboarding-steps.js";
+import { needsOnboarding, canLeaveAccounts, accountDraft, ACCOUNT_KINDS, accountKindOf, stepProgress, ONB_STEP_COUNT } from "../../app/app/js/onboarding-steps.js";
 import { SQL } from "../../app/app/js/sql.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
@@ -32,6 +32,38 @@ test("accountDraft: parsea coma decimal y respeta el signo", () => {
 test("accountDraft: liability siempre en negativo", () => {
   assert.equal(accountDraft({ name: "Coche", type: "liability", raw: "300" }).openingBalanceCents, -30000);
   assert.equal(accountDraft({ name: "Coche", type: "liability", raw: "-300" }).openingBalanceCents, -30000);
+});
+
+test("accountDraft: la baldosa Hucha crea una savings con familia imp (D-impl-2)", () => {
+  assert.deepEqual(accountDraft({ name: "Fondo", type: "hucha", raw: "1250,00" }),
+    { name: "Fondo", type: "savings", openingBalanceCents: 125000, fam: "imp" });
+});
+
+test("accountDraft: solo la Hucha lleva fam (las demás, sin la clave)", () => {
+  for (const type of ["checking", "savings", "liability"]) {
+    assert.equal("fam" in accountDraft({ name: "X", type, raw: "1" }), false, type);
+  }
+});
+
+test("ACCOUNT_KINDS: las cuatro baldosas de B-Onb-Cuentas, en su orden, con tipo de BD válido", () => {
+  assert.deepEqual(ACCOUNT_KINDS.map((k) => k.id), ["checking", "savings", "hucha", "liability"]);
+  assert.deepEqual(ACCOUNT_KINDS.map((k) => k.type), ["checking", "savings", "savings", "liability"]);
+  assert.deepEqual(ACCOUNT_KINDS.map((k) => k.fam), ["tra", "ali", "imp", "coc"]);
+});
+
+test("accountKindOf: una savings con familia imp se lee como Hucha; el resto, su tipo", () => {
+  assert.equal(accountKindOf({ type: "savings" }, "imp"), "hucha");
+  assert.equal(accountKindOf({ type: "savings" }, "ali"), "savings");
+  assert.equal(accountKindOf({ type: "checking" }, "imp"), "checking");
+  assert.equal(accountKindOf({ type: "liability" }, "coc"), "liability");
+});
+
+test("stepProgress: Bienvenida sin progreso; Cuentas, Ajustes y Periodo son 1, 2 y 3 de 3 (B-8 fuera)", () => {
+  assert.equal(ONB_STEP_COUNT, 3);
+  assert.equal(stepProgress(0), null);
+  assert.deepEqual(stepProgress(1), { current: 1, total: 3 });
+  assert.deepEqual(stepProgress(2), { current: 2, total: 3 });
+  assert.deepEqual(stepProgress(3), { current: 3, total: 3 });
 });
 
 // ---- SQL.deleteEmptyAccount (D9): reproduce el statement sobre la BD de helpers.mjs, mismo
