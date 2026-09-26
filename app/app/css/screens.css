@@ -210,6 +210,107 @@
 /* === fin: informe === */
 
 /* === pantalla: inicio === */
+/* Inicio (S1; B-Home, BD-Home, B-Inicio-Vacio, BD-Inicio-Vacio). Pila de bloques a 12 (§8). */
+.inicio { display: flex; flex-direction: column; gap: var(--sp-12); }
+.inicio > .root-header { margin-bottom: 0; }
+
+/* Bloque que navega entero: un <button> encima que lo cubre (un solo foco, nada anidado). Al
+   pulsarlo se hunde el bloque, no el botón invisible (§10). */
+.inicio-tap { position: relative; min-width: 0; }
+.inicio-tap > :first-child { height: 100%; transition: transform 120ms ease-out; }
+.inicio-account > :first-child { height: 100%; }
+.inicio-tap:has(> .inicio-overlay:active) > :first-child { transform: scale(.98); }
+.inicio-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: var(--sp-16);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.inicio-overlay:active { transform: none; }
+.inicio-chev { display: flex; }
+@media (prefers-reduced-motion: reduce) {
+  .inicio-tap > :first-child { transition: none; }
+  .inicio-tap:has(> .inicio-overlay:active) > :first-child { transform: none; }
+}
+
+/* Cuenta + compartidos y Semana + Ahorras: rejillas de 2 y de 3 (B-Home). Solo, a todo el ancho. */
+.inicio-duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-12); }
+.inicio-duo > :only-child { grid-column: 1 / -1; }
+.inicio-duo .bento { min-height: 140px; }
+.inicio-shared .btn-secondary { width: 100%; }
+.inicio-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-12); }
+.inicio-trio > .inicio-week { grid-column: span 2; }
+.inicio-trio > :only-child { grid-column: 1 / -1; }
+
+/* Esta semana: etiqueta 13/600 dim y total mono 15/600 (no es un título de sección). */
+.inicio-week-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
+.inicio-label { margin: 0; font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.inicio-week-total { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+/* Semana sin gasto (B-Inicio-Vacio): columnas de 6 en pozo, hoy en tinta. */
+.inicio-week.is-zero .cols { height: 32px; }
+.inicio-week.is-zero .col-bar { min-height: 6px; background: var(--well); box-shadow: var(--sh-well); }
+.inicio-week.is-zero .col.is-today .col-bar { background: var(--text); box-shadow: none; }
+
+/* Ahorras (F-09): lo ahorrado mono 13/600 en tinta («−» que avisa en --neg, C4) y «de» 12 dim. */
+.inicio-savings { gap: var(--sp-8); }
+.inicio-savings-foot { display: flex; flex-direction: column; gap: var(--sp-2); }
+.inicio-savings-amt { font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text); overflow-wrap: anywhere; }
+.inicio-savings-amt.is-neg { color: var(--neg); }
+.inicio-savings-of { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+
+/* El aviso: tarjeta de entidad con el tinte de su familia (C6), o neutra en --surface con borde
+   cuando no habla de una categoría (C11). Cifras en tinta (C7). */
+.inicio-notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border-radius: var(--radius-lg);
+  background: var(--ft);
+}
+.inicio-notice.is-neutral { background: var(--surface); border: 1px solid var(--border); }
+.inicio-notice-top { display: flex; align-items: center; gap: var(--sp-12); }
+.inicio-notice-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.inicio-notice-title { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); }
+.inicio-notice-line2 { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--fx, var(--text-dim)); }
+.inicio-notice-amt { font-weight: 600; color: var(--text); }
+.inicio-notice-left { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+.inicio-notice-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-8); }
+
+/* Una línea de ayuda en lugar de la lista o de la barra (§7: una por sección como mucho). */
+.inicio-help { margin: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+.inicio-list-help { padding: 0 var(--sp-12) var(--sp-8); }
+
+/* Listas (Últimos movimientos, Queda por pagar): el terciario de la cabecera y las cabeceras de
+   día a la altura del texto de las filas (relleno 12 de .ent-row). */
+.inicio-movements .box-head .btn-tertiary,
+.inicio-pending .box-head .btn-tertiary { padding: 0 var(--sp-4); }
+.inicio-movements .ent-day { padding: var(--sp-4) var(--sp-12) 0; }
+.inicio-left-row {
+  min-height: 48px;
+  padding: 0 var(--sp-12);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  border-top: 1px solid var(--border);
+}
+.inicio-left-label { flex: 1; min-width: 0; font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-title); color: var(--text); }
+.inicio-left-amt { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+.inicio-left-amt.is-neg { color: var(--neg); }
+
+/* Vacío (B-Inicio-Vacio): la flecha cuelga del bloque y baja hasta el botón de añadir; el margen
+   de abajo (con los 24 de main#screen) le guarda su sitio sobre la barra de pestañas. */
+.inicio-empty { position: relative; margin-bottom: calc(var(--sp-24) * 2); }
+.inicio-empty .empty-arrow { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); }
 /* === fin: inicio === */
 
 /* === pantalla: liquidar === */

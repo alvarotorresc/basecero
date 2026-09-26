@@ -24,7 +24,6 @@ export const PENDIENTES = new Set([
   "js/screens/categorias.js",
   "js/screens/etiquetas.js",
   "js/screens/gasto-por-categoria.js",
-  "js/screens/inicio.js",
   "js/screens/movimientos.js",
   "js/screens/onboarding.js",
   "js/screens/patrimonio.js",
