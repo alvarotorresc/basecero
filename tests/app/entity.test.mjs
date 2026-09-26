@@ -247,6 +247,24 @@ test("txRowHtml: height 52 y amountWeight 500 (B-Home); por defecto, 60 y 600", 
   assert.equal(decl(".ent-row.ent-row-w500 .ent-amount", "font-weight"), "500");
 });
 
+test("txRowHtml: amountNoteHtml va tal cual y gana a amountNote; sin él, amountNote se escapa como siempre", () => {
+  const html = txRowHtml({ fam: "res", title: "Casa Paco", amountHtml: AMOUNT, amountNote: "<i>x</i>", amountNoteHtml: 'con Marta, de <span class="num">24,00</span>' });
+  assert.match(html, /<span class="ent-amount-note">con Marta, de <span class="num">24,00<\/span><\/span>/);
+  assert.ok(!html.includes("&lt;i&gt;"), "amountNote no se pinta si llega amountNoteHtml");
+  const plano = txRowHtml({ fam: "res", title: "X", amountHtml: AMOUNT, amountNote: "<i>tu parte</i>" });
+  assert.match(plano, /<span class="ent-amount-note">&lt;i&gt;tu parte&lt;\/i&gt;<\/span>/);
+  assert.ok(!txRowHtml({ fam: "res", title: "X", amountHtml: AMOUNT }).includes("ent-amount-note"));
+});
+
+test("filterChipHtml: trailCheck pone el check de 16 detrás al estar elegido; sin él, nada cambia", () => {
+  const on = filterChipHtml({ fam: "ali", label: "Alimentación", selected: true, trailCheck: true });
+  assert.match(on, /<span class="ent-chip-label">Alimentación<\/span><span class="ent-chip-trail" aria-hidden="true"><svg[^>]*width="16"/);
+  assert.ok(!filterChipHtml({ fam: "ali", label: "A", selected: false, trailCheck: true }).includes("ent-chip-trail"), "sin elegir, sin check");
+  assert.ok(!filterChipHtml({ fam: "ali", label: "A", selected: true }).includes("ent-chip-trail"), "por defecto, sin check");
+  assert.ok(!filterChipHtml({ fam: "ali", label: "A", selected: true, check: true }).includes("ent-chip-trail"), "check (delantero) no lo activa");
+  assert.equal(decl(".ent-chip[aria-pressed=\"true\"] .ent-chip-trail", "color"), "var(--accent-text)");
+});
+
 test("sectionHeaderHtml: fam (texto -x; en grupo, Unbounded), ttl y dim; por defecto, sin modificadores", () => {
   assert.equal(sectionHeaderHtml({ title: "Activas" }).includes("is-"), false);
   assert.match(sectionHeaderHtml({ title: "Activas", fam: "sus" }), /class="ent-sec ent-sec-title fam-sus is-fam"/);

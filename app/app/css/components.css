@@ -904,6 +904,8 @@ button.ent-chosen { cursor: pointer; }
 .ent-chip-tag { border: 1px solid var(--border); }
 .ent-chip[aria-pressed="true"] { box-shadow: var(--ring-sel); font-weight: 700; }
 .ent-chip.ent-neutral[aria-pressed="true"] { box-shadow: none; border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+/* Check detrás de la etiqueta (filterChipHtml `trailCheck`, B-Movimientos-Filtros): 16 en --accent-text. */
+.ent-chip[aria-pressed="true"] .ent-chip-trail { flex: none; display: flex; color: var(--accent-text); }
 
 /* --- Fila de movimiento (§9, B-Movimientos): 60; baldosa 40 · nombre 15/600 · línea 2 12/500
    --fx · cifra mono 15/600 en tinta, «+» en --pos (C4, C7). Pulsar: fondo, no escala. --- */
