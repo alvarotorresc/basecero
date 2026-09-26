@@ -10,9 +10,11 @@
 
   /* Escala de cuerpo (el 16 solo en <input>, para que iOS no haga zoom) */
   --fs-12:12px;--fs-13:13px;--fs-14:14px;--fs-15:15px;--fs-input:16px;--fs-17:17px;--fs-20:20px;--fs-24:24px;
+  --fs-30:30px; /* cifra grande de un bloque con familia (B-Home «Ahorras 47 %») */
   --lh-title:1.2;--lh-body:1.5;
 
-  /* Cifra del Display: hero (Inicio, Patrimonio, Bienvenida, Gasto) · subpantalla · compacta (Movimientos) */
+  /* Cifra del Display: hero · subpantalla · compacta. Son los tamaños por defecto: cada pantalla puede
+     pedir el suyo (--disp-fs en línea) para quedar igual que su mockup (Álvaro 2026-09-27). */
   --disp-xl:52px;--disp-l:44px;--disp-m:34px;--lh-disp:1.05;
 
   /* Espaciado: rejilla 2/4/8/12/16/24; el 20 solo dentro del Display */
@@ -72,6 +74,9 @@
 
   /* Cuentas (D-2): eligen familia como una categoría; la deuda se pinta rayada sobre su familia */
   --stripe-debt:repeating-linear-gradient(135deg,var(--f-coc-b) 0 5px,var(--f-coc-t) 5px 8px);
+
+  /* Tinta sobre el sólido de familia (-b): el icono de la baldosa rellena (B-Ajustes, B-Categorias) */
+  --on-fam:#F8F7F4;
 }
 
 :root[data-theme="dark"]{
@@ -121,6 +126,9 @@
   --f-reg-t:#553231;--f-reg-b:#C17676;--f-reg-x:#FEBEBD;
   --f-imp-t:#3C4123;--f-imp-b:#828D50;--f-imp-x:#D1D893;
   --f-otr-t:#3F3C39;--f-otr-b:#98958E;--f-otr-x:#D4D0C8;
+
+  /* Tinta sobre el sólido de familia: en oscuro, el fondo (BD-Ajustes) */
+  --on-fam:#1D1E20;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -153,15 +161,18 @@
      inset 0 0 0 2px var(--accent)                       → var(--ring-sel)
      0 0 0 2px var(--surface), 0 0 0 4px var(--accent)   → var(--ring-sel)   (anillo exterior eliminado)
      outline 2px var(--accent) / anillo 0 0 0 2px var(--text) de foco → outline:var(--focus);outline-offset:var(--focus-offset)
-     inset 0 0 0 1px var(--<fam>-s) (borde de tarjeta elegida) → quitar (sin borde)
+     inset 0 0 0 1px var(--<fam>-s) (borde de tarjeta elegida) → RETIRADO (Álvaro 2026-09-27: igual que
+       el mockup): la tarjeta lleva borde 1px --f-<fam>-b donde el original lo pinta
      repeating-linear-gradient(135deg, var(--coc-s) 0 5px, var(--coc-t) 5px 8px) → var(--stripe-debt)
-     otr-s / otr-t usados como gris de gráfico           → var(--idle)
+     otr-s / otr-t usados como gris de gráfico           → RETIRADO (Álvaro 2026-09-27): --f-otr-b donde
+       el original lo pinta
 
    Radios y cifras:
      border-radius 24px                                  → var(--radius-xl)
      border-radius 2-6px en barras, columnas, segmentos  → var(--radius-xs)
      border-radius 8px y 14px                            → var(--radius)
-     cifra del Display 52|56|64 (hero) / 44|48 / 34      → var(--disp-xl) / var(--disp-l) / var(--disp-m)
+     cifra del Display 52|56|64 (hero) / 44|48 / 34      → RETIRADO (Álvaro 2026-09-27): el tamaño de su
+       mockup (--disp-fs); xl/l/m quedan como atajos de 52/44/34
      line-height de la cifra del Display 1|1.1           → var(--lh-disp)
 
    Decisiones aplicadas:

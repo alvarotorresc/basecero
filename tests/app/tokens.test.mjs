@@ -78,7 +78,7 @@ const sha256 = (buf) => createHash("sha256").update(buf).digest("hex");
 // K2 (DESIGN §13): tokens.css es la copia BYTE A BYTE de design/design-system/tokens-B.css. La
 // constante fija la copia en CI (design/ está ignorado en git); si tokens-B cambia, se vuelve a
 // copiar con `cp` y se actualiza aquí, nunca se edita tokens.css a mano.
-const TOKENS_B_SHA256 = "223c4bae691f335a847ca759fae98462a0c5913bac438e88ac2b197c556ed54c";
+const TOKENS_B_SHA256 = "2c2172a3ac1db8283afeecf44e3d306f29d1d8ecec64a89baa04e33ba7338ba0";
 const TOKENS_B = fileURLToPath(new URL("../../design/design-system/tokens-B.css", import.meta.url));
 
 test("tokens.css (K2): su sha256 es el de la copia canónica de tokens-B.css", () => {
