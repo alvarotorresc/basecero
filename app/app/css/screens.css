@@ -1,0 +1,49 @@
+/* BaseCero · estilos por pantalla del sistema B (plan del rediseño B, §1 «CSS»).
+   Una sección por fichero de js/screens/, en su orden. Cada PR de pantalla (S*) escribe SOLO dentro
+   de la suya, así las PRs en paralelo no se pisan. Solo lee tokens con var(): design-rules.test.mjs
+   comprueba colores, radios, tamaños de letra y naranja igual que en components.css. */
+
+/* === pantalla: ajustes === */
+/* === fin: ajustes === */
+
+/* === pantalla: categorias === */
+/* === fin: categorias === */
+
+/* === pantalla: etiquetas === */
+/* === fin: etiquetas === */
+
+/* === pantalla: gasto-por-categoria === */
+/* === fin: gasto-por-categoria === */
+
+/* === pantalla: informe === */
+/* === fin: informe === */
+
+/* === pantalla: inicio === */
+/* === fin: inicio === */
+
+/* === pantalla: liquidar === */
+/* === fin: liquidar === */
+
+/* === pantalla: movimientos === */
+/* === fin: movimientos === */
+
+/* === pantalla: onboarding === */
+/* === fin: onboarding === */
+
+/* === pantalla: patrimonio === */
+/* === fin: patrimonio === */
+
+/* === pantalla: periodo-nuevo === */
+/* === fin: periodo-nuevo === */
+
+/* === pantalla: recurrentes === */
+/* === fin: recurrentes === */
+
+/* === pantalla: registro === */
+/* === fin: registro === */
+
+/* === pantalla: semana === */
+/* === fin: semana === */
+
+/* === pantalla: suscripciones === */
+/* === fin: suscripciones === */

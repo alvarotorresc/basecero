@@ -97,9 +97,9 @@ export const ES = {
   },
   main: {
     banner: {
-      locked: "⚠ BaseCero ya está abierta en otra pestaña o ventana. Ciérrala y reintenta; mientras tanto, lo que hagas aquí NO se guardará. ",
-      memory: "⚠ Este navegador no soporta almacenamiento persistente: tus datos NO se guardarán al cerrar.",
-      boot_failed: "⚠ BaseCero no ha podido arrancar: {error}. Recarga la página.",
+      locked: "BaseCero ya está abierta en otra pestaña o ventana. Ciérrala y reintenta; mientras tanto, lo que hagas aquí NO se guardará. ",
+      memory: "Este navegador no soporta almacenamiento persistente: tus datos NO se guardarán al cerrar.",
+      boot_failed: "BaseCero no ha podido arrancar: {error}. Recarga la página.",
     },
     tabs: {
       inicio: "Inicio",

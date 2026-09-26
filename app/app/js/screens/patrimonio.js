@@ -345,11 +345,11 @@ export async function renderPatrimonio(container) {
     const editing = !!state.editingAccountId;
 
     container.innerHTML = `
-      ${subHeaderHtml({ id: "acc-back", title: editing ? t("patrimonio.account.title.edit") : t("patrimonio.accounts.new") })}
+      ${subHeaderHtml({ id: "cuenta-back", title: editing ? t("patrimonio.account.title.edit") : t("patrimonio.accounts.new") })}
 
       <label class="field field-stack" style="margin-bottom:18px;">
         <span class="field-label">${t("common.name")}</span>
-        <input type="text" id="acc-name" value="${escAttr(f.name)}" placeholder="${t("common.egPlaceholder", { example: "Revolut" })}">
+        <input type="text" id="cuenta-name" value="${escAttr(f.name)}" placeholder="${t("common.egPlaceholder", { example: "Revolut" })}">
       </label>
 
       <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
@@ -362,8 +362,8 @@ export async function renderPatrimonio(container) {
       <div style="display:flex; flex-direction:column; gap:4px; padding-bottom:8px; margin-bottom:8px; border-bottom:2px solid var(--accent);">
         <span style="font-size:13px;font-weight:500;color:var(--accent);">${t("patrimonio.account.openingBalance")}</span>
         <div class="amount-display" style="align-items:center;">
-          <button type="button" class="icon-btn" id="acc-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;">${f.sign}</button>
-          <input type="text" inputmode="decimal" id="acc-raw" value="${escAttr(f.raw)}" placeholder="0"
+          <button type="button" class="icon-btn" id="cuenta-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;">${f.sign}</button>
+          <input type="text" inputmode="decimal" id="cuenta-raw" value="${escAttr(f.raw)}" placeholder="0"
             style="border:0;background:none;color:var(--ink);font:600 36px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
           <span class="amount-currency" style="font-size:17px;">${currencySymbol()}</span>
           <span style="width:2px;height:30px;background:var(--accent);margin-left:4px;flex-shrink:0;" aria-hidden="true"></span>
@@ -379,7 +379,7 @@ export async function renderPatrimonio(container) {
       <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
         <div class="section-title">${t("patrimonio.account.monthlyInstallment")}</div>
         <div class="amount-display" style="align-items:center;">
-          <input type="text" inputmode="decimal" id="acc-loan-raw" value="${escAttr(f.loanRaw)}" placeholder="0"
+          <input type="text" inputmode="decimal" id="cuenta-loan-raw" value="${escAttr(f.loanRaw)}" placeholder="0"
             style="border:0;background:none;color:var(--ink);font:600 32px var(--font-num);letter-spacing:-0.02em;width:100%;outline:none;">
           <span class="amount-currency">${currencySymbol()}</span>
         </div>
@@ -388,7 +388,7 @@ export async function renderPatrimonio(container) {
 
       ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
 
-      <button type="button" class="btn-primary" id="acc-save">${editing ? t("common.saveChanges") : t("patrimonio.account.create")}</button>
+      <button type="button" class="btn-primary" id="cuenta-save">${editing ? t("common.saveChanges") : t("patrimonio.account.create")}</button>
     `;
 
     wireAccountForm();
@@ -396,9 +396,9 @@ export async function renderPatrimonio(container) {
 
   function wireAccountForm() {
     const f = state.accountForm;
-    container.querySelector("#acc-back").onclick = () => goBack();
+    container.querySelector("#cuenta-back").onclick = () => goBack();
 
-    container.querySelector("#acc-name").oninput = (e) => { f.name = e.target.value; };
+    container.querySelector("#cuenta-name").oninput = (e) => { f.name = e.target.value; };
 
     container.querySelectorAll("[data-acc-tipo]").forEach((b) => {
       b.onclick = () => {
@@ -410,32 +410,32 @@ export async function renderPatrimonio(container) {
       };
     });
 
-    container.querySelector("#acc-sign").onclick = () => { f.sign = f.sign === "+" ? "-" : "+"; render(); };
+    container.querySelector("#cuenta-sign").onclick = () => { f.sign = f.sign === "+" ? "-" : "+"; render(); };
 
-    container.querySelector("#acc-raw").oninput = (e) => {
+    container.querySelector("#cuenta-raw").oninput = (e) => {
       f.raw = e.target.value;
       f.cents = parseCentsRaw(f.raw);
       errorMsg = "";
     };
 
-    const loanRawInput = container.querySelector("#acc-loan-raw");
+    const loanRawInput = container.querySelector("#cuenta-loan-raw");
     if (loanRawInput) loanRawInput.oninput = (e) => {
       f.loanRaw = e.target.value;
-      // Math.abs: a diferencia de #acc-raw (saldo), este campo no tiene botón de signo — pero
+      // Math.abs: a diferencia de #cuenta-raw (saldo), este campo no tiene botón de signo — pero
       // parseCentsRaw respeta el signo tecleado (el flip queda siempre en el llamante, ver
-      // format.js). En un pasivo el signo de #acc-raw ya suele ser "-": sin este abs, un usuario
+      // format.js). En un pasivo el signo de #cuenta-raw ya suele ser "-": sin este abs, un usuario
       // que teclee "-189" aquí guardaría monthlyCents negativo, que setAccountLoan interpretaría
       // como "borrar la cuota" en silencio, sin ningún aviso.
       f.loanCents = Math.abs(parseCentsRaw(f.loanRaw));
       errorMsg = "";
     };
 
-    container.querySelector("#acc-save").onclick = async () => {
-      const btn = container.querySelector("#acc-save");
+    container.querySelector("#cuenta-save").onclick = async () => {
+      const btn = container.querySelector("#cuenta-save");
       if (!f.name.trim()) {
         errorMsg = t("patrimonio.account.validation.name");
         render();
-        const savedBtn = container.querySelector("#acc-save");
+        const savedBtn = container.querySelector("#cuenta-save");
         savedBtn.classList.add("shake");
         setTimeout(() => savedBtn.classList.remove("shake"), 400);
         return;

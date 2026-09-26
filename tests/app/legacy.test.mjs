@@ -49,10 +49,10 @@ test("legacy.css: cada var() apunta a un token que existe en tokens.css", () => 
   }
 });
 
-test("index.html: fuentes, tokens, legacy, components y app, en ese orden", () => {
+test("index.html: fuentes, tokens, legacy, components, app y screens, en ese orden", () => {
   const hojas = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map((m) => m[1]);
   assert.deepEqual(hojas, ["vendor/fonts/fonts.css", "css/tokens.css", "css/legacy.css",
-    "css/components.css", "css/app.css"]);
+    "css/components.css", "css/app.css", "css/screens.css"]);
 });
 
 // Todo nombre que la app lee con var() tiene que existir: si no, la propiedad cae a su valor

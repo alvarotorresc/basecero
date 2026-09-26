@@ -688,12 +688,9 @@ body:has(> .banner-aviso) main#screen { margin-top: 46px; }
 }
 .budget-input.is-empty {
   background: var(--bg);
-  /* --hairline-strong (rgba(244,244,242,.18)) da ~1.6:1 sobre --bg: insuficiente para el borde
-     funcional "vacío/sin límite" (WCAG 1.4.11, 3:1), igual que le pasaba al --rule viejo.
-     Alpha subido a mano a 0.4 (mismo tono --ink) → ~3.5:1 sobre --bg, ~3.3:1 sobre --surface.
-     Los --hairline-strong restantes (.field, .btn-secondary) no se tocan: ahí el borde no es
-     la única señal del estado. */
-  border: 1px dashed rgba(244, 244, 242, 0.4);
+  /* El borde discontinuo es la única señal de "vacío/sin límite": necesita 3:1 (WCAG 1.4.11).
+     --border-strong no llega sobre --bg en claro; --idle da ~4,1:1 (claro) y ~3,3:1 (oscuro). */
+  border: 1px dashed var(--idle);
   color: var(--ink-3);
   font: 500 12px var(--font-sans);
   text-align: center;
@@ -820,6 +817,7 @@ body.subscreen main#screen {
 
 /* ===== esqueleto de carga (skeleton.js) ===== */
 /* Misma tinta y mismo radio que las tarjetas para que la silueta prometa lo que va a llegar. */
+.skeleton-stack { display: flex; flex-direction: column; gap: var(--sp-16); }
 .skeleton {
   background: var(--surface-2);
   border-radius: var(--r-0);
@@ -879,8 +877,8 @@ body.subscreen main#screen {
 .recibo-body { background: var(--paper); color: var(--paper-ink); padding: 4px 20px 6px; }
 .recibo-label { font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--paper-dim); }
 .recibo-value { font: var(--t-figure-s); color: var(--paper-ink); }
-.recibo-dots { flex: 1; min-width: 10px; border-bottom: 1px dotted #A79E90; transform: translateY(-3px); }
-.recibo-perf { height: 1px; background: repeating-linear-gradient(90deg, #A79E90 0 4px, transparent 4px 8px); }
+.recibo-dots { flex: 1; min-width: 10px; border-bottom: 1px dotted var(--border-strong); transform: translateY(-3px); }
+.recibo-perf { height: 1px; background: repeating-linear-gradient(90deg, var(--border-strong) 0 4px, transparent 4px 8px); }
 .recibo-stamp { color: var(--stamp); transform: rotate(-8deg);
   animation: bc-recibo-stamp .22s cubic-bezier(.34,1.56,.64,1) .38s backwards; }
 .recibo-undo { height: 44px; border-radius: var(--r-pill); background: transparent;

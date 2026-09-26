@@ -389,11 +389,11 @@ export async function renderAjustes(container) {
         ${state.encImport ? `
         <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
           <p style="color:var(--text-2);font-size:13px">${t("ajustes.sheet.decIntro")}</p>
-          <input type="password" id="dec-pass" style="${INPUT_STYLE}" placeholder="${escAttr(t("ajustes.sheet.decPassPlaceholder"))}">
-          <div id="dec-error" class="banner-aviso red" style="display:none"></div>
+          <input type="password" id="descifrar-pass" style="${INPUT_STYLE}" placeholder="${escAttr(t("ajustes.sheet.decPassPlaceholder"))}">
+          <div id="descifrar-error" class="banner-aviso red" style="display:none"></div>
           <div style="display:flex;gap:8px">
-            <button type="button" class="btn-secondary" id="btn-dec-cancel" style="flex:1" ${state.busy ? "disabled" : ""}>${t("common.cancel")}</button>
-            <button type="button" class="btn-primary" id="btn-dec-confirm" style="flex:1" ${state.busy ? "disabled" : ""}>${t("ajustes.sheet.decConfirmBtn")}</button>
+            <button type="button" class="btn-secondary" id="btn-descifrar-cancel" style="flex:1" ${state.busy ? "disabled" : ""}>${t("common.cancel")}</button>
+            <button type="button" class="btn-primary" id="btn-descifrar-confirm" style="flex:1" ${state.busy ? "disabled" : ""}>${t("ajustes.sheet.decConfirmBtn")}</button>
           </div>
         </div>` : ""}
 
@@ -662,15 +662,15 @@ export async function renderAjustes(container) {
       }
     };
 
-    const decCancel = container.querySelector("#btn-dec-cancel");
+    const decCancel = container.querySelector("#btn-descifrar-cancel");
     if (decCancel) decCancel.onclick = () => { state.encImport = null; render(); };
 
-    const decConfirm = container.querySelector("#btn-dec-confirm");
+    const decConfirm = container.querySelector("#btn-descifrar-confirm");
     if (decConfirm) decConfirm.onclick = async () => {
-      const pass = container.querySelector("#dec-pass").value;
-      const errBox = container.querySelector("#dec-error");
+      const pass = container.querySelector("#descifrar-pass").value;
+      const errBox = container.querySelector("#descifrar-error");
       if (!pass) {
-        const box = container.querySelector("#dec-error");
+        const box = container.querySelector("#descifrar-error");
         box.textContent = t("ajustes.sheet.decPassRequired");
         box.style.display = "block";
         return;
@@ -685,7 +685,7 @@ export async function renderAjustes(container) {
           // El formulario sigue abierto para reintentar; el error va inline, sin re-render
           // (un render() vaciaría el input).
           state.busy = false; render();
-          const box = container.querySelector("#dec-error");
+          const box = container.querySelector("#descifrar-error");
           box.textContent = t("ajustes.sheet.decWrongPass");
           box.style.display = "block";
           return;
