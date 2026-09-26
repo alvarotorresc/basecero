@@ -108,10 +108,53 @@ Copyright 2020 The JetBrains Mono Project Authors
 JetBrains Mono declara un *Reserved Font Name*: «JetBrains Mono». La cláusula 5 de la licencia
 impide que un trabajo derivado y modificado siga usando ese nombre.
 
+## Unbounded (fuente)
+
+- **Componente:** Unbounded, peso 700 (fichero estático), subset latin.
+- **Rutas:** `app/app/vendor/fonts/unbounded-latin.woff2` y `app/app/vendor/fonts/fonts.css`
+- **Licencia:** SIL Open Font License, versión 1.1 — texto completo más abajo y en
+  `app/app/vendor/fonts/unbounded-OFL.txt`.
+
+Aviso de copyright:
+
+```
+Copyright 2022 The Unbounded Project Authors (https://github.com/googlefonts/unbounded)
+```
+
+## Instrument Sans (fuente)
+
+- **Componente:** Instrument Sans, fuente variable (eje `wght`), subset latin.
+- **Rutas:** `app/app/vendor/fonts/instrument-sans-latin.woff2` y `app/app/vendor/fonts/fonts.css`
+- **Licencia:** SIL Open Font License, versión 1.1 — texto completo más abajo y en
+  `app/app/vendor/fonts/instrument-sans-OFL.txt`.
+
+Aviso de copyright:
+
+```
+Copyright 2022 The Instrument Sans Project Authors (https://github.com/Instrument/instrument-sans)
+```
+
+## IBM Plex Mono (fuente)
+
+- **Componente:** IBM Plex Mono, pesos 500 y 600 (un fichero estático por peso), subset latin.
+- **Rutas:** `app/app/vendor/fonts/ibm-plex-mono-latin-500.woff2`,
+  `app/app/vendor/fonts/ibm-plex-mono-latin-600.woff2` y `app/app/vendor/fonts/fonts.css`
+- **Licencia:** SIL Open Font License, versión 1.1 — texto completo más abajo y en
+  `app/app/vendor/fonts/ibm-plex-mono-OFL.txt`.
+
+Aviso de copyright:
+
+```
+Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"
+```
+
+IBM Plex Mono declara un *Reserved Font Name*: «Plex». La cláusula 5 de la licencia impide que un
+trabajo derivado y modificado siga usando ese nombre.
+
 ### Texto de la SIL Open Font License, Version 1.1
 
-(Cubre tanto Schibsted Grotesk como JetBrains Mono: ambas se distribuyen bajo la misma versión de
-la licencia.)
+(Cubre Schibsted Grotesk, JetBrains Mono, Unbounded, Instrument Sans e IBM Plex Mono: todas se
+distribuyen bajo la misma versión de la licencia.)
 
 ```
 -----------------------------------------------------------

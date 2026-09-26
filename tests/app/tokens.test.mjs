@@ -1,36 +1,70 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const CSS = fileURLToPath(new URL("../../app/app/css/", import.meta.url));
 const FONTS = fileURLToPath(new URL("../../app/app/vendor/fonts/", import.meta.url));
 const fonts = readFileSync(FONTS + "fonts.css", "utf8");
 
-test("fonts.css: declara las dos familias del sistema v2 y ninguna otra", () => {
-  const familias = [...fonts.matchAll(/font-family:\s*'([^']+)'/g)].map((m) => m[1]);
-  assert.deepEqual([...new Set(familias)].sort(), ["JetBrains Mono", "Schibsted Grotesk"]);
+// Cada @font-face de fonts.css como { family, weight, url }, para comprobar pesos por familia.
+const faces = [...fonts.matchAll(/@font-face\s*{([^}]*)}/g)].map(([, body]) => ({
+  family: body.match(/font-family:\s*'([^']+)'/)[1],
+  weight: body.match(/font-weight:\s*([^;]+);/)[1].trim(),
+  url: body.match(/url\(\.\/([^)]+)\)/)[1],
+}));
+const pesos = (family) => faces.filter((f) => f.family === family).map((f) => f.weight).sort();
+
+test("fonts.css: declara las tres familias del sistema B y las dos del v2, ninguna más", () => {
+  // Schibsted Grotesk y JetBrains Mono se quedan hasta la PR-99 del rediseño B.
+  assert.deepEqual([...new Set(faces.map((f) => f.family))].sort(),
+    ["IBM Plex Mono", "Instrument Sans", "JetBrains Mono", "Schibsted Grotesk", "Unbounded"]);
 });
 
 test("fonts.css: cada url() apunta a un fichero que existe", () => {
   const urls = [...fonts.matchAll(/url\(\.\/([^)]+)\)/g)].map((m) => m[1]);
-  assert.ok(urls.length >= 2);
+  assert.equal(urls.length, faces.length);
   for (const u of urls) assert.ok(existsSync(FONTS + u), `fonts.css apunta a ${u}, que no existe`);
 });
 
-test("fonts.css: el subset latin cubre el euro y los diacríticos del español", () => {
-  assert.ok(fonts.includes("U+0000-00FF"));
-  assert.ok(fonts.includes("U+20AC"));
+test("fonts.css: el subset latin de cada @font-face cubre el euro y los diacríticos del español", () => {
+  for (const m of fonts.matchAll(/@font-face\s*{([^}]*)}/g)) {
+    assert.ok(m[1].includes("U+0000-00FF"), m[1]);
+    assert.ok(m[1].includes("U+20AC"), m[1]);
+    assert.match(m[1], /font-display:\s*swap;/);
+  }
 });
 
-test("fonts.css: declara el rango completo de pesos que traen los woff2 variables", () => {
-  // Los ficheros son variables de verdad (wght 400-900 Schibsted, 400-800 JetBrains): declarar un
-  // rango más corto en @font-face no falla, pero recorta el eje y el navegador satura al extremo
-  // declarado — un H1 a 800 se pinta como si fuera 700.
-  assert.match(fonts, /font-family:\s*'Schibsted Grotesk';[\s\S]*?font-weight:\s*400 900;/,
-    "Schibsted Grotesk debería declarar font-weight: 400 900");
-  assert.match(fonts, /font-family:\s*'JetBrains Mono';[\s\S]*?font-weight:\s*400 800;/,
-    "JetBrains Mono debería declarar font-weight: 400 800");
+test("fonts.css: el font-weight de cada familia coincide con el eje real de su woff2", () => {
+  // Ejes medidos con fontTools sobre los ficheros servidos (tabla fvar y OS/2 usWeightClass):
+  // Unbounded estático 700; Instrument Sans variable wght 400-700; Plex Mono estático, uno por peso;
+  // Schibsted variable 400-900 y JetBrains variable 400-800. Declarar un rango más corto que el eje
+  // lo recorta y el navegador satura al extremo declarado.
+  assert.deepEqual(pesos("Unbounded"), ["700"]);
+  assert.deepEqual(pesos("Instrument Sans"), ["400 700"]);
+  assert.deepEqual(pesos("IBM Plex Mono"), ["500", "600"]);
+  assert.deepEqual(pesos("Schibsted Grotesk"), ["400 900"]);
+  assert.deepEqual(pesos("JetBrains Mono"), ["400 800"]);
+});
+
+test("fonts.css: IBM Plex Mono va en un fichero por peso y no descarga el 400", () => {
+  const plex = faces.filter((f) => f.family === "IBM Plex Mono");
+  assert.equal(new Set(plex.map((f) => f.url)).size, plex.length);
+  assert.ok(!plex.some((f) => f.weight === "400"));
+});
+
+test("vendor/fonts: cada familia del sistema B trae su licencia OFL", () => {
+  for (const f of ["unbounded", "instrument-sans", "ibm-plex-mono"]) {
+    const ruta = FONTS + f + "-OFL.txt";
+    assert.ok(existsSync(ruta), `falta ${f}-OFL.txt`);
+    assert.match(readFileSync(ruta, "utf8"), /SIL Open Font License, Version 1\.1/);
+  }
+});
+
+test("vendor/fonts: ningún woff2 pasa de 120 KB", () => {
+  const woff2 = readdirSync(FONTS).filter((f) => f.endsWith(".woff2"));
+  assert.ok(woff2.length >= 6);
+  for (const f of woff2) assert.ok(statSync(FONTS + f).size <= 120 * 1024, `${f} pesa más de 120 KB`);
 });
 
 const tokens = readFileSync(CSS + "tokens.css", "utf8");
