@@ -9,7 +9,8 @@ import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 import { subHeaderHtml, buttonHtml } from "../ui.js";
 import { segmentedHtml, wireSegmented } from "../controls.js";
-import { displayHtml, dispInkHtml, bentoHtml, meterHtml, emptyStateHtml } from "../instrument.js";
+import { displayHtml, dispInkHtml, bentoHtml, meterHtml, emptyStateHtml, containerHtml } from "../instrument.js";
+import { settingRowHtml } from "../entity.js";
 import { icon } from "../icons.js";
 import { escHtml, escAttr } from "../esc.js";
 
@@ -21,8 +22,10 @@ import { escHtml, escAttr } from "../esc.js";
 // Todo el color y la forma viven en la sección «informe» de css/screens.css; en línea solo va
 // geometría (width y flex-basis), como pide R-INLINE.
 
-// Periodos visibles en el Segmented (B-Informe: tres, el más reciente primero).
+// Periodos visibles en el Segmented (B-Informe: tres, el más reciente primero). Con más, una cuarta
+// opción «Anteriores» despliega la lista de todos los periodos cerrados.
 const SEGMENTED_PERIODS = 3;
+const OLDER = "__older__";
 // Categorías con nombre antes de agrupar el resto en «Resto» (B-Informe: cinco más Resto).
 const TOP_CATEGORIES = 5;
 
@@ -33,18 +36,6 @@ function shortName(name) {
   const s = String(name ?? "").trim();
   const m = s.match(/^(.+?)\s+\d{4}$/);
   return m ? m[1] : s;
-}
-
-/** Los periodos del Segmented: los tres más recientes y, si el elegido es más antiguo (p. ej. al
- *  llegar desde el cierre de un periodo viejo), ocupa el último hueco para que siempre se vea
- *  marcado. `periods` llega ordenado por fecha de inicio descendente (sql.js#listPeriods). */
-function segmentedPeriods(periods, selectedId) {
-  const shown = periods.slice(0, SEGMENTED_PERIODS);
-  if (!shown.some((p) => p.id === selectedId)) {
-    const sel = periods.find((p) => p.id === selectedId);
-    if (sel) shown[shown.length - 1] = sel;
-  }
-  return shown;
 }
 
 /** Pantalla de error con recuperación: aviso + «Reintentar» + «Volver», nunca un callejón. */
@@ -69,10 +60,36 @@ function headerHtml(report) {
   return subHeaderHtml({ id: "informe-back", title: t("informe.title"), subtitle });
 }
 
-function periodsHtml(periods, selectedId) {
+/** Segmented de periodos: los tres más recientes (`periods` llega por fecha de inicio
+ *  descendente, sql.js#listPeriods) y, si hay más, «Anteriores». Viendo un periodo más antiguo,
+ *  esa cuarta opción lleva su nombre y sale marcada; con la lista abierta, también. */
+function periodsHtml(periods, selectedId, olderOpen) {
   if (periods.length < 2) return "";
-  const options = segmentedPeriods(periods, selectedId).map((p) => ({ value: p.id, label: shortName(p.name) }));
-  return segmentedHtml({ id: "informe-periods", name: t("informe.selector.label"), options, value: selectedId });
+  const recent = periods.slice(0, SEGMENTED_PERIODS);
+  const options = recent.map((p) => ({ value: p.id, label: shortName(p.name) }));
+  const inRecent = recent.some((p) => p.id === selectedId);
+  if (periods.length > SEGMENTED_PERIODS) {
+    const sel = inRecent ? null : periods.find((p) => p.id === selectedId);
+    options.push({ value: OLDER, label: sel ? shortName(sel.name) : t("informe.older.label") });
+  }
+  const value = olderOpen || !inRecent ? OLDER : selectedId;
+  return segmentedHtml({ id: "informe-periods", name: t("informe.selector.label"), options, value });
+}
+
+/** Lista desplegada de «Anteriores»: TODOS los periodos cerrados, cada uno una fila de ajuste con
+ *  sus fechas; el que se está viendo lo dice en el valor. Así se abre y se exporta cualquier
+ *  informe antiguo. */
+function olderListHtml(periods, selectedId) {
+  const closed = periods.filter((p) => p.status === "closed");
+  const rows = closed.length
+    ? closed.map((p) => settingRowHtml({
+      label: p.name,
+      sub: t("informe.closedPeriod", { start: fmtDiaCorto(p.start_date), end: fmtDiaCorto(p.end_date) }),
+      value: p.id === selectedId ? t("informe.older.viewing") : "",
+      data: { period: p.id },
+    })).join("")
+    : `<p class="inf-older-none">${escHtml(t("informe.older.none"))}</p>`;
+  return `<div id="informe-older">${containerHtml({ title: t("informe.older.title"), kind: "list", body: rows })}</div>`;
 }
 
 /** Display l (F-12): la tasa de ahorro manda. Con gasto por encima del ingreso la tasa sería
@@ -218,7 +235,7 @@ function downloadHtml(state, report) {
 /** Pantalla del Informe del periodo (F1). Sin `periodId`, el periodo abierto (o el más reciente
  *  si no hay ninguno abierto). */
 export async function renderInforme(container, onBack, { periodId } = {}) {
-  const state = { periodId, downloading: false, downloadError: "", periods: [], report: null, prevPeriodName: "" };
+  const state = { periodId, downloading: false, downloadError: "", periods: [], report: null, prevPeriodName: "", olderOpen: false };
 
   async function load() {
     const [inputs, periods] = await Promise.all([reportInputs(state.periodId), listPeriods()]);
@@ -254,29 +271,53 @@ export async function renderInforme(container, onBack, { periodId } = {}) {
     container.innerHTML = `
       ${headerHtml(report)}
       <div class="inf">
-        ${periodsHtml(state.periods, state.periodId)}
+        ${periodsHtml(state.periods, state.periodId, state.olderOpen)}
+        ${state.olderOpen ? olderListHtml(state.periods, state.periodId) : ""}
         ${body}
       </div>`;
     wire();
+  }
+
+  async function choosePeriod(id) {
+    state.periodId = id;
+    state.downloadError = "";
+    try {
+      await load();
+    } catch (err) {
+      renderInformeError(container, onBack, t("informe.error.load", { error: userMessage(err) }), boot);
+      return;
+    }
+    render();
   }
 
   function wire() {
     container.querySelector("#informe-back").onclick = () => onBack();
 
     const seg = container.querySelector("#informe-periods");
+    const focusSegmented = (value) => [...container.querySelectorAll("#informe-periods [role=\"radio\"]")]
+      .find((b) => b.dataset.value === value)?.focus();
+
     if (seg) wireSegmented(seg, async (value) => {
-      if (value === state.periodId) return;
-      state.periodId = value;
-      state.downloadError = "";
-      try {
-        await load();
-      } catch (err) {
-        renderInformeError(container, onBack, t("informe.error.load", { error: userMessage(err) }), boot);
+      // «Anteriores» abre (o, pulsado otra vez, cierra) la lista; no carga nada por sí solo.
+      if (value === OLDER) {
+        state.olderOpen = !state.olderOpen;
+        render();
+        focusSegmented(OLDER);
         return;
       }
-      render();
+      state.olderOpen = false;
+      if (value === state.periodId) { render(); focusSegmented(value); return; }
+      await choosePeriod(value);
       // El render rehace el Segmented: el foco vuelve al periodo elegido (K12, flechas seguidas).
-      [...container.querySelectorAll("#informe-periods [role=\"radio\"]")].find((b) => b.dataset.value === state.periodId)?.focus();
+      focusSegmented(state.periodId);
+    });
+
+    container.querySelectorAll("#informe-older [data-period]").forEach((b) => {
+      b.onclick = async () => {
+        state.olderOpen = false;
+        await choosePeriod(b.dataset.period);
+        focusSegmented(OLDER);
+      };
     });
 
     const dl = container.querySelector("#informe-download");

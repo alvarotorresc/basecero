@@ -1060,6 +1060,12 @@ export const EN = {
     // downloadNote: the one note under the primary button (F-11, B-Informe).
     downloadNote: { one: "Made on your phone, with {n} transaction.", other: "Made on your phone, with all {n} transactions." },
     selector: { label: "Period" },
+    older: {
+      label: "Earlier",
+      title: "Closed periods",
+      viewing: "Viewing",
+      none: "No closed periods yet.",
+    },
     display: {
       rate: "Share of income you save",
       overspent: "You spend more than you earn",

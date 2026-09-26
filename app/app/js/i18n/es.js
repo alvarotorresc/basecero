@@ -1131,6 +1131,12 @@ export const ES = {
     // downloadNote: la única nota bajo el primario (F-11, B-Informe).
     downloadNote: { one: "Se genera en tu móvil, con {n} movimiento.", other: "Se genera en tu móvil, con los {n} movimientos." },
     selector: { label: "Periodo" },
+    older: {
+      label: "Anteriores",
+      title: "Periodos cerrados",
+      viewing: "Viendo",
+      none: "Aún no hay periodos cerrados.",
+    },
     display: {
       rate: "Ahorras de lo que ingresas",
       overspent: "Gastas más de lo que ingresas",

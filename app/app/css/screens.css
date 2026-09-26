@@ -104,6 +104,9 @@
 .inf-bento { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-12); }
 .inf-bento.is-single { grid-template-columns: minmax(0, 1fr); }
 
+/* «Anteriores»: la lista de periodos cerrados, desplegada bajo el Segmented. */
+.inf-older-none { margin: 0; padding: var(--sp-8) var(--sp-12) var(--sp-12); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+
 .inf-download { display: flex; flex-direction: column; gap: var(--sp-12); padding-top: var(--sp-12); }
 .inf-download .btn-note { text-align: center; }
 /* === fin: informe === */
