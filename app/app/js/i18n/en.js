@@ -325,14 +325,17 @@ export const EN = {
     type: { transfer: "Transfer" },
     detail: {
       lockedNote: "It has a linked settlement entry (refund or adjustment): delete it first to change the amount or the split.",
-      typeLabel: "Type",
-      // No consumer IN THIS FILE since Task 1.5 (the Date+Tag block's label goes away: the
-      // artboard doesn't carry it), but registro.js:461 (P8) still calls this same key for the
-      // same control — deleting it would have broken Registro. Left as is.
+      // «Tag» row of the detail (S6) and Registro's tag button.
       tagLabel: "Tag",
       noTag: "No tag",
       newTag: "New tag",
       photoClose: "Close the photo",
+      // S6 (B-Movimiento-Detalle): view with «Edit», the row date and the split summary.
+      edit: "Edit",
+      dateToday: "Today, {date}",
+      dateYesterday: "Yesterday, {date}",
+      sharedMine: "Your share {amount}, {pct} %",
+      sharedPartnerPaid: "{name} paid, your share {amount}",
     },
     tagCard: {
       movements: { one: "{n} movement", other: "{n} movements" },
@@ -359,10 +362,8 @@ export const EN = {
     delete: {
       button: "Delete",
       title: "Delete this transaction?",
-      message: "{what}. It will disappear from the lists and from the period totals.",
-      // Replaces the "·" concatenation in movimientos.js (ModalBorrar.dc.html:137: "Bar La
-      // Plaza, 18.50 € on September 9"). fmtDiaLargo for the day, per spec §2.2.
-      what: "{merchant}, {amount} on {date}",
+      // S6 (B-Borrar): the row goes in the alert preview; this is the line below it.
+      body: "It will disappear from the lists and from the period totals.",
     },
     empty: {
       noUncategorized: "No uncategorized transactions.",

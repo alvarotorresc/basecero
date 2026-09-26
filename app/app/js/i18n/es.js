@@ -340,15 +340,18 @@ export const ES = {
     type: { transfer: "Transferencia" },
     detail: {
       lockedNote: "Tiene un apunte de liquidación enlazado (devolución o ajuste): para cambiar el importe o el reparto, bórralo antes.",
-      typeLabel: "Tipo",
-      // Sin consumidor EN ESTE FICHERO desde la Task 1.5 (la etiqueta del bloque Fecha+Etiqueta
-      // desaparece: el artboard no la lleva), pero registro.js:461 (P8) sigue llamando a esta
-      // misma clave para el mismo control — borrarla habría roto Registro. No se toca.
+      // Fila «Etiqueta» del detalle (S6) y botón de etiqueta de Registro.
       tagLabel: "Etiqueta",
       noTag: "Sin etiqueta",
       newTag: "Nueva etiqueta",
       // Foto del ticket (N5): aria-label del velo a pantalla completa que enseña la foto.
       photoClose: "Cerrar la foto",
+      // S6 (B-Movimiento-Detalle): vista con «Editar», fecha de la fila y resumen del reparto.
+      edit: "Editar",
+      dateToday: "Hoy, {date}",
+      dateYesterday: "Ayer, {date}",
+      sharedMine: "Tu parte {amount}, el {pct} %",
+      sharedPartnerPaid: "Pagó {name}, tu parte {amount}",
     },
     tagCard: {
       movements: { one: "{n} movimiento", other: "{n} movimientos" },
@@ -375,10 +378,8 @@ export const ES = {
     delete: {
       button: "Borrar",
       title: "¿Borrar este movimiento?",
-      message: "{what}. Desaparecerá de las listas y de los totales del periodo.",
-      // Sustituye a la concatenación con · de movimientos.js (ModalBorrar.dc.html:137: «Bar La
-      // Plaza, 18,50 € del 9 de septiembre»). fmtDiaLargo para el día, como pide la spec §2.2.
-      what: "{merchant}, {amount} del {date}",
+      // S6 (B-Borrar): la fila va en la vista previa del aviso; esta es la línea de debajo.
+      body: "Desaparecerá de las listas y de los totales del periodo.",
     },
     empty: {
       noUncategorized: "No hay movimientos sin categorizar.",

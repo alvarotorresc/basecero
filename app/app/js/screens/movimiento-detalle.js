@@ -1,28 +1,41 @@
 import {
   listPeriods, getTransaction, updateTransaction, softDeleteTransaction,
   listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById, hasActiveLinkedSettlement,
-  getMetaAll, listTags, createTag, tagTotals,
+  getMetaAll, listTags, createTag, tagTotals, listGoals,
 } from "../repo.js";
 import { attachments } from "../attachments.js";
-import { colorForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtDiaLargo, hoyISO, currencySymbol, parseCentsRaw, centsToRaw, appLocale } from "../format.js";
+import { familyForCategory, iconForCategory, rootOf } from "../category-colors.js";
+import { familyForAccount, parseAccountStyle } from "../account-colors.js";
+import { fmtMoney, fmtDiaCorto, hoyISO, prevDayIso, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
-import { metaHtml, subHeaderHtml } from "../ui.js";
-import { icon, catIcon as catSvg } from "../icons.js";
+import { metaHtml, subHeaderHtml, buttonHtml } from "../ui.js";
+import { icon } from "../icons.js";
+import { displayHtml } from "../instrument.js";
+import { switchHtml, segmentedHtml, wireSegmented, stepperHtml, fieldHtml } from "../controls.js";
+import { chosenCategoryHtml, settingRowHtml, filterChipHtml, tileHtml, sectionHeaderHtml } from "../entity.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
-import { goBack } from "../back.js";
+import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { showConfirm } from "../modal.js";
+import { showSheet } from "../sheet.js";
 import { escHtml, escAttr } from "../esc.js";
 
-// Detalle de un movimiento: editar, borrar y visor de la foto del ticket. Sale de movimientos.js
-// en la S5 del rediseño B (la lista pasa al sistema B y este fichero se queda en PENDIENTES hasta
-// la S6, que lo rediseña). El código es el de siempre; solo cambia de dónde saca sus datos.
+// Detalle de un movimiento (S6 del rediseño B: B-Movimiento-Detalle, B-Borrar y el visor de foto
+// de DESIGN.md §9). Dos estados en la misma pantalla:
+//  - VISTA (el mockup): Display l con el comercio arriba y la cifra con signo, tarjeta de la
+//    categoría elegida, filas de ajuste (cuenta, fecha, compartido, etiqueta), la nota con la foto
+//    y, abajo, «Editar» (secundario) y «Borrar» (entrada destructiva, C5).
+//  - EDICIÓN: la misma pantalla con los campos vivos (comercio e importe en el Display, categoría
+//    en una hoja, cuentas y etiquetas desplegadas bajo su fila, fecha nativa, reparto) y «Guardar
+//    cambios» como único primario. Tocar una fila o la tarjeta en la vista entra en edición con
+//    ese control abierto. Nada toca la BD hasta «Guardar cambios»; «Cancelar» vuelve a la vista.
+// Edición no apunta entrada de «atrás»: «Atrás» sale del detalle descartando lo no guardado, como
+// antes de B (el detalle era un formulario sin paso de vista).
 
 const needsCategory = (tipo) => tipo === "expense" || tipo === "income" || tipo === "refund";
 
-/** ¿Es el detalle de un gasto compartido que pagó la contraparte? Gatea la sección de cuentas, el
+/** ¿Es el detalle de un gasto compartido que pagó la contraparte? Gatea la fila de cuenta, el
  *  guard de validación y lo que se guarda — mismo criterio que registro.js#partnerPaid. */
 const partnerPaid = (d) => d.type === "expense" && d.isShared && d.paidBy === "partner";
 
@@ -33,6 +46,12 @@ const TIPO_KEY = {
   expense: "common.type.expense", income: "common.type.income", transfer: "movimientos.type.transfer",
   refund: "common.type.refund", adjustment: "common.type.adjustment",
 };
+
+const MINUS = "−"; // «−» tipográfico, el mismo ancho que «+» en la mono tabular (entity.js).
+
+/** Ancho del input del importe en el Display de edición: tantos caracteres como lleva (mismo
+ *  criterio que registro.js#amountWidth), para que el símbolo de moneda vaya pegado. */
+const amountWidth = (raw) => `${Math.max(1, String(raw ?? "").length)}ch`;
 
 /** Pinta el detalle del movimiento `txId` en `container`.
  *
@@ -54,13 +73,25 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
   if (!row) return null;
   let tagsAll = tagsLoaded;
   const partnerName = (meta.partner_name || "").trim();
+  const partnerLabel = partnerName || t("movimientos.shared.fallbackName");
   const state = { detailId: txId, detail: null, linkedExpense: null, tagTotalsAll };
   let errorMsg = "";
   // Foto del ticket (N5, spec §9.8): la URL del Blob leído al abrir (state.detail.photoBlob). Se
-  // revoca y se vuelve a crear en CADA renderDetail() (updateDetail repinta con innerHTML en cada
-  // cambio de estado) y también al salir del detalle (dispose) — sin esto, cada repintado filtraría
-  // una foto entera en memoria.
+  // crea UNA vez y se revoca al salir del detalle (dispose): el Blob no cambia durante la sesión,
+  // así que los repintados (innerHTML en cada cambio de estado) reutilizan la misma URL.
   let detailPhotoUrl = null;
+  // Visor de foto a pantalla completa (§9, D-impl-4): <dialog> colgado de <body>, no de
+  // `container` —los repintados con innerHTML se lo llevarían—. `closeViewer` lo cierra sin tocar
+  // el historial (lo llama la entrada de «atrás» que apunta al abrirse).
+  let viewer = null;
+  let closeViewer = null;
+
+  // Familia de cada cuenta (C8, PR-10): la muestra de 10 de las filas de cuenta y de sus chips. Los
+  // objetivos solo deciden la familia por defecto de una hucha; si fallan, cae al tipo de cuenta.
+  let goals = [];
+  try { goals = await listGoals(); } catch { goals = []; }
+  const accountStyle = parseAccountStyle(meta.account_style);
+  const accountFam = (a) => (a ? familyForAccount(a, accountStyle, goals) : null);
 
   const id = txId;
   state.detail = {
@@ -74,29 +105,32 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
     isShared: !!row.is_shared,
     paidBy: row.paid_by,
     // Fija en apertura si el movimiento YA era compartido, distinto del isShared vivo que cambia
-    // con el toggle: gatea la visibilidad del bloque compartido para que no desaparezca al desmarcar
-    // sin contraparte configurada, dejando al usuario sin forma de volver a marcarlo antes de guardar.
+    // con el interruptor: gatea la visibilidad de la fila «Compartido» para que no desaparezca al
+    // desmarcar sin contraparte configurada, dejando al usuario sin forma de volver a marcarlo.
     wasShared: !!row.is_shared,
     // El override manda; si no hay (null), el % del periodo del propio gasto (no el abierto).
     sharePct: normalizePct(row.share_pct_override ?? periods.find((p) => p.id === row.period_id)?.my_share_pct, 100),
     fecha: row.date,
-    merchant: row.merchant,
-    note: row.note,
+    merchant: row.merchant ?? "",
+    note: row.note ?? "",
     refId: row.ref_id,
     ruleId: row.rule_id,
     tagId: row.tag_id || null,
-    tagPickerOpen: false, // Task 12: solo UI, nunca se manda al guardar
-    newTagDraft: null, // Task 12: != null mientras se escribe el nombre de una etiqueta nueva
-    // Foto del ticket (N5): photoBlob se lee AQUÍ (renderDetail no puede esperar a OPFS).
+    // Solo UI, nunca se mandan al guardar:
+    editing: false,
+    accPicker: null,      // "from" | "to" | null: lista de cuentas desplegada bajo su fila
+    tagPickerOpen: false, // lista de etiquetas desplegada bajo su fila
+    newTagDraft: null,    // != null mientras se escribe el nombre de una etiqueta nueva
+    // Foto del ticket (N5): photoBlob se lee AQUÍ (render no puede esperar a OPFS).
     // has_attachment=1 sin fichero (hoja .xlsx restaurada, o un fallo del paso 3 de §9.4) se trata
     // como "sin foto" — null, sin banner ni error (spec §9.2/§13.11): el FICHERO es la verdad, la
     // columna solo evita sondear OPFS en la lista.
     photoBlob: null,
-    photoViewerOpen: false,
   };
   if (row.has_attachment && attachments) {
     try { state.detail.photoBlob = await attachments.blob(id); } catch { state.detail.photoBlob = null; }
   }
+  if (state.detail.photoBlob) detailPhotoUrl = URL.createObjectURL(state.detail.photoBlob);
   // El apunte de liquidación tiene DOS formas desde Task 3: la devolución ENTRANTE (refund) y el
   // ajuste SALIENTE (adjustment con ref_id, el que se crea cuando pagó ella). Los dos apuntan a un
   // gasto por ref_id y los dos los cubre settlementAmountLocked en repo.js.
@@ -113,23 +147,30 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
   // en silencio (el guard de repo lo rechazaría en save, pero mejor prevenirlo en el input).
   state.detail.refundLocked = (row.type === "refund" || row.type === "adjustment") && !!state.linkedExpense?.settled;
 
+  // Copia de lo editable al entrar en edición: «Cancelar» la restaura tal cual.
+  const EDITABLE = ["raw", "cents", "sign", "categoryId", "accountId", "counterAccountId", "isShared",
+    "paidBy", "sharePct", "fecha", "merchant", "note", "tagId"];
+  let snapshot = null;
+
   function categoriesFor(tipo) {
     if (tipo === "income") return incomeCats;
     if (needsCategory(tipo)) return expenseCats;
     return [];
   }
 
+  /** Familia de una categoría para ESTE movimiento: los ingresos no llevan familia (C9). */
+  const catFam = (catId) => (state.detail.type === "income" ? null : familyForCategory(catId, byId));
+
   /** Nombre de una etiqueta por id, resuelto contra tagTotalsAll (D7: TODAS las vivas, archivadas
    *  incluidas) y no contra `tagsAll` (solo activas, listTags — selector de alta): un movimiento
    *  guardado puede llevar una etiqueta archivada después, y su nombre tiene que seguir resolviendo. */
-  function tagName(id) {
-    return state.tagTotalsAll.find((tg) => tg.id === id)?.name ?? "";
+  function tagName(tagId) {
+    return state.tagTotalsAll.find((tg) => tg.id === tagId)?.name ?? "";
   }
 
-  /** Opciones del selector inline del detalle: las activas (`tagsAll`, mismo criterio que Registro,
-   *  Task 13) más la asignada actualmente si es una archivada que ya no está en `tagsAll` — así no
-   *  desaparece de golpe del selector al abrirlo (mismo criterio que etiquetas.js, que sigue
-   *  enseñando las archivadas en su propia lista, atenuadas, en vez de ocultarlas). */
+  /** Opciones del selector de etiqueta: las activas (`tagsAll`, mismo criterio que Registro) más
+   *  la asignada actualmente si es una archivada que ya no está en `tagsAll` — así no desaparece
+   *  de golpe del selector al abrirlo (mismo criterio que etiquetas.js). */
   function tagOptions() {
     const currentId = state.detail?.tagId;
     if (!currentId || tagsAll.some((tg) => tg.id === currentId)) return tagsAll;
@@ -137,16 +178,43 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
     return current ? [...tagsAll, current] : tagsAll;
   }
 
-  function updateDetail(patch) {
-    Object.assign(state.detail, patch);
-    renderDetail();
+  /** «Comercio» del Display y de la vista previa de Borrar: el comercio, o la categoría, o el tipo. */
+  function titleOf(d) {
+    return d.merchant.trim() || (d.categoryId ? byId[d.categoryId]?.name : "") || t(TIPO_KEY[d.type]);
+  }
+
+  /** Cifra con signo (B-Movimiento-Detalle): «−» gasto, «+» ingreso y devolución, el signo propio
+   *  del ajuste y sin signo la transferencia (va de una cuenta mía a otra). */
+  function signedAmount(d) {
+    const abs = fmtMoney(d.cents);
+    if (d.type === "expense") return MINUS + abs;
+    if (d.type === "income" || d.type === "refund") return "+" + abs;
+    if (d.type === "adjustment") return (d.sign === "-" ? MINUS : "+") + abs;
+    return abs;
+  }
+
+  /** «Restauración › Bares y cafés»: la raíz y la hoja, o solo la raíz (fila de movimiento). */
+  function categoryPath(catId) {
+    const cat = catId ? byId[catId] : null;
+    if (!cat) return "";
+    const root = rootOf(catId, byId);
+    return root && root !== catId && byId[root] ? `${byId[root].name} › ${cat.name}` : cat.name;
+  }
+
+  const weekdayShort = (iso) => t(`movimientos.weekdayShort.${new Date(iso + "T12:00:00").getDay()}`);
+  /** Fecha de la fila: «Hoy, 13 sep», «Ayer, 12 sep» o «vie 11 sep». */
+  function dateLabel(iso) {
+    const hoy = hoyISO();
+    if (iso === hoy) return t("movimientos.detail.dateToday", { date: fmtDiaCorto(iso) });
+    if (iso === prevDayIso(hoy)) return t("movimientos.detail.dateYesterday", { date: fmtDiaCorto(iso) });
+    return `${weekdayShort(iso)} ${fmtDiaCorto(iso)}`;
   }
 
   function validationError() {
     const d = state.detail;
-    // Guard que el detalle no tenía: desmarcar «Compartido» en una fila que pagó la contraparte
-    // (guardada con account_id='') devuelve la cuenta al juego y hay que exigirla — si no, el save
-    // escribiría un gasto mío sin cuenta.
+    // Desmarcar «Compartido» en una fila que pagó la contraparte (guardada con account_id='')
+    // devuelve la cuenta al juego y hay que exigirla — si no, el save escribiría un gasto mío sin
+    // cuenta.
     if (d.type === "expense" && !partnerPaid(d) && !d.accountId) return t("common.needAccount");
     if (d.type === "transfer") {
       if (d.cents <= 0) return t("common.enterAmount");
@@ -160,431 +228,616 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
     return "";
   }
 
-  function renderAccountsSection(d) {
-    // Un gasto que pagó la contraparte no tiene cuenta que elegir: el dinero no salió de mi banco.
-    if (partnerPaid(d)) return "";
-    const accounts = accountsAll.filter((a) => a.type !== "liability");
-    if (d.type === "transfer") {
-      return `
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">${t("common.from")}</div>
-        <div class="chips">
-          ${accounts.map((a) => `<button type="button" class="chip${d.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
-        </div>
+  // ---- Display -------------------------------------------------------------------------------
+
+  /** Vista: Display l con el comercio arriba (15/600 en --disp-ink, I-65) y la cifra con signo. */
+  function displayViewHtml(d) {
+    return `<div class="mdet-disp-view">${displayHtml({ label: titleOf(d), value: signedAmount(d), size: "l" })}</div>`;
+  }
+
+  /** Edición: el comercio y el importe son los campos (patrón de B-Gasto, registro.js). El importe
+   *  es la única cifra .disp-value (K4); el signo del ajuste, un botón de 44 a su izquierda. */
+  function displayEditHtml(d, amountLocked) {
+    const sign = d.type === "adjustment"
+      ? `<button type="button" class="mdet-sign" id="mdet-sign" aria-label="${escAttr(t("common.changeSign"))}"${amountLocked ? " disabled" : ""}>${d.sign === "-" ? MINUS : "+"}</button>`
+      : "";
+    return `<section class="disp mdet-disp" id="mdet-disp-edit" tabindex="-1">
+      <input type="text" id="mdet-merchant" class="mdet-merchant-input" value="${escAttr(d.merchant)}"
+        placeholder="${escAttr(t("common.merchant"))}" aria-label="${escAttr(t("common.merchant"))}" autocomplete="off">
+      <div class="num disp-value disp-value-l mdet-amount${amountLocked ? " is-locked" : ""}">
+        ${sign}
+        <input type="text" inputmode="decimal" id="mdet-raw" class="mdet-amount-input" value="${escAttr(d.raw)}" placeholder="0" autocomplete="off"
+          aria-label="${escAttr(t("common.amount"))}"${amountLocked ? " disabled" : ""} style="width:${amountWidth(d.raw)}">
+        <span class="mdet-amount-cur" aria-hidden="true">${escHtml(currencySymbol())}</span>
       </div>
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">${t("common.to")}</div>
-        <div class="chips">
-          ${accountsAll.filter((a) => a.id !== d.accountId).map((a) => `<button type="button" class="chip${d.counterAccountId === a.id ? " active" : ""}" data-counter-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
-        </div>
-      </div>`;
+    </section>`;
+  }
+
+  // ---- Categoría -----------------------------------------------------------------------------
+
+  /** Tarjeta de categoría elegida (§9, F-42): nombre de la hoja y, debajo, su raíz. Sin categoría,
+   *  neutra con «Sin categorizar». Siempre es un botón: en la vista entra en edición y abre la hoja. */
+  function chosenHtml(d) {
+    const c = d.categoryId ? byId[d.categoryId] : null;
+    if (!c) {
+      return chosenCategoryHtml({ fam: null, icon: "otr", name: t("movimientos.uncategorized"), id: "mdet-cat" });
     }
-    // Cuenta en una sola fila (MovimientoDetalle.dc.html:84-90): etiqueta a la izquierda, chips
-    // alineados a la derecha — a diferencia de De/Hacia arriba, que sí apilan (el artboard no
-    // dibuja un origen/destino de transferencia).
-    return `
-    <div style="display:flex; align-items:center; gap:8px; margin-bottom:18px;">
-      <div class="section-title" style="flex-shrink:0;">${d.type === "refund" ? t("common.destAccount") : t("common.account")}</div>
-      <div class="chips" style="flex:1; justify-content:flex-end;">
-        ${accounts.map((a) => `<button type="button" class="chip${d.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
-      </div>
-    </div>`;
+    const root = rootOf(c.id, byId);
+    const path = root && root !== c.id ? (byId[root]?.name ?? "") : "";
+    return chosenCategoryHtml({ fam: catFam(c.id), icon: iconForCategory(c.id, byId), name: c.name, path, id: "mdet-cat" });
   }
 
-  /** Fila «Tipo» (MovimientoDetalle.dc.html:38-44): dos píldoras de SOLO LECTURA — el tipo de un
-   *  movimiento guardado no se cambia aquí, así que van como <span>, no como chip de acción.
-   *  Solo se pinta para gasto/ingreso: transferencia, devolución y ajuste ya llevan su nombre
-   *  completo en el título de la cabecera (TIPO_KEY) y no hay "el otro tipo" que enseñar junto
-   *  al suyo — la dualidad Gasto/Ingreso del artboard no se extiende a los cinco tipos. */
-  function typePillsHtml(tipo) {
-    if (tipo !== "expense" && tipo !== "income") return "";
-    return `
-    <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
-      <span class="section-title">${t("movimientos.detail.typeLabel")}</span>
-      <div style="display:flex; gap:6px;">
-        <span class="type-pill${tipo === "expense" ? " active" : ""}">${t("common.type.expense")}</span>
-        <span class="type-pill${tipo === "income" ? " active" : ""}">${t("common.type.income")}</span>
-      </div>
-    </div>`;
+  // ---- Filas de ajuste -----------------------------------------------------------------------
+
+  const DIVIDER = '<div class="mdet-div" aria-hidden="true"></div>';
+
+  function accountRowHtml(which, d) {
+    const accId = which === "to" ? d.counterAccountId : d.accountId;
+    const acc = accountsAll.find((a) => a.id === accId);
+    let label = t("common.account");
+    if (d.type === "transfer") label = which === "to" ? t("common.to") : t("common.from");
+    else if (d.type === "refund") label = t("common.destAccount");
+    const open = d.editing && d.accPicker === which;
+    const rowHtml = settingRowHtml({
+      label, value: acc?.name ?? "", valueFam: accountFam(acc), id: `mdet-acc-${which}`,
+      data: { accRow: which },
+      ...(d.editing ? { expanded: open, controls: `mdet-acc-${which}-panel` } : {}),
+    });
+    if (!open) return rowHtml;
+    // «Desde»/«Cuenta»: solo cuentas mías con saldo (sin pasivos). «Hacia» de una transferencia sí
+    // admite pasivos (pagar la tarjeta), menos la cuenta de origen.
+    const list = which === "to"
+      ? accountsAll.filter((a) => a.id !== d.accountId)
+      : accountsAll.filter((a) => a.type !== "liability");
+    const chips = list.map((a) => filterChipHtml({
+      fam: accountFam(a), label: a.name, selected: accId === a.id, data: which === "to" ? { counterAcc: a.id } : { acc: a.id },
+    })).join("");
+    return `${rowHtml}<div class="mdet-panel" id="mdet-acc-${which}-panel" role="group" aria-label="${escAttr(label)}">${chips}</div>`;
   }
 
-  /** Control «Etiqueta» del detalle (Task 12, artboard MovimientoDetalle.dc.html:102-105): chip
-   *  cerrado con la etiqueta actual (o "Sin etiqueta" en punteado si no lleva) que al tocarlo abre
-   *  el selector inline — lista de activas, "Sin etiqueta" y "Nueva etiqueta" (esta última se
-   *  convierte en un campo de texto in situ, sin modal: mismo criterio de "un campo menos que
-   *  pedir" que el resto del detalle). Registro (Task 13) reutiliza este mismo patrón de UI. */
-  function renderTagControl(d) {
-    if (!d.tagPickerOpen) {
-      const hasTag = !!d.tagId;
-      return `
-      <button type="button" class="chip${hasTag ? " active" : ""}" id="mov-tag-chip"
-        style="align-self:flex-start;padding:0 14px;display:inline-flex;align-items:center;gap:7px;${hasTag ? "" : "background:transparent;border:1px dashed var(--rule);"}">
-        ${icon("tag", { size: 14 })}${hasTag ? escHtml(tagName(d.tagId)) : t("movimientos.detail.noTag")}
-      </button>`;
-    }
-    const options = tagOptions();
-    return `
-    <div class="chips">
-      <button type="button" class="chip${!d.tagId ? " active" : ""}" data-tag-pick="">${t("movimientos.detail.noTag")}</button>
-      ${options.map((tg) => `<button type="button" class="chip${d.tagId === tg.id ? " active" : ""}" data-tag-pick="${escAttr(tg.id)}">${icon("tag", { size: 14 })}${escHtml(tg.name)}</button>`).join("")}
-      ${d.newTagDraft == null ? `
-      <button type="button" id="mov-tag-new" class="chip" style="background:transparent;border:1px dashed var(--rule);">${icon("plus", { size: 13 })}${t("movimientos.detail.newTag")}</button>
-      ` : `
-      <span style="display:inline-flex;align-items:center;gap:6px;">
-        <input type="text" id="mov-tag-new-input" value="${escAttr(d.newTagDraft)}" placeholder="${escAttr(t("etiquetas.form.namePlaceholder"))}"
-          style="height:44px;min-width:0;border:1px solid var(--rule);border-radius:999px;padding:0 14px;background:none;color:var(--text);font:14px inherit;">
-        <button type="button" id="mov-tag-new-save" class="icon-btn" aria-label="${t("common.save")}" style="width:44px;height:44px;flex-shrink:0;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"></path></svg>
-        </button>
-      </span>`}
-    </div>`;
-  }
-
-  /** Caja de fecha de solo lectura APARENTE (MovimientoDetalle.dc.html:97-101): icono calendario +
-   *  fecha en dd/mm/aaaa mono. El `<input type="date">` real sigue ahí — mismo id `mov-fecha`,
-   *  mismo onchange de wireDetail() — pero transparente y a sangre sobre la caja: tocar CUALQUIER
-   *  punto de la caja abre el selector nativo, en vez de solo el pequeño icono de calendario que
-   *  pinta el navegador. `.field-date:focus-within` (bloque P1 de app.css) le da el anillo de foco
-   *  que un input con opacity:0 no puede pintarse a sí mismo. */
-  function fechaBoxHtml(d) {
-    const display = new Date(d.fecha + "T12:00:00").toLocaleDateString(appLocale(), { day: "2-digit", month: "2-digit", year: "numeric" });
-    return `
-    <label class="field-date">
-      ${icon("calendar", { size: 18, stroke: "var(--ink-3)" })}
-      <span class="num" style="font-size:13px;font-weight:500;">${escHtml(display)}</span>
-      <input type="date" id="mov-fecha" value="${escAttr(d.fecha)}" aria-label="${escAttr(t("common.date"))}">
+  /** Fecha. En la vista, fila botón; en edición, la misma anatomía con el <input type=date> nativo
+   *  transparente encima (un input no puede ir dentro de un botón): tocar la fila abre el selector
+   *  del sistema. El foco se pinta en la fila (:focus-within, screens.css). */
+  function dateRowHtml(d) {
+    if (!d.editing) return settingRowHtml({ label: t("common.date"), value: dateLabel(d.fecha), id: "mdet-date-row" });
+    return `<label class="ent-set mdet-date">
+      <span class="ent-set-body"><span class="ent-set-label">${escHtml(t("common.date"))}</span></span>
+      <span class="ent-set-value">${escHtml(dateLabel(d.fecha))}</span>
+      <span class="ent-chev">${icon("chevronRight", { size: 16 })}</span>
+      <input type="date" id="mdet-fecha" class="mdet-date-input" value="${escAttr(d.fecha)}" aria-label="${escAttr(t("common.date"))}">
     </label>`;
   }
 
-  function renderDetail() {
-    const d = state.detail;
-    // Foto del ticket: revocar SIEMPRE la URL del repintado anterior antes de crear la nueva —
-    // ver el comentario de detailPhotoUrl más arriba. d.photoBlob no cambia durante la sesión de
-    // detalle (solo openDetail lo rellena), así que esto es barato: una URL por repintado, nunca
-    // dos vivas a la vez.
-    if (detailPhotoUrl) { URL.revokeObjectURL(detailPhotoUrl); detailPhotoUrl = null; }
-    if (d.photoBlob) detailPhotoUrl = URL.createObjectURL(d.photoBlob);
-    const cats = categoriesFor(d.type);
-    const { mine: myCents, partner: partnerCents } = d.isShared ? splitCents(d.cents, d.sharePct) : { mine: d.cents, partner: 0 };
-    const locked = !!d.settledLocked;
-    // Task 7 (5d): además de `locked` (lado del gasto), el importe del apunte de liquidación
-    // (refund entrante o adjustment saliente) se bloquea si su gasto enlazado ya está settled —
-    // ver refundLocked en openDetail.
-    const amountLocked = locked || !!d.refundLocked;
+  /** ¿Se ofrece «Compartido con …»? Mismo criterio de siempre: tipos con categoría salvo ingreso, y
+   *  solo si ya era compartido o hay contraparte configurada. */
+  const sharedOffered = (d) => needsCategory(d.type) && d.type !== "income" && (d.wasShared || partnerName);
 
-    container.innerHTML = `
-      ${subHeaderHtml({ id: "mov-back", title: t(TIPO_KEY[d.type]) })}
-
-      ${locked ? `
-      <div class="banner-aviso" style="margin-bottom:18px;">
-        <p>${t("movimientos.detail.lockedNote")}</p>
-      </div>` : ""}
-
-      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
-        <div class="section-title">${t("common.amount")}</div>
-        <div class="amount-display" style="align-items:center;">
-          ${d.type === "adjustment" ? `<button type="button" class="icon-btn" id="mov-sign" aria-label="${t("common.changeSign")}" style="font-size:18px; font-weight:700;${amountLocked ? "opacity:.5;" : ""}" ${amountLocked ? "disabled" : ""}>${d.sign}</button>` : ""}
-          <input type="text" inputmode="decimal" id="mov-raw" value="${escAttr(d.raw)}" placeholder="0" ${amountLocked ? "disabled" : ""}
-            style="border:0;background:none;color:var(--text);font:var(--t-figure-xl);letter-spacing:-.015em;width:100%;outline:none;${amountLocked ? "opacity:.5;" : ""}">
-          <span class="amount-currency">${currencySymbol()}</span>
-        </div>
-        <hr class="divider" style="margin-top:6px;">
-      </div>
-
-      ${typePillsHtml(d.type)}
-
-      ${cats.length ? `
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">${t("common.category")}</div>
-        <div class="chips-grid">
-          ${cats.map((c) => {
-            const color = colorForCategory(c.id, byId);
-            // catIcon: mismo criterio que movRowHtml — deja el nombre `icon` libre para la
-            // función importada de icons.js.
-            const catIcon = catSvg(iconForCategory(c.id, byId), { size: "1em" });
-            const active = d.categoryId === c.id;
-            return `<button type="button" class="chip-v${active ? " active" : ""}" data-cat="${c.id}" style="--cat:${color};">
-              <span class="chip-icon">${catIcon}</span><span>${escHtml(c.name)}</span>
-            </button>`;
-          }).join("")}
-        </div>
-      </div>` : ""}
-
-      ${renderAccountsSection(d)}
-
-      ${d.type === "refund" && state.linkedExpense ? `
-      <div class="card" style="padding:12px 14px; margin-bottom:18px;">
-        <div style="font-size:10px; color:var(--text-3);">${t("common.linkedTo")}</div>
-        ${metaHtml([state.linkedExpense.merchant || byId[state.linkedExpense.category_id]?.name || t("common.type.expense"), fmtMoney(state.linkedExpense.amount_cents)])}
-      </div>` : ""}
-
-      <label class="field field-stack" style="margin-bottom:12px;">
-        <span class="field-label">${t("common.merchant")}</span>
-        <input type="text" id="mov-merchant" value="${escAttr(d.merchant)}" placeholder="${t("common.optional")}">
-      </label>
-
-      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
-        ${fechaBoxHtml(d)}
-        ${renderTagControl(d)}
-        ${detailPhotoUrl ? `
-        <button type="button" id="mov-photo-thumb" aria-label="${escAttr(t("registro.photo.viewAria"))}"
-          style="width:44px;height:44px;border-radius:var(--r-1);border:1px solid var(--hairline-strong);padding:0;overflow:hidden;flex-shrink:0;cursor:pointer;background:var(--surface-2);">
-          <img src="${escAttr(detailPhotoUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">
-        </button>` : ""}
-      </div>
-
-      ${d.photoViewerOpen && detailPhotoUrl ? `
-      <div id="mov-photo-viewer" role="dialog" aria-label="${escAttr(t("registro.photo.viewAria"))}" tabindex="-1"
-        style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;cursor:pointer;">
-        <button type="button" id="mov-photo-viewer-close" aria-label="${escAttr(t("movimientos.detail.photoClose"))}"
-          style="position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;">
-          ${icon("close", { size: 20, stroke: "#fff" })}
-        </button>
-        <img src="${escAttr(detailPhotoUrl)}" alt="" style="max-width:100%;max-height:100%;object-fit:contain;">
-      </div>` : ""}
-
-      <label class="field field-stack" style="margin-bottom:18px;">
-        <span class="field-label">${t("common.note")}</span>
-        <input type="text" id="mov-note" value="${escAttr(d.note)}" placeholder="${t("common.optional")}">
-      </label>
-
-      ${needsCategory(d.type) && d.type !== "income" && (d.wasShared || partnerName) ? `
-      <div class="card" style="background:var(--surface); padding:14px 16px; margin-bottom:18px;">
-        <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:${locked ? "default" : "pointer"};${locked ? "opacity:.5;" : ""}">
-          <span style="font-size:15px; font-weight:600;">${t("common.sharedWith", { name: escHtml(partnerName) || t("movimientos.shared.fallbackName") })}</span>
-          <span class="toggle">
-            <input type="checkbox" id="mov-shared" ${d.isShared ? "checked" : ""} ${locked ? "disabled" : ""}>
-            <span class="toggle-track"><span class="toggle-knob"></span></span>
-          </span>
-        </label>
-        ${d.isShared ? `
-        <div style="display:flex; flex-direction:column; gap:10px; padding:0 0 14px;${locked ? "opacity:.5;" : ""}">
-          ${d.type === "expense" ? `
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <div class="section-title">${t("common.paidBy.label")}</div>
-            <div class="segmented" style="border-radius:999px;">
-              <button type="button" data-paidby="me" class="${d.paidBy === "me" ? "active" : ""}" ${locked ? "disabled" : ""}
-                style="flex:1;border-radius:999px;${d.paidBy === "me" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("common.paidBy.me")}</button>
-              <button type="button" data-paidby="partner" class="${d.paidBy === "partner" ? "active" : ""}" ${locked ? "disabled" : ""}
-                style="flex:1;border-radius:999px;${d.paidBy === "partner" ? "background:var(--accent);color:var(--accent-ink);font-weight:600;" : ""}">${t("common.paidBy.partner", { name: escHtml(partnerName) || t("movimientos.shared.fallbackName") })}</button>
-            </div>
-          </div>` : ""}
-          <div style="display:flex; align-items:center; gap:10px;">
-            <div style="flex:1; min-width:0;">
-              <div style="font-size:14px; font-weight:600;">${t("common.split.label")}</div>
-              <div style="font-size:11px; color:var(--text-3);">${t("common.split.hint", { name: escHtml(partnerName || t("movimientos.shared.fallbackName")), pct: 100 - d.sharePct })}</div>
-            </div>
-            <button type="button" id="mov-pct-down" class="stepper-btn lg" aria-label="${t("common.split.decreaseAria")}" ${locked ? "disabled" : ""}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
-            <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${d.sharePct} %</div>
-            <button type="button" id="mov-pct-up" class="stepper-btn lg" aria-label="${t("common.split.increaseAria")}" ${locked ? "disabled" : ""}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
-          </div>
-          <div style="display:flex; gap:8px;">
-            <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
-              <div style="font-size:10px; color:var(--text-3);">${metaHtml([t("common.myShare"), t("common.pctValue", { pct: d.sharePct })])}</div>
-              <div class="num" id="mov-split-mine" style="font-size:15px; font-weight:600;">${fmtMoney(myCents)}</div>
-            </div>
-            <div style="flex:1; background:var(--card2); border-radius:0; padding:10px 11px;">
-              <div style="font-size:10px; color:var(--text-3);">${partnerPaid(d) ? metaHtml([t("common.paidByName", { name: partnerName || t("movimientos.shared.fallbackLabel") }), t("common.paidTotal")]) : metaHtml([partnerName || t("movimientos.shared.fallbackLabel"), t("common.pctValue", { pct: 100 - d.sharePct })])}</div>
-              <div class="num" id="mov-split-partner" style="font-size:15px; font-weight:600; color:var(--text-2);">${fmtMoney(partnerPaid(d) ? d.cents : partnerCents)}</div>
-            </div>
-          </div>
-        </div>` : ""}
-      </div>` : ""}
-
-      ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
-
-      <button type="button" class="btn-primary" id="mov-save" style="margin-bottom:10px;">${t("common.save")}</button>
-      <button type="button" class="btn-danger" id="mov-delete">${t("movimientos.delete.button")}</button>
-    `;
-
-    wireDetail();
+  function sharedRowHtml(d) {
+    let sub = "";
+    if (!d.editing && d.isShared) {
+      const { mine } = splitCents(d.cents, d.sharePct);
+      sub = partnerPaid(d)
+        ? t("movimientos.detail.sharedPartnerPaid", { name: partnerLabel, amount: fmtMoney(mine) })
+        : t("movimientos.detail.sharedMine", { amount: fmtMoney(mine), pct: d.sharePct });
+    }
+    const label = t("common.sharedWith", { name: partnerLabel });
+    return settingRowHtml({
+      label, sub, id: "mdet-shared-row",
+      controlHtml: switchHtml({ id: "mdet-shared", checked: d.isShared, label }),
+    });
   }
 
-  function wireDetail() {
-    const d = state.detail;
-    container.querySelector("#mov-back").onclick = () => goBack();
+  function tagRowHtml(d) {
+    const label = t("movimientos.detail.tagLabel");
+    const open = d.editing && d.tagPickerOpen;
+    const rowHtml = settingRowHtml({
+      label, value: d.tagId ? tagName(d.tagId) : t("movimientos.detail.noTag"), id: "mdet-tag",
+      ...(d.editing ? { expanded: open, controls: "mdet-tag-panel" } : {}),
+    });
+    if (!open) return rowHtml;
+    const draft = d.newTagDraft == null
+      ? filterChipHtml({ label: t("movimientos.detail.newTag"), id: "mdet-tag-new" })
+      : `<span class="mdet-newtag">
+          <span class="ctl-field mdet-newtag-field"><input type="text" class="ctl-field-input" id="mdet-tag-new-input" value="${escAttr(d.newTagDraft)}" placeholder="${escAttr(t("etiquetas.form.namePlaceholder"))}" aria-label="${escAttr(t("movimientos.detail.newTag"))}"></span>
+          <button type="button" id="mdet-tag-new-save" class="icon-btn" aria-label="${escAttr(t("common.save"))}">${icon("check", { size: 18 })}</button>
+        </span>`;
+    return `${rowHtml}<div class="mdet-panel" id="mdet-tag-panel" role="group" aria-label="${escAttr(label)}">
+      ${filterChipHtml({ label: t("movimientos.detail.noTag"), selected: !d.tagId, check: true, data: { tagPick: "" } })}
+      ${tagOptions().map((tg) => filterChipHtml({ tag: true, label: tg.name, selected: d.tagId === tg.id, data: { tagPick: tg.id } })).join("")}
+      ${draft}
+    </div>`;
+  }
 
-    // Foto del ticket: miniatura abre el visor a pantalla completa; el visor se cierra al tocar
-    // en cualquier sitio, con el botón explícito o con Escape (spec §9.8).
-    const photoThumb = container.querySelector("#mov-photo-thumb");
-    if (photoThumb) photoThumb.onclick = () => updateDetail({ photoViewerOpen: true });
-    const photoViewer = container.querySelector("#mov-photo-viewer");
-    if (photoViewer) {
-      photoViewer.onclick = () => updateDetail({ photoViewerOpen: false });
-      photoViewer.onkeydown = (e) => { if (e.key === "Escape") updateDetail({ photoViewerOpen: false }); };
-      photoViewer.focus();
+  function rowsHtml(d) {
+    const rows = [];
+    if (!partnerPaid(d)) {
+      rows.push(accountRowHtml("from", d));
+      if (d.type === "transfer") rows.push(accountRowHtml("to", d));
     }
-    const photoViewerClose = container.querySelector("#mov-photo-viewer-close");
-    if (photoViewerClose) photoViewerClose.onclick = (e) => { e.stopPropagation(); updateDetail({ photoViewerOpen: false }); };
+    rows.push(dateRowHtml(d));
+    if (sharedOffered(d)) rows.push(sharedRowHtml(d));
+    rows.push(tagRowHtml(d));
+    return `<div class="mdet-group">${rows.join(DIVIDER)}</div>`;
+  }
 
-    container.querySelectorAll("[data-cat]").forEach((b) => {
-      b.onclick = () => updateDetail({ categoryId: b.dataset.cat });
+  /** Reparto (edición, con «Compartido» encendido): quién pagó (solo gasto), el paso a paso del %
+   *  y las dos partes. Mismo bloque que B-Gasto (registro.js#sharedDetailHtml). */
+  function sharedDetailHtml(d, locked) {
+    if (!d.editing || !sharedOffered(d) || !d.isShared) return "";
+    const { mine: myCents, partner: partnerCents } = splitCents(d.cents, d.sharePct);
+    const partnerSeg = partnerName || t("movimientos.shared.fallbackLabel");
+    return `
+    <div class="mdet-block${locked ? " is-locked" : ""}">
+      ${d.type === "expense" ? `
+      <div class="mdet-block-sec">
+        <span class="mdet-block-label" id="mdet-paidby-label">${escHtml(t("common.paidBy.label"))}</span>
+        ${segmentedHtml({ id: "mdet-paidby", name: t("common.paidBy.label"), labelledBy: "mdet-paidby-label", value: d.paidBy,
+          options: [{ value: "me", label: t("common.paidBy.me") }, { value: "partner", label: t("common.paidBy.partner", { name: partnerLabel }) }] })}
+      </div>` : ""}
+      <div class="mdet-split-row">
+        <div class="mdet-split-text">
+          <span class="mdet-block-title">${escHtml(t("common.split.label"))}</span>
+          <span class="mdet-block-hint">${escHtml(t("common.split.hint", { name: partnerLabel, pct: 100 - d.sharePct }))}</span>
+        </div>
+        ${stepperHtml({ value: `${d.sharePct} %`, decId: "mdet-pct-down", incId: "mdet-pct-up", decLabel: t("common.split.decreaseAria"), incLabel: t("common.split.increaseAria") })}
+      </div>
+      <div class="mdet-split">
+        <div class="mdet-split-cell">
+          ${metaHtml([t("common.myShare"), t("common.pctValue", { pct: d.sharePct })], { cls: "mdet-split-label" })}
+          <span class="num mdet-split-value" id="mdet-split-mine">${escHtml(fmtMoney(myCents))}</span>
+        </div>
+        <div class="mdet-split-cell">
+          ${partnerPaid(d)
+            ? metaHtml([t("common.paidByName", { name: partnerSeg }), t("common.paidTotal")], { cls: "mdet-split-label" })
+            : metaHtml([partnerSeg, t("common.pctValue", { pct: 100 - d.sharePct })], { cls: "mdet-split-label" })}
+          <span class="num mdet-split-value" id="mdet-split-partner">${escHtml(fmtMoney(partnerPaid(d) ? d.cents : partnerCents))}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ---- Nota y foto ---------------------------------------------------------------------------
+
+  /** Tarjeta de nota con la foto del ticket (B-Movimiento-Detalle): la miniatura (la foto real,
+   *  en un pozo de 60×76) abre el visor. En la vista, la nota en texto; en edición, su campo
+   *  hundido. En la vista, sin nota ni foto no se pinta. */
+  function noteCardHtml(d) {
+    const photo = detailPhotoUrl
+      ? `<button type="button" class="mdet-photo" id="mdet-photo" aria-label="${escAttr(t("registro.photo.viewAria"))}">
+          <img class="mdet-photo-img" src="${escAttr(detailPhotoUrl)}" alt="">
+        </button>`
+      : "";
+    if (d.editing) {
+      return `<div class="mdet-notecard">${photo}<div class="mdet-note-field">${fieldHtml({ id: "mdet-note", label: t("common.note"), value: d.note, placeholder: t("common.optional") })}</div></div>`;
+    }
+    const note = d.note.trim();
+    if (!photo && !note) return "";
+    return `<div class="mdet-notecard">${photo}
+      ${note ? `<div class="mdet-note-body"><span class="mdet-note-label">${escHtml(t("common.note"))}</span><span class="mdet-note-text">${escHtml(note)}</span></div>` : ""}
+    </div>`;
+  }
+
+  /** Devolución enlazada: a qué gasto devuelve (bloque neutro, en los dos estados). */
+  function linkedHtml(d) {
+    if (d.type !== "refund" || !state.linkedExpense) return "";
+    const le = state.linkedExpense;
+    return `<div class="mdet-linked">
+      <span class="mdet-linked-label">${escHtml(t("common.linkedTo"))}</span>
+      ${metaHtml([le.merchant || byId[le.category_id]?.name || t("common.type.expense"), fmtMoney(le.amount_cents)], { cls: "mdet-linked-meta" })}
+    </div>`;
+  }
+
+  // ---- Pintado -------------------------------------------------------------------------------
+
+  function render(focusSel = "") {
+    const d = state.detail;
+    const locked = !!d.settledLocked;
+    // Task 7 (5d): además de `locked` (lado del gasto), el importe del apunte de liquidación
+    // (refund entrante o adjustment saliente) se bloquea si su gasto enlazado ya está settled.
+    const amountLocked = locked || !!d.refundLocked;
+    const cats = categoriesFor(d.type);
+
+    const actions = d.editing
+      ? `${errorMsg ? `<div class="mdet-error" role="alert">${icon("warn", { size: 18 })}<span>${escHtml(errorMsg)}</span></div>` : ""}
+        <div class="mdet-actions-edit">
+          ${buttonHtml({ kind: "primary", id: "mdet-save", label: t("common.saveChanges") })}
+          ${buttonHtml({ kind: "tertiary", id: "mdet-cancel", label: t("common.cancel") })}
+        </div>`
+      : `${errorMsg ? `<div class="mdet-error" role="alert">${icon("warn", { size: 18 })}<span>${escHtml(errorMsg)}</span></div>` : ""}
+        <div class="mdet-actions">
+          ${buttonHtml({ kind: "secondary", id: "mdet-edit", label: t("movimientos.detail.edit"), icon: "pencil" })}
+          ${buttonHtml({ kind: "danger-entry", id: "mdet-delete", label: t("movimientos.delete.button"), icon: "trash" })}
+        </div>`;
+
+    container.innerHTML = `
+    <div class="mdet${d.editing ? " is-editing" : ""}">
+      ${subHeaderHtml({ id: "mdet-back", title: t(TIPO_KEY[d.type]) })}
+      ${d.editing && locked ? `<p class="mdet-locked" role="note">${icon("lock", { size: 18 })}<span>${escHtml(t("movimientos.detail.lockedNote"))}</span></p>` : ""}
+      ${d.editing ? displayEditHtml(d, amountLocked) : displayViewHtml(d)}
+      ${linkedHtml(d)}
+      ${cats.length ? chosenHtml(d) : ""}
+      ${rowsHtml(d)}
+      ${sharedDetailHtml(d, locked)}
+      ${noteCardHtml(d)}
+      <div class="mdet-foot">${actions}</div>
+    </div>`;
+
+    wire(locked);
+    if (focusSel) container.querySelector(focusSel)?.focus();
+  }
+
+  function update(patch, focusSel = "") {
+    Object.assign(state.detail, patch);
+    render(focusSel);
+  }
+
+  /** Entra en edición (desde «Editar» o tocando una fila de la vista) con `patch` aplicado —p. ej.
+   *  la lista de cuentas ya desplegada— y el foco en `focusSel`. Por defecto el foco va al Display
+   *  de edición (no a un campo: en el móvil abriría el teclado sin pedirlo). */
+  function enterEdit(patch = {}, focusSel = "#mdet-disp-edit") {
+    const d = state.detail;
+    if (!d.editing) snapshot = Object.fromEntries(EDITABLE.map((k) => [k, d[k]]));
+    errorMsg = "";
+    update({ editing: true, accPicker: null, tagPickerOpen: false, newTagDraft: null, ...patch }, focusSel);
+  }
+
+  function cancelEdit() {
+    errorMsg = "";
+    update({ ...(snapshot ?? {}), editing: false, accPicker: null, tagPickerOpen: false, newTagDraft: null }, "#mdet-edit");
+    snapshot = null;
+  }
+
+  // ---- Hoja de categoría ---------------------------------------------------------------------
+
+  /** Categoría en una hoja inferior (sustituye a la rejilla de 30 fichas, auditoría §33): las
+   *  hojas agrupadas por su raíz, como chips de filtro con su familia; las raíces sin hijas van
+   *  juntas arriba, sin encabezado. Elegir cierra la hoja; el repintado espera a su `close` (la
+   *  página es inerte mientras está abierta) y devuelve el foco a la tarjeta. */
+  function openCategorySheet() {
+    const d = state.detail;
+    const order = [];
+    const byRoot = new Map();
+    for (const c of categoriesFor(d.type)) {
+      const root = rootOf(c.id, byId) || c.id;
+      if (!byRoot.has(root)) { byRoot.set(root, []); order.push(root); }
+      byRoot.get(root).push(c);
+    }
+    const chip = (c) => filterChipHtml({ fam: catFam(c.id), label: c.name, selected: d.categoryId === c.id, check: true, data: { pickCat: c.id } });
+    const direct = [];
+    const groups = [];
+    for (const root of order) {
+      const items = byRoot.get(root);
+      if (items.length === 1 && items[0].id === root) direct.push(items[0]);
+      else groups.push({ name: byId[root]?.name ?? items[0].name, items });
+    }
+    const body = `
+      ${direct.length ? `<div class="mdet-sheet-chips">${direct.map(chip).join("")}</div>` : ""}
+      ${groups.map((g) => `<div class="mdet-sheet-group">
+        ${sectionHeaderHtml({ title: g.name, level: "group", tag: "h3" })}
+        <div class="mdet-sheet-chips">${g.items.map(chip).join("")}</div>
+      </div>`).join("")}`;
+    const dlg = showSheet({ title: t("common.category"), body });
+    if (!dlg) return;
+    let picked = null;
+    dlg.querySelectorAll("[data-pick-cat]").forEach((b) => {
+      b.onclick = () => { picked = b.dataset.pickCat; goBack(); };
+    });
+    dlg.addEventListener("close", () => {
+      // Sin elegir, nada que repintar: la hoja ya devuelve el foco a la tarjeta. Y si un salto de
+      // varias entradas de «atrás» ya pintó otra pantalla en `container`, no se pisa.
+      if (!picked || !container.querySelector(".mdet")) return;
+      state.detail.categoryId = picked;
+      errorMsg = "";
+      render("#mdet-cat");
+    });
+  }
+
+  // ---- Visor de foto -------------------------------------------------------------------------
+
+  /** Visor a pantalla completa (§9, D-impl-4): <dialog> modal sobre --disp, la foto contenida y
+   *  cerrar de 44 en --disp-ink arriba a la derecha. Apunta una entrada de «atrás» (sin cambio de
+   *  pantalla ni de chrome, como el aviso) para que el gesto del sistema lo cierre a él y no al
+   *  detalle; cerrar, Escape y tocar la foto hacen goBack(), que deshace esa entrada. */
+  function openViewer() {
+    if (viewer || !detailPhotoUrl) return;
+    const dlg = document.createElement("dialog");
+    dlg.className = "mdet-viewer";
+    dlg.setAttribute("aria-label", t("registro.photo.viewAria"));
+    dlg.innerHTML = `
+      <button type="button" class="mdet-viewer-close" id="mdet-viewer-close" aria-label="${escAttr(t("movimientos.detail.photoClose"))}">${icon("close", { size: 24 })}</button>
+      <img class="mdet-viewer-img" src="${escAttr(detailPhotoUrl)}" alt="">`;
+    viewer = dlg;
+    let closed = false;
+    let pushed = false;
+    let myDepth = null;
+    const onPopstate = (e) => {
+      // Salto de varias entradas de golpe: back.js solo llama al callback de la más baja, que no
+      // es la nuestra. Si el historial ya está por debajo de nuestra profundidad, se cierra solo.
+      if (myDepth !== null && (e.state?.bc ?? -1) < myDepth) closeViewer?.();
+    };
+    closeViewer = () => {
+      if (closed) return;
+      closed = true;
+      window.removeEventListener("popstate", onPopstate);
+      if (dlg.open) dlg.close();
+      dlg.remove();
+      viewer = null;
+      closeViewer = null;
+      container.querySelector("#mdet-photo")?.focus();
+    };
+    // Un solo goBack() por visor: un doble toque antes del popstate deshacería también la entrada
+    // del detalle y sacaría de la pantalla.
+    let requested = false;
+    const requestClose = () => {
+      if (requested) return;
+      requested = true;
+      if (pushed) goBack(); else closeViewer?.();
+    };
+    dlg.addEventListener("cancel", (e) => { e.preventDefault(); requestClose(); });
+    dlg.addEventListener("click", () => requestClose());
+    document.body.appendChild(dlg);
+    dlg.showModal();
+    try {
+      pushBack(() => closeViewer?.(), { scroll: false, chrome: false });
+      pushed = true;
+      myDepth = window.history.state?.bc ?? null;
+      window.addEventListener("popstate", onPopstate);
+    } catch { /* sin entrada de historial: cerrar no toca el historial */ }
+    dlg.querySelector("#mdet-viewer-close").focus();
+  }
+
+  // ---- Borrar --------------------------------------------------------------------------------
+
+  /** Vista previa de la fila en el pozo del aviso (B-Borrar): baldosa, comercio, ruta de la
+   *  categoría, cifra con signo y día. HTML de confianza para modal.js: todo va escapado aquí. */
+  function deletePreviewHtml(d) {
+    const fam = needsCategory(d.type) ? catFam(d.categoryId) : null;
+    let key = d.categoryId ? iconForCategory(d.categoryId, byId) : "";
+    if (!key) key = d.type === "income" ? "income" : d.type === "transfer" ? "transfer" : "otr";
+    const line2 = categoryPath(d.categoryId);
+    const fc = fam ? ` fam-${fam}` : "";
+    return `${tileHtml({ fam, icon: key })}
+      <span class="mdet-prev-body">
+        <span class="mdet-prev-name">${escHtml(titleOf(d))}</span>
+        ${line2 ? `<span class="mdet-prev-line2${fc}">${escHtml(line2)}</span>` : ""}
+      </span>
+      <span class="mdet-prev-side">
+        <span class="num mdet-prev-amount">${escHtml(signedAmount(d))}</span>
+        <span class="mdet-prev-date">${escHtml(`${weekdayShort(d.fecha)} ${fmtDiaCorto(d.fecha)}`)}</span>
+      </span>`;
+  }
+
+  function confirmDelete() {
+    const d = state.detail;
+    showConfirm({
+      title: t("movimientos.delete.title"),
+      message: t("movimientos.delete.body"),
+      preview: deletePreviewHtml(d),
+      destructive: true,
+      cancelText: t("common.cancel"),
+      confirmText: t("common.delete"),
+      onConfirm: async () => {
+        // El aviso ya se ha desmontado; el botón sigue vivo detrás hasta que goBack() cierre el
+        // detalle, así que se deshabilita para que un segundo toque no abra otro aviso.
+        const btn = container.querySelector("#mdet-delete");
+        if (btn) btn.disabled = true;
+        try {
+          await softDeleteTransaction(state.detailId);
+          await onChanged();
+          goBack();
+        } catch (e) {
+          if (btn) btn.disabled = false;
+          // Incluye el guard de repo.js (expenseDeleteLocked): un gasto con su devolución de
+          // liquidación activa no se borra; el motivo llega en el mensaje del error.
+          errorMsg = t("movimientos.error.delete", { error: userMessage(e) });
+          render("#mdet-delete");
+        }
+      },
+    });
+  }
+
+  // ---- Guardar -------------------------------------------------------------------------------
+
+  async function save() {
+    const d = state.detail;
+    const btn = container.querySelector("#mdet-save");
+    const msg = validationError();
+    if (msg) {
+      errorMsg = msg;
+      render();
+      const again = container.querySelector("#mdet-save");
+      again.classList.add("shake");
+      setTimeout(() => again.classList.remove("shake"), 400);
+      return;
+    }
+    btn.disabled = true;
+    try {
+      const withCategory = needsCategory(d.type);
+      await updateTransaction(state.detailId, {
+        type: d.type,
+        amountCents: d.type === "adjustment" && d.sign === "-" ? -d.cents : d.cents,
+        date: d.fecha,
+        categoryId: withCategory ? d.categoryId : "",
+        // Un gasto que pagó la contraparte no toca ninguna cuenta mía hasta liquidar (el repo
+        // además lo blanquea por su cuenta, pero el payload no debe contradecirlo).
+        accountId: partnerPaid(d) ? "" : d.accountId,
+        counterAccountId: d.type === "transfer" ? d.counterAccountId : "",
+        merchant: d.merchant,
+        note: d.note,
+        isShared: withCategory && d.type !== "income" ? d.isShared : false,
+        // Locked (gasto liquidado con apunte enlazado): se deja undefined para que updateTransaction
+        // conserve el valor guardado — si mandáramos d.sharePct explícito, un gasto antiguo con override
+        // NULL dispararía sharedFieldsLocked al editar solo la nota o la fecha.
+        sharePctOverride: d.settledLocked ? undefined : (withCategory && d.type !== "income" && d.isShared ? d.sharePct : null),
+        // Mismo motivo que sharePctOverride: undefined conserva el paid_by guardado. Desmarcar
+        // «Compartido» cae a "me" — el guard del repo rechazaría un 'partner' sin is_shared.
+        paidBy: d.settledLocked ? undefined : (withCategory && d.type === "expense" && d.isShared ? d.paidBy : "me"),
+        refId: d.refId,
+        ruleId: d.ruleId,
+        tagId: d.tagId || "",
+      });
+      await onChanged();
+      goBack();
+    } catch (e) {
+      btn.disabled = false;
+      errorMsg = t("common.saveFailed", { error: userMessage(e) });
+      render();
+    }
+  }
+
+  async function submitNewTag() {
+    const d = state.detail;
+    const btn = container.querySelector("#mdet-tag-new-save");
+    if (btn) btn.disabled = true;
+    try {
+      const newId = await createTag({ name: d.newTagDraft });
+      [tagsAll, state.tagTotalsAll] = await Promise.all([listTags(), tagTotals()]);
+      update({ tagId: newId, tagPickerOpen: false, newTagDraft: null }, "#mdet-tag");
+    } catch (e) {
+      if (btn) btn.disabled = false;
+      errorMsg = t("common.saveFailed", { error: userMessage(e) });
+      render("#mdet-tag-new-input");
+    }
+  }
+
+  // ---- Cableado ------------------------------------------------------------------------------
+
+  function wire(locked) {
+    const d = state.detail;
+    const $ = (sel) => container.querySelector(sel);
+    $("#mdet-back").onclick = () => goBack();
+
+    const photo = $("#mdet-photo");
+    if (photo) photo.onclick = () => openViewer();
+
+    // Tarjeta de categoría: en la vista entra en edición; en los dos casos abre la hoja.
+    const cat = $("#mdet-cat");
+    if (cat) {
+      cat.onclick = () => {
+        if (!d.editing) enterEdit({}, "#mdet-cat");
+        openCategorySheet();
+      };
+    }
+
+    // Filas de cuenta: en la vista entran en edición con su lista desplegada; en edición, la
+    // despliegan o la pliegan.
+    container.querySelectorAll("[data-acc-row]").forEach((b) => {
+      const which = b.dataset.accRow;
+      b.onclick = () => {
+        if (!d.editing) enterEdit({ accPicker: which }, `#mdet-acc-${which}`);
+        else update({ accPicker: d.accPicker === which ? null : which, tagPickerOpen: false }, `#mdet-acc-${which}`);
+      };
     });
     container.querySelectorAll("[data-acc]").forEach((b) => {
-      b.onclick = () => updateDetail({
+      b.onclick = () => update({
         accountId: b.dataset.acc,
         counterAccountId: d.counterAccountId === b.dataset.acc ? "" : d.counterAccountId,
-      });
+        accPicker: null,
+      }, "#mdet-acc-from");
     });
     container.querySelectorAll("[data-counter-acc]").forEach((b) => {
-      b.onclick = () => updateDetail({ counterAccountId: b.dataset.counterAcc });
+      b.onclick = () => update({ counterAccountId: b.dataset.counterAcc, accPicker: null }, "#mdet-acc-to");
     });
 
-    const signBtn = container.querySelector("#mov-sign");
-    if (signBtn) signBtn.onclick = () => updateDetail({ sign: d.sign === "+" ? "-" : "+" });
+    const dateRow = $("#mdet-date-row");
+    if (dateRow) {
+      dateRow.onclick = () => {
+        enterEdit({}, "#mdet-fecha");
+        // Mismo gesto del usuario: el selector nativo se puede pedir ya (en escritorio el input
+        // transparente solo lo abre desde su icono; donde showPicker no existe, el foco basta).
+        try { $("#mdet-fecha")?.showPicker?.(); } catch { /* sin gesto válido */ }
+      };
+    }
+    const fecha = $("#mdet-fecha");
+    if (fecha) {
+      fecha.onchange = (e) => update({ fecha: e.target.value || hoyISO() }, "#mdet-fecha");
+      fecha.onclick = () => { try { fecha.showPicker?.(); } catch { /* sin gesto válido */ } };
+    }
 
-    container.querySelector("#mov-raw").oninput = (e) => {
+    const shared = $("#mdet-shared");
+    if (shared) {
+      shared.disabled = locked;
+      shared.onclick = () => {
+        if (!d.editing) enterEdit({ isShared: !d.isShared }, "#mdet-shared");
+        else update({ isShared: !d.isShared }, "#mdet-shared");
+      };
+    }
+
+    const tagRow = $("#mdet-tag");
+    if (tagRow) {
+      tagRow.onclick = () => {
+        if (!d.editing) enterEdit({ tagPickerOpen: true }, "#mdet-tag");
+        else update({ tagPickerOpen: !d.tagPickerOpen, newTagDraft: null, accPicker: null }, "#mdet-tag");
+      };
+    }
+    container.querySelectorAll("[data-tag-pick]").forEach((b) => {
+      b.onclick = () => update({ tagId: b.dataset.tagPick || null, tagPickerOpen: false, newTagDraft: null }, "#mdet-tag");
+    });
+    const tagNew = $("#mdet-tag-new");
+    if (tagNew) tagNew.onclick = () => update({ newTagDraft: "" }, "#mdet-tag-new-input");
+    const tagNewInput = $("#mdet-tag-new-input");
+    if (tagNewInput) {
+      // Sin repintar en oninput (perdería el foco): el valor solo se lee al guardar la etiqueta.
+      tagNewInput.oninput = (e) => { d.newTagDraft = e.target.value; };
+      tagNewInput.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); submitNewTag(); } };
+    }
+    const tagNewSave = $("#mdet-tag-new-save");
+    if (tagNewSave) tagNewSave.onclick = () => submitNewTag();
+
+    const edit = $("#mdet-edit");
+    // Con teclado (e.detail 0: Intro o Espacio) el foco va directo al comercio, el primer campo.
+    if (edit) edit.onclick = (e) => enterEdit({}, e.detail === 0 ? "#mdet-merchant" : "#mdet-disp-edit");
+    const del = $("#mdet-delete");
+    if (del) del.onclick = () => confirmDelete();
+
+    if (!d.editing) return;
+
+    // ---- solo en edición ----
+    const signBtn = $("#mdet-sign");
+    if (signBtn) signBtn.onclick = () => update({ sign: d.sign === "+" ? "-" : "+" }, "#mdet-sign");
+
+    $("#mdet-raw").oninput = (e) => {
       d.raw = e.target.value;
       d.cents = parseCentsRaw(d.raw);
-      errorMsg = "";
-      // No se llama a render() aquí (perdería el foco/cursor del input mientras se escribe), pero
-      // el preview "Tu parte / contraparte" de un gasto compartido se queda con el importe viejo si no se
-      // actualiza a mano — parche puntual de los dos nodos en vez de un re-render completo.
-      const mineEl = container.querySelector("#mov-split-mine");
-      const partnerEl = container.querySelector("#mov-split-partner");
+      e.target.style.width = amountWidth(d.raw);
+      // Sin repintar (perdería el foco y el cursor): se parchean a mano las dos partes del reparto.
+      const mineEl = $("#mdet-split-mine");
+      const partnerEl = $("#mdet-split-partner");
       if (d.isShared && mineEl && partnerEl) {
         const { mine: myCents, partner: partnerCents } = splitCents(d.cents, d.sharePct);
         mineEl.textContent = fmtMoney(myCents);
         partnerEl.textContent = fmtMoney(partnerPaid(d) ? d.cents : partnerCents);
       }
     };
-    container.querySelector("#mov-merchant").oninput = (e) => { d.merchant = e.target.value; };
-    container.querySelector("#mov-note").oninput = (e) => { d.note = e.target.value; };
-    container.querySelector("#mov-fecha").onchange = (e) => updateDetail({ fecha: e.target.value || hoyISO() });
+    $("#mdet-merchant").oninput = (e) => { d.merchant = e.target.value; };
+    $("#mdet-note").oninput = (e) => { d.note = e.target.value; };
 
-    // Selector de etiqueta (Task 12): abrir/cerrar y elegir son puro estado de UI en state.detail,
-    // ninguno toca la BD hasta pulsar «Guardar» (igual que categoryId/accountId más arriba).
-    const tagChip = container.querySelector("#mov-tag-chip");
-    if (tagChip) tagChip.onclick = () => updateDetail({ tagPickerOpen: true });
-    container.querySelectorAll("[data-tag-pick]").forEach((b) => {
-      b.onclick = () => updateDetail({ tagId: b.dataset.tagPick || null, tagPickerOpen: false, newTagDraft: null });
-    });
-    const tagNewBtn = container.querySelector("#mov-tag-new");
-    if (tagNewBtn) tagNewBtn.onclick = () => updateDetail({ newTagDraft: "" });
-    const tagNewInput = container.querySelector("#mov-tag-new-input");
-    if (tagNewInput) {
-      // Sin render() en oninput (perdería el foco, mismo motivo que #mov-raw/#mov-merchant): el
-      // valor tecleado solo se lee al guardar, ver submitNewTag.
-      tagNewInput.oninput = (e) => { d.newTagDraft = e.target.value; };
-      tagNewInput.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); submitNewTag(); } };
-    }
-    const tagNewSave = container.querySelector("#mov-tag-new-save");
-    if (tagNewSave) tagNewSave.onclick = () => submitNewTag();
-
-    async function submitNewTag() {
-      const btn = container.querySelector("#mov-tag-new-save");
-      if (btn) btn.disabled = true;
-      try {
-        const newId = await createTag({ name: d.newTagDraft });
-        [tagsAll, state.tagTotalsAll] = await Promise.all([listTags(), tagTotals()]);
-        updateDetail({ tagId: newId, tagPickerOpen: false, newTagDraft: null });
-      } catch (e) {
-        if (btn) btn.disabled = false;
-        errorMsg = t("common.saveFailed", { error: userMessage(e) });
-        renderDetail();
-      }
-    }
-
-    const sharedToggle = container.querySelector("#mov-shared");
-    if (sharedToggle) sharedToggle.onchange = (e) => updateDetail({ isShared: e.target.checked });
-
-    container.querySelectorAll("[data-paidby]").forEach((b) => {
-      b.onclick = () => {
-        const paidBy = b.dataset.paidby;
+    const paidBy = $("#mdet-paidby");
+    if (paidBy) {
+      if (locked) paidBy.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+      wireSegmented(paidBy, (value) => {
         // Volver a «Pagué yo» en una fila guardada sin cuenta: se precarga la cuenta por defecto
         // para que el guard de validationError no deje al usuario sin salida.
         const accounts = accountsAll.filter((a) => a.type !== "liability");
-        updateDetail({
-          paidBy,
-          accountId: paidBy === "me" ? (d.accountId || resolveAccountId(meta.default_account_id, accounts) || "") : d.accountId,
-        });
-      };
-    });
-
-    const pctDown = container.querySelector("#mov-pct-down");
-    if (pctDown) pctDown.onclick = () => updateDetail({ sharePct: stepPct(d.sharePct, -PCT_STEP) });
-    const pctUp = container.querySelector("#mov-pct-up");
-    if (pctUp) pctUp.onclick = () => updateDetail({ sharePct: stepPct(d.sharePct, PCT_STEP) });
-
-    container.querySelector("#mov-save").onclick = async () => {
-      const btn = container.querySelector("#mov-save");
-      const msg = validationError();
-      if (msg) {
-        errorMsg = msg;
-        renderDetail();
-        const savedBtn = container.querySelector("#mov-save");
-        savedBtn.classList.add("shake");
-        setTimeout(() => savedBtn.classList.remove("shake"), 400);
-        return;
-      }
-      btn.disabled = true;
-      try {
-        const withCategory = needsCategory(d.type);
-        await updateTransaction(state.detailId, {
-          type: d.type,
-          amountCents: d.type === "adjustment" && d.sign === "-" ? -d.cents : d.cents,
-          date: d.fecha,
-          categoryId: withCategory ? d.categoryId : "",
-          // Un gasto que pagó la contraparte no toca ninguna cuenta mía hasta liquidar (el repo
-          // además lo blanquea por su cuenta, pero el payload no debe contradecirlo).
-          accountId: partnerPaid(d) ? "" : d.accountId,
-          counterAccountId: d.type === "transfer" ? d.counterAccountId : "",
-          merchant: d.merchant,
-          note: d.note,
-          isShared: withCategory && d.type !== "income" ? d.isShared : false,
-          // Locked (gasto liquidado con apunte enlazado): se deja undefined para que updateTransaction
-          // conserve el valor guardado — si mandáramos d.sharePct explícito, un gasto antiguo con override
-          // NULL dispararía sharedFieldsLocked al editar solo la nota o la fecha.
-          sharePctOverride: d.settledLocked ? undefined : (withCategory && d.type !== "income" && d.isShared ? d.sharePct : null),
-          // Mismo motivo que sharePctOverride: undefined conserva el paid_by guardado. Desmarcar
-          // «Compartido» cae a "me" — el guard del repo rechazaría un 'partner' sin is_shared.
-          paidBy: d.settledLocked ? undefined : (withCategory && d.type === "expense" && d.isShared ? d.paidBy : "me"),
-          refId: d.refId,
-          ruleId: d.ruleId,
-          tagId: d.tagId || "",
-        });
-        await onChanged();
-        goBack();
-      } catch (e) {
-        btn.disabled = false;
-        errorMsg = t("common.saveFailed", { error: userMessage(e) });
-        renderDetail();
-      }
-    };
-
-    container.querySelector("#mov-delete").onclick = () => {
-      const what = t("movimientos.delete.what", {
-        merchant: d.merchant || byId[d.categoryId]?.name || t(TIPO_KEY[d.type]),
-        amount: fmtMoney(d.cents),
-        date: fmtDiaLargo(d.fecha),
+        update({
+          paidBy: value,
+          accountId: value === "me" ? (d.accountId || resolveAccountId(meta.default_account_id, accounts) || "") : d.accountId,
+        }, `#mdet-paidby [data-value="${value}"]`);
       });
-      showConfirm({
-        title: t("movimientos.delete.title"),
-        message: t("movimientos.delete.message", { what }),
-        cancelText: t("common.cancel"),
-        confirmText: t("common.delete"),
-        onConfirm: async () => {
-          // El modal ya se ha desmontado; el botón sigue vivo detrás hasta que goBack() cierre el
-          // detalle, así que se deshabilita para que un segundo toque no abra otro modal.
-          const btn = container.querySelector("#mov-delete");
-          if (btn) btn.disabled = true;
-          try {
-            await softDeleteTransaction(state.detailId);
-            await onChanged();
-            goBack();
-          } catch (e) {
-            if (btn) btn.disabled = false;
-            errorMsg = t("movimientos.error.delete", { error: userMessage(e) });
-            renderDetail();
-          }
-        },
-      });
-    };
+    }
+    const pctDown = $("#mdet-pct-down");
+    const pctUp = $("#mdet-pct-up");
+    if (pctDown) { pctDown.disabled = locked; pctDown.onclick = () => update({ sharePct: stepPct(d.sharePct, -PCT_STEP) }, "#mdet-pct-down"); }
+    if (pctUp) { pctUp.disabled = locked; pctUp.onclick = () => update({ sharePct: stepPct(d.sharePct, PCT_STEP) }, "#mdet-pct-up"); }
+
+    $("#mdet-save").onclick = () => save();
+    $("#mdet-cancel").onclick = () => cancelEdit();
   }
 
   onOpen();
-  renderDetail();
+  render();
   return () => {
+    closeViewer?.();
     if (detailPhotoUrl) { URL.revokeObjectURL(detailPhotoUrl); detailPhotoUrl = null; }
   };
 }

@@ -89,6 +89,14 @@ test("settingRowHtml: nunca emite fam- en el valor ni en la fila (I-61)", () => 
   assert.match(sinFam, /ent-tile ent-tile-32 ent-neutral/);
 });
 
+test("settingRowHtml: valueFam pinta la muestra de la cuenta delante del valor, nunca en él (C8, I-61)", () => {
+  const html = settingRowHtml({ label: "Cuenta", value: "Cuenta corriente", valueFam: "tra" });
+  assert.match(html, /<span class="ent-swatch fam-tra" aria-hidden="true"><\/span><span class="ent-set-value">Cuenta corriente<\/span>/);
+  assert.match(html, /^<button type="button" class="ent-set">/, "la familia no va en la fila");
+  assert.ok(!settingRowHtml({ label: "Cuenta", value: "X", valueFam: "rojo" }).includes("ent-swatch"), "una clave que no es familia no pinta muestra");
+  assert.ok(!settingRowHtml({ label: "Cuenta", valueFam: "tra" }).includes("ent-swatch"), "sin valor, sin muestra");
+});
+
 test("settingRowHtml: con control es un div sin chevron; sin él, botón con chevron; escapa", () => {
   const sw = '<button role="switch" aria-checked="true" aria-labelledby="notif-label"></button>';
   const conControl = settingRowHtml({ label: "Avisos", controlHtml: sw, id: "notif" });

@@ -824,6 +824,262 @@
 /* === fin: liquidar === */
 
 /* === pantalla: movimiento-detalle === */
+/* Detalle de un movimiento (B-Movimiento-Detalle/BD-), aviso de Borrar (B-Borrar, la vista previa
+   de modal.js) y visor de foto (§9, D-impl-4). Vista y edición comparten anatomía. */
+.mdet { display: flex; flex-direction: column; gap: var(--sp-12); }
+
+/* Vista: el comercio es la etiqueta del Display, 15/600 en --disp-ink (I-65), y la cifra con signo. */
+.mdet-disp-view .disp-label {
+  display: block;
+  font-size: var(--fs-15);
+  font-weight: 600;
+  color: var(--disp-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mdet-disp-view .disp-head { display: block; }
+
+/* Edición: comercio e importe son los campos del Display (patrón de B-Gasto). */
+.mdet-disp { gap: var(--sp-4); }
+/* El Display de edición recibe el foco al entrar (tabindex -1): sin anillo con el dedo, sí con teclado. */
+.mdet-disp:focus { outline: none; }
+.mdet-disp:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+.mdet-merchant-input {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  margin: calc(-1 * var(--sp-12)) 0 calc(-1 * var(--sp-8));
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--disp-ink);
+  font-family: var(--font-body);
+  font-size: var(--fs-input);
+  font-weight: 600;
+  line-height: var(--lh-title);
+}
+.mdet-merchant-input::placeholder { color: var(--disp-dim); }
+.mdet-merchant-input:focus { outline: none; }
+.mdet-merchant-input:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+.mdet-amount { display: flex; align-items: baseline; gap: var(--sp-12); min-width: 0; }
+.mdet-amount.is-locked { opacity: .5; }
+.mdet-amount-input {
+  min-width: 44px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-shadow: inherit;
+}
+.mdet-amount-input:focus { outline: none; }
+.mdet-amount:has(.mdet-amount-input:focus-visible) { outline: var(--focus); outline-offset: var(--focus-offset); border-radius: var(--radius-xs); }
+.mdet-amount-input::placeholder { color: inherit; opacity: .45; }
+.mdet-amount-cur { flex: none; }
+.mdet-sign {
+  flex: none;
+  align-self: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--disp-line);
+  color: var(--disp-ink);
+  font-family: var(--font-mono);
+  font-size: var(--fs-20);
+  font-weight: 600;
+  text-shadow: none;
+}
+.mdet-sign:disabled { cursor: default; }
+
+/* Nota de bloqueo (gasto liquidado): neutra, con candado; una línea de ayuda (K14). */
+.mdet-locked {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-13);
+  font-weight: 500;
+  line-height: var(--lh-body);
+  color: var(--text-dim);
+}
+.mdet-locked svg { flex: none; margin-top: var(--sp-2); }
+
+/* Devolución: a qué gasto devuelve (bloque neutro, C11). */
+.mdet-linked {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-12);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.mdet-linked-label { font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
+.mdet-linked-meta { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+
+/* Filas de ajuste en un contenedor --surface con borde; filetes sangrados 8 (B-Movimiento-Detalle). */
+.mdet-group {
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.mdet-div { height: 1px; margin: 0 var(--sp-8); background: var(--border); }
+/* Valor largo (nombre de cuenta o etiqueta): se recorta en vez de partir la fila. La muestra de la
+   cuenta va a 8 del valor, como en el mockup (la fila separa a 12). */
+.mdet-group .ent-set-value { min-width: 0; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mdet-group .ent-swatch + .ent-set-value { margin-left: calc(-1 * var(--sp-4)); }
+/* Lista desplegada bajo su fila (cuentas, etiquetas): chips de filtro. */
+.mdet-panel { display: flex; flex-wrap: wrap; gap: var(--sp-8); padding: var(--sp-4) var(--sp-8) var(--sp-8); }
+.mdet-newtag { display: inline-flex; align-items: center; gap: var(--sp-8); }
+.mdet-newtag-field { height: 44px; }
+/* Fecha en edición: la fila con el <input type=date> nativo transparente encima. */
+.mdet-date { position: relative; cursor: pointer; }
+.mdet-date-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+  font-size: var(--fs-input);
+}
+.mdet-date:has(.mdet-date-input:focus-visible) { outline: var(--focus); outline-offset: var(--focus-offset); }
+.mdet-group .ctl-switch:disabled { opacity: .5; cursor: default; }
+
+/* Reparto (edición): quién pagó, paso a paso y las dos partes (bloque neutro, C11). */
+.mdet-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.mdet-block.is-locked { opacity: .5; }
+.mdet-block-sec { display: flex; flex-direction: column; gap: var(--sp-8); }
+.mdet-block-label { padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }
+.mdet-split-row { display: flex; align-items: center; gap: var(--sp-12); }
+.mdet-split-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.mdet-block-title { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+.mdet-block-hint { font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
+.mdet-split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.mdet-split-cell { display: flex; flex-direction: column; gap: var(--sp-4); padding: var(--sp-8) var(--sp-12); border-radius: var(--radius); background: var(--well); }
+.mdet-split-label { font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
+.mdet-split-value { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+
+/* Nota con la foto del ticket: miniatura 60×76 en pozo (la foto real) y la nota. */
+.mdet-notecard {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.mdet-photo {
+  flex: none;
+  width: 60px;
+  height: 76px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--well);
+  box-shadow: var(--sh-well);
+  cursor: pointer;
+}
+.mdet-photo:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+.mdet-photo-img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.mdet-note-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-4); padding-top: var(--sp-2); }
+.mdet-note-label { font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }
+.mdet-note-text { font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-body); color: var(--text); overflow-wrap: anywhere; }
+.mdet-note-field { flex: 1; min-width: 0; }
+
+/* Abajo: vista, «Editar» (secundario) y «Borrar» (entrada destructiva, C5) en dos columnas, el
+   hueco que deja «Duplicar» (B-5, bloqueado); edición, «Guardar cambios» y «Cancelar». */
+.mdet-foot { display: flex; flex-direction: column; gap: var(--sp-8); margin-top: var(--sp-12); }
+.mdet-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.mdet-actions .btn-secondary,
+.mdet-actions .btn-danger { width: 100%; }
+.mdet-actions-edit { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-4); }
+.mdet-actions-edit .btn-tertiary { align-self: center; }
+.mdet-error {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-12);
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: var(--fs-14);
+  font-weight: 600;
+  line-height: var(--lh-body);
+}
+.mdet-error svg { flex: none; }
+
+/* Hoja de categoría: las hojas agrupadas por su raíz, chips de filtro con su familia. */
+.mdet-sheet-group { display: flex; flex-direction: column; gap: var(--sp-8); }
+.mdet-sheet-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+
+/* Vista previa del aviso de Borrar (B-Borrar): baldosa, comercio y ruta; cifra y día a la derecha. */
+.mdet-prev-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.mdet-prev-name { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mdet-prev-line2 { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--fx, var(--text-dim)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mdet-prev-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-2); }
+.mdet-prev-amount { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
+.mdet-prev-date { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); white-space: nowrap; }
+
+/* Visor de foto (§9, D-impl-4): <dialog> a pantalla completa sobre --disp (tapa también la barra
+   de pestañas), la foto contenida y cerrar 44×44 en --disp-ink arriba a la derecha. */
+.mdet-viewer {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: calc(env(safe-area-inset-top) + var(--sp-24) + 44px) var(--sp-16) calc(env(safe-area-inset-bottom) + var(--sp-24));
+  box-sizing: border-box;
+  border: 0;
+  background: var(--disp);
+  color: var(--disp-ink);
+  cursor: pointer;
+}
+.mdet-viewer[open] { display: flex; align-items: center; justify-content: center; }
+.mdet-viewer::backdrop { background: var(--disp); }
+.mdet-viewer-img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+.mdet-viewer-close {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + var(--sp-12));
+  right: var(--sp-12);
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--disp-line);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--disp-ink);
+  cursor: pointer;
+}
+.mdet-viewer-close:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
 /* === fin: movimiento-detalle === */
 
 /* === pantalla: movimientos === */
