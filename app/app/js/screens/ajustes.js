@@ -1,4 +1,5 @@
-import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta, setMetaMany, retranslateSeedNames, updatePeriodSharePct } from "../repo.js";
+import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, setMeta, setMetaMany, retranslateSeedNames, updatePeriodSharePct, listExpenseRootCategories, allCategoriesById } from "../repo.js";
+import { familyForCategory, famClass } from "../category-colors.js";
 import { PCT_STEP, normalizePct, stepPct } from "../share-pct.js";
 import { quickRegisterEnabled } from "../registro-mode.js";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
@@ -58,12 +59,21 @@ async function downloadXlsx(dump, filename) {
 
 // ---------- piezas de la pantalla (B-Ajustes) ----------
 
-/** Grupo neutro (F-08, C11): etiqueta 13/600 dim encima y tarjeta --surface con borde. `rows` son
+// Familia de cada grupo, como en B-Ajustes: Periodo y reparto en Cielo, Preferencias en
+// Suscripciones, Organizar en Alimentación y Tus datos en Casa.
+const GROUP_FAM = { period: "tra", prefs: "sus", organize: "ali", data: "casa" };
+
+/** Fila de ajuste de un grupo con la receta del original (aprobada el 2026-09-27): baldosa rellena
+ *  del sólido de la familia del grupo con icono claro y el valor en su -x. */
+const famRow = (fam) => (o) => settingRowHtml({ fam, tileFilled: true, valueInFam: true, ...o });
+
+/** Grupo (B-Ajustes, con la excepción aprobada el 2026-09-27): encabezado en Unbounded 13 con el -x
+ *  de su familia, como el original, y tarjeta NEUTRA --surface con borde (sin tinte). `rows` son
  *  trozos de HTML ya hechos; entre dos filas va el filete con sangría de baldosa. `after`, fuera de
  *  la tarjeta: la única línea de ayuda del grupo (K14) o los avisos de lo que acaba de pasar. */
-function groupHtml({ id, title, rows, after = "" }) {
+function groupHtml({ id, title, fam, rows, after = "" }) {
   return `<section class="aj-group" aria-labelledby="${escAttr(id)}">
-    ${sectionHeaderHtml({ title, level: "group", id })}
+    ${sectionHeaderHtml({ title, level: "group", id, fam })}
     <div class="aj-card">${rows.filter(Boolean).join('<div class="aj-sep" aria-hidden="true"></div>')}</div>
     ${after}
   </section>`;
@@ -72,11 +82,11 @@ function groupHtml({ id, title, rows, after = "" }) {
 /** Fila de ajuste con un <select> nativo encima, invisible: el toque abre el selector del sistema
  *  y la fila se ve como las demás (etiqueta · valor · chevron). No es settingRowHtml porque un
  *  select no puede ir dentro de un botón; usa sus mismas clases. */
-function selectRowHtml({ icon: key, label, value, valueNum = false, id, optionsHtml, disabled = false }) {
+function selectRowHtml({ icon: key, fam, label, value, valueNum = false, id, optionsHtml, disabled = false }) {
   return `<div class="ent-set aj-select-row">
-    ${tileHtml({ icon: key, size: 32 })}
+    ${tileHtml({ fam, icon: key, size: 32, filled: true })}
     <span class="ent-set-body"><span class="ent-set-label">${escHtml(label)}</span></span>
-    <span class="ent-set-value${valueNum ? " num" : ""}">${escHtml(value)}</span>
+    <span class="ent-set-value${valueNum ? " num" : ""} ${famClass(fam)} is-fam-ink">${escHtml(value)}</span>
     <span class="ent-chev">${icon("chevronRight", { size: 16 })}</span>
     <select class="aj-select" id="${escAttr(id)}" aria-label="${escAttr(label)}"${disabled ? " disabled" : ""}>${optionsHtml}</select>
   </div>`;
@@ -99,6 +109,10 @@ export async function renderAjustes(container) {
   let metaCfg = { currency: "EUR", locale: "es-ES" };
   try { metaCfg = { ...metaCfg, ...(await getMetaAll()) }; } catch {}
   const partnerName = (metaCfg.partner_name || "").trim();
+
+  // Solo para las muestras de color de la fila «Categorías»: si fallan, la fila va sin muestras.
+  let rootCats = [], catsById = {};
+  try { [rootCats, catsById] = await Promise.all([listExpenseRootCategories(), allCategoriesById()]); } catch { rootCats = []; }
 
   const state = {
     errors: null, pending: null, busy: false, n26Error: null,
@@ -160,8 +174,9 @@ export async function renderAjustes(container) {
     const partnerOpen = state.open === "partner";
     // Un error del reparto obliga a ver su panel: si no, el aviso quedaría plegado.
     const shareOpen = state.open === "share" || Boolean(state.periodError);
+    const row = famRow(GROUP_FAM.period);
     const rows = [
-      settingRowHtml({
+      row({
         icon: "people", label: t("ajustes.prefs.partnerLabel"), id: "aj-partner",
         value: partnerName || t("ajustes.rows.partnerNone"),
         expanded: partnerOpen, controls: "aj-partner-panel",
@@ -176,7 +191,7 @@ export async function renderAjustes(container) {
       </div>` : ""),
     ];
     if (openPeriod && partnerName) {
-      rows.push(settingRowHtml({
+      rows.push(row({
         icon: "split", label: t("ajustes.period.shareLabel"), id: "aj-share",
         value: `${pct} %`, valueNum: true, expanded: shareOpen, controls: "aj-share-panel",
       }) + (shareOpen ? `
@@ -191,13 +206,13 @@ export async function renderAjustes(container) {
     }
     // «El periodo empieza · Día de cobro» (B-Ajustes) se omite: no existe como dato (B-1, P1).
     if (openPeriod) {
-      rows.push(settingRowHtml({
+      rows.push(row({
         icon: "chart", label: t("informe.entry.fromSettings"), id: "btn-informe",
         sub: t("ajustes.rows.informeSub", { name: openPeriod.name, date: fmtDiaCorto(openPeriod.start_date) }),
       }));
-      rows.push(settingRowHtml({ icon: "periodNext", label: t("ajustes.period.closeBtn"), id: "btn-cerrar-periodo" }));
+      rows.push(row({ icon: "periodNext", label: t("ajustes.period.closeBtn"), id: "btn-cerrar-periodo" }));
     }
-    return groupHtml({ id: "aj-g-period", title: t("ajustes.groups.period"), rows });
+    return groupHtml({ id: "aj-g-period", title: t("ajustes.groups.period"), fam: GROUP_FAM.period, rows });
   }
 
   // ---------- Preferencias ----------
@@ -205,8 +220,10 @@ export async function renderAjustes(container) {
   function prefsGroupHtml() {
     const lang = activeLang();
     const langLabel = (LANGS.find(([v]) => v === lang) ?? [lang, lang])[1];
+    const fam = GROUP_FAM.prefs;
+    const row = famRow(fam);
     const rows = [
-      settingRowHtml({
+      row({
         icon: "theme", label: t("theme.label"), id: "theme-row",
         controlHtml: segmentedHtml({
           id: "theme-seg", name: t("theme.label"), labelledBy: "theme-row-label",
@@ -214,39 +231,49 @@ export async function renderAjustes(container) {
           value: readPref(getStorage(window)),
         }),
       }),
-      settingRowHtml({
-        icon: "bolt", label: t("ajustes.prefs.quickRegisterLabel"), sub: t("ajustes.rows.quickRegisterSub"), id: "aj-quick",
+      row({
+        icon: "bolt", label: t("ajustes.prefs.quickRegisterLabel"), id: "aj-quick",
         controlHtml: switchHtml({
           id: "pref-quick-register", checked: quickRegisterEnabled(metaCfg.quick_register),
           label: t("ajustes.prefs.quickRegisterLabel"),
         }),
       }),
       selectRowHtml({
-        icon: "currency", label: t("ajustes.prefs.currency"), value: metaCfg.currency, valueNum: true,
+        icon: "currency", fam, label: t("ajustes.prefs.currency"), value: metaCfg.currency, valueNum: true,
         id: "pref-currency", optionsHtml: currencyOptionsHtml(metaCfg.currency), disabled: state.busy,
       }),
       selectRowHtml({
-        icon: "format", label: t("ajustes.prefs.format"), value: localeLabel(metaCfg.locale),
+        icon: "format", fam, label: t("ajustes.prefs.format"), value: localeLabel(metaCfg.locale),
         id: "pref-locale", optionsHtml: localeOptionsHtml(metaCfg.locale), disabled: state.busy,
       }),
       selectRowHtml({
-        icon: "globe", label: t("ajustes.prefs.language"), value: langLabel,
+        icon: "globe", fam, label: t("ajustes.prefs.language"), value: langLabel,
         id: "pref-lang", optionsHtml: langOptionsHtml(lang), disabled: state.busy,
       }),
     ];
     const after = state.prefsError ? msgHtml(escHtml(state.prefsError), { error: true }) : "";
-    return groupHtml({ id: "aj-g-prefs", title: t("ajustes.groups.prefs"), rows, after });
+    return groupHtml({ id: "aj-g-prefs", title: t("ajustes.groups.prefs"), fam, rows, after });
   }
 
   // ---------- Organizar ----------
 
+  /** Muestras de «Categorías» (B-Ajustes): una barrita del sólido de cada familia de las primeras
+   *  categorías raíz de gasto, sin repetir, hasta seis. Decorativas: el nombre lo lleva la fila. */
+  function catSwatchesHtml() {
+    const fams = [...new Set(rootCats.map((c) => familyForCategory(c.id, catsById)).filter(Boolean))].slice(0, 6);
+    if (!fams.length) return "";
+    return `<span class="aj-cat-swatches" aria-hidden="true">${fams.map((f) => `<span class="aj-cat-swatch ${famClass(f)}"></span>`).join("")}</span>`;
+  }
+
   function organizeGroupHtml() {
+    const fam = GROUP_FAM.organize;
+    const row = famRow(fam);
     return groupHtml({
-      id: "aj-g-organize", title: t("ajustes.groups.organize"), rows: [
-        settingRowHtml({ icon: "sus", label: t("ajustes.recurring.title"), id: "btn-recurrentes" }),
-        settingRowHtml({ icon: "screen", label: t("ajustes.subscriptions.title"), id: "btn-suscripciones" }),
-        settingRowHtml({ icon: "grid", label: t("ajustes.categories.title"), id: "btn-categorias" }),
-        settingRowHtml({ icon: "tag", label: t("ajustes.tags.title"), id: "btn-etiquetas" }),
+      id: "aj-g-organize", title: t("ajustes.groups.organize"), fam, rows: [
+        row({ icon: "sus", label: t("ajustes.recurring.title"), id: "btn-recurrentes" }),
+        row({ icon: "screen", label: t("ajustes.subscriptions.title"), id: "btn-suscripciones" }),
+        row({ icon: "grid", label: t("ajustes.categories.title"), id: "btn-categorias", trailHtml: catSwatchesHtml() }),
+        row({ icon: "tag", label: t("ajustes.tags.title"), id: "btn-etiquetas" }),
       ],
     });
   }
@@ -310,14 +337,15 @@ export async function renderAjustes(container) {
       ${state.n26Error ? msgHtml(`<p>${escHtml(state.n26Error)}</p>`, { error: true }) : ""}
       <input type="file" id="xlsx-file-input" accept=".xlsx,.bce" hidden>
       <input type="file" id="n26-file-input" accept=".csv" hidden>`;
+    const row = famRow(GROUP_FAM.data);
     return groupHtml({
-      id: "aj-g-data", title: t("ajustes.groups.data"), after, rows: [
-        settingRowHtml({ icon: "lock", label: t("ajustes.rows.enc"), id: "aj-enc", value: ".bce", valueNum: true,
+      id: "aj-g-data", title: t("ajustes.groups.data"), fam: GROUP_FAM.data, after, rows: [
+        row({ icon: "lock", label: t("ajustes.rows.enc"), id: "aj-enc", value: ".bce", valueNum: true,
           expanded: encOpen, controls: "aj-enc-panel", disabled: state.busy }) + (encOpen ? encPanelHtml() : ""),
-        settingRowHtml({ icon: "table", label: t("ajustes.rows.sheet"), id: "aj-sheet", value: ".xlsx", valueNum: true,
+        row({ icon: "table", label: t("ajustes.rows.sheet"), id: "aj-sheet", value: ".xlsx", valueNum: true,
           expanded: sheetOpen, controls: "aj-sheet-panel", disabled: state.busy }) + (sheetOpen ? sheetPanelHtml() : ""),
-        settingRowHtml({ icon: "bank", label: t("ajustes.rows.bank"), id: "btn-n26-import", value: "CSV", valueNum: true, disabled: state.busy }),
-        settingRowHtml({ icon: "download", label: t("ajustes.rows.json"), id: "btn-json-export", value: "JSON", valueNum: true }),
+        row({ icon: "bank", label: t("ajustes.rows.bank"), id: "btn-n26-import", value: "CSV", valueNum: true, disabled: state.busy }),
+        row({ icon: "download", label: t("ajustes.rows.json"), id: "btn-json-export", value: "JSON", valueNum: true }),
       ],
     });
   }

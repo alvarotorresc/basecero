@@ -243,8 +243,11 @@ export function txRowHtml({ fam = null, icon: key = "", title, line2 = "", amoun
  *  @param {boolean} [o.valueInFam] Valor en el -x de `fam` (B-Ajustes/B-Cuenta/B-Objetivo original:
  *                                  «Marta», «50 %» en -d). Distinto de `valueFam` (la muestra).
  *                                  Sin `fam`, no hace nada.
+ *  @param {string} [o.trailHtml]   HTML decorativo ya hecho entre el valor y el chevron, sin
+ *                                  convertir la fila en div (a diferencia de `controlHtml`): las
+ *                                  muestras de color de «Categorías» en B-Ajustes. Tal cual.
  *  @returns {string} HTML */
-export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", value = "", valueNum = false, valueFam = null, chevron, controlHtml = "", expanded, controls = "", disabled = false, id = "", data = null, tileFilled = false, valueInFam = false }) {
+export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", value = "", valueNum = false, valueFam = null, chevron, controlHtml = "", expanded, controls = "", disabled = false, id = "", data = null, tileFilled = false, valueInFam = false, trailHtml = "" }) {
   const tag = controlHtml ? "div" : "button";
   const showChev = !controlHtml && (chevron ?? true);
   const labelId = controlHtml && id ? ` id="${escAttr(id + "-label")}"` : "";
@@ -261,6 +264,7 @@ export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", va
     + `${sub ? `<span class="ent-set-sub">${escHtml(sub)}</span>` : ""}</span>`
     + `${value !== "" && value != null && famClass(valueFam) ? `<span class="ent-swatch ${famClass(valueFam)}" aria-hidden="true"></span>` : ""}`
     + `${value !== "" && value != null ? `<span class="${cls("ent-set-value", valueNum && "num", valueInFam && famClass(fam), valueInFam && famClass(fam) && "is-fam-ink")}">${escHtml(value)}</span>` : ""}`
+    + `${trailHtml}`
     + `${controlHtml}`
     + `${showChev ? `<span class="ent-chev">${icon("chevronRight", { size: 16 })}</span>` : ""}</${tag}>`;
 }

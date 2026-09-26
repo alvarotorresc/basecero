@@ -497,7 +497,6 @@ export const EN = {
       empty: "You don’t have any accounts yet.",
     },
     account: {
-      title: { edit: "Edit account" },
       settings: "Account settings",
       openingBalance: "Opening balance",
       note: {
@@ -526,7 +525,6 @@ export const EN = {
       savings_rate: "Savings rate",
     },
     goal: {
-      title: { edit: "Edit goal" },
       settings: "Goal settings",
       monthsLabel: "Months to cover",
       monthLess: "One month less",
@@ -839,7 +837,6 @@ export const EN = {
       partnerNone: "No one",
       partnerField: "The other person’s name",
       informeSub: "{name}, opened {date}",
-      quickRegisterSub: "Just amount and category",
       enc: "Encrypted backup",
       sheet: "Spreadsheet",
       sheetNote: "Importing replaces your current data and also opens an encrypted backup (.bce).",

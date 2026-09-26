@@ -4,9 +4,10 @@
    comprueba colores, radios, tamaños de letra y naranja igual que en components.css. */
 
 /* === pantalla: ajustes === */
-/* S4 · B-Ajustes: grupos neutros (F-08, C11) con etiqueta 13/600 dim (sectionHeaderHtml "group")
-   y tarjeta --surface con borde; filas de ajuste de entity.js; paneles que se despliegan en su
-   sitio bajo su fila (sin hoja inferior todavía). Sin tinte de familia en nada. */
+/* S4 · B-Ajustes con la excepción aprobada (Álvaro 2026-09-27): tarjeta de grupo NEUTRA --surface
+   con borde; lo demás como el original: encabezado en Unbounded 13 con el -x de la familia del
+   grupo (sectionHeaderHtml `fam`), baldosas rellenas del sólido con icono claro y valores en -x
+   (settingRowHtml `tileFilled`/`valueInFam`). Paneles que se despliegan en su sitio bajo su fila. */
 .aj-screen { display: flex; flex-direction: column; gap: var(--sp-12); }
 .aj-group { display: flex; flex-direction: column; gap: var(--sp-8); }
 .aj-card {
@@ -18,8 +19,11 @@
 /* Filete con la sangría de la baldosa: relleno 8 + baldosa 32 + hueco 12. */
 .aj-sep { height: 1px; margin: 0 var(--sp-8) 0 calc(var(--sp-8) + 32px + var(--sp-12)); background: var(--border); }
 
-/* Fila Tema: el Segmented mide 52, así que la fila sube a 60 con menos relleno a la derecha. */
-#theme-row { min-height: 60px; padding-right: var(--sp-4); }
+/* Fila Tema (B-Ajustes): 64 de alto, con menos relleno a la derecha para el Segmented. */
+#theme-row { min-height: 64px; padding-right: var(--sp-4); }
+/* Muestras de «Categorías» (B-Ajustes): barritas de 8×14 del sólido de cada familia. */
+.aj-cat-swatches { flex: none; display: flex; gap: 3px; }
+.aj-cat-swatch { width: 8px; height: 14px; border-radius: 3px; background: var(--fb); }
 #theme-row .ctl-segmented { flex: none; }
 #aj-quick { cursor: pointer; }
 /* Fila que despliega: el chevron apunta abajo mientras su panel está abierto (sin animación). */
@@ -1256,8 +1260,9 @@
 /* === fin: movimientos === */
 
 /* === pantalla: onboarding === */
-/* S13 · B-Onb-Bienvenida, B-Onb-Cuentas, B-Onb-Ajustes (y sus BD-*). Pantalla de columna con el
-   CTA abajo (margin-top:auto); tarjetas --surface con borde, como los grupos de Ajustes. */
+/* S13 · B-Onb-Bienvenida, B-Onb-Cuentas, B-Onb-Ajustes (y sus BD-*), iguales al original (Álvaro
+   2026-09-27). Pantalla de columna con el CTA abajo (margin-top:auto); tarjetas --surface con
+   borde, salvo los grupos de Ajustes, teñidos de su familia como en el original. */
 /* Sin tab bar (body.onboarding la esconde): el hueco inferior de main#screen ya no la reserva. */
 body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--sp-24)); }
 .onb-screen {
@@ -1274,8 +1279,9 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   border: 1px solid var(--border);
 }
 .onb-foot { margin-top: auto; padding-top: var(--sp-12); display: flex; flex-direction: column; }
-.onb-foot-stack { gap: var(--sp-8); }
-.onb-foot-stack .btn-secondary { width: 100%; }
+.onb-foot-stack { gap: 10px; }
+/* Importar (B-Onb-Bienvenida): secundario de 52. */
+.onb-foot-stack .btn-secondary { width: 100%; min-height: 52px; }
 .onb-hint { text-align: center; font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
 .onb-help { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 .onb-help[hidden], .onb-share[hidden], .onb-row-extra[hidden] { display: none; }
@@ -1296,15 +1302,9 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .onb-msg svg { flex: none; }
 
-/* --- Marca de Bienvenida: logo (D-impl-5) + nombre en Unbounded y la línea de producto. --- */
+/* --- Marca de Bienvenida (B-Onb-Bienvenida): el nombre en Unbounded, sin logo, y la línea de
+   producto. --- */
 .onb-brand { padding: var(--sp-12) var(--sp-4) var(--sp-8); display: flex; flex-direction: column; gap: var(--sp-8); }
-.onb-brand-row { display: flex; align-items: center; gap: var(--sp-12); }
-.onb-logo { flex: none; display: block; }
-/* Logo en tokens (D-impl-5, §Desviaciones): el fondo es el naranja de marca y la tinta la que va
-   sobre él. Excepción registrada en design-rules.test (R-C1, .onb-logo). */
-.onb-logo-bg { fill: var(--accent); }
-.onb-logo-ink { fill: var(--on-accent); }
-.onb-logo-line { fill: none; stroke: var(--on-accent); }
 .onb-wordmark {
   margin: 0;
   font-family: var(--font-display);
@@ -1314,22 +1314,22 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   letter-spacing: -.03em;
 }
 .onb-tagline { font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
-.onb-ruler { margin-top: var(--sp-8); }
+.onb-ruler { margin-top: var(--sp-8); overflow: hidden; }
 .onb-ruler-tick { stroke: var(--disp-dim); stroke-opacity: .6; }
 
-/* Promesas: tarjeta con filas de 56, baldosa hundida de 40 y filete con la sangría de la baldosa. */
+/* Promesas: tarjeta con filas de 56, baldosa hundida de 36 y filete con la sangría de la baldosa. */
 .onb-promises { list-style: none; padding: var(--sp-4) var(--sp-12); }
 .onb-promise { position: relative; min-height: 56px; display: flex; align-items: center; gap: var(--sp-12); font-size: var(--fs-15); font-weight: 600; }
 .onb-promise + .onb-promise::before {
   content: "";
   position: absolute;
   top: 0;
-  left: calc(40px + var(--sp-12));
+  left: calc(36px + var(--sp-12));
   right: 0;
   height: 1px;
   background: var(--border);
 }
-.onb-promise .ent-tile { box-shadow: var(--sh-well); }
+.onb-promise .ent-tile { width: 36px; height: 36px; box-shadow: var(--sh-well); }
 
 /* --- Barra de los pasos: atrás, progreso y «1 de 3». Cabecera del paso: título 24 + línea. --- */
 .onb-top { display: flex; align-items: center; gap: var(--sp-12); }
@@ -1346,7 +1346,7 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .onb-sub { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 
-/* --- Cuentas: tarjeta teñida por familia (C8), baldosa sobre --chip, cifra en tinta (C7). --- */
+/* --- Cuentas: tarjeta teñida por familia (C8), baldosa sobre --chip, cifra en tinta. --- */
 .onb-accs { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-8); }
 .onb-acc {
   display: flex;
@@ -1361,24 +1361,37 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 .onb-acc-line { font-size: var(--fs-12); font-weight: 500; color: var(--fx); }
 .onb-acc-amount { flex: none; font-size: var(--fs-15); font-weight: 600; color: var(--text); }
 .onb-acc-amount.is-neg { color: var(--neg); }
-/* Papelera en dim (F-23): sin fondo ni borde sobre el tinte; el rojo llega en la confirmación. */
-.onb-acc-del { background: none; border: 0; color: var(--text-dim); }
+/* Papelera: entrada destructiva en rojo (D-1, «rojo en todas partes»), sin fondo ni borde. */
+.onb-acc-del { background: none; border: 0; color: var(--neg); }
 .onb-form { padding: var(--sp-16); display: flex; flex-direction: column; gap: var(--sp-12); }
 .onb-kinds { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-8); }
-/* La deuda lleva la trama sobre su familia (C8, --stripe-debt), como en Patrimonio. */
-.onb-kinds .ent-pick[data-onb-kind="liability"] { background: var(--stripe-debt); }
+/* Baldosas de tipo de 64 (B-Onb-Cuentas). La deuda, con la trama clara del original: tinte y
+   --surface, con un filete del sólido de su familia. */
+.onb-kinds .ent-pick { min-height: 64px; }
+.onb-kinds .ent-pick[data-onb-kind="liability"] {
+  background: repeating-linear-gradient(135deg, var(--ft) 0 6px, var(--surface) 6px 9px);
+  border: 1px solid var(--fb);
+}
 .onb-form .btn-secondary { width: 100%; }
 
-/* --- Ajustes: grupos con etiqueta 13/600 dim; reparto con paso a paso y barra de dos partes. --- */
+/* --- Ajustes (B-Onb-Ajustes): grupos teñidos de su familia (Cielo y Suscripciones) con el
+   encabezado en su -x; reparto con teclas sueltas y barra de dos partes. --- */
 .onb-sec { display: flex; flex-direction: column; gap: var(--sp-8); }
+.onb-card.onb-tinted { background: var(--ft); border: 0; }
+.onb-shared .ctl-field-label { font-size: var(--fs-12); color: var(--fx); }
+.onb-shared .ctl-field { background: var(--raised); }
+.onb-share .ctl-stepper { padding: 0; gap: var(--sp-8); background: none; box-shadow: none; }
+.onb-share .ctl-stepper-btn { border: 1px solid var(--border); box-shadow: none; }
+.onb-share .ctl-stepper-value { min-width: 56px; }
 .onb-shared { padding: var(--sp-12); display: flex; flex-direction: column; gap: var(--sp-12); }
 .onb-share { display: flex; flex-direction: column; gap: var(--sp-8); }
 .onb-share-head { display: flex; align-items: center; gap: var(--sp-8); }
 .onb-share-label { flex: 1; min-width: 0; font-size: var(--fs-15); font-weight: 500; }
-.onb-share-bar { display: flex; gap: var(--sp-2); height: 8px; border-radius: var(--radius-pill); overflow: hidden; }
-.onb-share-mine { background: var(--text); }
-.onb-share-theirs { background: var(--idle); }
+.onb-share-bar { display: flex; gap: 3px; height: 10px; border-radius: var(--radius-pill); overflow: hidden; }
+.onb-share-mine { background: var(--fb); }
+.onb-share-theirs { background: var(--raised); }
 .onb-share-legend { display: flex; justify-content: space-between; gap: var(--sp-8); font-size: var(--fs-12); font-weight: 600; }
+.onb-share-you { color: var(--fx); }
 .onb-share-partner { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .onb-rows { padding: var(--sp-4); }
 .onb-row { min-height: 60px; padding: 0 var(--sp-4) 0 var(--sp-8); display: flex; align-items: center; gap: var(--sp-12); }
@@ -1418,7 +1431,8 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 /* === pantalla: patrimonio === */
 /* S3 (B-Patrimonio, BD-Patrimonio; formularios con la anatomía de B-Cuenta y B-Objetivo). La
    familia llega como .fam-<k> (cuentas: account-colors.js, C8) y aquí solo se leen --ft/--fb/--fx.
-   Las cifras, siempre en tinta (C7). */
+   Las cifras van en tinta salvo donde el original las pinta con su familia (la deuda, el anillo y
+   la línea del objetivo: famNumHtml / herencia de --fx; C7 retirada ahí, Álvaro 2026-09-27). */
 .pat,
 .pat-form { display: flex; flex-direction: column; gap: var(--sp-12); }
 .pat-form { gap: var(--sp-16); }
@@ -1429,12 +1443,15 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 .pat-delta.is-up { color: var(--ok); }
 .pat-delta.is-down { color: var(--disp-ink); }
 
-/* Composición: Tienes / Debes a los lados de la barra y el operativo tras el separador. */
+/* Composición: Tienes / Debes a los lados de la barra y el operativo tras el separador. La barra
+   del original: 3 de separación y la deuda un poco más apartada. */
+.pat .sbar { gap: 3px; }
+.pat .sbar-seg.is-debt { margin-left: 5px; }
 .pat-split { display: flex; justify-content: space-between; gap: var(--sp-12); }
 .pat-split-col { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
 .pat-split-col.is-end { align-items: flex-end; text-align: right; }
 .pat-split-label { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
-.pat-split-fig { font-size: var(--fs-17); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
+.pat-split-fig { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--fs-17); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
 .pat-oper {
   display: flex;
   align-items: center;
@@ -1470,10 +1487,15 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .pat-acc.no-fam { background: var(--raised); border: 1px solid var(--border); }
 .pat-acc.is-wide { grid-column: span 2; flex-direction: row; align-items: center; }
+/* Media (apilada, B-Patrimonio): baldosa, 14, y debajo nombre, línea y saldo seguidos (2 entre
+   ellos), arriba; si la vecina es más alta, el hueco queda abajo. */
+.pat-acc:not(.is-wide) { gap: 0; }
+.pat-acc:not(.is-wide) > .ent-tile { margin-bottom: 14px; }
+.pat-acc:not(.is-wide) .pat-acc-body { flex: none; }
+.pat-acc:not(.is-wide) .pat-acc-fig { margin-top: var(--sp-2); }
 .pat-acc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
 .pat-acc-name { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); overflow-wrap: anywhere; }
 .pat-acc-line { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--fx, var(--text-dim)); }
-.pat-acc-line .num { color: var(--text-dim); }
 .pat-acc-fig { flex: none; font-size: var(--fs-17); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
 
 /* Tarjeta de objetivo: tinte de la familia de su cuenta, o --raised con borde sin cuenta (C11). */
@@ -1493,36 +1515,78 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   cursor: pointer;
 }
 .pat-goal.no-fam { background: var(--raised); border: 1px solid var(--border); }
-.pat-goal.is-wide { grid-column: span 2; }
+.pat-goal-body { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
 .pat-goal-name { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); overflow-wrap: anywhere; }
-.pat-goal-foot { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
 .pat-goal-line { min-width: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--fx, var(--text-dim)); }
-.pat-goal-line .num { color: var(--text); }
-.pat-goal-pct { flex: none; font-size: var(--fs-13); font-weight: 600; color: var(--text); }
-.pat-goal-pct.is-over { color: var(--neg); }
+.pat-goal-line .num:first-child { font-weight: 600; }
+/* Anillo de 56 (B-Patrimonio): pista --raised sobre el tinte (--well sin familia), arco -b (sin
+   familia, --idle) que arranca arriba; el porcentaje 13/600 en el centro. */
+.pat-ring { position: relative; flex: none; width: 56px; height: 56px; }
+.pat-ring-svg { display: block; transform: rotate(-90deg); }
+.pat-ring-track { stroke: var(--raised); }
+.pat-goal.no-fam .pat-ring-track { stroke: var(--well); }
+.pat-ring-arc { stroke: var(--fb, var(--idle)); }
+.pat-ring-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--text);
+}
+.pat-ring-pct.is-over { color: var(--neg); }
 
-/* Formularios (anatomía de «Ajustes de la cuenta» / «Ajustes del objetivo»): encabezado de grupo
-   13/600 dim, bloque teñido con la familia (o --surface con borde sin ella, C11) y una línea de
-   ayuda como mucho por sección (K14). */
+/* Formularios (anatomía de «Ajustes de la cuenta» / «Ajustes del objetivo» de B-Cuenta y
+   B-Objetivo): encabezado de grupo en Unbounded 13 con el -x de la familia, bloque teñido con
+   relleno 4 (sin familia, --surface con borde, C11) y filas de ajuste con baldosa rellena y filete
+   con la sangría de la baldosa. Una línea de ayuda como mucho por sección (K14). */
 .pat-group { display: flex; flex-direction: column; gap: var(--sp-8); }
 .pat-block {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-16);
-  padding: var(--sp-16) var(--sp-12);
+  padding: var(--sp-4);
   border-radius: var(--radius-lg);
   background: var(--ft);
 }
 .pat-block.no-fam { background: var(--surface); border: 1px solid var(--border); }
-.pat-field { display: flex; flex-direction: column; gap: var(--sp-8); }
+.pat-sep { height: 1px; margin: 0 var(--sp-8) 0 calc(var(--sp-8) + 32px + var(--sp-12)); background: var(--border); }
+.pat-frow-label { flex: 1; min-width: 0; }
+.pat-frow.is-tall { min-height: 64px; padding-right: var(--sp-4); }
+/* Fila con el control debajo (Tipo, Categoría): cabecera de 30 y el control a lo ancho. */
+.pat-sub { display: flex; flex-direction: column; gap: var(--sp-8); padding: var(--sp-8) var(--sp-4) var(--sp-8) var(--sp-8); }
+.pat-frow.is-head { min-height: 32px; padding: 0; }
+/* El valor de la fila es el input: sin pozo, a la derecha, 16 (K9) y 600, en el -x de la familia
+   (en tinta sin ella). El anillo de foco sigue en :focus-visible. */
+.pat-input {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 60%;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-input);
+  font-weight: 600;
+  text-align: right;
+}
+.pat-input.is-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.pat-input.is-fam-ink { color: var(--fx); }
+.pat-input::placeholder { color: var(--text-dim); font-weight: 500; }
+.pat-input:focus { outline: none; }
+.pat-input:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+.pat-input-suffix { flex: none; margin-left: calc(var(--sp-8) * -1); font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+.pat-input-suffix.is-fam-ink { color: var(--fx); }
 .pat-help { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 .pat-hint-strong { font-weight: 700; color: var(--fx, var(--text)); }
-.pat-amount-row { display: flex; align-items: flex-end; gap: var(--sp-8); }
-.pat-amount-row .ctl-field-wrap { flex: 1; min-width: 0; }
-.pat-sign { font-family: var(--font-mono); font-size: var(--fs-17); font-weight: 600; margin-bottom: var(--sp-2); }
+.pat-sign { flex: none; font-family: var(--font-mono); font-size: var(--fs-17); font-weight: 600; }
 .pat-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); min-height: 48px; padding: 0 var(--sp-4); }
 .pat-row-label { font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-title); color: var(--text); }
-.pat-row-value { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); text-align: right; overflow-wrap: anywhere; }
 .pat-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
 .pat-progress-fig { font-size: var(--fs-20); font-weight: 600; color: var(--text); white-space: nowrap; }
 .pat-progress-pct { align-self: flex-end; font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }
