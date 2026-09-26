@@ -78,6 +78,9 @@ function saveLabelHtml(tipo, cents) {
     : escHtml(t(SAVE_KEY[tipo]));
 }
 
+// Número de apertura de Registro, para su vida por DOM (createScreenLife).
+let registroOpenings = 0;
+
 /** Monta la pantalla completa de registro rápido de un movimiento (5 tipos).
  *  onDone() se llama tanto al cerrar (✕) como tras guardar con éxito.
  *  prefill opcional (Task 11): {type, amountCents, categoryId, accountId, merchant, ruleId, isShared}.
@@ -196,7 +199,11 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
   // D-3/D-4 (revisión de código): vida de la pantalla (registro-mode.js#createScreenLife). Se apaga
   // en ✕ y guardar, y también sola si el atrás del sistema ya quitó Registro del DOM: entonces para
   // la voz y suelta la foto, como las otras dos salidas.
-  const life = createScreenLife(container, "#reg-save", () => { speech?.stop(); releasePhotoUrl(); });
+  // El selector lleva el número de ESTA apertura: si el atrás del sistema cierra Registro y se
+  // vuelve a abrir enseguida, un callback tardío de la apertura vieja no confunde el #reg-save nuevo
+  // con el suyo.
+  const lifeId = String(++registroOpenings);
+  const life = createScreenLife(container, `#reg-save[data-life="${lifeId}"]`, () => { speech?.stop(); releasePhotoUrl(); });
   // D-5 (revisión de código): último texto ya interpretado por Enter/blur/voz — un blur sobre un
   // texto sin cambios desde la última interpretación no repinta.
   let lastInterpreted = null;
@@ -689,7 +696,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
 
       ${errorMsg ? `<div class="reg-error" role="alert">${icon("warn", { size: 18 })}<span>${escHtml(errorMsg)}</span></div>` : ""}
 
-      <button type="button" class="btn-primary reg-save" id="reg-save">${saveLabelHtml(state.tipo, state.cents)}</button>
+      <button type="button" class="btn-primary reg-save" id="reg-save" data-life="${lifeId}">${saveLabelHtml(state.tipo, state.cents)}</button>
     </div>`;
 
     wire();
