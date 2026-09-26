@@ -225,7 +225,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     }
   }
 
-  // Cabecera de asistente (§4.2, subHeaderHtml align:"start"): el kicker verde desaparece y su
+  // Cabecera con atrás (DESIGN.md §9, título a la izquierda con subtítulo): el kicker verde desaparece y su
   // frase pasa a ser el subtítulo del propio helper — en modo 'next' con el copy nuevo del
   // artboard (periodo.header.closing, con el nombre YA cargado en closingPeriod.name); en 'first'
   // no hay periodo que cerrar, así que se conserva "Primer periodo" (periodo.header.first), que no
@@ -236,7 +236,6 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
       id: mode === "next" || onBack ? "pn-back" : null,
       title: t("periodo.header.title"),
       subtitle,
-      align: "start",
     });
   }
 
