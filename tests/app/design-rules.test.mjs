@@ -34,7 +34,6 @@ export const PENDIENTES = new Set([
   // Ficheros que otras PRs de fundación reescriben en paralelo con esta; salen al integrarlas
   // (el test de «ya cumple» obliga a sacarlos).
   "js/category-colors.js", // PR-04: hex de la paleta v2
-  "js/ui.js",              // PR-05: el atrás de subHeaderHtml lleva t("common.goBack"), no t("common.back")
   "js/icons.js",           // PR-04: icon({style}) deja pasar un style="…" libre (lo usan registro e informe)
 ]);
 
