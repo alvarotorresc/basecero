@@ -432,6 +432,9 @@
   font-size: var(--fs-input);
   font-weight: 600;
 }
+.ctl-field-input.is-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.ctl-field-input::placeholder { color: var(--text-dim); font-weight: 500; }
+.ctl-field-suffix { flex: none; margin-left: var(--sp-8); font-size: var(--fs-15); font-weight: 600; color: var(--text-dim); }
 /* El foco va en el input, no en el pozo que lo envuelve (R-C1 exige que un var(--focus) viva
    siempre bajo un selector :focus-visible — un :focus-within en .ctl-field no vale). */
 .ctl-field-input:focus { outline: none; }

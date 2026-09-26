@@ -220,6 +220,19 @@ test("fieldHtml: escapa label y value", () => {
   assert.match(html, /value="10&quot;"/);
 });
 
+test("fieldHtml: sin opcionales no emite inputmode, placeholder, is-num ni sufijo", () => {
+  const html = fieldHtml({ id: "x", label: "X" });
+  assert.doesNotMatch(html, /inputmode|placeholder|is-num|ctl-field-suffix/);
+});
+
+test("fieldHtml: inputmode, placeholder (escapado), cifra mono y sufijo dentro del pozo", () => {
+  const html = fieldHtml({ id: "x", label: "Saldo", inputmode: "decimal", placeholder: 'p. ej. "0"', num: true, suffix: "€" });
+  assert.match(html, /inputmode="decimal"/);
+  assert.match(html, /placeholder="p\. ej\. &quot;0&quot;"/);
+  assert.match(html, /class="ctl-field-input is-num"/);
+  assert.match(html, /<span class="ctl-field-suffix" aria-hidden="true">€<\/span><\/span>/);
+});
+
 // ---------- neutralChipHtml ----------
 
 test("neutralChipHtml: pinta el label escapado", () => {
