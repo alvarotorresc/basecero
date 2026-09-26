@@ -16,10 +16,10 @@ const faces = [...fonts.matchAll(/@font-face\s*{([^}]*)}/g)].map(([, body]) => (
 }));
 const pesos = (family) => faces.filter((f) => f.family === family).map((f) => f.weight).sort();
 
-test("fonts.css: declara las tres familias del sistema B y las dos del v2, ninguna más", () => {
-  // Schibsted Grotesk y JetBrains Mono se quedan hasta la PR-99 del rediseño B.
+test("fonts.css: declara las tres familias del sistema B, ninguna más", () => {
+  // Schibsted Grotesk y JetBrains Mono (las del v2) se borraron en la PR-99 del rediseño B.
   assert.deepEqual([...new Set(faces.map((f) => f.family))].sort(),
-    ["IBM Plex Mono", "Instrument Sans", "JetBrains Mono", "Schibsted Grotesk", "Unbounded"]);
+    ["IBM Plex Mono", "Instrument Sans", "Unbounded"]);
 });
 
 test("fonts.css: cada url() apunta a un fichero que existe", () => {
@@ -38,14 +38,11 @@ test("fonts.css: el subset latin de cada @font-face cubre el euro y los diacrít
 
 test("fonts.css: el font-weight de cada familia coincide con el eje real de su woff2", () => {
   // Ejes medidos con fontTools sobre los ficheros servidos (tabla fvar y OS/2 usWeightClass):
-  // Unbounded estático 700; Instrument Sans variable wght 400-700; Plex Mono estático, uno por peso;
-  // Schibsted variable 400-900 y JetBrains variable 400-800. Declarar un rango más corto que el eje
-  // lo recorta y el navegador satura al extremo declarado.
+  // Unbounded estático 700; Instrument Sans variable wght 400-700; Plex Mono estático, uno por peso.
+  // Declarar un rango más corto que el eje lo recorta y el navegador satura al extremo declarado.
   assert.deepEqual(pesos("Unbounded"), ["700"]);
   assert.deepEqual(pesos("Instrument Sans"), ["400 700"]);
   assert.deepEqual(pesos("IBM Plex Mono"), ["500", "600"]);
-  assert.deepEqual(pesos("Schibsted Grotesk"), ["400 900"]);
-  assert.deepEqual(pesos("JetBrains Mono"), ["400 800"]);
 });
 
 test("fonts.css: IBM Plex Mono va en un fichero por peso y no descarga el 400", () => {
@@ -62,9 +59,15 @@ test("vendor/fonts: cada familia del sistema B trae su licencia OFL", () => {
   }
 });
 
+test("vendor/fonts: ni rastro de Schibsted Grotesk ni de JetBrains Mono (PR-99)", () => {
+  const ficheros = readdirSync(FONTS);
+  assert.ok(!ficheros.some((f) => /schibsted|jetbrains/i.test(f)), ficheros.join(", "));
+  assert.ok(!/schibsted|jetbrains/i.test(fonts));
+});
+
 test("vendor/fonts: ningún woff2 pasa de 120 KB", () => {
   const woff2 = readdirSync(FONTS).filter((f) => f.endsWith(".woff2"));
-  assert.ok(woff2.length >= 6);
+  assert.ok(woff2.length >= 4);
   for (const f of woff2) assert.ok(statSync(FONTS + f).size <= 120 * 1024, `${f} pesa más de 120 KB`);
 });
 

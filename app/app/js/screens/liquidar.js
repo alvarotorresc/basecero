@@ -71,7 +71,7 @@ export async function renderLiquidar(container, onBack) {
   } catch (e) {
     container.innerHTML = `
       ${subHeaderHtml({ id: "liq-back", title: t("common.settle") })}
-      <div class="liq"><div class="banner-aviso red">${escHtml(t("liquidar.error.load", { error: userMessage(e) }))}</div></div>`;
+      <div class="liq"><div class="banner-aviso is-error">${escHtml(t("liquidar.error.load", { error: userMessage(e) }))}</div></div>`;
     container.querySelector("#liq-back").onclick = () => onBack();
     return;
   }
@@ -107,7 +107,7 @@ export async function renderLiquidar(container, onBack) {
       container.innerHTML = `
         ${subHeaderHtml({ id: "liq-back", title })}
         <div class="liq">
-          ${errorMsg ? `<div class="banner-aviso red">${escHtml(errorMsg)}</div>` : ""}
+          ${errorMsg ? `<div class="banner-aviso is-error">${escHtml(errorMsg)}</div>` : ""}
           ${emptyStateHtml({ title: t("liquidar.empty") })}
         </div>`;
       wire();
@@ -152,7 +152,7 @@ export async function renderLiquidar(container, onBack) {
           })}
         </div>` : ""}
 
-        ${errorMsg ? `<div class="banner-aviso red">${escHtml(errorMsg)}</div>` : ""}
+        ${errorMsg ? `<div class="banner-aviso is-error">${escHtml(errorMsg)}</div>` : ""}
 
         <section class="liq-list">
           ${section("liquidar.balance.favor", theyOwe, favor, false)}

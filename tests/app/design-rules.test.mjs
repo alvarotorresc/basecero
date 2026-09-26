@@ -1,14 +1,15 @@
 // Reglas de diseño del sistema B (design/DESIGN.md §5, §7, §8, §11 y §13) comprobadas solas.
 // Cubre las casillas K1 (C13), K3 (C1), K4 (C2), K6 (C7), K9 (escala de letra) y K10 (radios) del
-// checklist de PR, más foco, emoji, estilos en línea y el «atrás».
+// checklist de PR, más foco, emoji, estilos en línea, el «atrás» y que no vuelvan los alias de
+// legacy.css (R-LEGACY, PR-99).
 //
 // Escanea el TEXTO de app/app/css/*.css (salvo tokens.css) y de app/app/js/**/*.js, plantillas
 // incluidas: el naranja y los estilos en línea viven sobre todo en los template strings de las
 // pantallas. Son regex, no un parser de CSS: reglas simples, y cada excepción cita su línea de DESIGN.
 //
-// PENDIENTES: ficheros aún sin migrar, que las reglas se saltan (desviación «Ficheros de la lista
-// PENDIENTES», DESIGN §Desviaciones, se retira en la PR-99). La lista SOLO ENCOGE: si un fichero de
-// la lista ya cumple todas las reglas, el último test falla hasta que se saca de ella.
+// PENDIENTES: ficheros aún sin migrar, que las reglas se saltaban durante la migración a B. Se vació
+// en la PR-99 (todas las pantallas y app.css migradas) y un test vigila que siga vacía: un fichero
+// que no cumple se arregla, no se añade a la lista.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -19,13 +20,7 @@ import { EN as en } from "../../app/app/js/i18n/en.js";
 
 const APP = fileURLToPath(new URL("../../app/app/", import.meta.url));
 
-export const PENDIENTES = new Set([
-  // Las 15 pantallas (cada S* saca las suyas). Una por línea para que las uniones no choquen.
-  // Módulos con plantilla o paleta propia, que migran con su pantalla o con su PR de fundación.
-  "css/app.css",         // estilos «Neto»; cada PR de fundación y cada S* le quita lo suyo
-  // Ficheros que otras PRs de fundación reescriben en paralelo con esta; salen al integrarlas
-  // (el test de «ya cumple» obliga a sacarlos).
-]);
+export const PENDIENTES = new Set();
 
 // ---------- lectura ----------
 
@@ -41,11 +36,9 @@ const FICHEROS = [
   ...listar(APP + "js").filter((f) => f.endsWith(".js")),
 ].map((abs) => ({ rel: relative(APP, abs), text: readFileSync(abs, "utf8") }));
 
-// legacy.css es su propia desviación (DESIGN §Desviaciones: alias var() de «Neto», se retira en la
-// PR-99): sus alias leen --accent por diseño. Solo pasa por C13; legacy.test.mjs ata sus valores.
-const SOLO_C13 = new Set(["css/legacy.css"]);
-
 const sinComentariosCss = (css) => css.replace(/\/\*[\s\S]*?\*\//g, "");
+/** Sin comentarios de bloque ni de línea (JS): los comentarios pueden citar nombres retirados. */
+const sinComentarios = (txt) => sinComentariosCss(txt).replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
 
 /** Reglas CSS {sel, decls:[{prop, value}]}. La regex coge solo los bloques más internos, así que
  *  las reglas dentro de @media salen con su selector limpio. No es un parser: basta para el repo. */
@@ -70,12 +63,12 @@ export function estilosEnLinea(js) {
 
 // ---------- reglas: cada una devuelve una lista de mensajes ----------
 
-// R-C13 · DESIGN §5 C13, la regex literal. Única excepción registrada: PDFLib.rgb( (§Desviaciones,
-// informe-pdf.js, D-impl-3).
+// R-C13 · DESIGN §5 C13, la regex literal y sin excepciones: la llamada a PDFLib.rgb de
+// informe-pdf.js va por un alias desde la PR-99, así que el comando de C13 sale vacío tal cual.
 const C13 = /#[0-9a-fA-F]{3,8}\b|rgba?\(/;
 export function rC13(rel, text) {
   return text.split("\n").flatMap((l, i) =>
-    C13.test(l.replaceAll("PDFLib.rgb(", "")) ? [`${rel}:${i + 1} color literal: ${l.trim().slice(0, 90)}`] : []);
+    C13.test(l) ? [`${rel}:${i + 1} color literal: ${l.trim().slice(0, 90)}`] : []);
 }
 
 // R-C1 · DESIGN §5 C1: naranja solo en el primario y lo seleccionado. En JS, nunca (va por clase).
@@ -208,23 +201,60 @@ export function rINLINE(rel, text) {
 }
 
 // R-BACK · DESIGN §11: el atrás lleva aria-label «Atrás», es decir t("common.back").
-// Se reconoce por id o clase con «back» en la etiqueta del botón.
+// Se reconoce por id o clase con «back» en la etiqueta del botón: palabra suelta («mov-back»,
+// «back-btn») o tramo camelCase («goBack», «backBtn»), nunca dentro de otra palabra («background»).
+const ATRAS_ID = /\b(id|class)="[^"]*(\bback(?![a-z])|[a-z0-9]Back(?![a-z]))/;
 export function rBACK(rel, text) {
   if (!rel.endsWith(".js")) return [];
   const errs = [];
   for (const m of text.matchAll(/(<button\b[^>]*>)([\s\S]*?)<\/button>/g)) {
     const [, tag, cuerpo] = m;
-    const esAtras = /\b(id|class)="[^"]*\bback\b/.test(tag) || cuerpo.includes('icon("back"');
+    const esAtras = ATRAS_ID.test(tag) || cuerpo.includes('icon("back"');
     if (!esAtras) continue;
     if (!/aria-label="\$\{(escAttr\()?t\("common\.back"\)\)?\}"/.test(tag)) errs.push(`${rel}: atrás sin aria-label t("common.back"): ${tag.slice(0, 90)}`);
   }
   return errs;
 }
 
-const REGLAS = { rC13, rC1, rC2, rC7, rFS, rRAD, rFOCUS, rEMOJI, rINLINE, rBACK };
-const aplicables = (rel) => (SOLO_C13.has(rel) ? { rC13 } : REGLAS);
+// R-LEGACY · DESIGN §4 («sin alias»): legacy.css (los alias var() de «Neto») se borró en la PR-99.
+// Ningún fichero lee ni declara uno de sus nombres: foto fija de la lista, tomada del fichero antes
+// de borrarlo (más --surface-1 y --r-1, que ya se usaban sin definir). Se comprueban las lecturas y
+// también las declaraciones, para que un `--ink:` local no reabra la puerta. Que toda lectura
+// var(--x) esté definida en algún sitio lo mira aparte el test de huérfanas de más abajo.
+export const NOMBRES_LEGACY = new Set([
+  "--ink", "--ink-2", "--ink-3", "--text-2", "--text-3", "--surface-1", "--surface-2", "--card2", "--card",
+  "--hairline", "--rule", "--hairline-strong", "--accent-ink", "--danger", "--red", "--green", "--warn",
+  "--amber", "--accent-tint", "--pos-tint", "--danger-tint", "--warn-tint", "--shadow-float", "--paper",
+  "--paper-ink", "--paper-dim", "--stamp", "--r-0", "--r-1", "--radius-sm", "--r-pill", "--r-circle",
+  "--s-1", "--s-2", "--s-3", "--s-4", "--s-5", "--s-6", "--s-7", "--s-8", "--s-9", "--pad-screen",
+  "--gap-section", "--tabbar-h", "--font-sans", "--font-ui", "--font-num", "--t-hero", "--t-figure-xl",
+  "--t-figure-l", "--t-figure-m", "--t-figure-s", "--t-title", "--t-section", "--t-body", "--t-label",
+  "--t-micro",
+]);
+const NOMBRE_PROP = /--[a-zA-Z0-9-]*[a-zA-Z0-9]/g;
+export function rLEGACY(rel, text) {
+  const errs = [];
+  for (const [i, l] of sinComentarios(text).split("\n").entries()) {
+    for (const [n] of l.matchAll(NOMBRE_PROP)) {
+      if (NOMBRES_LEGACY.has(n)) errs.push(`${rel}:${i + 1} nombre de legacy.css: ${n}`);
+    }
+  }
+  return errs;
+}
+
+/** Lecturas var(--x) que nadie declara: ni tokens.css (`tokens`, un Set) ni el propio código de la
+ *  app (una declaración `--x:` en CSS o en un style="--x:…" de plantilla). Sin definir, la propiedad
+ *  cae a su valor inicial en silencio (color negro, radio 0…) y ningún otro test lo pinta. */
+export function huerfanas(textos, tokens) {
+  const limpios = textos.map(sinComentarios);
+  const locales = new Set(limpios.flatMap((s) => [...s.matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)].map((m) => m[1])));
+  const leidas = new Set(limpios.flatMap((s) => [...s.matchAll(/var\((--[a-zA-Z0-9-]+)/g)].map((m) => m[1])));
+  return [...leidas].filter((n) => !tokens.has(n) && !locales.has(n)).sort();
+}
+
+const REGLAS = { rC13, rC1, rC2, rC7, rFS, rRAD, rFOCUS, rEMOJI, rINLINE, rBACK, rLEGACY };
 const migrados = FICHEROS.filter((f) => !PENDIENTES.has(f.rel));
-const incumple = (regla) => migrados.flatMap((f) => (aplicables(f.rel)[regla] ? aplicables(f.rel)[regla](f.rel, f.text) : []));
+const incumple = (regla) => migrados.flatMap((f) => REGLAS[regla](f.rel, f.text));
 
 // ---------- las reglas, sobre los ficheros migrados ----------
 
@@ -233,7 +263,7 @@ test("hay ficheros migrados que escanear, y los de las otras PRs de fundación e
   assert.ok(migrados.some((f) => f.rel === "css/components.css"));
   assert.ok(!FICHEROS.some((f) => f.rel === "css/tokens.css" || f.rel.startsWith("vendor")));
 });
-test("R-C13: ningún hex ni rgb( fuera de tokens.css (salvo PDFLib.rgb()", () => assert.deepEqual(incumple("rC13"), []));
+test("R-C13: ningún hex ni rgb( fuera de tokens.css", () => assert.deepEqual(incumple("rC13"), []));
 test("R-C1: naranja solo en primario y seleccionado; nada de var(--accent en JS", () => assert.deepEqual(incumple("rC1"), []));
 test("R-C2: --disp-text solo en .disp-value, .disp-chart-line y .disp-today", () => assert.deepEqual(incumple("rC2"), []));
 test("R-C7: ninguna cifra (num|amount|value) en -x/-b/-t de familia", () => assert.deepEqual(incumple("rC7"), []));
@@ -248,9 +278,31 @@ test("R-EMOJI: cero emoji en los valores de i18n (es y en)", () => {
   }
 });
 test("R-INLINE: style=\"…\" solo con geometría dinámica", () => assert.deepEqual(incumple("rINLINE"), []));
+test("R-LEGACY: ningún fichero lee ni declara un nombre de legacy.css (tampoco index.html)", () => {
+  // Sobre TODOS los ficheros, también los de PENDIENTES: legacy.css ya no existe para nadie.
+  const html = readFileSync(APP + "index.html", "utf8");
+  assert.deepEqual([...FICHEROS.flatMap((f) => rLEGACY(f.rel, f.text)), ...rLEGACY("index.html", html)], []);
+});
+test("R-LEGACY: cada var(--x) que se lee lo declara tokens.css o el propio código", () => {
+  const tokensCss = readFileSync(APP + "css/tokens.css", "utf8");
+  const tokens = new Set([...sinComentariosCss(tokensCss).matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)].map((m) => m[1]));
+  assert.ok(tokens.size > 50, "tokens.css no se ha leído");
+  assert.deepEqual(huerfanas([...FICHEROS.map((f) => f.text), readFileSync(APP + "index.html", "utf8")], tokens), []);
+});
 test("R-BACK: el atrás lleva aria-label t(\"common.back\") y vale «Atrás»", () => {
   assert.equal(es.common.back, "Atrás");
   assert.deepEqual(incumple("rBACK"), []);
+});
+
+test("C4: el aviso de error (.banner-aviso) es neutro: ni rojo en CSS ni la clase «red» en JS", () => {
+  const css = FICHEROS.filter((f) => f.rel.endsWith(".css")).flatMap((f) => reglasCss(f.text));
+  const aviso = css.filter(({ sel }) => /\.banner-aviso/.test(sel));
+  assert.ok(aviso.length > 0, "no hay reglas de .banner-aviso");
+  for (const { sel, decls } of aviso) {
+    assert.ok(!decls.some((d) => /var\(--neg\)/.test(d.value)), `«${sel}» lee --neg`);
+  }
+  const js = FICHEROS.filter((f) => f.rel.endsWith(".js") && /banner-aviso red\b/.test(f.text)).map((f) => f.rel);
+  assert.deepEqual(js, []);
 });
 
 test("screens.css: una sección sembrada por fichero de js/screens/, en su orden", () => {
@@ -267,7 +319,7 @@ test("screens.css: una sección sembrada por fichero de js/screens/, en su orden
 test("detectores: cazan lo que prohíben y dejan pasar lo permitido", () => {
   assert.equal(rC13("x.js", "// antes #1b1e21\nconst a = 1;").length, 1);
   assert.equal(rC13("x.js", "#acc-name").length, 1, "los ids #acc-* son falsos positivos reales: se renombran");
-  assert.equal(rC13("x.js", "PDFLib.rgb(r, g, b)").length, 0);
+  assert.equal(rC13("x.js", "PDFLib.rgb(r, g, b)").length, 1, "ya sin excepción: el PDF usa un alias");
   assert.equal(rC13("x.css", "a{color:rgba(0,0,0,.1)}").length, 1);
 
   assert.equal(rC1("x.js", "`<b style=\"color:var(--accent)\">`").length, 1);
@@ -322,10 +374,30 @@ test("detectores: cazan lo que prohíben y dejan pasar lo permitido", () => {
   assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"mov-back\" aria-label=\"${escAttr(t(\"common.back\"))}\"></button>`").length, 0);
   assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"mov-back\" aria-label=\"${t(\"common.goBack\")}\"></button>`").length, 1);
   assert.equal(rBACK("x.js", "`<button id=\"${escAttr(id)}\" aria-label=\"${t(\"common.goBack\")}\">${icon(\"back\")}</button>`").length, 1);
+  assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"goBack\" aria-label=\"Volver\">x</button>`").length, 1, "id camelCase");
+  assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"backBtn\" aria-label=\"Volver\">x</button>`").length, 1, "id camelCase delante");
+  assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"goBack\" aria-label=\"${t(\"common.back\")}\">x</button>`").length, 0);
+  assert.equal(rBACK("x.js", "`<button type=\"button\" class=\"background feedback\">x</button>`").length, 0, "back dentro de otra palabra no es atrás");
+
+  assert.equal(rLEGACY("x.css", ".a{color:var(--ink-3)}").length, 1, "lectura de un alias retirado");
+  assert.equal(rLEGACY("x.css", ".a{--ink:red}").length, 1, "declararlo en local tampoco vale");
+  assert.equal(rLEGACY("x.js", "`<b style=\"--gap-section:4px\"></b>`").length, 1);
+  assert.equal(rLEGACY("x.css", ".a{color:var(--text-dim);border-radius:var(--radius-pill)}").length, 0);
+  assert.equal(rLEGACY("x.css", "/* antes --ink-3 */ .a{color:var(--text-dim)}").length, 0, "un comentario no cuenta");
+  assert.equal(rLEGACY("x.css", ".a{color:var(--ink-30)}").length, 0, "solo el nombre exacto");
+  assert.deepEqual(huerfanas([".a{color:var(--nada)}"], new Set(["--text"])), ["--nada"]);
+  assert.deepEqual(huerfanas([".a{color:var(--text)}"], new Set(["--text"])), []);
+  assert.deepEqual(huerfanas([".a{--cat:x}", "`<b style=\"color:var(--cat)\">`"], new Set()), [], "declarada en el código");
+  assert.deepEqual(huerfanas(["/* var(--vieja) */ .a{}"], new Set()), [], "un comentario no cuenta");
 
 });
 
 // ---------- la lista PENDIENTES solo encoge ----------
+
+test("PENDIENTES: vacía desde la PR-99 (todo app/app pasa por todas las reglas)", () => {
+  assert.equal(PENDIENTES.size, 0, `vuelve a haber ficheros exentos: ${[...PENDIENTES].join(", ")}`);
+  assert.equal(migrados.length, FICHEROS.length);
+});
 
 test("PENDIENTES: cada entrada existe y está dentro del escaneo", () => {
   const rels = new Set(FICHEROS.map((f) => f.rel));

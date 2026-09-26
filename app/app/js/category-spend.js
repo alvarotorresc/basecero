@@ -29,6 +29,23 @@ export function relativeWidth(spent, maxSpent) {
   return Math.min(100, Math.max(0, (spent / maxSpent) * 100));
 }
 
+/** Tramos de una barra apilada cuyo total es un NETO (Etiquetas: el gasto de una etiqueta por
+ *  categoría, devoluciones restadas). Una barra no puede pintar un tramo negativo, así que se
+ *  quedan los positivos; si alguna categoría resta (neto negativo), los positivos se escalan en
+ *  proporción para que la barra sume el total de verdad y no más. Sin negativos devuelve los
+ *  mismos objetos, sin tocar. Total <= 0 → nada que pintar.
+ *  @param {{value:number}[]} parts
+ *  @param {number} total   La suma de TODOS los `value`, negativos incluidos.
+ *  @returns {{value:number}[]} */
+export function netPositiveParts(parts, total) {
+  const pos = (parts ?? []).filter((p) => p.value > 0);
+  const sum = pos.reduce((a, p) => a + p.value, 0);
+  if (sum <= total) return pos;
+  if (!(total > 0)) return [];
+  const k = total / sum;
+  return pos.map((p) => ({ ...p, value: p.value * k }));
+}
+
 /** Totales de la tarjeta héroe: gastado, límite y cuántas categorías, contando SOLO las raíces con
  *  límite > 0. `> 0` y no `!= null` a propósito: una fila a 0 (solo alcanzable importando una hoja
  *  a mano) es "sin límite" para budgetStatus, así que tampoco puede sumar aquí. */

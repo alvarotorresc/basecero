@@ -144,7 +144,8 @@ function activeRowHtml(rule, byId, todayIso) {
 function candidateCardHtml(candidate, byId) {
   const fam = familyForCategory(candidate.categoryId, byId);
   const iconKey = iconForCategory(candidate.categoryId, byId);
-  const dates = [...candidate.lastDates].reverse().map((d) => fmtDiaCorto(d)).join(", ");
+  // Cada fecha va entera (espacio duro dentro de «2 sep»): la línea 2 parte entre fechas, no dentro.
+  const dates = [...candidate.lastDates].reverse().map((d) => fmtDiaCorto(d).replace(/ /g, "\u00a0")).join(", ");
   return `
   <div class="susc-candidate">
     <div class="susc-candidate-head ${famClass(fam)}">
@@ -197,7 +198,7 @@ export async function renderSuscripciones(container, onBack) {
       listRules(), allCategoriesById(), getIgnoredMerchants(), getSnoozedRenewals(), subscriptionCharges(today),
     ]);
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("suscripciones.error.load", { error: escHtml(userMessage(e)) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso is-error">${t("suscripciones.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
 
@@ -266,7 +267,7 @@ export async function renderSuscripciones(container, onBack) {
       await reload();
     } catch (e) {
       noticeKeepBtn.disabled = false;
-      container.insertAdjacentHTML("afterbegin", `<div class="banner-aviso red">${escHtml(userMessage(e))}</div>`);
+      container.insertAdjacentHTML("afterbegin", `<div class="banner-aviso is-error">${escHtml(userMessage(e))}</div>`);
     }
   };
   const noticeCancelBtn = container.querySelector("#notice-cancel");
@@ -283,7 +284,7 @@ export async function renderSuscripciones(container, onBack) {
           showToast(t("toast.subscriptionCancelled"));
           await reload();
         } catch (e) {
-          container.insertAdjacentHTML("afterbegin", `<div class="banner-aviso red">${escHtml(userMessage(e))}</div>`);
+          container.insertAdjacentHTML("afterbegin", `<div class="banner-aviso is-error">${escHtml(userMessage(e))}</div>`);
         }
       },
     });
@@ -299,7 +300,7 @@ export async function renderSuscripciones(container, onBack) {
         await reload();
       } catch (e) {
         btn.disabled = false;
-        container.insertAdjacentHTML("afterbegin", `<div class="banner-aviso red">${escHtml(userMessage(e))}</div>`);
+        container.insertAdjacentHTML("afterbegin", `<div class="banner-aviso is-error">${escHtml(userMessage(e))}</div>`);
       }
     };
   });
@@ -312,7 +313,7 @@ export async function renderSuscripciones(container, onBack) {
         await reload();
       } catch (e) {
         btn.disabled = false;
-        container.insertAdjacentHTML("afterbegin", `<div class="banner-aviso red">${escHtml(userMessage(e))}</div>`);
+        container.insertAdjacentHTML("afterbegin", `<div class="banner-aviso is-error">${escHtml(userMessage(e))}</div>`);
       }
     };
   });

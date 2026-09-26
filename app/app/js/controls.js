@@ -24,8 +24,7 @@ import { famClass } from "./category-colors.js";
  *  Nombre accesible del radiogroup: por defecto `aria-label="${name}"`. Si la pantalla ya pinta una
  *  etiqueta VISIBLE al lado del control (como el «Tema» de Ajustes), pásale `labelledBy` con el id
  *  de ese elemento — entonces sale `aria-labelledby` en vez de `aria-label`, así el grupo se asocia
- *  con el texto que el usuario ya ve en vez de duplicarlo (mismo patrón que el `theme-label` de la
- *  vieja `themeSegmentedHtml` de ui.js). `name` sigue siendo obligatorio: es el aria-label de
+ *  con el texto que el usuario ya ve en vez de duplicarlo. `name` sigue siendo obligatorio: es el aria-label de
  *  respaldo cuando no hay `labelledBy`.
  *
  *  Cada opción admite `fam` (clave de familia, category-colors.js): pinta delante del texto la

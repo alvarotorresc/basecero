@@ -106,7 +106,7 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
   try {
     [periods, accountsAll, byId, meta] = await Promise.all([listPeriods(), listAccounts(), allCategoriesById(), getMetaAll()]);
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("movimientos.error.load", { error: escHtml(userMessage(e)) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso is-error">${t("movimientos.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
   if (periods.length === 0) {
@@ -369,7 +369,7 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
         ${chipsRowHtml()}
         ${tagCardHtml()}
 
-        ${errorMsg ? `<div class="banner-aviso red">${escHtml(errorMsg)}</div>` : ""}
+        ${errorMsg ? `<div class="banner-aviso is-error">${escHtml(errorMsg)}</div>` : ""}
 
         <div id="mov-list-body" class="mov-list">${listBodyHtml()}</div>
         ${tagOlderNoteHtml()}
@@ -536,7 +536,7 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
   try {
     await loadPeriodData();
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("movimientos.error.load", { error: escHtml(userMessage(e)) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso is-error">${t("movimientos.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
   render();

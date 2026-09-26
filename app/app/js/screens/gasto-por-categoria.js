@@ -406,11 +406,11 @@ export async function renderGastoPorCategoria(container, onBack) {
 
   try {
     if (!(await load())) {
-      container.innerHTML = `<div class="banner-aviso red">${t("common.noOpenPeriod")}</div>`;
+      container.innerHTML = `<div class="banner-aviso is-error">${t("common.noOpenPeriod")}</div>`;
       return;
     }
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("gastoCategoria.error.load", { error: escHtml(userMessage(e)) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso is-error">${t("gastoCategoria.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
   render();

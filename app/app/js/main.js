@@ -77,11 +77,12 @@ async function boot() {
       // Otra pestaña o la PWA instalada ya tienen la base abierta (opfs-sahpool
       // es de instancia única): recuperable cerrando la otra y reintentando.
       const aviso = document.createElement("div");
-      aviso.className = "banner-aviso red";
+      aviso.className = "banner-aviso is-error";
       aviso.textContent = t("main.banner.locked");
       const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "banner-aviso-btn";
       btn.textContent = t("common.retry");
-      btn.style.cssText = "margin-left:8px;padding:4px 12px;border-radius:8px;border:1px solid currentColor;background:none;color:inherit;font:inherit;cursor:pointer";
       btn.onclick = () => location.reload();
       aviso.appendChild(btn);
       document.body.prepend(aviso);
@@ -106,7 +107,7 @@ async function boot() {
   } catch (err) {
     console.error(err);
     const aviso = document.createElement("div");
-    aviso.className = "banner-aviso red";
+    aviso.className = "banner-aviso is-error";
     aviso.textContent = t("main.banner.boot_failed", { error: userMessage(err) });
     document.body.prepend(aviso);
   }

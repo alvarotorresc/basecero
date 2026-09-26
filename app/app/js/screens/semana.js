@@ -222,7 +222,7 @@ export async function renderSemana(container, onBack, { openDay } = {}) {
     // abría. Se sale a la pantalla anterior (mismo criterio que gasto-por-categoria.js#saveLimit).
     if (!(await load())) { onBack(); return; }
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("semana.error.load", { error: escHtml(userMessage(e)) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso is-error">${t("semana.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
   render();

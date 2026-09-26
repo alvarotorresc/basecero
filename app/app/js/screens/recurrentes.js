@@ -165,7 +165,7 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
     ]);
     prevision = period ? await previsionOfPeriod(period) : null;
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("recurrentes.error.load", { error: escHtml(userMessage(e)) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso is-error">${t("recurrentes.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
   const accounts = accountsAll.filter((a) => a.type !== "liability");
@@ -293,7 +293,7 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
     container.innerHTML = `
       ${subHeaderHtml({ id: "rec-back", title: t("recurrentes.title"), action: { id: "rec-new", icon: "plus", label: t("recurrentes.newRule") } })}
       <div class="rec-body">
-        ${errorMsg ? `<div class="banner-aviso red">${escHtml(errorMsg)}</div>` : ""}
+        ${errorMsg ? `<div class="banner-aviso is-error">${escHtml(errorMsg)}</div>` : ""}
 
         ${heroHtml(prevision, state.rules)}
 
@@ -421,7 +421,7 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
           ${annualEstimate}
         </div>
 
-        ${errorMsg ? `<div class="banner-aviso red">${escHtml(errorMsg)}</div>` : ""}
+        ${errorMsg ? `<div class="banner-aviso is-error">${escHtml(errorMsg)}</div>` : ""}
 
         ${buttonHtml({ kind: "primary", id: "rec-save", label: state.editId ? t("common.saveChanges") : t("recurrentes.form.create") })}
         ${state.editId && canCancelSubscription ? buttonHtml({ kind: "danger-entry", id: "rec-cancel-subscription", label: t("recurrentes.form.cancelSubscription") }) : ""}

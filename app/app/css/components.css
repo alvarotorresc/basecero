@@ -711,10 +711,6 @@ circle.disp-today { fill: var(--disp-text); stroke: var(--disp); }
 .col-seg:first-child { border-radius: var(--radius-xs) var(--radius-xs) 0 0; }
 .col.is-selected { border-radius: var(--radius) var(--radius) 0 0; background: var(--well); box-shadow: var(--sh-well); }
 
-/* Barras SVG de charts.js (Informe, Gasto por categoría): la familia (-b) o --idle (C11). */
-.chart-bar { fill: var(--fb); }
-.chart-bar.is-idle { fill: var(--idle); }
-
 /* --- Estado vacío (§9, B-Inicio-Vacio · instrument.js#emptyStateHtml): filas fantasma en pozo,
    15/600 + 13/500 dim, flecha discontinua hacia el botón de añadir. --- */
 .empty { display: flex; flex-direction: column; align-items: center; gap: var(--sp-12); }
@@ -905,6 +901,9 @@ button.ent-chosen { cursor: pointer; }
 .ent-amount .money-cents,
 .ent-amount .money-cur { font-size: inherit; color: inherit; margin-left: 0; }
 .ent-amount-note { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+/* Sin familia (ingreso, sin categoría): la línea 2 en dim aunque la fila cuelgue de un contenedor
+   con familia (no hereda su --fx), como .ent-chosen.ent-neutral. */
+.ent-row.ent-neutral .ent-line2 { color: var(--text-dim); }
 
 /* --- Fila de ajuste (§9, B-Ajustes): 48 (60 con dos líneas); baldosa 32 opcional · etiqueta
    15/500 · valor 15/600 --text (nunca familia, I-61) · chevron 16 dim o control. --- */
@@ -1229,3 +1228,90 @@ body.subscreen #toast, body.onboarding #toast { bottom: calc(var(--sp-16) + env(
 .ent-fam-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 12px; background: var(--fb); }
 .ent-fam-pick[aria-pressed="true"] { box-shadow: var(--ring-sel); }
 .ent-fam-pick[aria-pressed="true"] .ent-fam-bar { left: 2px; right: 2px; bottom: 2px; }
+
+/* ===== Piezas sueltas: metadatos, aviso de error y esqueleto (PR-99, antes en app.css) ===== */
+
+/* --- Metadatos con divisor de 1px (ui.js#metaHtml): la alternativa al punto medio, que el sistema
+   no usa. 13/500 dim; divisor de 11 en --border-strong. --- */
+.meta-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font: 500 var(--fs-13)/var(--lh-body) var(--font-body); color: var(--text-dim); }
+.meta-sep { width: 1px; height: 11px; background: var(--border-strong); flex-shrink: 0; }
+
+/* --- Aviso (.banner-aviso): el patrón neutro de los avisos en línea del sistema B (como .aj-msg de
+   Ajustes): --raised con borde, texto 13/500 en --text. El de error (.is-error) lleva el icono de
+   aviso delante y el borde fuerte; nunca rojo en fondo, borde ni texto (C4: el rojo solo en cifras).
+   El icono es el «warn» de icons.js pintado con máscara (currentColor), porque muchas pantallas
+   crean el aviso con una sola clase y un texto. main.js lo antepone a <body> cuando el almacenamiento
+   no es persistente o la base está bloqueada: franja pegada arriba, a todo el ancho del layout. --- */
+.banner-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  min-height: 44px;
+  padding: var(--sp-12);
+  border-radius: var(--radius);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: var(--fs-13);
+  font-weight: 500;
+  line-height: var(--lh-body);
+}
+.banner-aviso[hidden] { display: none; }
+.banner-aviso svg { flex-shrink: 0; width: 18px; height: 18px; color: var(--text); }
+.banner-aviso.is-error {
+  position: relative;
+  padding-left: calc(var(--sp-12) + 18px + var(--sp-8));
+  border-color: var(--border-strong);
+  --banner-warn: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4.5 21 19.5H3z'/%3E%3Cpath d='M12 10v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E");
+}
+.banner-aviso.is-error::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--sp-12) + 1px);
+  left: var(--sp-12);
+  width: 18px;
+  height: 18px;
+  background: currentColor;
+  -webkit-mask: var(--banner-warn) center / contain no-repeat;
+  mask: var(--banner-warn) center / contain no-repeat;
+}
+/* «Reintentar» del aviso de base bloqueada (main.js): terciario en tinta, alto de toque 44. */
+.banner-aviso-btn {
+  flex: none;
+  align-self: center;
+  min-height: 44px;
+  margin: calc((44px - var(--lh-body) * 1em) / -2) 0;
+  padding: 0 var(--sp-12);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  cursor: pointer;
+}
+/* Franja de main.js, antepuesta a <body>: pegada arriba (sticky) en su propio hueco, así no tapa
+   la pantalla crezca lo que crezca el texto. .is-error pone position:relative (0,2,0): esta regla
+   (0,2,1) la vuelve a pegar. */
+body > .banner-aviso,
+body > .banner-aviso.is-error {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-radius: 0;
+  background: var(--surface);
+  border-width: 0 0 1px;
+}
+
+/* --- Esqueleto de carga (skeleton.js): bloques en --raised con el radio de las tarjetas y un pulso
+   (@keyframes bc-skeleton en app.css); quieto con movimiento reducido. --- */
+.skeleton-stack { display: flex; flex-direction: column; gap: var(--sp-16); }
+.skeleton {
+  background: var(--raised);
+  border-radius: var(--radius);
+  animation: bc-skeleton 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}

@@ -52,7 +52,7 @@ function dayTileHtml(iso, selected) {
  *  donde SÍ hay algo a lo que volver sin haber creado nada) llama a onDone() como cancelación. */
 function renderAsistenteError(container, { mode, onDone, onBack, embed, initialSharePct }, message) {
   container.innerHTML = `
-    <div class="banner-aviso red">${escHtml(message)}</div>
+    <div class="banner-aviso is-error">${escHtml(message)}</div>
     <div class="pn-error-actions">
       ${buttonHtml({ kind: "primary", id: "pn-error-retry", label: t("common.retry") })}
       ${mode === "next" ? buttonHtml({ id: "pn-error-back", label: t("common.goBack") }) : ""}
@@ -496,7 +496,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
   function bloqueCTA() {
     return `
     <div class="pn-cta">
-      ${errorMsg ? `<div class="banner-aviso red">${escHtml(errorMsg)}</div>` : ""}
+      ${errorMsg ? `<div class="banner-aviso is-error">${escHtml(errorMsg)}</div>` : ""}
       ${buttonHtml({
         kind: "primary", id: "pn-submit", disabled: state.saving,
         label: state.saving ? t("periodo.cta.saving") : t("periodo.cta.submit"),

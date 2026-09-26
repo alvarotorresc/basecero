@@ -79,35 +79,6 @@ tal y como aparece en la cabecera embebida en el bundle:
 Copyright (c) Microsoft Corporation. All rights reserved.
 ```
 
-## Schibsted Grotesk (fuente)
-
-- **Componente:** Schibsted Grotesk, fuente variable (eje `wght`), subset latin.
-- **Rutas:** `app/app/vendor/fonts/schibsted-grotesk-latin.woff2` y `app/app/vendor/fonts/fonts.css`
-- **Licencia:** SIL Open Font License, versión 1.1 — texto completo más abajo, tal y como exige la
-  propia licencia.
-
-Aviso de copyright:
-
-```
-Copyright The Schibsted Grotesk Project Authors
-```
-
-## JetBrains Mono (fuente)
-
-- **Componente:** JetBrains Mono, fuente variable (eje `wght`), subset latin.
-- **Rutas:** `app/app/vendor/fonts/jetbrains-mono-latin.woff2` y `app/app/vendor/fonts/fonts.css`
-- **Licencia:** SIL Open Font License, versión 1.1 — texto completo más abajo, tal y como exige la
-  propia licencia.
-
-Aviso de copyright:
-
-```
-Copyright 2020 The JetBrains Mono Project Authors
-```
-
-JetBrains Mono declara un *Reserved Font Name*: «JetBrains Mono». La cláusula 5 de la licencia
-impide que un trabajo derivado y modificado siga usando ese nombre.
-
 ## Unbounded (fuente)
 
 - **Componente:** Unbounded, peso 700 (fichero estático), subset latin.
@@ -153,7 +124,7 @@ trabajo derivado y modificado siga usando ese nombre.
 
 ### Texto de la SIL Open Font License, Version 1.1
 
-(Cubre Schibsted Grotesk, JetBrains Mono, Unbounded, Instrument Sans e IBM Plex Mono: todas se
+(Cubre Unbounded, Instrument Sans e IBM Plex Mono: todas se
 distribuyen bajo la misma versión de la licencia.)
 
 ```

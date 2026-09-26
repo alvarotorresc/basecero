@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { sparklineSvg, barRowsGeometry, categoryBarsSvg, comparisonBarsSvg, trendOf, trendSvg, TREND_MIN_H } from "../../app/app/js/charts.js";
+import { sparklineSvg, barRowsGeometry } from "../../app/app/js/charts.js";
 import { SQL } from "../../app/app/js/sql.js";
 import { fmtDiaIni } from "../../app/app/js/format.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
@@ -95,8 +95,7 @@ test("fmtDiaIni: iniciales L-D de una semana completa (2026-08-17 lunes .. 08-23
   );
 });
 
-// ---- barRowsGeometry / categoryBarsSvg / comparisonBarsSvg (Task 7, Informe) -------------------
-// Esta es LA garantía de que el PDF y la pantalla no divergen: los dos consumen barRowsGeometry.
+// ---- barRowsGeometry (Task 7, PDF del Informe) ---------------------------------------------------
 
 test("barRowsGeometry: ancho proporcional al valor y filas apiladas", () => {
   const geo = barRowsGeometry([
@@ -127,116 +126,8 @@ test("barRowsGeometry: es determinista — mismo input, misma geometria", () => 
   assert.deepEqual(barRowsGeometry(rows, opts), barRowsGeometry(rows, opts));
 });
 
-test("categoryBarsSvg: un rect por fila con la clase de su familia; sin familia, --idle (C11)", () => {
-  const rows = [
-    { key: "a", value: 50, max: 100, fam: "casa" },
-    { key: "b", value: 30, max: 100, fam: "otr" },
-    { key: "c", value: 20, max: 100, fam: null },
-  ];
-  const svg = categoryBarsSvg(rows, { width: 200, rowH: 20, barH: 12, gap: 4 });
-  const cls = [...svg.matchAll(/<rect class="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(cls, ["chart-bar fam-casa", "chart-bar fam-otr", "chart-bar is-idle"]);
-  assert.doesNotMatch(svg, /style=|fill="/, "el color lo pone components.css, no el SVG");
-});
-
 test("barRowsGeometry: pasa fam y color tal cual (pantalla con fam, PDF con color)", () => {
   const [g] = barRowsGeometry([{ key: "a", value: 1, max: 2, fam: "ali", color: "rgb-del-pdf" }], { width: 10, rowH: 4, barH: 2 });
   assert.equal(g.fam, "ali");
   assert.equal(g.color, "rgb-del-pdf");
-});
-
-test("comparisonBarsSvg: las dos barras a la MISMA escala (el maximo de ambos periodos)", () => {
-  const svg = comparisonBarsSvg(
-    [{ key: "a", value: 80, prevValue: 100, fam: "tra" }],
-    { width: 200, rowH: 40, barH: 14, gap: 4 },
-  );
-  const widths = [...svg.matchAll(/<rect[^>]*width="(\d+(?:\.\d+)?)"/g)].map((m) => Number(m[1]));
-  assert.equal(widths.length, 2, "una barra por periodo");
-  const [curW, prevW] = widths;
-  assert.equal(curW, 160, "80/100 del maximo compartido (100) sobre 200 de ancho");
-  assert.equal(prevW, 200, "100/100 del maximo compartido: la barra llena el ancho entero");
-});
-
-test("comparisonBarsSvg: la actual en su familia y la anterior en --idle (C11: comparativas en gris)", () => {
-  const svg = comparisonBarsSvg(
-    [{ key: "a", value: 80, prevValue: 100, fam: "tra" }],
-    { width: 200, rowH: 40, barH: 14, gap: 4 },
-  );
-  const cls = [...svg.matchAll(/<rect class="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(cls, ["chart-bar fam-tra", "chart-bar is-idle"]);
-  assert.doesNotMatch(svg, /style=|fill="/);
-});
-
-test("comparisonBarsSvg: sin periodo anterior no emite la segunda barra", () => {
-  const svg = comparisonBarsSvg(
-    [{ key: "a", value: 80, prevValue: null, fam: "tra" }],
-    { width: 200, rowH: 40, barH: 14, gap: 4 },
-  );
-  const rectCount = (svg.match(/<rect/g) || []).length;
-  assert.equal(rectCount, 1, "sin prevValue solo se dibuja la barra actual");
-});
-
-// ---- trendOf / trendSvg (Task 8: mini tendencia de 3 periodos, N3 — SISTEMA §4.19) -----------
-
-// La tabla entera de SISTEMA §5 / etiquetas-design §8.2: jul/ago/sep en céntimos, alturas
-// esperadas y el `max` de la serie (nunca el actual — Alimentación lo demuestra: su barra de
-// 18px es la de AGOSTO, no la de septiembre).
-const TREND_ROWS = [
-  { name: "Casa", values: [23100, 23800, 24560], heights: [17, 17, 18] },
-  { name: "Alimentación", values: [19650, 21490, 18740], heights: [16, 18, 16] },
-  { name: "Coche", values: [14320, 7640, 12180], heights: [18, 10, 15] },
-  { name: "Restauración", values: [11840, 14210, 9630], heights: [15, 18, 12] },
-  { name: "Ocio", values: [7480, 6130, 8995], heights: [15, 12, 18] },
-  { name: "Transporte", values: [6100, 5820, 6400], heights: [17, 16, 18] },
-  { name: "Salud", values: [2890, 3350, 4215], heights: [12, 14, 18] },
-];
-
-test("trendOf: las siete filas de SISTEMA §5, al píxel", () => {
-  for (const row of TREND_ROWS) {
-    const t = trendOf(row.values);
-    assert.deepEqual(t.heights, row.heights, row.name);
-    assert.equal(t.max, Math.max(...row.values), row.name);
-  }
-});
-
-test("trendOf: null con 1 solo valor", () => {
-  assert.equal(trendOf([1000]), null);
-});
-
-test("trendOf: null con max <= 0 (una raíz con más devoluciones que gasto)", () => {
-  assert.equal(trendOf([0, -200, -100]), null);
-  assert.equal(trendOf([0, 0]), null);
-});
-
-test("trendOf: un valor positivo que redondea a 0 sube a TREND_MIN_H", () => {
-  const t = trendOf([120, 50000]); // 120/50000*18 = 0.0432 -> round 0
-  assert.equal(t.heights[0], TREND_MIN_H);
-  assert.ok(TREND_MIN_H > 0);
-});
-
-test("trendOf: 2 valores -> 2 alturas", () => {
-  const t = trendOf([10000, 20000]);
-  assert.equal(t.heights.length, 2);
-  assert.deepEqual(t.heights, [9, 18]);
-});
-
-test("trendSvg: una barra por valor, la última a opacidad 1 y las demás a .45, en la familia recibida", () => {
-  const svg = trendSvg([23100, 23800, 24560], "sal");
-  const rects = svg.match(/<rect[^>]*>/g);
-  assert.equal(rects.length, 3);
-  assert.match(rects[0], /fill-opacity="0\.45"/);
-  assert.match(rects[1], /fill-opacity="0\.45"/);
-  assert.doesNotMatch(rects[2], /fill-opacity/, "la última va a opacidad 1: sin fill-opacity, o 1 explícito");
-  for (const r of rects) assert.match(r, /class="chart-bar fam-sal"/);
-  assert.doesNotMatch(svg, /style=/);
-});
-
-test("trendSvg: sin familia (o una clave desconocida) pinta en --idle, nunca en otr", () => {
-  assert.match(trendSvg([1, 2], null), /class="chart-bar is-idle"/);
-  assert.match(trendSvg([1, 2], "zzz"), /class="chart-bar is-idle"/);
-});
-
-test("trendSvg: devuelve \"\" cuando trendOf da null", () => {
-  assert.equal(trendSvg([1000], "casa"), "");
-  assert.equal(trendSvg([0, 0], "casa"), "");
 });

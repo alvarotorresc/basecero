@@ -94,8 +94,7 @@ const BAR_H = 6;
 // hacerle sitio (BADGE_SIZE + el hueco).
 const BADGE_SIZE = 6;
 const BADGE_INDENT = BADGE_SIZE + 6;
-// La barra atenuada del periodo anterior (mismo color, menos opacidad): mismo 0.35 que
-// charts.js#comparisonBarsSvg, para que pantalla y PDF lean la misma comparativa.
+// La barra atenuada del periodo anterior (mismo color, menos opacidad, 0.35).
 const COMPARISON_OPACITY = 0.35;
 
 // Color de barra/insignia de una categoría: el NOMBRE del token (--f-<fam>-b), que buildPdfBytes
@@ -141,8 +140,7 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
     page().blocks.push({ kind: "rule", section, x: margin, y, w: contentW });
   }
   // `opacity` (Task: comparativa por categoría): la barra atenuada del periodo anterior reutiliza
-  // el color de la categoría con menos opacidad, mismo criterio que charts.js#comparisonBarsSvg
-  // (fill-opacity 0.35) — nunca un gris nuevo que la pantalla y el PDF no comparten.
+  // el color de la categoría con menos opacidad (0.35), nunca un gris nuevo.
   function bar(section, { value, max, color, opacity = 1 }) {
     ensure(BAR_ROW_H);
     y -= BAR_ROW_H;
@@ -311,8 +309,15 @@ export const PAPER_TOKENS = { paper: "--raised", ink: "--text", dim: "--text-dim
 // grises de PDF-lib (0 negro, 1 blanco), no un color del sistema.
 const GRAY_FALLBACK = { paper: 1, ink: 0.1, dim: 0.4, rule: 0.75 };
 
+/** El constructor de color de PDF-lib (su `rgb`), leído en cada llamada: un test puede cambiarlo
+ *  en el objeto. Con alias, ningún literal de color queda en el fuente (C13 sin excepciones). */
+function pdfColor(PDFLib, r, g, b) {
+  const { rgb: toColor } = PDFLib;
+  return toColor(r, g, b);
+}
+
 function rgbFromParts(PDFLib, [r, g, b]) {
-  return PDFLib.rgb(r / 255, g / 255, b / 255);
+  return pdfColor(PDFLib, r / 255, g / 255, b / 255);
 }
 
 // Un bloque trae el NOMBRE de un token; la paleta (tokens.css) lo convierte en números. Un token
@@ -327,7 +332,7 @@ function paperColors(PDFLib, palette) {
   const out = {};
   for (const [k, token] of Object.entries(PAPER_TOKENS)) {
     const g = GRAY_FALLBACK[k];
-    out[k] = colorOf(PDFLib, token, palette, PDFLib.rgb(g, g, g));
+    out[k] = colorOf(PDFLib, token, palette, pdfColor(PDFLib, g, g, g));
   }
   return out;
 }

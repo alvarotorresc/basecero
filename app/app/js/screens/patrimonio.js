@@ -247,7 +247,7 @@ export async function renderPatrimonio(container) {
   try {
     await loadData();
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("patrimonio.error.load", { error: escHtml(userMessage(e)) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso is-error">${t("patrimonio.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
 
@@ -265,7 +265,7 @@ export async function renderPatrimonio(container) {
   };
   let errorMsg = "";
 
-  const errorHtml = () => (errorMsg ? `<div class="banner-aviso red">${escHtml(errorMsg)}</div>` : "");
+  const errorHtml = () => (errorMsg ? `<div class="banner-aviso is-error">${escHtml(errorMsg)}</div>` : "");
 
   function backToMain() {
     state.view = "main";

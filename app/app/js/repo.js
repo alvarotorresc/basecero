@@ -762,7 +762,7 @@ export async function reportInputs(periodId) {
  *  último elemento es SIEMPRE `periodId`) — Task 7, N3: la comparativa y la mini tendencia de
  *  «Gasto por categoría». Un solo Promise.all. Con menos periodos en la BD (o un `periodId`
  *  desconocido) devuelve menos entradas —incluso `[]`— y quien pinta decide: comparativa con
- *  >= 2, tendencia con >= 2 (category-spend.js#spentSeriesByRoot/charts.js#trendOf). */
+ *  >= 2, tendencia con >= 2 (category-spend.js#spentSeriesByRoot). */
 export async function rootSpendHistory(periodId, n = 3) {
   const periods = await listPeriods();
   const current = periods.find((p) => p.id === periodId);

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   budgetStatus, pctOf, relativeWidth, limitTotals, sortRootRows, budgetMap, inheritedBudgetsRaw,
-  compareRoots, spentSeriesByRoot,
+  compareRoots, spentSeriesByRoot, netPositiveParts,
 } from "../../app/app/js/category-spend.js";
 
 test("budgetStatus: 82% del límite -> ok", () => {
@@ -277,4 +277,30 @@ test("spentSeriesByRoot: guard __proto__ (mismo motivo que budgetMap)", () => {
   const series = spentSeriesByRoot(history);
   assert.deepEqual(Object.keys(series), []);
   assert.equal(({}).polluted, undefined);
+});
+
+// ---- netPositiveParts (Etiquetas: barra por categoría de un neto) ----------------------------
+
+test("netPositiveParts: sin negativos devuelve los mismos tramos, sin tocar", () => {
+  const parts = [{ key: "a", value: 12000 }, { key: "b", value: 5080 }];
+  const out = netPositiveParts(parts, 17080);
+  assert.equal(out.length, 2);
+  assert.equal(out[0], parts[0]);
+  assert.equal(out[1], parts[1]);
+});
+
+test("netPositiveParts: una categoría con neto negativo escala los positivos hasta el total", () => {
+  const parts = [{ key: "a", value: 6000 }, { key: "b", value: 2000 }, { key: "c", value: -2000 }];
+  const out = netPositiveParts(parts, 6000);
+  assert.deepEqual(out.map((p) => p.key), ["a", "b"]);
+  assert.equal(out.reduce((a, p) => a + p.value, 0), 6000);
+  assert.equal(out[0].value / out[1].value, 3, "la proporción entre tramos se mantiene");
+  assert.equal(parts[0].value, 6000, "no muta la entrada");
+});
+
+test("netPositiveParts: total <= 0 no pinta nada; ceros fuera", () => {
+  assert.deepEqual(netPositiveParts([{ value: 1000 }, { value: -1500 }], -500), []);
+  assert.deepEqual(netPositiveParts([{ value: 1000 }, { value: -1000 }], 0), []);
+  assert.deepEqual(netPositiveParts([{ value: 0 }], 0), []);
+  assert.deepEqual(netPositiveParts(null, 0), []);
 });

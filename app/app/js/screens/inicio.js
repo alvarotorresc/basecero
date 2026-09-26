@@ -89,7 +89,7 @@ function partnerBannerHtml() {
   const body = `<p class="inicio-help">${escHtml(t("inicio.partnerBanner.body"))}</p>
     ${fieldHtml({ id: "partner-banner-input", label: t("inicio.partnerBanner.namePlaceholder") })}
     ${buttonHtml({ kind: "primary", id: "partner-banner-save", label: t("common.save") })}
-    <div id="partner-banner-error" class="banner-aviso red" hidden></div>`;
+    <div id="partner-banner-error" class="banner-aviso is-error" hidden></div>`;
   return `<div class="inicio-partner">${containerHtml({ title: t("inicio.partnerBanner.title"), body })}</div>`;
 }
 
@@ -370,7 +370,7 @@ export async function renderInicio(container) {
   try {
     period = await getOpenPeriod();
     if (!period) {
-      container.innerHTML = `<div class="banner-aviso red">${t("common.noOpenPeriod")}</div>`;
+      container.innerHTML = `<div class="banner-aviso is-error">${t("common.noOpenPeriod")}</div>`;
       return;
     }
     // weekRange(hoy) da la MISMA ventana de 7 días que usa Semana (semana-logic.js).
@@ -402,7 +402,7 @@ export async function renderInicio(container) {
     // Sin nombre, se mira si hay compartidos «huérfanos» (Task 5).
     showPartnerBanner = !partnerName && await hasSharedData();
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("inicio.error.load", { error: escHtml(userMessage(e)) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso is-error">${t("inicio.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
 

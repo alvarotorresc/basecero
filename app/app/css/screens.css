@@ -1008,12 +1008,11 @@
 .mdet-note-text { font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-body); color: var(--text); overflow-wrap: anywhere; }
 .mdet-note-field { flex: 1; min-width: 0; }
 
-/* Abajo: vista, «Editar» (secundario) y «Borrar» (entrada destructiva, C5) en dos columnas, el
-   hueco que deja «Duplicar» (B-5, bloqueado); edición, «Guardar cambios» y «Cancelar». */
+/* Abajo: vista, «Editar» primario a todo el ancho (B-Movimiento-Detalle) y, debajo, «Borrar»
+   (entrada destructiva, C5) solo en su fila: el mockup lo pone junto a «Duplicar», bloqueado (B-5).
+   Edición, «Guardar cambios» y «Cancelar». */
 .mdet-foot { display: flex; flex-direction: column; gap: var(--sp-8); margin-top: var(--sp-12); }
-.mdet-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
-.mdet-actions .btn-secondary,
-.mdet-actions .btn-danger { width: 100%; }
+.mdet-actions { display: flex; flex-direction: column; gap: var(--sp-8); }
 .mdet-actions-edit { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-4); }
 .mdet-actions-edit .btn-tertiary { align-self: center; }
 .mdet-error {
@@ -1041,6 +1040,8 @@
 .mdet-prev-line2 { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--fx, var(--text-dim)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mdet-prev-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-2); }
 .mdet-prev-amount { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
+/* «+» de ingreso o devolución en --pos, como en la lista (C4). */
+.mdet-prev-amount.is-pos { color: var(--pos); }
 .mdet-prev-date { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); white-space: nowrap; }
 
 /* Visor de foto (§9, D-impl-4): <dialog> a pantalla completa sobre --disp (tapa también la barra
@@ -1089,6 +1090,9 @@
 .mov { display: flex; flex-direction: column; gap: var(--sp-12); }
 .mov-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); }
 .mov-head .root-header { flex: 1; min-width: 0; margin-bottom: 0; padding: 0 0 0 var(--sp-4); }
+/* El nombre del periodo es texto libre («Septiembre 2026»): en una línea junto a las flechas, a 20
+   para que quepa a 390 (el 24 de la cabecera de raíz lo partía), y con elipsis si aun así no cabe. */
+.mov-head .root-header-title { font-size: var(--fs-20); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mov-period-nav { flex: none; display: flex; gap: var(--sp-8); }
 
 /* Display m: «de X» a la derecha de la cifra, abajo; el medidor de 8 debajo, a todo el ancho. */
@@ -1479,7 +1483,7 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 
 /* === pantalla: periodo-nuevo === */
 /* S11 (B-PeriodoNuevo, BD-PeriodoNuevo). Bloques verticales de la pantalla (.pn-blocks: el 16 del
-   mockup, no el --gap-section=24 de legacy.css) y piezas propias sin componente canónico: día
+   mockup, no el 24 entre secciones del sistema «Neto») y piezas propias sin componente canónico: día
    seleccionable, fila de reparto compartido, importe hundido reutilizado en límite/ingresos
    previstos/barrido, y el resumen de "Presupuestado". */
 .pn-blocks { display: flex; flex-direction: column; gap: var(--sp-16); }
@@ -2227,7 +2231,9 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   border: 1px solid var(--border);
 }
 .susc-candidate-head { display: flex; align-items: center; gap: var(--sp-12); }
-.susc-candidate-amount { font-weight: 600; }
+.susc-candidate-amount { flex: none; font-weight: 600; white-space: nowrap; }
+/* Las fechas del radar caben enteras: la línea 2 puede ir en dos líneas en vez de cortarse. */
+.susc-candidate-head .ent-line2 { white-space: normal; overflow: visible; text-overflow: clip; }
 .susc-candidate-actions { display: flex; gap: var(--sp-8); }
 .susc-candidate-actions .btn-secondary { flex: 1; }
 

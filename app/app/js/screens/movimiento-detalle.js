@@ -25,7 +25,8 @@ import { escHtml, escAttr } from "../esc.js";
 // de DESIGN.md §9). Dos estados en la misma pantalla:
 //  - VISTA (el mockup): Display l con el comercio arriba y la cifra con signo, tarjeta de la
 //    categoría elegida, filas de ajuste (cuenta, fecha, compartido, etiqueta), la nota con la foto
-//    y, abajo, «Editar» (secundario) y «Borrar» (entrada destructiva, C5).
+//    y, abajo, «Editar» (el primario de la vista, a todo el ancho) y debajo «Borrar» (entrada
+//    destructiva, C5), solo en su fila porque «Duplicar» está bloqueado (B-5).
 //  - EDICIÓN: la misma pantalla con los campos vivos (comercio e importe en el Display, categoría
 //    en una hoja, cuentas y etiquetas desplegadas bajo su fila, fecha nativa, reparto) y «Guardar
 //    cambios» como único primario. Tocar una fila o la tarjeta en la vista entra en edición con
@@ -445,7 +446,7 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
         </div>`
       : `${errorMsg ? `<div class="mdet-error" role="alert">${icon("warn", { size: 18 })}<span>${escHtml(errorMsg)}</span></div>` : ""}
         <div class="mdet-actions">
-          ${buttonHtml({ kind: "secondary", id: "mdet-edit", label: t("movimientos.detail.edit"), icon: "pencil" })}
+          ${buttonHtml({ kind: "primary", id: "mdet-edit", label: t("movimientos.detail.edit"), icon: "pencil" })}
           ${buttonHtml({ kind: "danger-entry", id: "mdet-delete", label: t("movimientos.delete.button"), icon: "trash" })}
         </div>`;
 
@@ -602,7 +603,7 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
         ${line2 ? `<span class="mdet-prev-line2${fc}">${escHtml(line2)}</span>` : ""}
       </span>
       <span class="mdet-prev-side">
-        <span class="num mdet-prev-amount">${escHtml(signedAmount(d))}</span>
+        <span class="num mdet-prev-amount${signedAmount(d).startsWith("+") ? " is-pos" : ""}">${escHtml(signedAmount(d))}</span>
         <span class="mdet-prev-date">${escHtml(`${weekdayShort(d.fecha)} ${fmtDiaCorto(d.fecha)}`)}</span>
       </span>`;
   }
