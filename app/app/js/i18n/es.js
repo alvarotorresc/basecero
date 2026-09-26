@@ -589,11 +589,9 @@ export const ES = {
       newRootChip: "Raíz nueva",
       inheritNote: "Una subcategoría hereda el color y el icono de su raíz.",
       colorSectionTitle: "Color",
-      pickColorAria: "Elegir color",
-      colorHint: "El pool de 12 del sistema — legible con daltonismo. Te sugerimos uno; puedes cambiarlo.",
+      colorHint: "Doce familias de color. Te sugerimos una; si repites la de otra categoría, el icono las distingue.",
       iconSectionTitle: "Icono",
-      pickIconAria: "Elegir icono",
-      iconHint: "Set curado — sin picker de emojis del sistema (v1.1 si acaso).",
+      iconHint: "Los iconos del sistema: los doce de las familias y doce más.",
       colorIconSectionTitle: "Color e icono",
       create: "Crear categoría",
       previewTitle: "Vista previa",
@@ -1215,5 +1213,19 @@ export const ES = {
     light: "Claro",
     dark: "Oscuro",
     system: "Sistema",
+  },
+  // Familias de color de categoría (PR-04): el NOMBRE del color, no el de la categoría que lo usa.
+  families: {
+    casa: "Arena", ali: "Salvia", res: "Mostaza", tra: "Cielo", coc: "Pizarra", sal: "Agua",
+    sus: "Lavanda", oci: "Rosa", rop: "Ciruela", reg: "Arcilla", imp: "Oliva", otr: "Piedra",
+  },
+  // Etiquetas accesibles de los iconos de categoría (selector de la pantalla de edición).
+  icons: {
+    cat: {
+      casa: "Casa", ali: "Cesta de la compra", res: "Taza", tra: "Autobús", coc: "Coche", sal: "Pulso",
+      sus: "Renovación", oci: "Entrada", rop: "Camiseta", reg: "Regalo", imp: "Recibo", otr: "Puntos",
+      huella: "Huella", hoja: "Hoja", libro: "Libro", nota: "Nota musical", avion: "Avión", estrella: "Estrella",
+      billete: "Billete", bebe: "Bebé", portatil: "Portátil", mando: "Mando de juego", paquete: "Paquete", birrete: "Birrete",
+    },
   },
 };

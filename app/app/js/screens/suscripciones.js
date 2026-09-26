@@ -8,6 +8,7 @@ import {
 } from "../subscriptions.js";
 import { detectSubscriptions } from "../subscription-detect.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
+import { catIcon as catSvg } from "../icons.js";
 import { fmtMoney, moneyPartsHtml, fmtDiaLargo, fmtDiaCorto, hoyISO } from "../format.js";
 import { t } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
@@ -56,7 +57,7 @@ function badgeHtml(rule, byId) {
   // pintaba la insignia neutra de "sin categoría" aunque su cargo sí tuviera una detectada.
   const categoryId = rule.category_id ?? rule.categoryId;
   const color = colorForCategory(categoryId, byId);
-  const icon = iconForCategory(categoryId, byId);
+  const icon = catSvg(iconForCategory(categoryId, byId), { size: "1em" });
   return `<div class="dotico" style="--cat:${color};">${icon}</div>`;
 }
 

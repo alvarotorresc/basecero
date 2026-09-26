@@ -51,3 +51,51 @@ test("icon(): tamaño, grosor y color se pueden forzar donde el artboard los fue
 test("icon(): un nombre inexistente devuelve cadena vacía y no lanza", () => {
   assert.equal(icon("noExiste"), "");
 });
+
+// ---- Iconos de categoría (PR-04): 12 de familia + 6 del selector de B-Categorias-Nueva ----------
+import { CAT_ICONS, catIcon } from "../../app/app/js/icons.js";
+
+test("CAT_ICONS: los 12 de familia, los 6 del selector y los 6 de Lucide, en ese orden", () => {
+  assert.deepEqual(Object.keys(CAT_ICONS), [
+    "casa", "ali", "res", "tra", "coc", "sal", "sus", "oci", "rop", "reg", "imp", "otr",
+    "huella", "hoja", "libro", "nota", "avion", "estrella",
+    "billete", "bebe", "portatil", "mando", "paquete", "birrete",
+  ]);
+});
+
+test("CAT_ICONS: los 6 de Lucide (ISC) se copian tal cual de lucide-static 1.48.0", () => {
+  assert.equal(CAT_ICONS.billete, '<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>');
+  assert.equal(CAT_ICONS.birrete, '<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>');
+  for (const k of ["billete", "bebe", "portatil", "mando", "paquete", "birrete"]) assert.match(CAT_ICONS[k], /^<(path|rect|line|circle|polyline)/, k);
+});
+
+test("catIcon(): una clave heredada de Object.prototype no se toma por icono", () => {
+  for (const k of ["toString", "constructor", "__proto__", "hasOwnProperty"]) assert.equal(catIcon(k), catIcon("otr"), k);
+});
+
+test("CAT_ICONS: los d se copian tal cual de B-Gasto y B-Categorias-Nueva", () => {
+  assert.equal(CAT_ICONS.casa, '<path d="M4 11l8-6.5 8 6.5v8.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/>');
+  assert.equal(CAT_ICONS.sal, '<path d="M3 12h4l2-4 3 8 2-4h7"/>');
+  assert.equal(CAT_ICONS.otr, '<circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/>');
+  assert.equal(CAT_ICONS.hoja, '<path d="M5 19C5 10 10 5 19 5c0 9-5 14-14 14zM5 19l7-7"/>');
+  assert.equal(CAT_ICONS.estrella, '<path d="M12 4l2.5 5.2 5.5.7-4 3.9 1 5.6-5-2.7-5 2.7 1-5.6-4-3.9 5.5-.7z"/>');
+});
+
+test("catIcon(): SVG de trazo con currentColor; income y tag también se resuelven", () => {
+  const svg = catIcon("casa");
+  assert.match(svg, /^<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"/);
+  assert.match(svg, /aria-hidden="true"/);
+  assert.match(catIcon("oci", { size: 14, cls: "x" }), /width="14" height="14".*class="x"/s);
+  assert.match(catIcon("income"), /M12 19V5M6 11l6-6 6 6/);
+  assert.match(catIcon("tag"), /M3.5 12.5V4.5h8l9 9-8 8z/);
+});
+
+test("catIcon(): con label deja de ser decorativo (role img + aria-label escapado)", () => {
+  const svg = catIcon("libro", { label: 'Li"bro' });
+  assert.match(svg, /role="img" aria-label="Li&quot;bro"/);
+  assert.doesNotMatch(svg, /aria-hidden/);
+});
+
+test("catIcon(): una clave desconocida devuelve el icono de Otros, no rompe la fila", () => {
+  assert.equal(catIcon("noExiste"), catIcon("otr"));
+});

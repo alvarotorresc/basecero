@@ -11,7 +11,7 @@ import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { showConfirm } from "../modal.js";
 import { subHeaderHtml, metaHtml } from "../ui.js";
-import { icon } from "../icons.js";
+import { icon, catIcon as catSvg } from "../icons.js";
 
 import { escHtml, escAttr } from "../esc.js";
 
@@ -198,7 +198,7 @@ function goalBarRowHtml(g, byId) {
   const barPct = Math.min(100, Math.max(0, pct));
   const isCap = goal.type === "spending_cap";
   const doticoHtml = isCap
-    ? `<div class="dotico sm" style="--cat:${colorForCategory(goal.category_id, byId)};" aria-hidden="true">${iconForCategory(goal.category_id, byId)}</div>`
+    ? `<div class="dotico sm" style="--cat:${colorForCategory(goal.category_id, byId)};" aria-hidden="true">${catSvg(iconForCategory(goal.category_id, byId), { size: "1em" })}</div>`
     : "";
   const kindLabel = t(isCap ? "patrimonio.goals.kind.cap" : "patrimonio.goals.kind.savings");
 
@@ -592,7 +592,7 @@ export async function renderPatrimonio(container) {
         <div class="chips-scroll">
           ${expenseRootCats.map((c) => {
             const color = colorForCategory(c.id, byId);
-            const catIcon = iconForCategory(c.id, byId);
+            const catIcon = catSvg(iconForCategory(c.id, byId), { size: "1em" });
             const active = f.categoryId === c.id;
             return `<button type="button" class="chip-v${active ? " active" : ""}" data-goal-cat="${c.id}" style="--cat:${color};">
               <span class="chip-icon">${catIcon}</span><span>${escHtml(c.name)}</span>

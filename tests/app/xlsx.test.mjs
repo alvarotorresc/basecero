@@ -1044,3 +1044,52 @@ test("validate: tag_id vacío no es fkEmpty; a un id inexistente es fkMissing; a
   assert.deepEqual(validateImport(etiquetaBorrada), [],
     "la app nunca produce tags.deleted=1 (archivar es is_archived), pero una hoja editada a mano sí puede");
 });
+
+// PR-04: meta.category_style en formato ANTIGUO ({color:hex, icon:emoji}) sigue entrando para
+// siempre (hay xlsx viejos). Se importa, se exporta y se reimporta: la familia y el icono resueltos
+// no cambian por el camino, y lo que queda escrito ya es el formato nuevo {fam, icon}.
+test("round-trip: un category_style antiguo se importa, exporta y reimporta sin perder familia ni icono", async () => {
+  const { parseStyle, initCategoryStyle, familyForCategory, iconForCategory } = await import("../../app/app/js/category-colors.js");
+  const OLD = JSON.stringify({ "cat-x": { color: "#629D3B", icon: "🐾" } });
+  const byId = { "cat-x": { id: "cat-x", parent_id: "", flow: "expense" } };
+  const resolve = (raw) => {
+    initCategoryStyle(parseStyle(raw));
+    const out = { fam: familyForCategory("cat-x", byId), icon: iconForCategory("cat-x", byId) };
+    initCategoryStyle({});
+    return out;
+  };
+  const before = resolve(OLD);
+  assert.deepEqual(before, { fam: "ali", icon: "huella" }, "verde v1 → ranura v2 → salvia; huella → huella");
+
+  const styleOf = (db) => db.prepare("SELECT value FROM meta WHERE key='category_style'").get().value;
+  const importInto = (wb) => {
+    const { data, errors } = workbookToRows(X, wb);
+    assert.deepEqual(errors, []);
+    assert.deepEqual(validateImport(data), []);
+    const db = openDb(); seedMinimal(db);
+    for (const s of replaceAllStmts(data)) db.prepare(s.sql).run(...(s.bind ?? []));
+    return db;
+  };
+
+  const db1 = importInto(wbFromSeed((d) => {
+    d.meta = d.meta.filter((m) => m.key !== "category_style");
+    d.meta.push({ key: "category_style", value: OLD });
+  }));
+  const db2 = importInto(rowsToWorkbook(X, dumpAll(db1)));
+  const finalRaw = styleOf(db2);
+  assert.deepEqual(JSON.parse(finalRaw), { "cat-x": { fam: "ali", icon: "huella" } }, "formato nuevo tras el viaje");
+  assert.deepEqual(resolve(finalRaw), before);
+});
+
+test("import: replaceAllStmts escribe category_style ya normalizado; el resto de meta pasa tal cual", () => {
+  const data = {
+    meta: [
+      { key: "category_style", value: JSON.stringify({ "cat-a": { color: "#E85F72", icon: "🎮" }, "cat-b": { fam: "oci", icon: "libro" } }) },
+      { key: "currency", value: "USD" },
+    ],
+    accounts: [], categories: [], periods: [], transactions: [], recurring_rules: [], goals: [], budgets: [], tags: [],
+  };
+  const binds = Object.fromEntries(replaceAllStmts(data).filter((s) => s.bind?.length === 2).map((s) => s.bind));
+  assert.deepEqual(JSON.parse(binds.category_style), { "cat-a": { fam: "reg", icon: "mando" }, "cat-b": { fam: "oci", icon: "libro" } });
+  assert.equal(binds.currency, "USD");
+});

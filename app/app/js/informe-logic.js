@@ -8,7 +8,7 @@
  *  presentadores de este mismo objeto (spec §5.2, D2). */
 import { dayIndexOfPeriod, expectedPeriodDays, ruleApplies, myAmountOfRule, periodMonth } from "./prevision.js";
 import { budgetMap, budgetStatus, pctOf, relativeWidth, sortRootRows, compareRoots } from "./category-spend.js";
-import { colorForCategory, textColorForCategory, iconForCategory, rootOf } from "./category-colors.js";
+import { familyForCategory, iconForCategory, rootOf } from "./category-colors.js";
 import { activeSubscriptions, monthlyTotalCents, annualTotalCents } from "./subscriptions.js";
 
 /** Los n periodos ANTERIORES a `periodId`, del más reciente al más antiguo (Task 7, N3: la serie
@@ -81,7 +81,8 @@ function buildAccounts({ accountsStart, accountsEnd }) {
 
 /** Fila por raíz de gasto, con su comparativa contra `prevSpentByRoot` (N3). Reutiliza
  *  `budgetMap`/`budgetStatus`/`pctOf`/`relativeWidth`/`sortRootRows` de category-spend.js y
- *  `colorForCategory`/`textColorForCategory`/`iconForCategory` de category-colors.js — nada de
+ *  `familyForCategory`/`iconForCategory` de category-colors.js (la FAMILIA y la clave de icono, no
+ *  colores: la pantalla los pinta con `.fam-*` y el PDF con la paleta de tokens.css) — nada de
  *  aritmética duplicada (spec §5.5). */
 function buildCategories({ spentByRoot, prevSpentByRoot, budgets, categoriesById, prevPeriod }) {
   const hasPrev = !!prevPeriod;
@@ -105,8 +106,7 @@ function buildCategories({ spentByRoot, prevSpentByRoot, budgets, categoriesById
     return {
       rootId: r.root_id,
       name: r.name,
-      color: colorForCategory(r.root_id, byId),
-      textColor: textColorForCategory(r.root_id, byId),
+      fam: familyForCategory(r.root_id, byId),
       icon: iconForCategory(r.root_id, byId),
       spentCents: r.spent_cents,
       limitCents,
@@ -167,7 +167,7 @@ function buildMovements({ transactions, categoriesById, tagsById }, categories) 
     seenRoots.add(catRow.rootId);
     const items = groupsById.get(catRow.rootId).slice().sort(byDateDesc);
     groups.push({
-      rootId: catRow.rootId, name: catRow.name, color: catRow.color, icon: catRow.icon,
+      rootId: catRow.rootId, name: catRow.name, fam: catRow.fam, icon: catRow.icon,
       totalCents: catRow.spentCents, count: items.length, items: items.map(toItem),
     });
   }
@@ -178,7 +178,7 @@ function buildMovements({ transactions, categoriesById, tagsById }, categories) 
     if (seenRoots.has(rootId)) continue;
     const sorted = items.slice().sort(byDateDesc);
     groups.push({
-      rootId, name: byId[rootId]?.name ?? "", color: colorForCategory(rootId, byId), icon: iconForCategory(rootId, byId),
+      rootId, name: byId[rootId]?.name ?? "", fam: familyForCategory(rootId, byId), icon: iconForCategory(rootId, byId),
       totalCents: sorted.reduce((s, t) => s + t.amount_cents, 0), count: sorted.length,
       items: sorted.map(toItem),
     });

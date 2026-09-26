@@ -153,7 +153,7 @@ test("categoryBarsSvg: un rect por fila con el color de su categoria", () => {
     { key: "b", value: 30, max: 100, color: "#00ff00" },
   ];
   const svg = categoryBarsSvg(rows, { width: 200, rowH: 20, barH: 12, gap: 4 });
-  const rects = [...svg.matchAll(/<rect[^>]*fill="([^"]+)"[^>]*>/g)].map((m) => m[1]);
+  const rects = [...svg.matchAll(/<rect[^>]*style="fill:([^"]+)"[^>]*>/g)].map((m) => m[1]);
   assert.deepEqual(rects, ["#ff0000", "#00ff00"]);
 });
 
@@ -229,7 +229,7 @@ test("trendSvg: una barra por valor, la última a opacidad 1 y las demás a .45,
   assert.match(rects[0], /fill-opacity="0\.45"/);
   assert.match(rects[1], /fill-opacity="0\.45"/);
   assert.doesNotMatch(rects[2], /fill-opacity/, "la última va a opacidad 1: sin fill-opacity, o 1 explícito");
-  for (const r of rects) assert.match(r, /fill="#ff0000"/);
+  for (const r of rects) assert.match(r, /style="fill:#ff0000"/);
 });
 
 test("trendSvg: devuelve \"\" cuando trendOf da null", () => {

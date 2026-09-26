@@ -9,7 +9,7 @@ import { budgetMap } from "../category-spend.js";
 import { limitWarning } from "../limit-warning.js";
 import { fmtMoney, fmtMoneyParts, fmtDiaCorto, hoyISO, currencySymbol, parseCentsRaw, centsToRaw } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
-import { icon } from "../icons.js";
+import { icon, catIcon as catSvg } from "../icons.js";
 import { t, activeLang } from "../i18n/index.js";
 import { metaHtml, subHeaderHtml } from "../ui.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
@@ -264,7 +264,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     if (parsed?.categoryId && byId[parsed.categoryId]) {
       const color = colorForCategory(parsed.categoryId, byId);
       const textColor = textColorForCategory(parsed.categoryId, byId);
-      const catEmoji = iconForCategory(parsed.categoryId, byId);
+      const catEmoji = catSvg(iconForCategory(parsed.categoryId, byId), { size: "1em" });
       chips.push(`<button type="button" data-nat-chip="category" style="height:44px;border-radius:999px;border:1px solid color-mix(in srgb, ${color} 42%, transparent);background:color-mix(in srgb, ${color} 16%, transparent);color:${textColor};font-size:13px;font-weight:500;padding:0 12px;display:flex;align-items:center;gap:6px;cursor:pointer;"><span style="font-size:13px;" aria-hidden="true">${catEmoji}</span>${escHtml(byId[parsed.categoryId].name)}</button>`);
     }
     if (parsed?.merchant) {
@@ -279,7 +279,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
       <div style="display:flex; flex-direction:column; gap:11px; padding:16px; background:var(--accent-tint);">
         <div style="display:flex; align-items:flex-start; gap:11px;">
-          ${icon("mic", { size: 20, stroke: "var(--accent)", style: "flex-shrink:0;margin-top:1px;" })}
+          <span style="flex-shrink:0;margin-top:1px;display:flex;">${icon("mic", { size: 20, stroke: "var(--accent)" })}</span>
           <span style="font-size:15px; line-height:1.4; color:var(--ink); flex:1; min-width:0;">${chips.length ? `«${escHtml(text)}»` : escHtml(t("registro.natural.notUnderstood"))}</span>
           <button type="button" id="reg-nat-reset" style="border:0; background:transparent; color:var(--ink-3); font-size:13px; font-weight:500; padding:0; height:24px; flex-shrink:0; cursor:pointer;">${t("registro.natural.reset")}</button>
         </div>
@@ -563,7 +563,7 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
           ${shown.map((c) => {
             const color = colorForCategory(c.id, byId);
             const textColor = textColorForCategory(c.id, byId);
-            const categoryEmoji = iconForCategory(c.id, byId);
+            const categoryEmoji = catSvg(iconForCategory(c.id, byId), { size: "1em" });
             const active = state.categoryId === c.id;
             const chipStyle = active
               ? `--cat:${color};background:color-mix(in srgb, ${color} 16%, transparent);color:${textColor};font-weight:700;`

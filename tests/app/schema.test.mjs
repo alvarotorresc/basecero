@@ -118,7 +118,7 @@ test("colores: hoja hereda de la raíz", async () => {
   const { colorForCategory } = await import("../../app/app/js/category-colors.js");
   const byId = Object.fromEntries(SEED_CATEGORIES.map((c) => [c[0], { id: c[0], parent_id: c[2] }]));
   assert.equal(colorForCategory("cat-casa-luz", byId), colorForCategory("cat-casa", byId));
-  assert.match(colorForCategory("cat-casa", byId), /^#[0-9a-f]{6}$/i);
+  assert.match(colorForCategory("cat-casa", byId), /^var\(--f-[a-z]+-b\)$/);
 });
 
 test("meta: semillas incluyen locale es-ES y currency EUR", () => {

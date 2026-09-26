@@ -3,6 +3,7 @@ import {
   openNextPeriod, getMetaAll, goalsWithProgress, listAllAccounts, defaultAccountId, accountBalanceCents,
 } from "../repo.js";
 import { colorForCategory, iconForCategory } from "../category-colors.js";
+import { catIcon as catSvg } from "../icons.js";
 import { eurToCents } from "../contract.js";
 import { fmtMoney, moneyPartsHtml, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol, centsToRaw, parseCentsRaw } from "../format.js";
 import { t } from "../i18n/index.js";
@@ -409,7 +410,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
 
   function budgetRowHtml(r, withDivider) {
     const color = colorForCategory(r.root_id, byId);
-    const icon = iconForCategory(r.root_id, byId);
+    const icon = catSvg(iconForCategory(r.root_id, byId), { size: "1em" });
     const raw = state.budgets[r.root_id] ?? "";
     const empty = raw === "";
     return `
@@ -464,7 +465,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
           <button type="button" data-add-root="${r.root_id}"
             style="display:flex; align-items:center; gap:10px; padding:9px 0 9px 52px; background:none; border:0;
             width:100%; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent;">
-            <span style="font-size:16px; line-height:1;">${iconForCategory(r.root_id, byId)}</span>
+            <span style="font-size:16px; line-height:1;">${catSvg(iconForCategory(r.root_id, byId), { size: "1em" })}</span>
             <span style="font-size:13px; color:var(--text-2);">${escHtml(r.name)}</span>
           </button>`).join("")}
         </div>` : ""}

@@ -563,11 +563,9 @@ export const EN = {
       newRootChip: "New root",
       inheritNote: "A subcategory inherits its root’s color and icon.",
       colorSectionTitle: "Color",
-      pickColorAria: "Pick color",
-      colorHint: "The system’s pool of 12 — colorblind-legible. We suggest one; you can change it.",
+      colorHint: "Twelve color families. We suggest one; if you repeat another category’s, the icon tells them apart.",
       iconSectionTitle: "Icon",
-      pickIconAria: "Pick icon",
-      iconHint: "Curated set — no system emoji picker (maybe in v1.1).",
+      iconHint: "The system icons: the twelve family ones and twelve more.",
       colorIconSectionTitle: "Color and icon",
       create: "Create category",
       previewTitle: "Preview",
@@ -1144,5 +1142,19 @@ export const EN = {
     light: "Light",
     dark: "Dark",
     system: "System",
+  },
+  // Category color families (PR-04): the color's NAME, not the category that uses it.
+  families: {
+    casa: "Sand", ali: "Sage", res: "Mustard", tra: "Sky", coc: "Slate", sal: "Teal",
+    sus: "Lavender", oci: "Rose", rop: "Plum", reg: "Clay", imp: "Olive", otr: "Stone",
+  },
+  // Accessible labels for the category icons (edit screen picker).
+  icons: {
+    cat: {
+      casa: "House", ali: "Shopping basket", res: "Cup", tra: "Bus", coc: "Car", sal: "Pulse",
+      sus: "Renewal", oci: "Ticket", rop: "T-shirt", reg: "Gift", imp: "Receipt", otr: "Dots",
+      huella: "Paw print", hoja: "Leaf", libro: "Book", nota: "Musical note", avion: "Plane", estrella: "Star",
+      billete: "Banknote", bebe: "Baby", portatil: "Laptop", mando: "Game controller", paquete: "Package", birrete: "Graduation cap",
+    },
   },
 };

@@ -11,7 +11,7 @@ import { fmtMoney, moneyPartsHtml, fmtDiaLargo, fmtDiaCorto, hoyISO, currencySym
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { metaHtml, subHeaderHtml } from "../ui.js";
-import { icon } from "../icons.js";
+import { icon, catIcon as catSvg } from "../icons.js";
 import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
 import { PCT_STEP, normalizePct, stepPct, splitCents } from "../share-pct.js";
 import { pushBack, goBack } from "../back.js";
@@ -87,7 +87,7 @@ function movRowHtml(r, byId, accById, partnerName) {
   const color = uncategorized ? "var(--card2)" : colorForCategory(r.category_id, byId);
   // catIcon, no `icon`: ese nombre queda para la función importada de icons.js, y un `const icon`
   // local aquí la taparía con un error de TDZ en la propia línea (uncategorized ? icon(...) : ...).
-  const catIcon = uncategorized ? icon("plus", { size: 15, width: 2, stroke: "var(--ink-3)" }) : iconForCategory(r.category_id, byId);
+  const catIcon = uncategorized ? icon("plus", { size: 15, width: 2, stroke: "var(--ink-3)" }) : catSvg(iconForCategory(r.category_id, byId), { size: "1em" });
   const dashedStyle = uncategorized ? "border:1.5px dashed var(--rule);" : "";
   const title = r.merchant || catName || t("movimientos.uncategorized");
   const subBase = uncategorized ? t("movimientos.tapToCategorize") : (catName || t("movimientos.uncategorized"));
@@ -578,7 +578,7 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
             const color = colorForCategory(c.id, byId);
             // catIcon: mismo criterio que movRowHtml — deja el nombre `icon` libre para la
             // función importada de icons.js.
-            const catIcon = iconForCategory(c.id, byId);
+            const catIcon = catSvg(iconForCategory(c.id, byId), { size: "1em" });
             const active = d.categoryId === c.id;
             return `<button type="button" class="chip-v${active ? " active" : ""}" data-cat="${c.id}" style="--cat:${color};">
               <span class="chip-icon">${catIcon}</span><span>${escHtml(c.name)}</span>
@@ -924,7 +924,7 @@ export async function renderMovimientos(container, { detailTxId = null, onDetail
       const active = state.filter.rootCatId === catId;
       // catIcon: mismo criterio que movRowHtml — deja el nombre `icon` libre para la función
       // importada de icons.js, que esta misma función renderList ya usa más abajo.
-      const catIcon = iconForCategory(catId, byId);
+      const catIcon = catSvg(iconForCategory(catId, byId), { size: "1em" });
       const name = byId[catId]?.name ?? "";
       const color = textColorForCategory(catId, byId);
       return `<button type="button" class="chip${active ? " active" : ""}" data-chip-cat="${catId}" style="padding:0 14px;">

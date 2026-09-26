@@ -12,7 +12,7 @@ import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 import { showToast } from "../toast.js";
 import { subHeaderHtml } from "../ui.js";
-import { icon } from "../icons.js";
+import { icon, catIcon as catSvg } from "../icons.js";
 
 import { escHtml, escAttr } from "../esc.js";
 
@@ -204,7 +204,7 @@ export async function renderGastoPorCategoria(container, onBack) {
     const limitCents = budgetByCategory[row.root_id] ?? 0;
     const st = budgetStatus(row.spent_cents, limitCents);
     const color = colorForCategory(row.root_id, byId);
-    const categoryEmoji = iconForCategory(row.root_id, byId);
+    const categoryEmoji = catSvg(iconForCategory(row.root_id, byId), { size: "1em" });
     const expanded = state.expanded.has(row.root_id);
     const noBar = row.spent_cents <= 0;
     // Una raíz sin límite y sin gasto no aporta nada este periodo: se atenúa entera para que la
