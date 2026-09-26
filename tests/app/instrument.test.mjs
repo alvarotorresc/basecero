@@ -226,6 +226,26 @@ test("columnsHtml: hoy puede ir en la barra de su familia; alturas relativas al 
   assert.equal(columnsHtml([]), "");
 });
 
+test("columnsHtml: apiladas por familia, el mayor abajo, con los nombres en el aria-label (C12)", () => {
+  const html = columnsHtml([
+    { label: "L", value: 30, segments: [{ fam: "rop", value: 20, name: "Ropa" }, { fam: "res", value: 10, name: "Restauración" }], selected: true, amount: "30,00", name: "Lunes 7" },
+    { label: "M", value: 0, segments: [] },
+  ], { labels: false });
+  assert.equal(count(html, /class="col-bar"/g), 0);
+  assert.equal(count(html, /class="col-stack"/g), 2);
+  // Orden ascendente de arriba abajo: Restauración (10) arriba, Ropa (20) abajo.
+  assert.match(html, /col-seg fam-res" style="flex-basis:33\.333%"><\/span><span class="col-seg fam-rop" style="flex-basis:66\.667%"/);
+  assert.match(html, /class="col is-selected"/);
+  assert.match(html, /aria-label="Lunes 7 30,00 Ropa, Restauración"/);
+  assert.match(html, /<span class="col-stack" style="height:0%"><\/span>/);
+  assert.doesNotMatch(html, /cols-labels/);
+  assert.equal(decl(".col-seg", "background"), "var(--fb)");
+  assert.equal(decl(".col.is-selected", "background"), "var(--well)");
+  assert.throws(() => columnsHtml([{ label: "L", value: 1, segments: [{ fam: "ali", value: 1, name: "" }] }]), /C12/);
+  // Sin segments, la columna de siempre y la fila de iniciales por defecto.
+  assert.match(columnsHtml([{ label: "L", value: 1 }]), /cols-labels/);
+});
+
 // ---- Estado vacío ----------------------------------------------------------------------------
 
 test("emptyStateHtml: filas fantasma decorativas, título y una línea; flecha opcional", () => {

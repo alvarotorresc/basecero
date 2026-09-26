@@ -659,6 +659,13 @@ circle.disp-today { fill: var(--disp-text); stroke: var(--disp); }
 .col-amt { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); white-space: nowrap; color: var(--text); }
 .cols-labels { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); text-align: center; color: var(--text-dim); }
 .cols-labels .is-today { color: var(--text); }
+/* Apiladas (B-Semana): tramos por familia (-b, C6), el mayor abajo, 2 de separación; solo el de
+   arriba lleva el radio xs. La columna elegida se hunde en un pozo (--well + --sh-well). */
+.col-stack { flex: none; width: 100%; display: flex; flex-direction: column; gap: var(--sp-2); }
+.col-seg { flex-grow: 0; flex-shrink: 1; min-height: var(--sp-2); background: var(--fb); }
+.col-seg.is-idle { background: var(--idle); }
+.col-seg:first-child { border-radius: var(--radius-xs) var(--radius-xs) 0 0; }
+.col.is-selected { border-radius: var(--radius) var(--radius) 0 0; background: var(--well); box-shadow: var(--sh-well); }
 
 /* Barras SVG de charts.js (Informe, Gasto por categoría): la familia (-b) o --idle (C11). */
 .chart-bar { fill: var(--fb); }
