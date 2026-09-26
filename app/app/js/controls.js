@@ -30,7 +30,9 @@ import { famClass } from "./category-colors.js";
  *
  *  Cada opción admite `fam` (clave de familia, category-colors.js): pinta delante del texto la
  *  muestra de 10 en la barra de esa familia (--fb), como las cuentas de B-Liquidar. Sin `fam` o con
- *  una clave desconocida, sin muestra. */
+ *  una clave desconocida, sin muestra.
+ *  Y `count` (S10, B-Categorias «Gasto 12 · Ingreso 3»): una cifra mono 500 dim detrás del texto;
+ *  el nombre accesible del radio la incluye tal cual («Gasto 12»). */
 export function segmentedHtml({ id = "", name, labelledBy = "", options, value, allowNone = false }) {
   // allowNone (Crear gasto, S2): el valor activo puede vivir FUERA del grupo (devolución o ajuste,
   // que se eligen debajo). Entonces ningún radio va marcado —marcar el primero mentiría— y la
@@ -44,7 +46,8 @@ export function segmentedHtml({ id = "", name, labelledBy = "", options, value, 
     // Muestra de 10 en la barra de la familia (B-Liquidar «Entra en»: la cuenta con su familia, C8).
     const fc = o.fam ? famClass(o.fam) : "";
     const swatch = fc ? `<span class="ctl-seg-muestra ${fc}" aria-hidden="true"></span>` : "";
-    return `<button type="button" role="radio" aria-checked="${on}" tabindex="${tab ? "0" : "-1"}" data-value="${escAttr(o.value)}">${swatch ? `${swatch}<span class="ctl-seg-text">${escHtml(o.label)}</span>` : escHtml(o.label)}</button>`;
+    const count = o.count !== undefined && o.count !== null && o.count !== "" ? ` <span class="ctl-seg-count num">${escHtml(o.count)}</span>` : "";
+    return `<button type="button" role="radio" aria-checked="${on}" tabindex="${tab ? "0" : "-1"}" data-value="${escAttr(o.value)}">${swatch ? `${swatch}<span class="ctl-seg-text">${escHtml(o.label)}</span>` : escHtml(o.label)}${count}</button>`;
   }).join("");
   const labelAttr = labelledBy ? `aria-labelledby="${escAttr(labelledBy)}"` : `aria-label="${escAttr(name)}"`;
   return `<div class="ctl-segmented"${id ? ` id="${escAttr(id)}"` : ""} role="radiogroup" ${labelAttr}>${items}</div>`;
@@ -134,13 +137,16 @@ export function stepsHtml({ total, current, ariaLabel = "", labels = null }) {
  *  viene formateado por la pantalla. Opcionales (S3, formularios de Patrimonio): `inputmode`
  *  («decimal» en importes), `placeholder` (ya traducido), `num` (cifra en mono tabular) y `suffix`,
  *  la unidad 15/600 dim a la derecha dentro del pozo («€», «%»). `min` y `step` (S7, límite de
- *  Gasto por categoría) para inputs numéricos. Sin ellos, el marcado es el de siempre. */
-export function fieldHtml({ id, label, type = "text", value = "", inputmode = "", placeholder = "", num = false, suffix = "", min = "", step = "" }) {
+ *  Gasto por categoría) para inputs numéricos. `lead` (S10, B-Categorias-Nueva: la baldosa de 32 que
+ *  hace de vista previa): HTML YA RENDERIZADO (entity.js#tileHtml) que va dentro del pozo, delante
+ *  del input, envuelto en `.ctl-field-lead` (quien llama lo repinta por ahí). Sin ellos, el marcado
+ *  es el de siempre. */
+export function fieldHtml({ id, label, type = "text", value = "", inputmode = "", placeholder = "", num = false, suffix = "", min = "", step = "", lead = "" }) {
   const extra = `${inputmode ? ` inputmode="${escAttr(inputmode)}"` : ""}${placeholder ? ` placeholder="${escAttr(placeholder)}"` : ""}`
     + `${min !== "" ? ` min="${escAttr(min)}"` : ""}${step !== "" ? ` step="${escAttr(step)}"` : ""}`;
   return `<label class="ctl-field-wrap" for="${escAttr(id)}">
     <span class="ctl-field-label">${escHtml(label)}</span>
-    <span class="ctl-field"><input class="ctl-field-input${num ? " is-num" : ""}" id="${escAttr(id)}" type="${escAttr(type)}" value="${escAttr(value)}"${extra}>${suffix ? `<span class="ctl-field-suffix" aria-hidden="true">${escHtml(suffix)}</span>` : ""}</span>
+    <span class="ctl-field${lead ? " has-lead" : ""}">${lead ? `<span class="ctl-field-lead" aria-hidden="true">${lead}</span>` : ""}<input class="ctl-field-input${num ? " is-num" : ""}" id="${escAttr(id)}" type="${escAttr(type)}" value="${escAttr(value)}"${extra}>${suffix ? `<span class="ctl-field-suffix" aria-hidden="true">${escHtml(suffix)}</span>` : ""}</span>
   </label>`;
 }
 
