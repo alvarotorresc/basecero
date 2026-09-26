@@ -16,9 +16,11 @@ import { escHtml } from "./esc.js";
  *  armazón — filtros, formulario de categoría nueva, etc. llegan con sus propias PRs de pantalla y
  *  usan goBack() para cerrarse, igual que cualquier subpantalla (back.js). */
 
-// DESIGN.md §10 «Hoja y aviso»: sale en 180ms ease-in. Mismo motivo que EXIT_MS en modal.js: el
-// cierre real (dlg.close()) espera a que termine la animación de .is-leaving (components.css).
+// DESIGN.md §10 «Hoja y aviso»: sale en 180ms ease-in; con movimiento reducido, 120ms de fundido
+// (K13). Mismo motivo que en modal.js: el cierre real (dlg.close()) espera lo que dure la
+// animación de .is-leaving en cada caso (components.css), ni más ni menos.
 const EXIT_MS = 180;
+const EXIT_MS_REDUCED = 120;
 
 /** Interior del <dialog>, envuelto en .sheet-content: el <dialog> se queda con padding:0 (para que
  *  un clic en el velo, fuera de esa caja, llegue con target=dlg) y el relleno real (8 16 24) vive
@@ -55,22 +57,32 @@ export function createSheet(doc, { pushBack, goBack, win, wait = (ms, fn) => set
       let byBack = false;
       let pushed = false;
       let closing = false;   // ya se pidió el cierre: evita reentradas (doble Escape, velo + atrás)
+      let myDepth = null;    // profundidad propia en la pila de atrás — ver onPopstate
 
       // requestClose(): ÚNICA puerta hacia el cierre real — mismo mecanismo que modal.js. Añade
       // .is-leaving (dispara la animación de salida, components.css) y solo cuando termina llama a
-      // dlg.close() de verdad, que dispara el evento "close" (el embudo de siempre).
+      // dlg.close() de verdad, que dispara el evento "close" (el embudo de siempre). Con
+      // movimiento reducido se espera solo lo que dure el fundido corto (K13).
       const requestClose = () => {
         if (closing) return;
         closing = true;
         dlg.classList.add("is-leaving");
-        wait(EXIT_MS, () => dlg.close());
+        const reduced = win?.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+        wait(reduced ? EXIT_MS_REDUCED : EXIT_MS, () => dlg.close());
       };
 
-      // Red de seguridad del salto de varias entradas (ver modal.js, mismo motivo exacto): si
-      // no hay `win` (dependencia opcional), no hay red — la hoja solo se cierra por su propio
-      // pushBack, por Escape, por el velo o por goBack() de quien la abrió.
-      const onPopstate = () => {
-        if (dlg.open) { byBack = true; requestClose(); }
+      // Red de seguridad del salto de varias entradas (ver modal.js, mismo motivo exacto,
+      // incluida la comprobación de profundidad — bug de revisión, ronda 1: un aviso abierto
+      // ENCIMA de esta hoja que se cancela también hace goBack() y dispara este mismo popstate;
+      // sin mirar `myDepth`, `dlg.open` (el de la hoja) seguiría siendo true y la cerraría sin
+      // pasar por su propio goBack(), dejando una entrada colgada en back.js). Si no hay `win`
+      // (dependencia opcional), no hay red — la hoja solo se cierra por su propio pushBack, por
+      // Escape, por el velo o por goBack() de quien la abrió.
+      const onPopstate = (e) => {
+        if (!dlg.open) return;
+        if (myDepth !== null && !((e.state?.bc ?? -1) < myDepth)) return;
+        byBack = true;
+        requestClose();
       };
       win?.addEventListener("popstate", onPopstate);
 
@@ -98,7 +110,13 @@ export function createSheet(doc, { pushBack, goBack, win, wait = (ms, fn) => set
       dlg.showModal();
       // {scroll:false, chrome:false}: mismo motivo que modal.js — abrir/cerrar la hoja apunta una
       // entrada de historial pero no es un cambio de pantalla ni de subpantalla (back.js).
-      try { pushBack(() => { byBack = true; requestClose(); }, { scroll: false, chrome: false }); pushed = true; } catch {}
+      // pushBack() llama a win.history.pushState({bc:N}) antes de volver: leer win.history.state
+      // justo después nos da N, nuestra propia profundidad (ver onPopstate).
+      try {
+        pushBack(() => { byBack = true; requestClose(); }, { scroll: false, chrome: false });
+        pushed = true;
+        myDepth = win?.history.state?.bc ?? null;
+      } catch {}
       return dlg;
     },
   };

@@ -39,10 +39,14 @@ function fakeDoc() {
   return doc;
 }
 
+// `history.state` empieza en null y lo actualiza el mock de pushBack de harness() — mismo efecto
+// que back.js#push (win.history.pushState({bc:N})) — para que createSheet pueda leer su propia
+// profundidad justo después de llamar a pushBack().
 function fakeWin() {
   const listeners = {};
   return {
     listeners,
+    history: { state: null },
     addEventListener(type, fn) { (listeners[type] ??= []).push(fn); },
     removeEventListener(type, fn) {
       listeners[type] = (listeners[type] ?? []).filter((l) => l !== fn);
@@ -57,8 +61,14 @@ function harness({ wait = SYNC_WAIT, win = fakeWin() } = {}) {
   const backs = [];
   const backOpts = [];
   const calls = [];
+  let depth = 0;
   const sheet = createSheet(doc, {
-    pushBack: (cb, opts) => { backs.push(cb); backOpts.push(opts); calls.push("pushBack"); },
+    // Simula back.js#push: pushState({bc:N}) ANTES de que pushBack() devuelva el control.
+    pushBack: (cb, opts) => {
+      depth += 1;
+      if (win) win.history.state = { bc: depth };
+      backs.push(cb); backOpts.push(opts); calls.push("pushBack");
+    },
     goBack: () => calls.push("goBack"),
     win,
     wait,
@@ -204,6 +214,26 @@ test("salto de varias entradas: cierra la hoja aunque el popstate no ejecute su 
   assert.deepEqual(calls, ["pushBack"]);
 });
 
+test("popstate que NO descarta nuestra entrada (bc >= myDepth): NO cierra (bug de revisión, ronda 1)", () => {
+  // Con un aviso abierto ENCIMA de la hoja (modal.js) que se cancela: el goBack() de su propio
+  // cierre dispara este mismo popstate, pero bc sigue siendo >= nuestra profundidad (1) — la
+  // entrada de ESTA hoja sigue en pie, así que la red de seguridad no debe tocarla.
+  const { doc, calls, sheet, win } = harness();
+  const dlg = sheet.open(OPTS);
+  for (const fn of [...win.listeners.popstate]) fn({ state: { bc: 1 } });   // 1, no < myDepth (1)
+  assert.equal(dlg.open, true, "bc no descarta nuestra entrada: la hoja se queda abierta");
+  assert.equal(doc.body.children.length, 1);
+  assert.deepEqual(calls, ["pushBack"]);
+});
+
+test("popstate que SÍ descarta nuestra entrada (bc < myDepth): cierra", () => {
+  const { doc, sheet, win } = harness();
+  const dlg = sheet.open(OPTS);
+  for (const fn of [...win.listeners.popstate]) fn({ state: { bc: 0 } });   // 0 < myDepth (1)
+  assert.equal(dlg.open, false);
+  assert.equal(doc.body.children.length, 0);
+});
+
 test("cerrar quita su listener de popstate de seguridad", () => {
   const { sheet, win } = harness();
   const dlg = sheet.open(OPTS);
@@ -241,6 +271,38 @@ test("si pushBack lanzó (pushState rechazado), cerrar no deshace la pantalla de
   dlg.fireClickOn(dlg);
   assert.equal(dlg.open, false);
   assert.deepEqual(calls, []);
+});
+
+test("con movimiento reducido, requestClose espera solo EXIT_MS_REDUCED (120ms), no los 180ms enteros", () => {
+  const esperas = [];
+  const win = fakeWin();
+  win.matchMedia = () => ({ matches: true });
+  let depth = 0;
+  const sheet = createSheet(fakeDoc(), {
+    pushBack: () => { depth += 1; win.history.state = { bc: depth }; },
+    goBack: () => {},
+    win,
+    wait: (ms) => esperas.push(ms),
+  });
+  const dlg = sheet.open(OPTS);
+  dlg.fireClickOn(dlg);
+  assert.deepEqual(esperas, [120]);
+});
+
+test("sin movimiento reducido, requestClose espera los 180ms enteros", () => {
+  const esperas = [];
+  const win = fakeWin();
+  win.matchMedia = () => ({ matches: false });
+  let depth = 0;
+  const sheet = createSheet(fakeDoc(), {
+    pushBack: () => { depth += 1; win.history.state = { bc: depth }; },
+    goBack: () => {},
+    win,
+    wait: (ms) => esperas.push(ms),
+  });
+  const dlg = sheet.open(OPTS);
+  dlg.fireClickOn(dlg);
+  assert.deepEqual(esperas, [180]);
 });
 
 test("createSheet sin `wait`: usa setTimeout por defecto", () => {

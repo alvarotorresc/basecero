@@ -45,11 +45,15 @@ function fakeDoc() {
 }
 
 // win falso que registra listeners de verdad (varios por tipo, con removeEventListener) — no el
-// win de back.test.mjs, que solo guarda uno por tipo y no lo necesita.
+// win de back.test.mjs, que solo guarda uno por tipo y no lo necesita. `history.state` empieza en
+// null (como una pestaña recién abierta, antes de cualquier pushState) y lo actualiza el mock de
+// pushBack de harness() — mismo efecto que back.js#push (win.history.pushState({bc:N})) — para que
+// createModal pueda leer su propia profundidad justo después de llamar a pushBack().
 function fakeWin() {
   const listeners = {};
   return {
     listeners,
+    history: { state: null },
     addEventListener(type, fn) { (listeners[type] ??= []).push(fn); },
     removeEventListener(type, fn) {
       listeners[type] = (listeners[type] ?? []).filter((l) => l !== fn);
@@ -68,8 +72,15 @@ function harness({ wait = SYNC_WAIT } = {}) {
   const backOpts = [];
   const calls = [];
   const win = fakeWin();
+  let depth = 0;
   const modal = createModal(doc, {
-    pushBack: (cb, opts) => { backs.push(cb); backOpts.push(opts); calls.push("pushBack"); },
+    // Simula back.js#push: pushState({bc:N}) ANTES de que pushBack() devuelva el control, para que
+    // createModal pueda leer win.history.state.bc justo después y quedarse con su profundidad.
+    pushBack: (cb, opts) => {
+      depth += 1;
+      win.history.state = { bc: depth };
+      backs.push(cb); backOpts.push(opts); calls.push("pushBack");
+    },
     goBack: () => calls.push("goBack"),
     win,
     wait,
@@ -300,6 +311,41 @@ test("salto de varias entradas: cierra el modal aunque el popstate no ejecute su
   assert.deepEqual(calls, ["pushBack"], "el historial ya saltó por sí solo: no hay que deshacer nada más");
 });
 
+test("popstate que NO descarta nuestra entrada (bc >= myDepth): NO cierra (bug de revisión, ronda 1)", () => {
+  // Con algo apilado ENCIMA del aviso (una hoja, sheet.js) que se cierra: el popstate que eso
+  // dispara llega también aquí, pero bc sigue siendo >= nuestra profundidad (1) — la entrada de
+  // ESTE aviso sigue en pie, así que la red de seguridad no debe tocarlo.
+  const { doc, calls, modal, win } = harness();
+  const dlg = modal.confirm(OPTS);
+  for (const fn of [...win.listeners.popstate]) fn({ state: { bc: 1 } });   // 1, no < myDepth (1)
+  assert.equal(dlg.open, true, "bc no descarta nuestra entrada: el aviso se queda abierto");
+  assert.equal(doc.body.children.length, 1);
+  assert.deepEqual(calls, ["pushBack"], "no se ha deshecho nada");
+});
+
+test("popstate que SÍ descarta nuestra entrada (bc < myDepth): cierra", () => {
+  const { doc, modal, win } = harness();
+  const dlg = modal.confirm(OPTS);
+  for (const fn of [...win.listeners.popstate]) fn({ state: { bc: 0 } });   // 0 < myDepth (1)
+  assert.equal(dlg.open, false);
+  assert.equal(doc.body.children.length, 0);
+});
+
+test("sin `win.history.state` fiable (pushBack lanzó): la red de seguridad se mantiene incondicional", () => {
+  const doc = fakeDoc();
+  const calls = [];
+  const win = { listeners: {}, addEventListener(t, fn) { (this.listeners[t] ??= []).push(fn); }, removeEventListener() {} };
+  const modal = createModal(doc, {
+    pushBack: () => { throw new Error("límite de Safari"); },
+    goBack: () => calls.push("goBack"),
+    win,
+    wait: SYNC_WAIT,
+  });
+  const dlg = modal.confirm(OPTS);
+  for (const fn of [...win.listeners.popstate]) fn({ state: { bc: 99 } });  // cualquier bc
+  assert.equal(dlg.open, false, "sin myDepth que comparar, cualquier popstate cierra (como antes)");
+});
+
 test("cerrar el modal (cancelar) quita su listener de popstate de seguridad", () => {
   const { modal, win } = harness();
   const dlg = modal.confirm(OPTS);
@@ -355,6 +401,38 @@ test("cancelar: devuelve el foco a quien abrio el modal", () => {
   const dlg = modal.confirm(OPTS);
   dlg.querySelector("#modal-cancel").onclick();
   assert.equal(abridor.focusCount, 1);
+});
+
+test("con movimiento reducido, requestClose espera solo EXIT_MS_REDUCED (120ms), no los 180ms enteros", () => {
+  const esperas = [];
+  const win = fakeWin();
+  win.matchMedia = () => ({ matches: true });
+  let depth = 0;
+  const modal = createModal(fakeDoc(), {
+    pushBack: (cb) => { depth += 1; win.history.state = { bc: depth }; },
+    goBack: () => {},
+    win,
+    wait: (ms, fn) => esperas.push(ms),
+  });
+  const dlg = modal.confirm(OPTS);
+  dlg.querySelector("#modal-cancel").onclick();
+  assert.deepEqual(esperas, [120], "con prefers-reduced-motion, el cierre no espera lo que dura la animación completa");
+});
+
+test("sin movimiento reducido, requestClose espera los 180ms enteros", () => {
+  const esperas = [];
+  const win = fakeWin();
+  win.matchMedia = () => ({ matches: false });
+  let depth = 0;
+  const modal = createModal(fakeDoc(), {
+    pushBack: (cb) => { depth += 1; win.history.state = { bc: depth }; },
+    goBack: () => {},
+    win,
+    wait: (ms, fn) => esperas.push(ms),
+  });
+  const dlg = modal.confirm(OPTS);
+  dlg.querySelector("#modal-cancel").onclick();
+  assert.deepEqual(esperas, [180]);
 });
 
 test("createModal sin `wait`: usa setTimeout por defecto (no revienta si el llamador no lo pasa)", () => {

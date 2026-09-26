@@ -989,7 +989,8 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
   margin: 0 auto;
   width: 100%;
   max-width: 480px;         /* mismo tope que .tabbar */
-  max-height: 92vh;
+  max-height: 92vh;         /* con soporte de dvh, la línea de abajo la sustituye (barras móviles) */
+  max-height: 92dvh;
   padding: 0;
   border: 0;
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
@@ -1059,7 +1060,9 @@ button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
 .modal {
   left: var(--sp-8);
   right: var(--sp-8);
-  bottom: var(--sp-8);
+  /* + safe-area: mismo motivo que .sheet-content y #toast — el margen de 8 no puede quedar debajo
+     de la zona segura del dispositivo (el borde curvo, el home indicator). */
+  bottom: calc(var(--sp-8) + env(safe-area-inset-bottom, 0px));
   top: auto;
   margin: 0;
   /* El navegador da al <dialog> width:fit-content y a dialog:modal max-width:calc(100% - 6px - 2em):

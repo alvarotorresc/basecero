@@ -15,11 +15,13 @@ import { buttonHtml } from "./ui.js";
  *  Cuelga de <body>, no de #screen: mismo motivo que toast.js — las pantallas se repintan enteras
  *  con innerHTML y se lo llevarían por delante. */
 
-// DESIGN.md §10 «Hoja y aviso»: sale en 180ms ease-in. El cierre REAL (dlg.close(), que dispara el
-// único embudo de salida más abajo) espera a que termine la animación de salida de .is-leaving
-// (components.css) para que se vea siempre, sea cual sea la puerta de salida (botón, Escape,
-// clic en el velo o el atrás del sistema).
+// DESIGN.md §10 «Hoja y aviso»: sale en 180ms ease-in; con movimiento reducido, components.css
+// recorta la animación de salida a un fundido de 120ms (K13) — el cierre REAL (dlg.close(), que
+// dispara el único embudo de salida más abajo) espera lo mismo que dure esa animación en cada
+// caso, para que se vea siempre pero sin dejar el <dialog> abierto (e inerte todo lo demás) más de
+// lo que la propia animación necesita.
 const EXIT_MS = 180;
+const EXIT_MS_REDUCED = 120;
 
 /** Interior del <dialog>, envuelto en .modal-content: el <dialog> se queda con padding:0 (para que
  *  un clic en el velo, fuera de esa caja, llegue con target=dlg — createModal#onClickBackdrop) y
@@ -64,18 +66,20 @@ export function createModal(doc, { pushBack, goBack, win, wait = (ms, fn) => set
       let byBack = false;
       let pushed = false;
       let closing = false;   // ya se pidió el cierre: evita reentradas (doble Escape, velo + atrás)
+      let myDepth = null;    // profundidad propia en la pila de atrás — ver onPopstate
 
       // requestClose(): ÚNICA puerta hacia el cierre real. Añade .is-leaving (dispara la animación
       // de salida, components.css) y solo cuando termina llama a dlg.close() de verdad, que es
       // quien dispara el evento "close" (el embudo de siempre: deshace el historial y decide
       // onConfirm/foco). Cancelar, confirmar, Escape, el clic en el velo y el atrás del sistema
-      // pasan TODOS por aquí, así que la animación se ve siempre — y con movimiento reducido,
-      // components.css la reduce a un fundido corto (K13).
+      // pasan TODOS por aquí, así que la animación se ve siempre — y con movimiento reducido, se
+      // espera solo lo que dure el fundido corto de components.css (K13), no los 180ms enteros.
       const requestClose = () => {
         if (closing) return;
         closing = true;
         dlg.classList.add("is-leaving");
-        wait(EXIT_MS, () => dlg.close());
+        const reduced = win.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+        wait(reduced ? EXIT_MS_REDUCED : EXIT_MS, () => dlg.close());
       };
 
       // Salto de varias entradas de golpe (history.go(-n), o "atrás" del sistema mantenido): el
@@ -83,10 +87,23 @@ export function createModal(doc, { pushBack, goBack, win, wait = (ms, fn) => set
       // dropped[0]). Si la del aviso se descarta sin ser esa, el pushBack de más abajo nunca corre:
       // el <dialog> se quedaría abierto en el top layer —con todo lo demás inerte— y `current`
       // señalando a un aviso muerto, así que showConfirm() no volvería a abrir nada nunca más.
-      // Red de seguridad: cualquier popstate mientras el diálogo siga abierto lo cierra, lo haya
-      // ejecutado o no el callback de pushBack de arriba.
-      const onPopstate = () => {
-        if (dlg.open) { byBack = true; requestClose(); }
+      // Red de seguridad: un popstate que descarte NUESTRA entrada (target < myDepth) lo cierra,
+      // lo haya ejecutado o no el callback de pushBack de arriba.
+      //
+      // Comprobar la profundidad y no solo `dlg.open` importa en cuanto hay algo apilado ENCIMA
+      // del aviso (p. ej. este mismo aviso abierto sobre una hoja, sheet.js): cancelar el aviso
+      // llama a goBack() en su propio embudo de salida, que hace history.back() y dispara ESTE
+      // MISMO popstate — pero también lo reciben todos los demás listeners vivos en `win`,
+      // incluida la red de seguridad de la hoja de abajo. Sin mirar la profundidad, esa hoja vería
+      // `dlg.open === true` (la suya, no la de este aviso) y se cerraría también, sin pasar por su
+      // propio goBack() — dejando una entrada colgada en back.js (bug de revisión, ronda 1).
+      // Sin `myDepth` fiable (pushBack lanzó: no hay entrada que proteger), se mantiene la red de
+      // seguridad de siempre: cualquier popstate cierra.
+      const onPopstate = (e) => {
+        if (!dlg.open) return;
+        if (myDepth !== null && !((e.state?.bc ?? -1) < myDepth)) return;
+        byBack = true;
+        requestClose();
       };
       win.addEventListener("popstate", onPopstate);
 
@@ -121,7 +138,14 @@ export function createModal(doc, { pushBack, goBack, win, wait = (ms, fn) => set
       // `main#screen`), que se quede como estuviera la pantalla de detrás (back.js: syncChrome).
       // showModal() va ANTES que esto: si pushBack lanza, el diálogo ya está abierto y Cancelar
       // debe poder cerrarlo igual (arriba, con pushed=false, sin tocar goBack()).
-      try { pushBack(() => { byBack = true; requestClose(); }, { scroll: false, chrome: false }); pushed = true; } catch {}
+      // pushBack() llama a win.history.pushState({bc:N}) antes de volver (back.js): leer
+      // win.history.state justo después nos da N, nuestra propia profundidad, sin que back.js
+      // tenga que exponer nada nuevo.
+      try {
+        pushBack(() => { byBack = true; requestClose(); }, { scroll: false, chrome: false });
+        pushed = true;
+        myDepth = win.history.state?.bc ?? null;
+      } catch {}
       // El guard `closing` va TAMBIÉN aquí, no solo dentro de requestClose(): con la animación de
       // salida, el <dialog> sigue abierto (y sus botones, tocables) durante 180ms. Sin este guard,
       // Cancelar y luego Borrar dentro de esa ventana pondría confirmed=true DESPUÉS de que
