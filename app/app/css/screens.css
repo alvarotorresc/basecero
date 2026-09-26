@@ -195,6 +195,8 @@
 
 /* Editor del límite dentro del bloque: campo hundido, primario y la nota con «Quitar límite». */
 .gc-edit { margin: 0 var(--sp-12) 0 52px; padding-top: var(--sp-12); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--sp-12); }
+/* Con el campo vacío manda el placeholder («Sin límite») y la unidad se oculta. */
+.gc-edit .ctl-field-input:placeholder-shown + .ctl-field-suffix { display: none; }
 .gc-edit .ctl-field-input { -moz-appearance: textfield; }
 .gc-edit .ctl-field-input::-webkit-outer-spin-button,
 .gc-edit .ctl-field-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
