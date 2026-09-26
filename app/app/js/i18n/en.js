@@ -93,9 +93,9 @@ export const EN = {
   },
   main: {
     banner: {
-      locked: "⚠ BaseCero is already open in another tab or window. Close it and retry; meanwhile, anything you do here will NOT be saved. ",
-      memory: "⚠ This browser does not support persistent storage: your data will NOT be saved when you close it.",
-      boot_failed: "⚠ BaseCero failed to start: {error}. Reload the page.",
+      locked: "BaseCero is already open in another tab or window. Close it and retry; meanwhile, anything you do here will NOT be saved. ",
+      memory: "This browser does not support persistent storage: your data will NOT be saved when you close it.",
+      boot_failed: "BaseCero failed to start: {error}. Reload the page.",
     },
     tabs: {
       inicio: "Home",
