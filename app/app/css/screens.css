@@ -620,7 +620,127 @@
 .liq-primary .num { font-weight: 600; }
 /* === fin: liquidar === */
 
+/* === pantalla: movimiento-detalle === */
+/* === fin: movimiento-detalle === */
+
 /* === pantalla: movimientos === */
+/* B-Movimientos: cabecera de raíz con ‹ › de periodo · Display m · buscador + Filtrar · chips ·
+   lista por día. Todo en pila de 12 (§8). La hoja de filtros (B-Movimientos-Filtros) cuelga de
+   <body> (sheet.js): sus reglas van por la clase .mov-flt que le pone la pantalla. */
+.mov { display: flex; flex-direction: column; gap: var(--sp-12); }
+.mov-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); }
+.mov-head .root-header { flex: 1; min-width: 0; margin-bottom: 0; padding: 0 0 0 var(--sp-4); }
+.mov-period-nav { flex: none; display: flex; gap: var(--sp-8); }
+
+/* Display m: «de X» a la derecha de la cifra, abajo; el medidor de 8 debajo, a todo el ancho. */
+.mov-disp .disp {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--sp-12);
+  row-gap: var(--sp-2);
+}
+.mov-disp .disp-head,
+.mov-disp .disp-slot { grid-column: 1 / -1; }
+.mov-disp .disp-foot { align-self: end; padding-bottom: var(--sp-4); white-space: nowrap; }
+.mov-disp .disp-slot { margin-top: var(--sp-8); }
+
+/* Buscador (F-29): campo hundido RECTANGULAR (radio 10, un campo nunca es píldora, §8) con la lupa
+   dentro; el foco se pinta en el pozo entero. Filtrar: botón icono de 48 a su lado. */
+.mov-tools { display: flex; gap: var(--sp-8); }
+.mov-search {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  padding: 0 var(--sp-16);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  border-radius: var(--radius);
+  background: var(--well);
+  box-shadow: var(--sh-well);
+  color: var(--text-dim);
+}
+.mov-search svg { flex: none; }
+.mov-search-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-input);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.mov-search-input::placeholder { color: var(--text-dim); opacity: 1; }
+.mov-search-input::-webkit-search-cancel-button { display: none; }
+.mov-search-input:focus { outline: none; }
+.mov-search:has(.mov-search-input:focus-visible) { outline: var(--focus); outline-offset: var(--focus-offset); }
+.mov-filter-btn { width: 48px; height: 48px; }
+
+/* Chips: una fila que se desliza hasta el borde de la pantalla; el relleno de 4 deja ver el foco. */
+.mov-chips {
+  display: flex;
+  gap: var(--sp-8);
+  overflow-x: auto;
+  margin: calc(-1 * var(--sp-4)) calc(-1 * var(--sp-16)) calc(-1 * var(--sp-4)) calc(-1 * var(--sp-4));
+  padding: var(--sp-4) var(--sp-16) var(--sp-4) var(--sp-4);
+  scrollbar-width: none;
+}
+.mov-chips::-webkit-scrollbar { display: none; }
+
+/* Lista: un bloque por día (cabecera de 24 + tarjeta de filas de 60 con divisor a la altura del
+   texto, 12 + 40 + 12). */
+.mov-list { display: flex; flex-direction: column; gap: var(--sp-16); padding-top: var(--sp-4); }
+.mov-day { display: flex; flex-direction: column; gap: var(--sp-8); }
+.mov-card {
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.mov-hr { height: 1px; margin: 0 var(--sp-12) 0 calc(var(--sp-12) + 40px + var(--sp-12)); background: var(--border); }
+
+/* Tarjeta de la etiqueta activa (entrando desde Etiquetas): neutra (C10), cifra en tinta a 20 (C3). */
+.mov-tag {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.mov-tag-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); }
+.mov-tag-name {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  font-size: var(--fs-15);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  color: var(--text);
+}
+.mov-tag-name svg { flex: none; color: var(--text-dim); }
+.mov-tag-count,
+.mov-tag-period,
+.mov-tag-of { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+.mov-tag-limit { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--sp-8); }
+.mov-tag-amt { font-size: var(--fs-20); font-weight: 600; line-height: var(--lh-title); color: var(--text); }
+.mov-note { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+
+/* Hoja de filtros: secciones con título 13/600 dim y chips que saltan de línea; «Ver N
+   movimientos» se queda abajo aunque el cuerpo haga scroll. */
+.mov-flt-sec { display: flex; flex-direction: column; gap: var(--sp-8); }
+.mov-flt-label { margin: 0; padding-left: var(--sp-4); font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.mov-flt-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); margin: calc(-1 * var(--sp-4)); padding: var(--sp-4); }
+.mov-flt-foot { position: sticky; bottom: 0; margin-top: auto; padding-top: var(--sp-8); background: var(--surface); }
 /* === fin: movimientos === */
 
 /* === pantalla: onboarding === */

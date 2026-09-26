@@ -68,6 +68,9 @@ export const ICON_PATHS = {
   offline:      '<path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0"/><path d="M3 3l18 18"/>',
   phone:        '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>',
   upload:       '<path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M5 19.5h14"/>',
+  chevronLeft:  '<path d="M14.5 5 8 12l6.5 7"/>',
+  search:       '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+  filterLines:  '<path d="M4 6.5h16M7 12h10M10 17.5h4"/>',
 };
 
 /** SVG listo para pegar. `size` en px (20 dentro de fila o botón, 24 en cabecera, 16 dentro de la

@@ -116,3 +116,11 @@ test("icons: los cuatro de B-Onb-Bienvenida, verbatim", () => {
   assert.equal(ICON_PATHS.phone, '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>');
   assert.equal(ICON_PATHS.upload, '<path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M5 19.5h14"/>');
 });
+
+test("icons: los tres de B-Movimientos (‹ de periodo, lupa y filtrar), verbatim", () => {
+  // Espejo exacto de chevronRight: el ‹ de periodo NO puede ser `back` (R-BACK lo trataría como
+  // un «Atrás» y exigiría ese aria-label).
+  assert.equal(ICON_PATHS.chevronLeft, '<path d="M14.5 5 8 12l6.5 7"/>');
+  assert.equal(ICON_PATHS.search, '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>');
+  assert.equal(ICON_PATHS.filterLines, '<path d="M4 6.5h16M7 12h10M10 17.5h4"/>');
+});

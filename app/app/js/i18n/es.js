@@ -308,7 +308,28 @@ export const ES = {
     uncategorizedChip: "Sin categoría {n}",
     chipAll: "Todos",
     // filter.toggle sustituye a search.toggle (embudo en vez de lupa, Movimientos.dc.html:24).
-    filter: { toggle: "Filtrar" },
+    // Hoja de filtros (S5, B-Movimientos-Filtros) con la semántica de siempre: una categoría raíz,
+    // «sin categoría» y una etiqueta. apply cuenta los movimientos que dejaría el filtro elegido.
+    filter: {
+      toggle: "Filtrar",
+      title: "Filtros",
+      clear: "Quitar filtros",
+      category: "Categoría",
+      tag: "Etiqueta",
+      apply: { one: "Ver {n} movimiento", other: "Ver {n} movimientos" },
+    },
+    // Sistema B (S5, B-Movimientos): cabecera de raíz con el periodo que se mira y Display compacto.
+    header: {
+      sub: { one: "Día {day} de {total}, queda {n} día", other: "Día {day} de {total}, quedan {n} días" },
+      closed: "Periodo cerrado",
+    },
+    display: {
+      label: "Gastado en el periodo",
+      of: "de {amount}",
+      meter: "Gastado frente a los límites del periodo",
+    },
+    yesterday: "Ayer",
+    weekdayShort: { 0: "dom", 1: "lun", 2: "mar", 3: "mié", 4: "jue", 5: "vie", 6: "sáb" },
     // Sustituyen al <select id="mov-period"> (Movimientos.dc.html:30-40): aria-label de los dos
     // botones circulares de 40px que mueven state.periodId por índice sobre `periods`.
     period: { prev: "Periodo anterior", next: "Periodo siguiente" },
