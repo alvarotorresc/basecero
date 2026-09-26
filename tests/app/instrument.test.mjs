@@ -119,6 +119,14 @@ test("containerHtml: gráfico con relleno 16 y lista con 4; cabecera con título
   assert.equal(decl(".box-list", "padding"), "var(--sp-4)");
 });
 
+test("containerHtml: `aside` pone la acción a la derecha de la cabecera, tal cual y en lugar del total", () => {
+  const btn = '<button type="button" class="btn-tertiary" id="ver">Ver todos</button>';
+  const html = containerHtml({ title: "Últimos movimientos", total: "9,00 €", aside: btn, body: "", kind: "list" });
+  assert.match(html, /<div class="box-head"><h2 class="box-title">Últimos movimientos<\/h2><button type="button" class="btn-tertiary" id="ver">Ver todos<\/button><\/div>/);
+  assert.ok(!html.includes("box-total"), "con aside no hay total");
+  assert.match(containerHtml({ aside: btn, body: "" }), /<div class="box-head"><span><\/span><button/, "sin título la acción sigue a la derecha");
+});
+
 // ---- Barra apilada ---------------------------------------------------------------------------
 
 const SEGS = [

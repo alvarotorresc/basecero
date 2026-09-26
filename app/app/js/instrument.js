@@ -116,10 +116,14 @@ export function bentoHtml({ label, value = "", foot = "", fam = null, iconHtml =
  *  @param {string} o.body             HTML de confianza.
  *  @param {"list"|"chart"} [o.kind]   Por defecto "chart".
  *  @param {string} [o.label]          aria-label de la sección cuando no hay título.
+ *  @param {string} [o.aside]          HTML de confianza a la derecha de la cabecera, en lugar del
+ *                                     total: la acción de la sección (el terciario «Ver todos» de
+ *                                     B-Home). Con `aside`, `total` no se pinta.
  *  @returns {string} HTML */
-export function containerHtml({ title = "", total = "", body, kind = "chart", label = "" }) {
-  const head = title || total
-    ? `<div class="box-head">${title ? `<h2 class="box-title">${escHtml(title)}</h2>` : "<span></span>"}${total ? `<span class="num box-total">${escHtml(total)}</span>` : ""}</div>`
+export function containerHtml({ title = "", total = "", body, kind = "chart", label = "", aside = "" }) {
+  const right = aside || (total ? `<span class="num box-total">${escHtml(total)}</span>` : "");
+  const head = title || right
+    ? `<div class="box-head">${title ? `<h2 class="box-title">${escHtml(title)}</h2>` : "<span></span>"}${right}</div>`
     : "";
   const aria = !title && label ? ` aria-label="${escAttr(label)}"` : "";
   return `<section class="box box-${kind === "list" ? "list" : "chart"}"${aria}>${head}${body}</section>`;
