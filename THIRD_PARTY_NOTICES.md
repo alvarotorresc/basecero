@@ -79,39 +79,53 @@ tal y como aparece en la cabecera embebida en el bundle:
 Copyright (c) Microsoft Corporation. All rights reserved.
 ```
 
-## Schibsted Grotesk (fuente)
+## Unbounded (fuente)
 
-- **Componente:** Schibsted Grotesk, fuente variable (eje `wght`), subset latin.
-- **Rutas:** `app/app/vendor/fonts/schibsted-grotesk-latin.woff2` y `app/app/vendor/fonts/fonts.css`
-- **Licencia:** SIL Open Font License, versión 1.1 — texto completo más abajo, tal y como exige la
-  propia licencia.
-
-Aviso de copyright:
-
-```
-Copyright The Schibsted Grotesk Project Authors
-```
-
-## JetBrains Mono (fuente)
-
-- **Componente:** JetBrains Mono, fuente variable (eje `wght`), subset latin.
-- **Rutas:** `app/app/vendor/fonts/jetbrains-mono-latin.woff2` y `app/app/vendor/fonts/fonts.css`
-- **Licencia:** SIL Open Font License, versión 1.1 — texto completo más abajo, tal y como exige la
-  propia licencia.
+- **Componente:** Unbounded, peso 700 (fichero estático), subset latin.
+- **Rutas:** `app/app/vendor/fonts/unbounded-latin.woff2` y `app/app/vendor/fonts/fonts.css`
+- **Licencia:** SIL Open Font License, versión 1.1 — texto completo más abajo y en
+  `app/app/vendor/fonts/unbounded-OFL.txt`.
 
 Aviso de copyright:
 
 ```
-Copyright 2020 The JetBrains Mono Project Authors
+Copyright 2022 The Unbounded Project Authors (https://github.com/googlefonts/unbounded)
 ```
 
-JetBrains Mono declara un *Reserved Font Name*: «JetBrains Mono». La cláusula 5 de la licencia
-impide que un trabajo derivado y modificado siga usando ese nombre.
+## Instrument Sans (fuente)
+
+- **Componente:** Instrument Sans, fuente variable (eje `wght`), subset latin.
+- **Rutas:** `app/app/vendor/fonts/instrument-sans-latin.woff2` y `app/app/vendor/fonts/fonts.css`
+- **Licencia:** SIL Open Font License, versión 1.1 — texto completo más abajo y en
+  `app/app/vendor/fonts/instrument-sans-OFL.txt`.
+
+Aviso de copyright:
+
+```
+Copyright 2022 The Instrument Sans Project Authors (https://github.com/Instrument/instrument-sans)
+```
+
+## IBM Plex Mono (fuente)
+
+- **Componente:** IBM Plex Mono, pesos 500 y 600 (un fichero estático por peso), subset latin.
+- **Rutas:** `app/app/vendor/fonts/ibm-plex-mono-latin-500.woff2`,
+  `app/app/vendor/fonts/ibm-plex-mono-latin-600.woff2` y `app/app/vendor/fonts/fonts.css`
+- **Licencia:** SIL Open Font License, versión 1.1 — texto completo más abajo y en
+  `app/app/vendor/fonts/ibm-plex-mono-OFL.txt`.
+
+Aviso de copyright:
+
+```
+Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"
+```
+
+IBM Plex Mono declara un *Reserved Font Name*: «Plex». La cláusula 5 de la licencia impide que un
+trabajo derivado y modificado siga usando ese nombre.
 
 ### Texto de la SIL Open Font License, Version 1.1
 
-(Cubre tanto Schibsted Grotesk como JetBrains Mono: ambas se distribuyen bajo la misma versión de
-la licencia.)
+(Cubre Unbounded, Instrument Sans e IBM Plex Mono: todas se
+distribuyen bajo la misma versión de la licencia.)
 
 ```
 -----------------------------------------------------------
@@ -214,3 +228,32 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
   renuncian al copyright) y el *glue code* de Emscripten está bajo **MIT** y **University of
   Illinois/NCSA Open Source License**.
 - **Web del proyecto:** <https://sqlite.org/wasm>
+
+## Lucide (iconos)
+
+- **Componente:** seis iconos de [Lucide](https://lucide.dev), tomados de `lucide-static` **1.48.0**:
+  `banknote`, `baby`, `laptop`, `gamepad-2`, `package` y `graduation-cap`.
+- **Ruta:** `app/app/js/icons.js` (`CAT_ICONS.billete`, `bebe`, `portatil`, `mando`, `paquete` y
+  `birrete`). Se copian los elementos SVG tal cual; la app los pinta con su propio grosor de trazo.
+- **Licencia:** ISC.
+- **Web del proyecto:** <https://lucide.dev>
+
+### Texto de la licencia ISC
+
+```
+ISC License
+
+Copyright (c) 2026 Lucide Icons and Contributors
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+```

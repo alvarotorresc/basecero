@@ -4,7 +4,7 @@ import {
   annualCents, monthlyCents, activeSubscriptions, inactiveSubscriptions,
   annualTotalCents, monthlyTotalCents, nextRenewal, daysUntil, wholeMonthsBetween, savedSinceCancelCents,
   RENEWAL_SOON_DAYS, renewalNotice, parseIgnored, parseSnoozed, IGNORED_MAX,
-  monthlyCommitmentCents, ruleStateKey,
+  monthlyCommitmentCents, ruleStateKey, paidThisPeriodCents,
 } from "../../app/app/js/subscriptions.js";
 
 /** Regla mínima con la forma de una fila real de recurring_rules — solo los campos que estos
@@ -336,6 +336,33 @@ test("monthlyCommitmentCents: la lista del artboard da 78988", () => {
 test("monthlyCommitmentCents: lista vacía o nula da 0", () => {
   assert.equal(monthlyCommitmentCents([]), 0);
   assert.equal(monthlyCommitmentCents(undefined), 0);
+});
+
+// ---- paidThisPeriodCents (S9, héroe de Recurrentes) ----------------------------------------
+
+test("paidThisPeriodCents: suma solo los items pagados", () => {
+  const a = rule({ type: "expense" });
+  const b = rule({ type: "expense" });
+  const items = [
+    { rule: a, myCents: 1000, paid: true },
+    { rule: b, myCents: 500, paid: false },
+  ];
+  assert.equal(paidThisPeriodCents(items), 1000);
+});
+
+test("paidThisPeriodCents: excluye type:\"income\" aunque esté pagado", () => {
+  const nomina = rule({ type: "income" });
+  assert.equal(paidThisPeriodCents([{ rule: nomina, myCents: 185000, paid: true }]), 0);
+});
+
+test("paidThisPeriodCents: incluye type:\"transfer\" pagado", () => {
+  const ahorro = rule({ type: "transfer" });
+  assert.equal(paidThisPeriodCents([{ rule: ahorro, myCents: 20000, paid: true }]), 20000);
+});
+
+test("paidThisPeriodCents: lista vacía o nula da 0", () => {
+  assert.equal(paidThisPeriodCents([]), 0);
+  assert.equal(paidThisPeriodCents(undefined), 0);
 });
 
 // ---- ruleStateKey (P4, spec §5.1 decisión 7) -----------------------------------------------

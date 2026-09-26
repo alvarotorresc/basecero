@@ -7,7 +7,7 @@ import {
   nextRenewal, daysUntil, savedSinceCancelCents, renewalNotice, RENEWAL_SOON_DAYS,
 } from "../subscriptions.js";
 import { detectSubscriptions } from "../subscription-detect.js";
-import { colorForCategory, iconForCategory } from "../category-colors.js";
+import { familyForCategory, iconForCategory, famClass } from "../category-colors.js";
 import { fmtMoney, moneyPartsHtml, fmtDiaLargo, fmtDiaCorto, hoyISO } from "../format.js";
 import { t } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
@@ -16,23 +16,30 @@ import { showConfirm } from "../modal.js";
 import { showToast } from "../toast.js";
 import { skeletonHtml } from "../skeleton.js";
 import { renderRecurrentes } from "./recurrentes.js";
-import { subHeaderHtml } from "../ui.js";
+import { subHeaderHtml, buttonHtml } from "../ui.js";
+import { tileHtml, txRowHtml, sectionHeaderHtml } from "../entity.js";
+import { displayHtml, dispInkHtml, containerHtml, emptyStateHtml } from "../instrument.js";
+import { escHtml } from "../esc.js";
 
-import { escHtml, escAttr } from "../esc.js";
-
-/** «renueva el X» (--warn + ", en N días" si faltan ≤7), "renueva cada semana" para las
- *  semanales (D5: sin ancla semanal, nunca aviso), o "sin fecha" para datos incompletos.
- *  Devuelve también `dueIso` (para ordenar) y `warn` (para el color de la fila). */
+/** «renueva el X, en N días» (si faltan ≤7), «renueva cada semana» para las semanales (D5: sin
+ *  ancla semanal, nunca aviso), o «sin fecha» para datos incompletos. Sin dueIso ni warn: el
+ *  sistema B no colorea esta línea fuera del Display (C2) — el texto ya dice si es pronto. */
 function renewsInfo(rule, todayIso) {
-  if (rule.frequency === "weekly") return { text: t("suscripciones.row.renewsWeekly"), dueIso: "", warn: false };
+  if (rule.frequency === "weekly") return t("suscripciones.row.renewsWeekly");
   const dueIso = nextRenewal(rule, todayIso);
-  if (!dueIso) return { text: t("suscripciones.row.noDate"), dueIso: "", warn: false };
+  if (!dueIso) return t("suscripciones.row.noDate");
   const days = daysUntil(dueIso, todayIso);
   if (days <= RENEWAL_SOON_DAYS) {
     // n (no "days"): dispara el plural {one, other} de t() — "en 1 día" en vez de "en 1 días".
-    return { text: t("suscripciones.row.renewsInDays", { date: fmtDiaLargo(dueIso), n: days }), dueIso, warn: true };
+    return t("suscripciones.row.renewsInDays", { date: fmtDiaLargo(dueIso), n: days });
   }
-  return { text: t("suscripciones.row.renewsOn", { date: fmtDiaLargo(dueIso) }), dueIso, warn: false };
+  return t("suscripciones.row.renewsOn", { date: fmtDiaLargo(dueIso) });
+}
+
+/** Un <div class="ent-divider"> entre cada elemento (nunca antes del primero), para las listas de
+ *  txRowHtml dentro de un box-list (§9): mismo criterio que recurrentes.js#withDividers. */
+function withDividers(items) {
+  return items.map((html, i) => (i > 0 ? `<div class="ent-divider"></div>${html}` : html)).join("");
 }
 
 /** Activas ordenadas por nextRenewal ascendente; las sin fecha (semanales, datos incompletos) al
@@ -47,124 +54,140 @@ function sortActive(rules, todayIso) {
   });
 }
 
-// Insignia de la fila = la categoría de la REGLA, nunca un logo de marca (SISTEMA.md §2.2):
-// reutiliza .dotico (recurrentes.js), el mismo círculo tintado al 16 % del resto de la app.
-function badgeHtml(rule, byId) {
-  // Se llama con dos formas distintas: una regla real (category_id, snake_case, como el resto
-  // del esquema) y una candidata de subscription-detect.js (categoryId, camelCase — ver su
-  // acceptSubscriptionCandidateStmts/detectSubscriptions). Sin el fallback, una candidata siempre
-  // pintaba la insignia neutra de "sin categoría" aunque su cargo sí tuviera una detectada.
-  const categoryId = rule.category_id ?? rule.categoryId;
-  const color = colorForCategory(categoryId, byId);
-  const icon = iconForCategory(categoryId, byId);
-  return `<div class="dotico" style="--cat:${color};">${icon}</div>`;
+// ---- marcas de renovación (Display, F-13) -----------------------------------------------------
+
+const TIMELINE_DAYS = 30;
+const TIMELINE_W = 318, TIMELINE_H = 28, TIMELINE_PAD = 6;
+
+/** Sparkline de «marcas de renovación» dentro del Display (B-Suscripciones): un punto por
+ *  suscripción activa que renueva dentro de los próximos 30 días, proporcional a esos días. La más
+ *  próxima se pinta grande con `.disp-today` (la clase ya existente del Display, C2: ámbar SOLO
+ *  ahí); el resto, pequeñas y apagadas — nunca en el color que manda el Display, ninguna otra es
+ *  «la que importa». Decorativa (aria-hidden): el detalle por nombre ya vive en cada fila de
+ *  Activas de abajo, así que no se repite en un aria-label (mismo criterio que charts.js#sparklineSvg,
+ *  cuyo <svg> interno también es aria-hidden). "" sin ninguna renovación en ventana. */
+function renewalTimelineHtml(actives, todayIso) {
+  const days = actives
+    .map((r) => {
+      if (r.frequency === "weekly") return null;
+      const dueIso = nextRenewal(r, todayIso);
+      if (!dueIso) return null;
+      const d = daysUntil(dueIso, todayIso);
+      return d >= 0 && d <= TIMELINE_DAYS ? d : null;
+    })
+    .filter((d) => d !== null)
+    .sort((a, b) => a - b);
+  if (!days.length) return "";
+  const y = TIMELINE_H / 2;
+  const trackW = TIMELINE_W - TIMELINE_PAD * 2;
+  const x = (d) => Number((TIMELINE_PAD + (d / TIMELINE_DAYS) * trackW).toFixed(2));
+  const base = `<path class="disp-chart-base" d="M0,${y} L${TIMELINE_W},${y}" stroke-width="1"></path>`;
+  const marks = days.map((d, i) => (i === 0
+    ? `<circle class="disp-today" cx="${x(d)}" cy="${y}" r="6" stroke-width="3"></circle>`
+    : `<circle class="susc-mark" cx="${x(d)}" cy="${y}" r="4"></circle>`)).join("");
+  return `<div class="disp-chart"><svg class="disp-chart-svg" width="${TIMELINE_W}" height="${TIMELINE_H}" `
+    + `viewBox="0 0 ${TIMELINE_W} ${TIMELINE_H}" aria-hidden="true">${base}${marks}</svg></div>`;
 }
 
-function heroHtml(rules) {
+function heroHtml(rules, actives, todayIso) {
   const annual = annualTotalCents(rules);
   const monthly = monthlyTotalCents(rules);
-  const n = activeSubscriptions(rules).length;
-  return `
-  <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:26px;">
-    <span style="font-size:13px;font-weight:500;color:var(--ink-2);">${t("suscripciones.hero.label")}</span>
-    <div class="num" style="display:flex;align-items:baseline;gap:2px;font:var(--t-hero);letter-spacing:-.02em;">${moneyPartsHtml(annual)}</div>
-    <div style="display:flex;align-items:center;gap:10px;padding-top:4px;">
-      <span class="num" style="font-size:14px;font-weight:600;">${escHtml(fmtMoney(monthly))}</span>
-      <span style="font-size:14px;font-weight:500;color:var(--ink-2);">${t("suscripciones.hero.perMonth")}</span>
-      <span style="width:1px;height:13px;background:var(--hairline-strong);flex-shrink:0;"></span>
-      <span style="font-size:14px;font-weight:500;color:var(--ink-2);">${t("suscripciones.hero.activeCount", { n })}</span>
-    </div>
-  </div>`;
+  return displayHtml({
+    label: t("suscripciones.hero.label"),
+    value: fmtMoney(annual),
+    size: "l",
+    led: { state: actives.length > 0 ? "ok" : "idle", text: t("suscripciones.hero.activeCount", { n: actives.length }) },
+    footHtml: `${dispInkHtml(fmtMoney(monthly))} ${escHtml(t("suscripciones.hero.perMonth"))}`,
+    slot: renewalTimelineHtml(actives, todayIso),
+  });
 }
 
-const HUCHA_SVG = `<svg viewBox="0 0 512 512" width="34" height="34" style="flex-shrink:0;border-radius:9px;" aria-hidden="true">
-  <rect width="512" height="512" rx="112" fill="var(--accent)"></rect>
-  <path d="M193.43 112.79A41 42 0 1 0 166 186A41 42 0 1 1 138.57 259.21" fill="none" stroke="var(--accent-ink)" stroke-width="40" stroke-linecap="round"></path>
-  <rect x="149" y="78" width="34" height="216" rx="17" fill="var(--accent-ink)"></rect>
-  <path d="M373.43 112.79A41 42 0 1 0 346 186A41 42 0 1 1 318.57 259.21" fill="none" stroke="var(--accent-ink)" stroke-width="40" stroke-linecap="round"></path>
-  <rect x="329" y="78" width="34" height="216" rx="17" fill="var(--accent-ink)"></rect>
-  <rect x="138" y="349" width="236" height="50" rx="25" fill="var(--accent-ink)"></rect>
-</svg>`;
-
-function noticeHtml(notice) {
+/** Tarjeta de aviso (F-1x): la única suscripción de la que toca preguntar esta semana, tintada con
+ *  la familia de su categoría (C6: una sola entidad, tinte permitido). «Lo sigo usando» /
+ *  «Voy a cancelarlo» son un secundario S cada uno — sin naranja (C1): nada se preselecciona. */
+function noticeHtml(notice, rules, byId) {
   if (!notice) return "";
+  const rule = rules.find((r) => r.id === notice.ruleId);
+  const fam = rule ? familyForCategory(rule.category_id, byId) : null;
+  const iconKey = rule ? iconForCategory(rule.category_id, byId) : "otr";
   return `
-  <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:var(--accent-tint);border-left:2px solid var(--accent);margin-bottom:26px;">
-    ${HUCHA_SVG}
-    <div style="display:flex;flex-direction:column;gap:10px;flex:1;min-width:0;">
-      <span style="font-size:14px;line-height:1.45;">${t("suscripciones.notice.question", { name: escHtml(notice.name), when: escHtml(fmtDiaLargo(notice.dueIso)), amount: escHtml(fmtMoney(notice.amountCents)) })}</span>
-      <div style="display:flex;align-items:center;gap:18px;">
-        <button type="button" id="notice-keep" style="border:0;background:transparent;color:var(--accent);font-size:14px;font-weight:600;padding:12px 0;margin:-12px 0;cursor:pointer;">${t("suscripciones.notice.keep")}</button>
-        <button type="button" id="notice-cancel" style="border:0;background:transparent;color:var(--danger);font-size:14px;font-weight:600;padding:12px 0;margin:-12px 0;cursor:pointer;">${t("suscripciones.notice.cancel")}</button>
+  <section class="susc-notice ${famClass(fam)}">
+    <div class="susc-notice-head">
+      ${tileHtml({ fam, icon: iconKey, onTint: true })}
+      <div class="ent-body">
+        <span class="ent-name">${t("suscripciones.notice.title", { name: escHtml(notice.name), when: escHtml(fmtDiaLargo(notice.dueIso)) })}</span>
+        <span class="ent-line2 susc-notice-sub"><span class="num susc-notice-amount">${escHtml(fmtMoney(notice.amountCents))}</span> ${escHtml(t("suscripciones.notice.question"))}</span>
       </div>
     </div>
-  </div>`;
-}
-
-function sharedPillHtml() {
-  return `<span style="display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;background:var(--surface-2);color:var(--ink-2);font-size:11px;font-weight:500;flex-shrink:0;">${t("recurrentes.subtitle.shared")}</span>`;
+    <div class="susc-notice-actions">
+      ${buttonHtml({ kind: "secondary", size: "s", id: "notice-keep", label: t("suscripciones.notice.keep") })}
+      ${buttonHtml({ kind: "secondary", size: "s", id: "notice-cancel", label: t("suscripciones.notice.cancel") })}
+    </div>
+  </section>`;
 }
 
 function activeRowHtml(rule, byId, todayIso) {
-  const { text, warn } = renewsInfo(rule, todayIso);
+  const fam = familyForCategory(rule.category_id, byId);
+  const iconKey = iconForCategory(rule.category_id, byId);
   const annual = annualCents(rule);
-  return `
-  <button type="button" data-active-rule="${rule.id}" class="tx-row"
-    style="width:100%;background:none;border-left:0;border-right:0;border-top:0;padding:10px 0;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-    ${badgeHtml(rule, byId)}
-    <div class="tx-body">
-      <div class="tx-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span>${escHtml(rule.name)}</span>
-        ${rule.is_shared ? sharedPillHtml() : ""}
-      </div>
-      <div class="tx-sub wrap" style="${warn ? "color:var(--warn);font-weight:600;" : ""}">${text}</div>
-    </div>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">
-      <div class="tx-amount">${moneyPartsHtml(rule.amount_cents)}</div>
-      <span class="num" style="font-size:11px;font-weight:500;color:var(--ink-2);">${escHtml(fmtMoney(annual))}${t("suscripciones.row.perYear")}</span>
-    </div>
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--ink-2)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M9.5 5 16 12l-6.5 7"/></svg>
-  </button>`;
+  return txRowHtml({
+    fam, icon: iconKey,
+    title: rule.name,
+    line2: renewsInfo(rule, todayIso),
+    amountHtml: moneyPartsHtml(rule.amount_cents),
+    sign: "none",
+    amountNote: fmtMoney(annual) + t("suscripciones.row.perYear"),
+    data: { activeRule: rule.id },
+  });
 }
 
-function candidateHtml(candidate, byId) {
-  const dates = [...candidate.lastDates].reverse().map((d) => fmtDiaCorto(d)).join(", ");
+function candidateCardHtml(candidate, byId) {
+  const fam = familyForCategory(candidate.categoryId, byId);
+  const iconKey = iconForCategory(candidate.categoryId, byId);
+  // Cada fecha va entera (espacio duro dentro de «2 sep»): la línea 2 parte entre fechas, no dentro.
+  const dates = [...candidate.lastDates].reverse().map((d) => fmtDiaCorto(d).replace(/ /g, "\u00a0")).join(", ");
   return `
-  <div style="display:flex;flex-direction:column;gap:14px;padding:16px;background:var(--surface);margin-bottom:14px;">
-    <div style="display:flex;align-items:center;gap:12px;">
-      ${badgeHtml(candidate, byId)}
-      <div class="tx-body">
-        <div class="tx-title">${escHtml(candidate.merchant)}</div>
-        <div class="tx-sub">${t("suscripciones.candidate.sameAmountOn", { dates: escHtml(dates) })}</div>
-      </div>
-      <div class="tx-amount">${moneyPartsHtml(candidate.amountCents)}</div>
+  <div class="susc-candidate">
+    <div class="susc-candidate-head ${famClass(fam)}">
+      ${tileHtml({ fam, icon: iconKey, onTint: true })}
+      <span class="ent-body">
+        <span class="ent-name">${escHtml(candidate.merchant)}</span>
+        <span class="ent-line2">${t("suscripciones.candidate.sameAmountOn", { dates: escHtml(dates) })}</span>
+      </span>
+      <span class="num susc-candidate-amount">${moneyPartsHtml(candidate.amountCents)}</span>
     </div>
-    <div style="display:flex;gap:10px;">
-      <button type="button" data-add="${escAttr(candidate.merchantKey)}" style="flex:1;height:46px;border-radius:999px;border:0;background:var(--accent);color:var(--accent-ink);font-size:14px;font-weight:600;cursor:pointer;">${t("suscripciones.candidate.add")}</button>
-      <button type="button" data-ignore="${escAttr(candidate.merchantKey)}" style="flex:1;height:46px;border-radius:999px;border:1px solid var(--hairline-strong);background:transparent;color:var(--ink);font-size:14px;font-weight:500;cursor:pointer;">${t("suscripciones.candidate.ignore")}</button>
+    <div class="susc-candidate-actions">
+      ${buttonHtml({ kind: "secondary", size: "s", label: t("suscripciones.candidate.add"), data: { add: candidate.merchantKey } })}
+      ${buttonHtml({ kind: "secondary", size: "s", label: t("suscripciones.candidate.ignore"), data: { ignore: candidate.merchantKey } })}
     </div>
   </div>`;
 }
 
+/** Fila de «Canceladas»: cancelada (con ahorro, en «+» --pos: un resultado positivo, C4) o
+ *  pausada (sin fecha, sin ahorro). Clicable igual que las activas — abre su edición en
+ *  Recurrentes (mismo `data-active-rule`, misma reactivación que ya ofrecía el toggle): así
+ *  txRowHtml sigue siendo un botón con algo real que hacer, no uno muerto. Apagada con
+ *  `.susc-row-inactive` (mismo criterio que la fila pausada de Recurrentes). */
 function cancelledRowHtml(rule, todayIso) {
-  const figure = rule.cancelled_at
-    ? `<span class="num" style="font-size:15px;font-weight:600;color:var(--pos);">${escHtml(fmtMoney(savedSinceCancelCents(rule, todayIso)))}</span>
-       <span style="font-size:11px;font-weight:500;color:var(--ink-2);">${t("suscripciones.cancelled.saved")}</span>`
-    : `<span style="font-size:13px;font-weight:500;color:var(--ink-2);">${t("suscripciones.cancelled.paused")}</span>`;
-  return `
-  <div class="tx-row">
-    <div class="tx-body">
-      <div class="tx-title" style="color:var(--ink-2);">${escHtml(rule.name)}</div>
-      ${rule.cancelled_at ? `<div class="tx-sub">${t("suscripciones.cancelled.on", { date: escHtml(fmtDiaLargo(rule.cancelled_at)) })}</div>` : ""}
-    </div>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">${figure}</div>
-  </div>`;
+  const cancelled = !!rule.cancelled_at;
+  return `<div class="susc-row-inactive">${txRowHtml({
+    fam: null,
+    icon: "otr",
+    title: rule.name,
+    line2: cancelled ? t("suscripciones.cancelled.on", { date: fmtDiaLargo(rule.cancelled_at) }) : "",
+    amountHtml: cancelled ? moneyPartsHtml(savedSinceCancelCents(rule, todayIso)) : "",
+    sign: cancelled ? "income" : "none",
+    amountNote: cancelled ? t("suscripciones.cancelled.saved") : t("suscripciones.cancelled.paused"),
+    data: { activeRule: rule.id },
+  })}</div>`;
 }
 
-/** Pantalla "Suscripciones" (N6, «el radar»): héroe anual → aviso → Activas → candidatas →
- *  Canceladas → pie. onBack vuelve a quien la haya abierto (Ajustes, Recurrentes o Inicio). */
+/** Pantalla "Suscripciones" (N6, «el radar»): Display → aviso → Activas → candidatas →
+ *  Canceladas → estado vacío. onBack vuelve a quien la haya abierto (Ajustes, Recurrentes o Inicio).
+ *  Omite (lógica nueva bloqueada, brief S9): nada — la tabla del brief no lista nada para esta
+ *  pantalla. */
 export async function renderSuscripciones(container, onBack) {
-  container.innerHTML = skeletonHtml([72, 120, 236, 200]);
+  container.innerHTML = skeletonHtml([140, 120, 236, 200]);
 
   const today = hoyISO();
   const reload = () => renderSuscripciones(container, onBack);
@@ -175,7 +198,7 @@ export async function renderSuscripciones(container, onBack) {
       listRules(), allCategoriesById(), getIgnoredMerchants(), getSnoozedRenewals(), subscriptionCharges(today),
     ]);
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("suscripciones.error.load", { error: escHtml(userMessage(e)) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso is-error">${t("suscripciones.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
 
@@ -183,48 +206,44 @@ export async function renderSuscripciones(container, onBack) {
   const inactives = inactiveSubscriptions(rules);
   const candidates = detectSubscriptions(charges, rules, { todayIso: today, ignored });
   const notice = renewalNotice(rules, today, snoozed);
-  // El bloque «Canceladas» (inactives) tiene su PROPIO if más abajo y se pinta igual dentro y
-  // fuera de isEmpty — pero solo si el árbol `else` llega a evaluarse: sin esta condición, con
-  // 0 activas y 0 candidatas pero ALGUNA cancelada, se entraba en la rama isEmpty (la tarjeta de
-  // "todavía no hay ninguna suscripción") y las canceladas desaparecían de la pantalla.
   const isEmpty = actives.length === 0 && candidates.length === 0 && inactives.length === 0;
 
   container.innerHTML = `
     ${subHeaderHtml({ id: "susc-back", title: t("suscripciones.title") })}
+    <div class="susc-body">
+      ${heroHtml(rules, actives, today)}
+      ${noticeHtml(notice, rules, byId)}
 
-    ${heroHtml(rules)}
-    ${noticeHtml(notice)}
+      ${isEmpty ? `
+      <div class="susc-section">
+        ${emptyStateHtml({ title: t("suscripciones.empty.title"), text: t("suscripciones.empty.body"), rows: 2 })}
+        ${buttonHtml({ kind: "tertiary", id: "susc-empty-recurrentes", label: t("recurrentes.title") })}
+      </div>
+      ` : `
+      ${actives.length ? `
+      <div class="susc-section">
+        <div class="susc-section-head">
+          <h2 class="ttl susc-section-title">${escHtml(t("suscripciones.section.active"))}</h2>
+          <span class="susc-section-hint">${escHtml(t("suscripciones.section.activeHint"))}</span>
+        </div>
+        ${containerHtml({ kind: "list", body: withDividers(actives.map((r) => activeRowHtml(r, byId, today))) })}
+      </div>
+      ` : ""}
 
-    ${isEmpty ? `
-    <div class="card" style="text-align:center;padding:24px 16px;display:flex;flex-direction:column;gap:8px;">
-      <span style="font-size:15px;font-weight:600;">${t("suscripciones.empty.title")}</span>
-      <span style="font-size:13px;color:var(--ink-2);line-height:1.45;">${t("suscripciones.empty.body")}</span>
-      <button type="button" id="susc-empty-recurrentes" class="link-btn" style="margin-top:6px;color:var(--accent);">${t("recurrentes.title")}</button>
-    </div>` : `
-    ${actives.length ? `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
-      <span class="section-title">${t("suscripciones.section.active")}</span>
-      <span style="font-size:12px;font-weight:500;color:var(--ink-2);">${t("suscripciones.section.activeHint")}</span>
-    </div>
-    <div style="display:flex;flex-direction:column;margin-bottom:26px;">
-      ${actives.map((r) => activeRowHtml(r, byId, today)).join("")}
-    </div>` : ""}
+      ${candidates.length ? `
+      <div class="susc-section">
+        ${sectionHeaderHtml({ title: t("suscripciones.section.candidates") })}
+        <div class="susc-candidates">${candidates.map((c) => candidateCardHtml(c, byId)).join("")}</div>
+      </div>
+      ` : ""}
 
-    ${candidates.length ? `
-    <div class="section-title" style="margin-bottom:12px;">${t("suscripciones.section.candidates")}</div>
-    <div style="margin-bottom:26px;">
-      ${candidates.map((c) => candidateHtml(c, byId)).join("")}
-    </div>` : ""}
-
-    ${inactives.length ? `
-    <div class="section-title" style="margin-bottom:6px;">${t("suscripciones.section.cancelled")}</div>
-    <div style="display:flex;flex-direction:column;margin-bottom:26px;">
-      ${inactives.map((r) => cancelledRowHtml(r, today)).join("")}
-    </div>` : ""}
-    `}
-
-    <div style="padding-bottom:12px;">
-      <span style="font-size:12px;font-weight:500;color:var(--ink-2);line-height:1.5;">${t("suscripciones.footer")}</span>
+      ${inactives.length ? `
+      <div class="susc-section">
+        ${sectionHeaderHtml({ title: t("suscripciones.section.cancelled") })}
+        ${containerHtml({ kind: "list", body: withDividers(inactives.map((r) => cancelledRowHtml(r, today))) })}
+      </div>
+      ` : ""}
+      `}
     </div>
   `;
 
@@ -248,7 +267,7 @@ export async function renderSuscripciones(container, onBack) {
       await reload();
     } catch (e) {
       noticeKeepBtn.disabled = false;
-      container.insertAdjacentHTML("afterbegin", `<div class="banner-aviso red">${escHtml(userMessage(e))}</div>`);
+      container.insertAdjacentHTML("afterbegin", `<div class="banner-aviso is-error">${escHtml(userMessage(e))}</div>`);
     }
   };
   const noticeCancelBtn = container.querySelector("#notice-cancel");
@@ -265,7 +284,7 @@ export async function renderSuscripciones(container, onBack) {
           showToast(t("toast.subscriptionCancelled"));
           await reload();
         } catch (e) {
-          container.insertAdjacentHTML("afterbegin", `<div class="banner-aviso red">${escHtml(userMessage(e))}</div>`);
+          container.insertAdjacentHTML("afterbegin", `<div class="banner-aviso is-error">${escHtml(userMessage(e))}</div>`);
         }
       },
     });
@@ -281,7 +300,7 @@ export async function renderSuscripciones(container, onBack) {
         await reload();
       } catch (e) {
         btn.disabled = false;
-        container.insertAdjacentHTML("afterbegin", `<div class="banner-aviso red">${escHtml(userMessage(e))}</div>`);
+        container.insertAdjacentHTML("afterbegin", `<div class="banner-aviso is-error">${escHtml(userMessage(e))}</div>`);
       }
     };
   });
@@ -294,7 +313,7 @@ export async function renderSuscripciones(container, onBack) {
         await reload();
       } catch (e) {
         btn.disabled = false;
-        container.insertAdjacentHTML("afterbegin", `<div class="banner-aviso red">${escHtml(userMessage(e))}</div>`);
+        container.insertAdjacentHTML("afterbegin", `<div class="banner-aviso is-error">${escHtml(userMessage(e))}</div>`);
       }
     };
   });

@@ -21,7 +21,10 @@ test("icons: los paths críticos son los de SISTEMA.md §3, verbatim", () => {
 test("icons: el repertorio cubre todo lo que emite la app", () => {
   for (const name of ["back", "close", "chevronRight", "chevronDown", "plus", "minus", "check",
     "warn", "tag", "calendar", "download", "trash", "pencil", "repeat", "filter", "lock",
-    "trendUp", "trendDown", "camera", "mic", "drag", "file", "transfer"]) {
+    "trendUp", "trendDown", "camera", "mic", "drag", "file", "transfer",
+    // Filas de Ajustes (S4, B-Ajustes)
+    "people", "split", "periodNext", "theme", "bolt", "currency", "format", "globe", "screen",
+    "grid", "table", "bank", "chart", "card", "piggy", "debt", "undo", "note"]) {
     assert.ok(ICON_PATHS[name], `falta el icono ${name}`);
   }
 });
@@ -50,4 +53,84 @@ test("icon(): tamaño, grosor y color se pueden forzar donde el artboard los fue
 
 test("icon(): un nombre inexistente devuelve cadena vacía y no lanza", () => {
   assert.equal(icon("noExiste"), "");
+});
+
+// ---- Iconos de categoría (PR-04): 12 de familia + 6 del selector de B-Categorias-Nueva ----------
+import { CAT_ICONS, catIcon } from "../../app/app/js/icons.js";
+
+test("CAT_ICONS: los 12 de familia, los 6 del selector y los 6 de Lucide, en ese orden", () => {
+  assert.deepEqual(Object.keys(CAT_ICONS), [
+    "casa", "ali", "res", "tra", "coc", "sal", "sus", "oci", "rop", "reg", "imp", "otr",
+    "huella", "hoja", "libro", "nota", "avion", "estrella",
+    "billete", "bebe", "portatil", "mando", "paquete", "birrete",
+  ]);
+});
+
+test("CAT_ICONS: los 6 de Lucide (ISC) se copian tal cual de lucide-static 1.48.0", () => {
+  assert.equal(CAT_ICONS.billete, '<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>');
+  assert.equal(CAT_ICONS.birrete, '<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>');
+  for (const k of ["billete", "bebe", "portatil", "mando", "paquete", "birrete"]) assert.match(CAT_ICONS[k], /^<(path|rect|line|circle|polyline)/, k);
+});
+
+test("catIcon(): una clave heredada de Object.prototype no se toma por icono", () => {
+  for (const k of ["toString", "constructor", "__proto__", "hasOwnProperty"]) assert.equal(catIcon(k), catIcon("otr"), k);
+});
+
+test("CAT_ICONS: los d se copian tal cual de B-Gasto y B-Categorias-Nueva", () => {
+  assert.equal(CAT_ICONS.casa, '<path d="M4 11l8-6.5 8 6.5v8.5a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/>');
+  assert.equal(CAT_ICONS.sal, '<path d="M3 12h4l2-4 3 8 2-4h7"/>');
+  assert.equal(CAT_ICONS.otr, '<circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/>');
+  assert.equal(CAT_ICONS.hoja, '<path d="M5 19C5 10 10 5 19 5c0 9-5 14-14 14zM5 19l7-7"/>');
+  assert.equal(CAT_ICONS.estrella, '<path d="M12 4l2.5 5.2 5.5.7-4 3.9 1 5.6-5-2.7-5 2.7 1-5.6-4-3.9 5.5-.7z"/>');
+});
+
+test("catIcon(): SVG de trazo con currentColor; income y tag también se resuelven", () => {
+  const svg = catIcon("casa");
+  assert.match(svg, /^<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"/);
+  assert.match(svg, /aria-hidden="true"/);
+  assert.match(catIcon("oci", { size: 14, cls: "x" }), /width="14" height="14".*class="x"/s);
+  assert.match(catIcon("income"), /M12 19V5M6 11l6-6 6 6/);
+  assert.match(catIcon("tag"), /M3.5 12.5V4.5h8l9 9-8 8z/);
+});
+
+test("etiqueta: icon(\"tag\") y catIcon(\"tag\") pintan el mismo glifo, el de los mockups B", () => {
+  const inner = (svg) => svg.slice(svg.indexOf(">") + 1, svg.lastIndexOf("</svg>"));
+  assert.equal(inner(icon("tag")), inner(catIcon("tag")));
+  assert.equal(ICON_PATHS.tag, '<path d="M3.5 12.5V4.5h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.3"/>');
+});
+
+test("catIcon(): con label deja de ser decorativo (role img + aria-label escapado)", () => {
+  const svg = catIcon("libro", { label: 'Li"bro' });
+  assert.match(svg, /role="img" aria-label="Li&quot;bro"/);
+  assert.doesNotMatch(svg, /aria-hidden/);
+});
+
+test("catIcon(): una clave desconocida devuelve el icono de Otros, no rompe la fila", () => {
+  assert.equal(catIcon("noExiste"), catIcon("otr"));
+});
+
+test("icons: los cuatro de cuenta son los de B-Patrimonio y B-Onb-Cuentas, verbatim", () => {
+  assert.equal(ICON_PATHS.card, '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/>');
+  assert.equal(ICON_PATHS.bank, '<path d="M4 20h16M6 20V11M10 20V11M14 20V11M18 20V11M3 8l9-5 9 5z"/>');
+  assert.equal(ICON_PATHS.piggy, '<path d="M5 11a7 6 0 0 1 13-2h2v4l-2 1v3h-3v-2H9v2H6v-3a6 6 0 0 1-1-3z"/><path d="M10 7.5h3"/>');
+  assert.equal(ICON_PATHS.debt, '<path d="M6 4h12v16l-3-2-3 2-3-2-3 2z"/><path d="M9 9h6M9 12.5h4"/>');
+});
+
+test("icons: los cuatro de B-Onb-Bienvenida, verbatim", () => {
+  assert.equal(ICON_PATHS.user, '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>');
+  assert.equal(ICON_PATHS.offline, '<path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0"/><path d="M3 3l18 18"/>');
+  assert.equal(ICON_PATHS.phone, '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>');
+  assert.equal(ICON_PATHS.upload, '<path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M5 19.5h14"/>');
+});
+
+test("icons: los tres de B-Movimientos (‹ de periodo, lupa y filtrar), verbatim", () => {
+  // Espejo exacto de chevronRight: el ‹ de periodo NO puede ser `back` (R-BACK lo trataría como
+  // un «Atrás» y exigiría ese aria-label).
+  assert.equal(ICON_PATHS.chevronLeft, '<path d="M14.5 5 8 12l6.5 7"/>');
+  assert.equal(ICON_PATHS.search, '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>');
+  assert.equal(ICON_PATHS.filterLines, '<path d="M4 6.5h16M7 12h10M10 17.5h4"/>');
+});
+
+test("ICON_PATHS.archive: la caja de archivo de B-Categorias y B-Etiquetas", () => {
+  assert.equal(ICON_PATHS.archive, '<path d="M4 5h16v4H4zM5.5 9v10h13V9M10 13h4"/>');
 });

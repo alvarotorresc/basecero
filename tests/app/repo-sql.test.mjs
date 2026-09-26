@@ -470,3 +470,42 @@ test("SQL.listAllByDay trae tag_id", () => {
   const row = d.prepare(SQL.listAllByDay).all("p1")[0];
   assert.equal(row.tag_id, "tag-japon");
 });
+
+// ---- S10: tagSpendByCategory, el desglose de la barra de Etiquetas ----------------------------
+
+test("SQL.tagSpendByCategory: por categoría, y la suma por etiqueta es la de tagTotals", () => {
+  const d = db();
+  addSecondPeriod(d);
+  d.prepare(SQL.insertTag).run("tag-japon", "Viaje Japón", null, T, T);
+  d.prepare(SQL.insertTag).run("tag-reforma", "Reforma baño", 300000, T, T);
+  tx(d, { period: "p1", cents: 10000, tag: "tag-japon", category: "cat-alimentacion-supermercado" });
+  tx(d, { period: "p2", cents: 6000, tag: "tag-japon", category: "cat-alimentacion-supermercado" });
+  tx(d, { cents: 8000, shared: 1, override: 50, tag: "tag-japon", category: "cat-transporte" });
+  tx(d, { type: "refund", cents: 1000, tag: "tag-japon", category: "cat-transporte" });
+  tx(d, { cents: 2500, tag: "tag-japon", category: "" });
+  tx(d, { cents: 12000, tag: "tag-reforma", category: "cat-casa" });
+  const borrado = tx(d, { cents: 99999, tag: "tag-reforma", category: "cat-casa" });
+  d.prepare("UPDATE transactions SET deleted=1 WHERE id=?").run(borrado);
+  tx(d, { cents: 500, tag: "", category: "cat-casa" });
+
+  const rows = d.prepare(SQL.tagSpendByCategory).all();
+  const of = (tag, cat) => rows.find((r) => r.tag_id === tag && r.category_id === cat)?.spent_cents;
+  assert.equal(of("tag-japon", "cat-alimentacion-supermercado"), 16000, "cruza periodos");
+  assert.equal(of("tag-japon", "cat-transporte"), 3000, "mi parte (4000) menos la devolución (1000)");
+  assert.equal(of("tag-japon", ""), 2500, "sin categoría es su propia fila");
+  assert.equal(of("tag-reforma", "cat-casa"), 12000, "los borrados no cuentan");
+  assert.ok(!rows.some((r) => r.tag_id === ""), "los movimientos sin etiqueta no salen");
+
+  for (const tot of d.prepare(SQL.tagTotals).all()) {
+    const suma = rows.filter((r) => r.tag_id === tot.id).reduce((a, r) => a + r.spent_cents, 0);
+    assert.equal(suma, tot.spent_cents, tot.id);
+  }
+});
+
+test("SQL.tagSpendByCategory: una etiqueta borrada no sale", () => {
+  const d = db();
+  d.prepare(SQL.insertTag).run("tag-x", "Boda", null, T, T);
+  tx(d, { cents: 1000, tag: "tag-x" });
+  d.prepare("UPDATE tags SET deleted=1 WHERE id='tag-x'").run();
+  assert.deepEqual(d.prepare(SQL.tagSpendByCategory).all(), []);
+});

@@ -31,3 +31,14 @@ export function userMessage(e) {
   console.error(e);
   return t("errors.generic");
 }
+
+/** Escritura y recarga, en dos pasos que fallan por separado (mismo criterio que
+ *  gasto-por-categoria.js#saveLimit). Si la escritura falla: `{written:false, error}` y la pantalla
+ *  enseña «no se pudo guardar». Si lo que falla es la recarga de después, la escritura YA está
+ *  hecha: `{written:true, error}` — decir «no se pudo guardar» ahí invitaría a repetir algo que sí
+ *  se guardó (o a borrar algo que ya no existe). Nunca lanza. */
+export async function writeThenRefresh(write, refresh) {
+  try { await write(); } catch (error) { return { written: false, error }; }
+  try { await refresh(); } catch (error) { return { written: true, error }; }
+  return { written: true, error: null };
+}

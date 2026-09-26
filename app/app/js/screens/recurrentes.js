@@ -1,19 +1,22 @@
 import {
   listRules, listExpenseLeafCategories, listIncomeCategories, listAccounts, allCategoriesById,
   createRule, updateRule, softDeleteRule, cancelSubscription, getMetaAll,
-  getOpenPeriod, previsionOfPeriod,
+  getOpenPeriod, previsionOfPeriod, getAccountStyle, listGoals,
 } from "../repo.js";
-import { colorForCategory, iconForCategory } from "../category-colors.js";
+import { familyForCategory, iconForCategory } from "../category-colors.js";
+import { familyForAccount } from "../account-colors.js";
 import { fmtMoney, moneyPartsHtml, currencySymbol, parseCentsRaw, centsToRaw, hoyISO } from "../format.js";
-import { annualCents, monthlyCommitmentCents, ruleStateKey } from "../subscriptions.js";
+import { annualCents, monthlyCommitmentCents, ruleStateKey, paidThisPeriodCents } from "../subscriptions.js";
 import { t, monthLong } from "../i18n/index.js";
 import { pushBack, goBack } from "../back.js";
 import { userMessage } from "../errors.js";
 import { showConfirm } from "../modal.js";
 import { showToast } from "../toast.js";
 import { renderSuscripciones } from "./suscripciones.js";
-import { subHeaderHtml, metaHtml } from "../ui.js";
-import { icon } from "../icons.js";
+import { subHeaderHtml, buttonHtml } from "../ui.js";
+import { segmentedHtml, wireSegmented, switchHtml, fieldHtml } from "../controls.js";
+import { txRowHtml, pickTileHtml, filterChipHtml, settingRowHtml, sectionHeaderHtml } from "../entity.js";
+import { displayHtml, dispInkHtml, meterHtml, emptyStateHtml, containerHtml } from "../instrument.js";
 
 import { escHtml, escAttr } from "../esc.js";
 
@@ -30,28 +33,139 @@ const FREQ_CHIPS = [
 ];
 // Guarda la CLAVE del diccionario, no el texto resuelto: FREQ_CHIPS/TIPOS_RULE son const de
 // módulo, evaluadas antes de initI18n(meta) — resolver aquí con t() congelaría el idioma en el
-// que arrancó la app. ruleSubtitle() resuelve con t() en cada render, ya con el idioma real.
+// que arrancó la app. ruleSubtitleParts() resuelve con t() en cada render, ya con el idioma real.
 const FREQ_KEY = Object.fromEntries(FREQ_CHIPS.map((f) => [f.id, f.labelKey]));
 const needsCategory = (tipo) => tipo === "expense" || tipo === "income";
 const needsMonth = (freq) => freq === "quarterly" || freq === "yearly";
 
+/** Un <div class="ent-divider"> entre cada elemento (nunca antes del primero): mismo criterio que
+ *  el <hr class="divider"> de la lista de «Neto», reescrito con la clase de componente (§9). */
+function withDividers(items) {
+  return items.map((html, i) => (i > 0 ? `<div class="ent-divider"></div>${html}` : html)).join("");
+}
+
+// Sub de cada fila: frecuencia + día siempre visibles (la lista queda plana, sin agrupar por
+// frecuencia como el artboard), + "próximo: {mes}" para trimestral/anual (due_month, dato real de
+// la regla), cuentas origen→destino en transferencias, y compartido/suscripción/pausada al final
+// (F-11: se pliegan en esta única línea en vez de llevar cada uno su propia insignia de color).
+function ruleSubtitleParts(r, accountsAll) {
+  const freqKey = FREQ_KEY[r.frequency];
+  const freqLabel = freqKey ? t(freqKey).toLowerCase() : r.frequency;
+  const parts = [freqLabel, t("recurrentes.subtitle.day", { n: r.due_day })];
+  if (needsMonth(r.frequency) && r.due_month) {
+    parts.push(t("recurrentes.subtitle.next", { month: monthLong(r.due_month - 1) }));
+  }
+  if (r.type === "transfer") {
+    const from = accountsAll.find((a) => a.id === r.account_id)?.name;
+    const to = accountsAll.find((a) => a.id === r.counter_account_id)?.name;
+    if (from && to) parts.push(t("recurrentes.subtitle.transferRoute", { from, to }));
+  }
+  if (r.is_shared) parts.push(t("recurrentes.subtitle.shared"));
+  if (r.is_subscription) parts.push(t("recurrentes.badge.subscription"));
+  if (!r.is_active) parts.push(t("recurrentes.subtitle.paused"));
+  return parts.join(", ");
+}
+
+/** Fila de regla (§9, B-Recurrentes): fila de movimiento (icono + nombre + importe) HERMANA de un
+ *  interruptor — nunca anidada (D7: dos <button> uno dentro del otro es HTML inválido y duplicaría
+ *  el toque). El botón que abre la edición cubre icono+cuerpo+importe; pausada se atenúa SOLO ahí
+ *  (`.rec-row-paused .ent-row`), nunca en el interruptor: es el único control que la reactiva. */
+function ruleRowHtml(r, item, byId, accountsAll) {
+  const isTransfer = r.type === "transfer";
+  const fam = isTransfer ? null : familyForCategory(r.category_id, byId);
+  const iconKey = isTransfer ? "transfer" : iconForCategory(r.category_id, byId);
+  const stateKey = ruleStateKey(r, item);
+  const row = txRowHtml({
+    fam, icon: iconKey,
+    title: r.name,
+    line2: ruleSubtitleParts(r, accountsAll),
+    amountHtml: moneyPartsHtml(r.amount_cents),
+    sign: r.type === "income" ? "income" : "none",
+    amountNote: stateKey ? t("recurrentes.state." + stateKey) : "",
+    data: { rule: r.id },
+  });
+  const toggle = switchHtml({
+    id: `rec-toggle-${r.id}`,
+    checked: !!r.is_active,
+    label: t("recurrentes.toggle.aria", { name: r.name }),
+  });
+  return `<div class="rec-row${r.is_active ? "" : " rec-row-paused"}">${row}${toggle}</div>`;
+}
+
+function sectionHtml(titleKey, list, byId, accountsAll) {
+  if (!list.length) return "";
+  const rows = list.map(({ r, item }) => ruleRowHtml(r, item, byId, accountsAll));
+  return `<div class="rec-section">`
+    + `${sectionHeaderHtml({ title: t(titleKey) })}`
+    + `${containerHtml({ kind: "list", body: withDividers(rows) })}`
+    + `</div>`;
+}
+
+/** Héroe "Queda por pagar este periodo" (spec §5.1 bloque 2): LED en espera (ámbar, SOLO dentro
+ *  del Display, §9 LED) mientras quede algo pendiente, "ok" cuando todo esté liquidado. El pie
+ *  dice cuánto quedará después (repo.previsionOfPeriod#disponibleCents ya lo da: el saldo menos
+ *  TODO lo comprometido, que es justo "tras pagarlo" cuando eso es lo único que falta). El
+ *  medidor compara lo pendiente contra el total real de este periodo (pagado + pendiente, de los
+ *  `items` que YA se cargaron) — no el promedio anual de monthlyCommitmentCents, que cuenta reglas
+ *  que ni siquiera aplican este mes (ver subscriptions.js#paidThisPeriodCents). Sin periodo
+ *  abierto no hay nada que prever (§5.1): el Display entero se oculta, como antes. */
+function heroHtml(prevision, rules) {
+  if (!prevision) return "";
+  const pendingCount = prevision.items.filter((it) => !it.paid && it.rule.type !== "income").length;
+  const paid = paidThisPeriodCents(prevision.items);
+  const total = paid + prevision.comprometidoCents;
+  const led = pendingCount > 0
+    ? { state: "wait", text: t("recurrentes.hero.pendingCount", { n: pendingCount }) }
+    : { state: "ok", text: t("recurrentes.hero.allSettled") };
+  const meterSlot = total > 0
+    ? meterHtml({
+      // value es lo PENDIENTE (el ámbar del medidor, C2: lo que llama la atención) — el
+      // aria-label tiene que hablar del mismo número, no del pagado (revisión ronda 1).
+      value: prevision.comprometidoCents, max: total, onDisplay: true,
+      label: t("recurrentes.hero.meterAria", { pending: fmtMoney(prevision.comprometidoCents), total: fmtMoney(total) }),
+    })
+    : "";
+  const footRow = `<div class="rec-hero-row">
+    <span>${escHtml(t("recurrentes.hero.paidLabel"))} ${dispInkHtml(fmtMoney(paid))}</span>
+    <span>${dispInkHtml(fmtMoney(monthlyCommitmentCents(rules)))} ${escHtml(t("recurrentes.hero.perMonth"))}</span>
+  </div>`;
+  return displayHtml({
+    label: t("recurrentes.hero.pending"),
+    value: fmtMoney(prevision.comprometidoCents),
+    size: "l",
+    led,
+    footHtml: t("recurrentes.hero.remaining", { amount: dispInkHtml(fmtMoney(prevision.disponibleCents)) }),
+    slot: meterSlot ? `<div class="rec-hero-slot">${meterSlot}${footRow}</div>` : footRow,
+  });
+}
+
+/** Campo de importe (§9 «Campo hundido», con sufijo de moneda: fieldHtml no lo cubre —
+ *  inputmode/sufijo— así que se compone aquí con sus mismas clases, sin tocar controls.js. */
+function amountFieldHtml(f) {
+  return `<label class="ctl-field-wrap" for="rec-raw">
+    <span class="ctl-field-label">${escHtml(t("common.amount"))}</span>
+    <span class="ctl-field rec-amount-field">
+      <input class="ctl-field-input num" id="rec-raw" type="text" inputmode="decimal" value="${escAttr(f.raw)}">
+      <span class="rec-amount-suffix">${escHtml(currencySymbol())}</span>
+    </span>
+  </label>`;
+}
+
 /** Pantalla "Recurrentes": lista de reglas (Task 11 la consume para generar movimientos de
  *  previsión) + formulario de alta/edición con borrado en dos toques (mismo patrón que
- *  movimientos.js openDetail/backToList). onBack vuelve a quien la haya abierto (Ajustes). */
+ *  movimientos.js openDetail/backToList). onBack vuelve a quien la haya abierto (Ajustes).
+ *  Omite (lógica nueva bloqueada, brief S9): nada — la tabla del brief no lista nada para esta
+ *  pantalla. */
 export async function renderRecurrentes(container, onBack, opts = {}) {
-  let rules, expenseCats, incomeCats, accountsAll, byId, meta, period, prevision;
+  let rules, expenseCats, incomeCats, accountsAll, byId, meta, period, prevision, accountStyle, goals;
   try {
-    [rules, expenseCats, incomeCats, accountsAll, byId, meta, period] = await Promise.all([
+    [rules, expenseCats, incomeCats, accountsAll, byId, meta, period, accountStyle, goals] = await Promise.all([
       listRules(), listExpenseLeafCategories(), listIncomeCategories(), listAccounts(), allCategoriesById(),
-      getMetaAll(), getOpenPeriod(),
+      getMetaAll(), getOpenPeriod(), getAccountStyle(), listGoals(),
     ]);
-    // previsionOfPeriod necesita `period` ya resuelto (start_date/end_date/my_share_pct): no puede
-    // entrar en el Promise.all de arriba, que es justo lo que lo resuelve. Sin periodo abierto no
-    // hay nada que prever: el héroe y las etiquetas de estado de la fila se ocultan (mismo
-    // criterio que el resto de la app, spec §5.1 bloque 2).
     prevision = period ? await previsionOfPeriod(period) : null;
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("recurrentes.error.load", { error: escHtml(userMessage(e)) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso is-error">${t("recurrentes.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
   const accounts = accountsAll.filter((a) => a.type !== "liability");
@@ -60,97 +174,12 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
   const state = { view: "list", rules, editId: null, form: null };
   let errorMsg = "";
 
-  // Recarga reglas + previsión juntas: cualquier alta/edición/borrado/toggle puede cambiar tanto
-  // la lista como lo que el héroe da por pendiente este periodo (un cargo que pasa a activo, por
-  // ejemplo). `period` no cambia en la vida de esta pantalla (no hay forma de cerrar el periodo
-  // desde aquí), así que solo se vuelve a pedir la previsión, no el periodo.
   async function reloadRules() {
     state.rules = await listRules();
     if (period) prevision = await previsionOfPeriod(period);
   }
 
   const categoriesFor = (tipo) => (tipo === "income" ? incomeCats : tipo === "expense" ? expenseCats : []);
-
-  // Insignia de la fila: emoji de su categoría (mismo patrón que el resto de la app) o, para una
-  // transferencia, el SVG del repertorio (§1.8: sustituye el glifo de texto «⇄»). El fondo de una
-  // transferencia es --surface-2 liso, NO el color-mix(--cat) de .dotico: no hay categoría que
-  // teñir, y es el gris plano que pinta Recurrentes.dc.html:151 (misma pareja fondo/trazo que el
-  // icono de transferencia de movimientos.js).
-  function ruleIconHtml(r) {
-    if (r.type === "transfer") {
-      return `<div class="dotico" style="background:var(--surface-2);">${icon("transfer", { stroke: "var(--ink-2)" })}</div>`;
-    }
-    const color = colorForCategory(r.category_id, byId);
-    return `<div class="dotico" style="--cat:${color};">${iconForCategory(r.category_id, byId)}</div>`;
-  }
-
-  // Sub de cada fila: frecuencia + día SIEMPRE visibles (la lista queda plana, sin agrupar por
-  // frecuencia como el artboard — ver informe de la tarea, brecha documentada), + "próximo: {mes}"
-  // para trimestral/anual (due_month, dato real de la regla) y cuentas origen→destino en
-  // transferencias (accountsAll ya cargado). "compartido"/"suscripción" salen de aquí: pasan a ser
-  // .state-pill en la línea del nombre (ruleRowHtml), no texto del subtítulo.
-  function ruleSubtitleParts(r) {
-    const freqKey = FREQ_KEY[r.frequency];
-    const freqLabel = freqKey ? t(freqKey).toLowerCase() : r.frequency;
-    // día SIEMPRE visible (antes se omitía en trimestral/anual a favor de "próximo: {mes}",
-    // como el artboard — pero el artboard no lleva "día" porque agrupa por frecuencia; sin esa
-    // agrupación aquí, omitirlo perdía info real que la regla sí tiene, contra el criterio de la
-    // tarea 7: "no se quita info real sin que el brief lo pida").
-    const parts = [freqLabel, t("recurrentes.subtitle.day", { n: r.due_day })];
-    if (needsMonth(r.frequency) && r.due_month) {
-      parts.push(t("recurrentes.subtitle.next", { month: monthLong(r.due_month - 1) }));
-    }
-    if (r.type === "transfer") {
-      const from = accountsAll.find((a) => a.id === r.account_id)?.name;
-      const to = accountsAll.find((a) => a.id === r.counter_account_id)?.name;
-      if (from && to) parts.push(t("recurrentes.subtitle.transferRoute", { from, to }));
-    }
-    if (!r.is_active) parts.push(t("recurrentes.subtitle.paused"));
-    return parts;
-  }
-
-  // Fila plana (sin card propia) dentro de la lista compartida — mismo patrón que
-  // rootRowHtml/cuentaRowHtml/rowHtml de gasto-por-categoria.js/patrimonio.js/liquidar.js (tarea 7):
-  // una única .card con <hr class="divider"> entre filas. El toggle (D7) es un <button role="switch">
-  // HERMANO del botón que abre la edición, no un hijo suyo: dos <button> anidados es HTML inválido
-  // y además duplicaría el toque (el de fuera abriría el formulario Y activaría el toggle). El
-  // botón de abrir cubre icono+cuerpo+importe; el wrapper que los envuelve a los dos NO es un
-  // <button> (evita el anidado), así que la opacidad de "pausada" va en el botón de abrir, no en
-  // el wrapper — si no, el propio toggle (el único control que reactiva la regla) se atenuaría.
-  function ruleRowHtml(r, withDivider, item) {
-    const stateKey = ruleStateKey(r, item);
-    const isIncome = r.type === "income";
-    const amountCls = isIncome ? " rec-amount-pos" : r.type === "transfer" ? " rec-amount-muted" : "";
-    const stateColor = stateKey === "pending" ? "var(--warn)" : "var(--ink-3)";
-    return `
-    ${withDivider ? '<hr class="divider">' : ""}
-    <div style="display:flex;align-items:center;gap:12px;min-height:64px;">
-      <button type="button" data-rule="${r.id}"
-        style="flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:12px 0;background:none;border:0;
-        text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;${!r.is_active ? "opacity:0.55;" : ""}">
-        ${ruleIconHtml(r)}
-        <div class="tx-body">
-          <div class="tx-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <span>${escHtml(r.name)}</span>
-            ${r.is_shared ? `<span class="state-pill">${t("recurrentes.badge.shared")}</span>` : ""}
-            ${r.is_subscription ? `<span class="state-pill">${t("recurrentes.badge.subscription")}</span>` : ""}
-          </div>
-          ${metaHtml(ruleSubtitleParts(r))}
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">
-          <div class="num${amountCls}" style="font-size:16px;font-weight:500;">${isIncome ? "+" : ""}${moneyPartsHtml(r.amount_cents)}</div>
-          ${stateKey ? `<span style="font-size:11px;font-weight:500;color:${stateColor};">${t(`recurrentes.state.${stateKey}`)}</span>` : ""}
-        </div>
-      </button>
-      <button type="button" role="switch" aria-checked="${r.is_active ? "true" : "false"}"
-        aria-label="${escAttr(t("recurrentes.toggle.aria", { name: r.name }))}"
-        class="toggle rec-toggle" data-toggle="${r.id}" style="border:0;background:none;padding:0;flex-shrink:0;">
-        <span class="toggle-track" style="${r.is_active ? "background:var(--accent);" : ""}">
-          <span class="toggle-knob" style="${r.is_active ? "background:var(--accent-ink);transform:translateX(20px);" : ""}"></span>
-        </span>
-      </button>
-    </div>`;
-  }
 
   function openNew() {
     state.editId = null;
@@ -206,75 +235,74 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
     return "";
   }
 
+  // Familia de cuenta (C8, PR-10): cada cuenta elige una de las 12 familias como una categoría;
+  // el chip la lleva igual que el resto de la app (liquidar.js#familyForAccount).
+  const accountFam = (a) => familyForAccount(a, accountStyle, goals);
+
   function renderAccountsSection(f) {
     if (f.type === "transfer") {
       return `
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">${t("common.from")}</div>
-        <div class="chips">
-          ${accounts.map((a) => `<button type="button" class="chip${f.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
+      <div class="rec-field-group">
+        <div class="rec-field-label">${escHtml(t("common.from"))}</div>
+        <div class="rec-chip-row">
+          ${accounts.map((a) => filterChipHtml({ label: a.name, fam: accountFam(a), selected: f.accountId === a.id, data: { acc: a.id } })).join("")}
         </div>
       </div>
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">${t("common.to")}</div>
-        <div class="chips">
-          ${accountsAll.filter((a) => a.id !== f.accountId).map((a) => `<button type="button" class="chip${f.counterAccountId === a.id ? " active" : ""}" data-counter-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
+      <div class="rec-field-group">
+        <div class="rec-field-label">${escHtml(t("common.to"))}</div>
+        <div class="rec-chip-row">
+          ${accountsAll.filter((a) => a.id !== f.accountId)
+            .map((a) => filterChipHtml({ label: a.name, fam: accountFam(a), selected: f.counterAccountId === a.id, data: { counterAcc: a.id } })).join("")}
         </div>
       </div>`;
     }
     return `
-    <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-      <div class="section-title">${t("common.account")}</div>
-      <div class="chips">
-        ${accounts.map((a) => `<button type="button" class="chip${f.accountId === a.id ? " active" : ""}" data-acc="${a.id}">${escHtml(a.name)}</button>`).join("")}
+    <div class="rec-field-group">
+      <div class="rec-field-label">${escHtml(t("common.account"))}</div>
+      <div class="rec-chip-row">
+        ${accounts.map((a) => filterChipHtml({ label: a.name, fam: accountFam(a), selected: f.accountId === a.id, data: { acc: a.id } })).join("")}
       </div>
     </div>`;
   }
 
-  // Héroe "Pendiente este periodo" (spec §5.1 bloque 2): el mismo número que Inicio ya enseña en
-  // "Queda por pagar" (repo.previsionOfPeriod#comprometidoCents), con el compromiso mensual del
-  // conjunto de reglas como segunda línea (subscriptions.js#monthlyCommitmentCents). Sin periodo
-  // abierto no hay nada que prever — ni héroe ni etiquetas de estado en las filas.
-  function heroHtml() {
-    if (!period) return "";
-    return `
-    <div style="display:flex;flex-direction:column;gap:7px;padding-bottom:22px;">
-      <span style="font-size:13px;font-weight:500;color:var(--ink-3);">${t("recurrentes.hero.pending")}</span>
-      <div class="amount-hero lg num">${moneyPartsHtml(prevision.comprometidoCents)}</div>
-      <div style="display:flex;align-items:center;gap:10px;padding-top:4px;">
-        <span class="num" style="font-size:14px;font-weight:600;">${escHtml(fmtMoney(monthlyCommitmentCents(state.rules)))}</span>
-        <span style="font-size:14px;font-weight:500;color:var(--ink-2);">${t("recurrentes.hero.perMonth")}</span>
-      </div>
-    </div>`;
-  }
-
-  // Item de previsionOfPeriod para esta regla (myCents/paid), o undefined si no aplica este mes.
   const itemFor = (r) => prevision?.items.find((it) => it.rule.id === r.id);
 
   function renderList() {
+    const pending = [], paid = [], other = [];
+    for (const r of state.rules) {
+      const item = itemFor(r);
+      const key = ruleStateKey(r, item);
+      if (key === "pending") pending.push({ r, item });
+      else if (key === "paid") paid.push({ r, item });
+      else other.push({ r, item });
+    }
+    // Sin nada pendiente ni pagado (sin periodo abierto, o ninguna regla aplica este mes): una
+    // sola lista con todas, en vez de dos secciones vacías y un cajón de "otras" con todo dentro.
+    const sections = (pending.length || paid.length)
+      ? `${sectionHtml("recurrentes.section.pending", pending, byId, accountsAll)}`
+        + `${sectionHtml("recurrentes.section.paidPeriod", paid, byId, accountsAll)}`
+        + `${sectionHtml("recurrentes.section.other", other, byId, accountsAll)}`
+      : sectionHtml("recurrentes.section.all", state.rules.map((r) => ({ r, item: itemFor(r) })), byId, accountsAll);
+
+    // Sin fam: no es una entidad (C11), es un enlace de navegación — baldosa neutra en --well,
+    // aunque su icono sea el mismo trazo que la familia "sus" (revisión ronda 1).
+    const radarLink = `<div class="rec-radar-link">${settingRowHtml({
+      icon: "sus", label: t("recurrentes.radarLink"), id: "rec-radar-link",
+    })}</div>`;
+
     container.innerHTML = `
       ${subHeaderHtml({ id: "rec-back", title: t("recurrentes.title"), action: { id: "rec-new", icon: "plus", label: t("recurrentes.newRule") } })}
+      <div class="rec-body">
+        ${errorMsg ? `<div class="banner-aviso is-error">${escHtml(errorMsg)}</div>` : ""}
 
-      ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
+        ${heroHtml(prevision, state.rules)}
 
-      ${heroHtml()}
-
-      <div class="section-title" style="margin-bottom:6px;">${t("recurrentes.section.all")}</div>
-
-      <div class="card" style="display:flex; flex-direction:column;">
         ${state.rules.length === 0
-          ? `<p style="text-align:center;color:var(--text-3);padding:16px 0;">${t("recurrentes.empty")}</p>`
-          : state.rules.map((r, i) => ruleRowHtml(r, i > 0, itemFor(r))).join("")}
-        <hr class="divider">
-        <button type="button" id="rec-radar-link"
-          style="width:100%;display:flex;align-items:center;gap:12px;padding:16px 0;min-height:56px;
-          background:transparent;border:0;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-          <span style="flex:1;font-size:14px;font-weight:600;color:var(--accent);">${t("recurrentes.radarLink")}</span>
-          ${icon("chevronRight", { size: 18, stroke: "var(--accent)" })}
-        </button>
-      </div>
+          ? emptyStateHtml({ title: t("recurrentes.empty"), rows: 2 })
+          : `${sections}<p class="rec-foot-note">${escHtml(t("recurrentes.footNote"))}</p>`}
 
-      <p style="font-size:12px;font-weight:500;color:var(--ink-3);line-height:1.5;padding-top:20px;">${t("recurrentes.footNote")}</p>
+        ${radarLink}
+      </div>
     `;
     wireList();
   }
@@ -288,22 +316,22 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
         if (r) openEdit(r);
       };
     });
-    // Toggle real (D7): hermano del botón que abre la edición, con su propio stopPropagation por
-    // si algún día un ancestro común gana un listener de clic (defensivo, mismo criterio que pide
-    // la spec). Tras guardar, se devuelve el foco al MISMO botón (por id de regla, no por índice:
-    // reloadRules() puede reordenar la lista) — sin esto, cada toque pierde el foco al repintar.
-    container.querySelectorAll("[data-toggle]").forEach((btn) => {
-      btn.onclick = async (e) => {
-        e.stopPropagation();
-        const ruleId = btn.dataset.toggle;
+    // Toggle real (D7): hermano del botón que abre la edición. Actualiza el atributo en el sitio
+    // (sin volver a pintar: CSS ya reacciona a [aria-checked], igual que antes reaccionaba a
+    // :checked) y devuelve el foco al MISMO botón tras guardar — por id de regla, no por índice:
+    // reloadRules() puede reordenar la lista.
+    container.querySelectorAll("[id^='rec-toggle-']").forEach((btn) => {
+      btn.onclick = async () => {
+        const ruleId = btn.id.slice("rec-toggle-".length);
         const r = state.rules.find((x) => x.id === ruleId);
         if (!r) return;
+        const next = btn.getAttribute("aria-checked") !== "true";
         btn.disabled = true;
         try {
-          await updateRule(r.id, { isActive: !r.is_active });
+          await updateRule(r.id, { isActive: next });
           await reloadRules();
           render();
-          container.querySelector(`[data-toggle="${ruleId}"]`)?.focus();
+          container.querySelector(`#rec-toggle-${ruleId}`)?.focus();
         } catch (err) {
           errorMsg = t("common.saveFailed", { error: userMessage(err) });
           render();
@@ -321,126 +349,84 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
     const cats = categoriesFor(f.type);
     const withCategory = needsCategory(f.type);
     // «Cancelar la suscripción» solo tiene sentido sobre lo GUARDADO, no sobre el formulario en
-    // curso: f.isSubscription/f.isActive cambian con cada toggle sin guardar, así que un usuario
-    // que desmarca "es una suscripción" (o la desactiva) vería el botón desaparecer/aparecer antes
-    // de pulsar "Guardar cambios" — y si lo pulsa, cancelSubscription() actuaría sobre una fila
-    // cuyo estado real en BD puede no ser ni suscripción ni activa. Se mira state.rules (la última
-    // lista recargada tras guardar), nunca el formulario vivo.
+    // curso: se mira state.rules (la última lista recargada tras guardar), nunca el formulario vivo.
     const saved = state.rules.find((r) => r.id === state.editId);
     const canCancelSubscription = !!(saved?.is_subscription && saved?.is_active);
 
-    container.innerHTML = `
-      ${subHeaderHtml({ id: "rec-form-back", title: state.editId ? t("recurrentes.form.title.edit") : t("recurrentes.form.title.new") })}
-
-      <label class="field field-stack" style="margin-bottom:18px;">
-        <span class="field-label">${t("common.name")}</span>
-        <input type="text" id="rec-name" value="${escAttr(f.name)}" placeholder="${t("common.egPlaceholder", { example: t("recurrentes.form.namePlaceholderExample") })}">
-      </label>
-
-      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
-        <div class="section-title">${t("common.amount")}</div>
-        <div class="amount-display" style="align-items:center;">
-          <input type="text" inputmode="decimal" id="rec-raw" value="${escAttr(f.raw)}" placeholder="0"
-            style="border:0;background:none;color:var(--text);font:var(--t-figure-xl);letter-spacing:-.015em;width:100%;outline:none;">
-          <span class="amount-currency" style="font-size:17px;">${currencySymbol()}</span>
-        </div>
-        <hr class="divider" style="margin-top:6px;">
-      </div>
-
-      <div class="segmented" style="margin-bottom:18px;">
-        ${TIPOS_RULE.map((tr) => `<button type="button" data-tipo="${tr.id}" class="${f.type === tr.id ? "active" : ""}">${t(tr.labelKey)}</button>`).join("")}
-      </div>
-
-      ${cats.length ? `
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">${t("common.category")}</div>
-        <div class="chips-grid">
+    const categoryGrid = cats.length ? `
+      <div class="rec-field-group">
+        <div class="rec-field-label">${escHtml(t("common.category"))}</div>
+        <div class="rec-cat-grid">
           ${cats.map((c) => {
-            const color = colorForCategory(c.id, byId);
-            const catIcon = iconForCategory(c.id, byId);
-            const active = f.categoryId === c.id;
-            return `<button type="button" class="chip-v${active ? " active" : ""}" data-cat="${c.id}" style="--cat:${color};">
-              <span class="chip-icon">${catIcon}</span><span>${escHtml(c.name)}</span>
-            </button>`;
+            const fam = familyForCategory(c.id, byId);
+            return pickTileHtml({ fam, icon: iconForCategory(c.id, byId), label: c.name, selected: f.categoryId === c.id, data: { cat: c.id } });
           }).join("")}
         </div>
-      </div>` : ""}
+      </div>` : "";
 
-      ${renderAccountsSection(f)}
+    const toggleRows = [];
+    if (f.type === "expense") {
+      toggleRows.push(settingRowHtml({
+        label: t("recurrentes.form.subscriptionLabel"), sub: t("recurrentes.form.subscriptionHint"),
+        controlHtml: switchHtml({ id: "rec-subscription", checked: f.isSubscription, label: t("recurrentes.form.subscriptionLabel") }),
+        id: "rec-subscription",
+      }));
+    }
+    if (withCategory && f.type !== "income" && (f.isShared || partnerName)) {
+      toggleRows.push(settingRowHtml({
+        label: t("recurrentes.form.sharedWith", { name: partnerName || t("recurrentes.shared.fallbackName") }),
+        controlHtml: switchHtml({ id: "rec-shared", checked: f.isShared, label: t("recurrentes.form.sharedWith", { name: partnerName || t("recurrentes.shared.fallbackName") }) }),
+        id: "rec-shared",
+      }));
+    }
+    toggleRows.push(settingRowHtml({
+      label: t("recurrentes.form.activeLabel"),
+      controlHtml: switchHtml({ id: "rec-active", checked: f.isActive, label: t("recurrentes.form.activeLabel") }),
+      id: "rec-active",
+    }));
 
-      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:18px;">
-        <div class="section-title">${t("recurrentes.form.frequency")}</div>
-        <div class="chips">
-          ${FREQ_CHIPS.map((fr) => `<button type="button" class="chip${f.frequency === fr.id ? " active" : ""}" data-freq="${fr.id}">${t(fr.labelKey)}</button>`).join("")}
+    const annualEstimate = f.isSubscription && f.cents > 0 ? `
+      <p class="rec-sub-annual">
+        <span class="num">${moneyPartsHtml(annualCents({ amount_cents: f.cents, frequency: f.frequency }))}</span>
+        ${escHtml(t("recurrentes.form.perYear"))}
+      </p>` : "";
+
+    container.innerHTML = `
+      ${subHeaderHtml({ id: "rec-form-back", title: state.editId ? t("recurrentes.form.title.edit") : t("recurrentes.form.title.new") })}
+      <div class="rec-form-body">
+        ${fieldHtml({ id: "rec-name", label: t("common.name"), value: f.name })}
+
+        ${amountFieldHtml(f)}
+
+        ${segmentedHtml({ id: "rec-type-seg", name: t("common.typeLabel"), options: TIPOS_RULE.map((tr) => ({ value: tr.id, label: t(tr.labelKey) })), value: f.type })}
+
+        ${categoryGrid}
+
+        ${renderAccountsSection(f)}
+
+        <div class="rec-field-group">
+          <div class="rec-field-label">${escHtml(t("recurrentes.form.frequency"))}</div>
+          <div class="rec-chip-row">
+            ${FREQ_CHIPS.map((fr) => filterChipHtml({ label: t(fr.labelKey), selected: f.frequency === fr.id, data: { freq: fr.id } })).join("")}
+          </div>
         </div>
-      </div>
 
-      <div style="display:flex; gap:8px; margin-bottom:18px;">
-        <label class="field field-stack" style="flex:1;">
-          <span class="field-label">${t("recurrentes.form.dayLabel")}</span>
-          <input type="number" min="1" max="31" id="rec-day" value="${escAttr(f.dueDay)}">
-        </label>
-        ${needsMonth(f.frequency) ? `
-        <label class="field field-stack" style="flex:1;">
-          <span class="field-label">${t("recurrentes.form.monthLabel")}</span>
-          <input type="number" min="1" max="12" id="rec-month" value="${escAttr(f.dueMonth)}">
-        </label>` : ""}
-      </div>
-
-      ${f.type === "expense" ? `
-      <div style="display:flex; flex-direction:column; gap:10px; padding:16px; background:var(--accent-tint); border-left:2px solid var(--accent); margin-bottom:18px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-          <span style="font-size:15px; font-weight:600;">${t("recurrentes.form.subscriptionLabel")}</span>
-          <span class="toggle">
-            <input type="checkbox" id="rec-subscription" ${f.isSubscription ? "checked" : ""}>
-            <span class="toggle-track"><span class="toggle-knob"></span></span>
-          </span>
+        <div class="rec-day-month">
+          ${fieldHtml({ id: "rec-day", label: t("recurrentes.form.dayLabel"), type: "number", value: f.dueDay })}
+          ${needsMonth(f.frequency) ? fieldHtml({ id: "rec-month", label: t("recurrentes.form.monthLabel"), type: "number", value: f.dueMonth }) : ""}
         </div>
-        <span style="font-size:13px; line-height:1.45; color:var(--ink-2);">${t("recurrentes.form.subscriptionHint")}</span>
-        ${f.isSubscription && f.cents > 0 ? `
-        <div style="display:flex; align-items:baseline; gap:6px; padding-top:2px;">
-          <span class="num" style="font:var(--t-figure-l); letter-spacing:-.01em;">${moneyPartsHtml(annualCents({ amount_cents: f.cents, frequency: f.frequency }))}</span>
-          <span style="font-size:13px; font-weight:500; color:var(--ink-2);">${t("recurrentes.form.perYear")}</span>
-        </div>` : ""}
-      </div>` : ""}
 
-      ${withCategory && f.type !== "income" && (f.isShared || partnerName) ? `
-      <div class="card" style="padding:0 16px; margin-bottom:18px;">
-        <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
-          <span style="font-size:15px; font-weight:600;">${t("recurrentes.form.sharedWith", { name: escHtml(partnerName) || t("recurrentes.shared.fallbackName") })}</span>
-          <span class="toggle">
-            <input type="checkbox" id="rec-shared" ${f.isShared ? "checked" : ""}>
-            <span class="toggle-track"><span class="toggle-knob"></span></span>
-          </span>
-        </label>
-      </div>` : ""}
+        <div class="rec-toggles">
+          ${containerHtml({ kind: "list", body: withDividers(toggleRows) })}
+          ${annualEstimate}
+        </div>
 
-      <div class="card" style="padding:0 16px; margin-bottom:18px;">
-        <label style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer;">
-          <span style="font-size:15px; font-weight:600;">${t("recurrentes.form.activeLabel")}</span>
-          <span class="toggle">
-            <input type="checkbox" id="rec-active" ${f.isActive ? "checked" : ""}>
-            <span class="toggle-track"><span class="toggle-knob"></span></span>
-          </span>
-        </label>
+        ${errorMsg ? `<div class="banner-aviso is-error">${escHtml(errorMsg)}</div>` : ""}
+
+        ${buttonHtml({ kind: "primary", id: "rec-save", label: state.editId ? t("common.saveChanges") : t("recurrentes.form.create") })}
+        ${state.editId && canCancelSubscription ? buttonHtml({ kind: "danger-entry", id: "rec-cancel-subscription", label: t("recurrentes.form.cancelSubscription") }) : ""}
+        ${state.editId ? buttonHtml({ kind: "danger-entry", id: "rec-delete", label: t("recurrentes.form.delete") }) : ""}
       </div>
-
-      ${errorMsg ? `<div class="banner-aviso red" style="margin-bottom:12px;">${escHtml(errorMsg)}</div>` : ""}
-
-      <button type="button" class="btn-primary" id="rec-save" style="margin-bottom:${state.editId ? "10px" : "0"};">
-        ${state.editId ? t("common.saveChanges") : t("recurrentes.form.create")}
-      </button>
-      ${state.editId && canCancelSubscription ? `
-      <button type="button" id="rec-cancel-subscription"
-        style="width:100%;background:var(--danger-tint);color:var(--danger);
-          border:1px solid rgba(255,122,107,.4);border-radius:999px;padding:16px;font:600 15px var(--font-ui);
-          cursor:pointer;margin-bottom:10px;">
-        ${t("recurrentes.form.cancelSubscription")}
-      </button>` : ""}
-      ${state.editId ? `
-      <button type="button" class="btn-danger" id="rec-delete">
-        ${t("recurrentes.form.delete")}
-      </button>` : ""}
     `;
 
     wireForm();
@@ -450,14 +436,12 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
     const f = state.form;
     container.querySelector("#rec-form-back").onclick = () => goBack();
 
-    container.querySelectorAll("[data-tipo]").forEach((b) => {
-      b.onclick = () => {
-        f.type = b.dataset.tipo;
-        f.categoryId = null;
-        f.counterAccountId = "";
-        errorMsg = "";
-        render();
-      };
+    wireSegmented(container.querySelector("#rec-type-seg"), (value) => {
+      f.type = value;
+      f.categoryId = null;
+      f.counterAccountId = "";
+      errorMsg = "";
+      render();
     });
 
     container.querySelector("#rec-name").oninput = (e) => { f.name = e.target.value; };
@@ -493,14 +477,24 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
     if (monthInput) monthInput.oninput = (e) => { f.dueMonth = e.target.value; };
 
     const sharedToggle = container.querySelector("#rec-shared");
-    if (sharedToggle) sharedToggle.onchange = (e) => { f.isShared = e.target.checked; };
+    if (sharedToggle) sharedToggle.onclick = () => {
+      f.isShared = sharedToggle.getAttribute("aria-checked") !== "true";
+      sharedToggle.setAttribute("aria-checked", String(f.isShared));
+    };
 
-    container.querySelector("#rec-active").onchange = (e) => { f.isActive = e.target.checked; };
+    const activeToggle = container.querySelector("#rec-active");
+    activeToggle.onclick = () => {
+      f.isActive = activeToggle.getAttribute("aria-checked") !== "true";
+      activeToggle.setAttribute("aria-checked", String(f.isActive));
+    };
 
     // render() aquí (a diferencia de isShared/isActive): la visibilidad del coste anual depende
     // de f.isSubscription, así que hay que repintar para que aparezca o desaparezca.
     const subscriptionToggle = container.querySelector("#rec-subscription");
-    if (subscriptionToggle) subscriptionToggle.onchange = (e) => { f.isSubscription = e.target.checked; render(); };
+    if (subscriptionToggle) subscriptionToggle.onclick = () => {
+      f.isSubscription = subscriptionToggle.getAttribute("aria-checked") !== "true";
+      render();
+    };
 
     container.querySelector("#rec-save").onclick = async () => {
       const btn = container.querySelector("#rec-save");
@@ -508,9 +502,6 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
       if (msg) {
         errorMsg = msg;
         render();
-        const savedBtn = container.querySelector("#rec-save");
-        savedBtn.classList.add("shake");
-        setTimeout(() => savedBtn.classList.remove("shake"), 400);
         return;
       }
       btn.disabled = true;
@@ -597,8 +588,8 @@ export async function renderRecurrentes(container, onBack, opts = {}) {
   }
 
   // Radar → formulario (Task 10): si el llamador pide abrir una regla concreta (Suscripciones,
-  // fila de Activas) y esa regla sigue entre las cargadas, el primer pintado va directo al
-  // formulario en vez de a la lista — sin reimplementar un formulario de once campos aparte.
+  // fila de Activas o Canceladas) y esa regla sigue entre las cargadas, el primer pintado va
+  // directo al formulario en vez de a la lista.
   const editRule = opts.editRuleId && rules.find((r) => r.id === opts.editRuleId);
   if (editRule) openEdit(editRule);
   else render();

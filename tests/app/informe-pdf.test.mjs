@@ -1,6 +1,6 @@
 // pdf-lib con fuentes estandar codifica en WinAnsi y LANZA ante cualquier caracter fuera de esa
 // tabla (verificado: `WinAnsi cannot encode "→" (0x2192)`). En esta app los nombres de
-// categoria admiten emoji por diseno (CURATED_ICONS, category-colors.js:63) y los comercios vienen
+// categoria son texto libre y admiten emoji, y los comercios vienen
 // de CSV ajenos: sin este saneo, el PDF de un usuario normal revienta.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -57,17 +57,17 @@ function smallReport() {
     },
     categories: {
       rows: [
-        { rootId: "cat-casa", name: "Casa", color: "#5B9BFF", textColor: "#7FB3FF", icon: "🏠", spentCents: 24560, limitCents: 26000, pctOfLimit: 94, level: "warn", shareOfMax: 100, prevCents: 23800, deltaCents: 760, deltaPct: 3.19, direction: "up" },
-        { rootId: "cat-alimentacion", name: "Alimentación", color: "#6BCB3E", textColor: "#8FE05F", icon: "🛒", spentCents: 18740, limitCents: 25000, pctOfLimit: 75, level: "ok", shareOfMax: 76, prevCents: 21490, deltaCents: -2750, deltaPct: -12.8, direction: "down" },
+        { rootId: "cat-casa", name: "Casa", fam: "casa", icon: "casa", spentCents: 24560, limitCents: 26000, pctOfLimit: 94, level: "warn", shareOfMax: 100, prevCents: 23800, deltaCents: 760, deltaPct: 3.19, direction: "up" },
+        { rootId: "cat-alimentacion", name: "Alimentación", fam: "ali", icon: "ali", spentCents: 18740, limitCents: 25000, pctOfLimit: 75, level: "ok", shareOfMax: 76, prevCents: 21490, deltaCents: -2750, deltaPct: -12.8, direction: "down" },
       ],
       totalCents: 43300, prevTotalCents: 45290, totalDeltaPct: -4.4, hasPrev: true,
     },
     movements: {
       count: 4,
       groups: [
-        { rootId: "cat-casa", name: "Casa", color: "#5B9BFF", icon: "🏠", totalCents: 24560, count: 1,
+        { rootId: "cat-casa", name: "Casa", fam: "casa", icon: "casa", totalCents: 24560, count: 1,
           items: [{ id: "t1", date: "2026-09-07", merchant: "Ferretería Ruiz", cents: 6790, type: "expense", isShared: false, paidBy: "me" }] },
-        { rootId: "cat-alimentacion", name: "Alimentación", color: "#6BCB3E", icon: "🛒", totalCents: 18740, count: 2,
+        { rootId: "cat-alimentacion", name: "Alimentación", fam: "ali", icon: "ali", totalCents: 18740, count: 2,
           items: [
             { id: "t2", date: "2026-09-08", merchant: "Mercadona", cents: 2345, type: "expense", isShared: false, paidBy: "me" },
             { id: "t3", date: "2026-09-02", merchant: "Mercadona", cents: 8430, type: "expense", isShared: true, paidBy: "me" },
@@ -100,7 +100,7 @@ function reportWith(n, opts = {}) {
     tag: i === 0 ? (opts.tag ?? "") : "",
   }));
   const group = {
-    rootId: "cat-generado", name: catName, color: "#8A8794", icon: "▫️",
+    rootId: "cat-generado", name: catName, fam: "otr", icon: "otr",
     totalCents: items.reduce((s, it) => s + it.cents, 0), count: items.length, items,
   };
   return {
@@ -115,7 +115,7 @@ function reportWith(n, opts = {}) {
 function reportWithManyGroups(n) {
   const base = smallReport();
   const groups = Array.from({ length: n }, (_, i) => ({
-    rootId: "cat-g" + i, name: "Grupo " + i, color: "#123456", icon: "•", totalCents: 1000, count: 1,
+    rootId: "cat-g" + i, name: "Grupo " + i, fam: "otr", icon: "otr", totalCents: 1000, count: 1,
     items: [{ id: "gi-" + i, date: "2026-09-01", merchant: "Comercio " + i, cents: 1000, type: "expense", isShared: false, paidBy: "me" }],
   }));
   return { ...base, movements: { count: n, groups, others: { count: 0, items: [] } } };
@@ -191,10 +191,10 @@ test("layoutReport: los rects de las barras salen de barRowsGeometry", () => {
   const casa = report.categories.rows.find((r) => r.rootId === "cat-casa");
   const maxSpent = Math.max(...report.categories.rows.map((r) => r.spentCents));
   const [expected] = barRowsGeometry(
-    [{ key: "row", value: casa.spentCents, max: maxSpent, color: casa.color }],
+    [{ key: "row", value: casa.spentCents, max: maxSpent, color: "--f-casa-b" }],
     { width: contentW, rowH: 16, barH: 6 },
   );
-  const rect = pages.flatMap((p) => p.blocks).find((b) => b.kind === "rect" && b.section === "categories" && b.color === casa.color);
+  const rect = pages.flatMap((p) => p.blocks).find((b) => b.kind === "rect" && b.section === "categories" && b.color === "--f-casa-b");
   assert.ok(rect, "debe haber un rect de barra para la categoria Casa");
   assert.equal(rect.w, expected.w);
   assert.equal(rect.h, expected.h);
@@ -235,11 +235,11 @@ test("layoutReport: la barra principal sigue siendo el primer rect de ese color 
   const casa = report.categories.rows.find((r) => r.rootId === "cat-casa");
   const maxSpent = Math.max(...report.categories.rows.map((r) => r.spentCents));
   const [expected] = barRowsGeometry(
-    [{ key: "row", value: casa.spentCents, max: maxSpent, color: casa.color }],
+    [{ key: "row", value: casa.spentCents, max: maxSpent, color: "--f-casa-b" }],
     { width: contentW, rowH: 16, barH: 6 },
   );
   const rect = layoutReport(report).pages.flatMap((p) => p.blocks)
-    .find((b) => b.kind === "rect" && b.section === "categories" && b.color === casa.color);
+    .find((b) => b.kind === "rect" && b.section === "categories" && b.color === "--f-casa-b");
   assert.equal(rect.w, expected.w);
   assert.equal(rect.h, expected.h);
 });
@@ -268,7 +268,7 @@ function reportWithManyCategories(n) {
   // spentCents todos cercanos entre si (1000..1000+n): las barras salen casi a ancho completo,
   // muy lejos de BADGE_SIZE (6pt) — así un rect de 6x6 solo puede ser la insignia, nunca una barra.
   const rows = Array.from({ length: n }, (_, i) => ({
-    rootId: `cat-gen-${i}`, name: `Categoria ${i}`, color: "#123456", textColor: "#456789", icon: "•",
+    rootId: `cat-gen-${i}`, name: `Categoria ${i}`, fam: "otr", icon: "otr",
     spentCents: 1000 + i, limitCents: 0, pctOfLimit: 0, level: null, shareOfMax: 90,
     prevCents: 900 + i, deltaCents: 100, deltaPct: 11.1, direction: "up",
   }));
@@ -385,4 +385,100 @@ test("layoutReport: un item CON tag pinta un bloque de texto mas que el mismo it
 test("reportFilename: determinista y sin caracteres de ruta", () => {
   assert.equal(reportFilename(smallReport()), "basecero-informe-2026-09-01.pdf");
   assert.ok(!/[/\\:]/.test(reportFilename(smallReport())));
+});
+
+// ---- PR-04 / D-impl-3: colores de familia desde tokens.css ----------------------------------
+import { readFileSync as readTokens } from "node:fs";
+import { parseRootTokens } from "../../app/app/js/pdf-palette.js";
+const PALETTE = parseRootTokens(readTokens(new URL("../../app/app/css/tokens.css", import.meta.url), "utf8"));
+
+test("layoutReport: los rects de categoría llevan el token --f-<fam>-b, que la paleta clara resuelve", () => {
+  const rects = layoutReport(smallReport()).pages.flatMap((p) => p.blocks)
+    .filter((b) => b.kind === "rect" && b.section === "categories");
+  assert.ok(rects.length > 0);
+  assert.deepEqual([...new Set(rects.map((b) => b.color))].sort(), ["--f-ali-b", "--f-casa-b"]);
+  for (const b of rects) assert.ok(PALETTE[b.color], `${b.color} no está en el :root claro`);
+});
+
+test("layoutReport: una fila sin familia (fam null) usa --idle, también en la paleta", () => {
+  const base = smallReport();
+  const report = { ...base, categories: { ...base.categories, rows: base.categories.rows.map((r, i) => (i === 0 ? { ...r, fam: null } : r)) } };
+  const colors = layoutReport(report).pages.flatMap((p) => p.blocks).filter((b) => b.kind === "rect").map((b) => b.color);
+  assert.ok(colors.includes("--idle"));
+  assert.ok(PALETTE["--idle"]);
+});
+
+test("buildPdfBytes: con la paleta de tokens.css y sin ella, el PDF sale", async () => {
+  await assert.doesNotReject(() => buildPdfBytes(PDFLib, smallReport(), { palette: PALETTE }));
+  await assert.doesNotReject(() => buildPdfBytes(PDFLib, smallReport(), {}));
+  await assert.doesNotReject(() => buildPdfBytes(PDFLib, smallReport()));
+});
+
+test("buildPdfBytes: el color de la barra es el del token en la paleta (no negro ni gris por defecto)", async () => {
+  const seen = [];
+  const spy = { ...PDFLib, rgb: (r, g, b) => { seen.push([r, g, b].map((v) => Math.round(v * 255))); return PDFLib.rgb(r, g, b); } };
+  await buildPdfBytes(spy, smallReport(), { palette: PALETTE });
+  assert.ok(seen.some(([r, g, b]) => r === 0xa8 && g === 0x89 && b === 0x5f), "Casa en arena (--f-casa-b claro)");
+});
+
+// ---- S8: el papel y las barras, dibujados con la paleta del tokens.css real ---------------------
+
+/** PDFLib espía: el real, pero cada página anota lo que dibuja (drawRectangle / drawText) con su
+ *  color ya en 0..255. Así se comprueba el PDF que sale de verdad, no solo la geometría. */
+function spyPdfLib() {
+  const rects = [], texts = [];
+  const to255 = (c) => (c ? [c.red, c.green, c.blue].map((v) => Math.round(v * 255)) : null);
+  const spy = {
+    ...PDFLib,
+    PDFDocument: {
+      create: async () => {
+        const doc = await PDFLib.PDFDocument.create();
+        const addPage = doc.addPage.bind(doc);
+        doc.addPage = (...args) => {
+          const page = addPage(...args);
+          const drawRectangle = page.drawRectangle.bind(page);
+          const drawText = page.drawText.bind(page);
+          page.drawRectangle = (o) => { rects.push({ ...o, rgb: to255(o.color) }); return drawRectangle(o); };
+          page.drawText = (s, o) => { texts.push({ text: s, rgb: to255(o.color) }); return drawText(s, o); };
+          return page;
+        };
+        return doc;
+      },
+    },
+  };
+  return { spy, rects, texts };
+}
+
+test("buildPdfBytes: cada barra de categoría sale con el hex de --f-<fam>-b del tokens.css real", async () => {
+  const report = smallReport();
+  const { spy, rects } = spyPdfLib();
+  await buildPdfBytes(spy, report, { palette: PALETTE });
+  const hex = (rgb) => "#" + rgb.map((v) => v.toString(16).padStart(2, "0")).join("").toUpperCase();
+  const { pages, pageSize, margin } = layoutReport(report);
+  const contentW = pageSize.w - margin * 2;
+  const maxSpent = Math.max(...report.categories.rows.map((r) => r.spentCents));
+  for (const row of report.categories.rows) {
+    const token = `--f-${row.fam}-b`;
+    const [g] = barRowsGeometry([{ key: "row", value: row.spentCents, max: maxSpent, color: token }], { width: contentW, rowH: 16, barH: 6 });
+    const drawn = rects.find((r) => r.width === g.w && r.height === g.h && (r.opacity ?? 1) === 1 && r.rgb && hex(r.rgb) === PALETTE[token].toUpperCase());
+    assert.ok(drawn, `la barra de ${row.name} lleva ${token} = ${PALETTE[token]}`);
+  }
+  assert.ok(pages.length >= 1);
+});
+
+test("buildPdfBytes: el papel es --raised y la tinta --text del bloque claro (el PDF nunca sale en oscuro)", async () => {
+  const { spy, rects, texts } = spyPdfLib();
+  await buildPdfBytes(spy, smallReport(), { palette: PALETTE });
+  const rgbOfHex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const page = rects.find((r) => r.x === 0 && r.y === 0 && r.width === A4.w);
+  assert.deepEqual(page.rgb, rgbOfHex(PALETTE["--raised"]));
+  assert.ok(texts.length > 0);
+  for (const tx of texts) assert.deepEqual(tx.rgb, rgbOfHex(PALETTE["--text"]));
+});
+
+test("buildPdfBytes: sin paleta, papel blanco y tinta en gris neutro (nunca revienta)", async () => {
+  const { spy, rects } = spyPdfLib();
+  await buildPdfBytes(spy, smallReport(), {});
+  const page = rects.find((r) => r.x === 0 && r.y === 0 && r.width === A4.w);
+  assert.deepEqual(page.rgb, [255, 255, 255]);
 });

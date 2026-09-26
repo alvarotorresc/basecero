@@ -439,3 +439,29 @@ test("previousPeriodOf sigue devolviendo EXACTAMENTE lo mismo que antes (delega 
   assert.equal(previousPeriodOf(FOUR_PERIODS, "no-existe"), null);
   assert.equal(previousPeriodOf([], "cualquiera"), null);
 });
+
+// PR-04: el informe transporta la FAMILIA (clave de 12) y la clave de icono, no colores.
+test("buildReport: cada fila de categoría lleva fam e icono SVG, sin color ni textColor", () => {
+  const r = buildReport(fixture());
+  const casa = r.categories.rows.find((x) => x.rootId === "cat-casa");
+  assert.equal(casa.fam, "casa");
+  assert.equal(casa.icon, "casa");
+  for (const row of r.categories.rows) {
+    assert.ok(!("color" in row) && !("textColor" in row), row.rootId);
+    assert.match(row.fam, /^[a-z]+$/);
+  }
+  const g = r.movements.groups.find((x) => x.rootId === "cat-casa");
+  assert.equal(g.fam, "casa");
+  assert.equal(g.icon, "casa");
+  assert.ok(!("color" in g));
+});
+
+test("buildReport: un grupo de raíz sin fila de categoría (p. ej. «sin categoría») sale con fam null", () => {
+  const f = fixture();
+  f.transactions.push({ ...f.transactions[0], id: "t-sin-cat", category_id: "" });
+  const r = buildReport(f);
+  const g = r.movements.groups.find((x) => x.rootId === "");
+  assert.ok(g, "el grupo huérfano se añade al final");
+  assert.equal(g.fam, null);
+  assert.equal(g.icon, "otr");
+});

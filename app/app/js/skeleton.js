@@ -15,5 +15,5 @@ export function skeletonHtml(heights) {
     const px = Number.isFinite(h) ? Math.max(0, Math.round(h)) : 0;
     return `<div class="skeleton" style="height:${px}px;"></div>`;
   }).join("");
-  return `<div aria-hidden="true" style="display:flex;flex-direction:column;gap:16px;">${bloques}</div>`;
+  return `<div aria-hidden="true" class="skeleton-stack">${bloques}</div>`;
 }

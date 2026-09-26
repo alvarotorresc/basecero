@@ -62,3 +62,27 @@ export function visibleCategories(cats, selectedId, limit) {
   }
   return { shown: head, hidden: cats.length - head.length };
 }
+
+/** Vida de la pantalla Registro. Un callback async que resuelve DESPUÉS de dejar Registro (voz
+ *  tardía, foto que tarda en comprimirse, cifras del recibo) no debe repintar `container` encima de
+ *  la pantalla que ya está debajo. Hay tres salidas: ✕ y guardar llaman a `end()`; el atrás del
+ *  sistema no pasa por Registro (back.js repinta otra pantalla en el mismo `container`), así que
+ *  la vida se mira también en el DOM: sin `selector` dentro de `container`, Registro ya no está.
+ *  Al detectarlo se llama a `onEnd` una sola vez (parar la voz, soltar la URL de la foto), igual
+ *  que en las otras dos salidas. `container` se inyecta (solo se usa su querySelector): el módulo
+ *  sigue sin tocar `document`. */
+export function createScreenLife(container, selector, onEnd) {
+  let alive = true;
+  const end = () => {
+    if (!alive) return;
+    alive = false;
+    onEnd?.();
+  };
+  return {
+    end,
+    isAlive() {
+      if (alive && !container.querySelector(selector)) end();
+      return alive;
+    },
+  };
+}

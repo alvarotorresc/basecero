@@ -2,34 +2,63 @@ import {
   getOpenPeriod, spentOfPeriod, incomeOfPeriod, listAllByDay, spentByRootCategory, budgetsOfPeriod,
   openNextPeriod, getMetaAll, goalsWithProgress, listAllAccounts, defaultAccountId, accountBalanceCents,
 } from "../repo.js";
-import { colorForCategory, iconForCategory } from "../category-colors.js";
+import { familyForCategory, iconForCategory } from "../category-colors.js";
 import { eurToCents } from "../contract.js";
-import { fmtMoney, moneyPartsHtml, fmtDiaCorto, hoyISO, prevDayIso, nombrePorDefecto, fmtPct, currencySymbol, centsToRaw, parseCentsRaw } from "../format.js";
+import {
+  fmtMoney, moneyPartsHtml, fmtDiaCorto, fmtDiaIni, hoyISO, prevDayIso, nombrePorDefecto, fmtPct,
+  currencySymbol, centsToRaw, parseCentsRaw,
+} from "../format.js";
 import { t } from "../i18n/index.js";
-import { PCT_STEP, stepPct } from "../share-pct.js";
+import { PCT_STEP, stepPct, normalizePct } from "../share-pct.js";
 import { inheritedBudgetsRaw, budgetMap } from "../category-spend.js";
 import { remainderCents, sweepDestinations, sweepPlan } from "../barrido.js";
 import { renderInforme } from "./informe.js";
 import { userMessage } from "../errors.js";
-import { subHeaderHtml, metaHtml } from "../ui.js";
-
+import { subHeaderHtml, buttonHtml, metaHtml } from "../ui.js";
+import { stepperHtml, fieldHtml } from "../controls.js";
+import { settingRowHtml, sectionHeaderHtml } from "../entity.js";
+import { displayHtml, dispInkHtml, stackedBarHtml, meterHtml } from "../instrument.js";
 import { escHtml, escAttr } from "../esc.js";
-const BTN_SECONDARY = "background:var(--card2);color:var(--text);border:0;"
-  + "border-radius:999px;padding:16px;flex:1;font:600 16px var(--font-ui);cursor:pointer;";
+
+// Ventana de días seleccionables del picker de fecha (±2 alrededor de hoy, P1 abierto: la
+// sugerencia es siempre hoy, nunca un «día de cobro» fijo — ver Omite del brief S11).
+const DAY_WINDOW = 2;
+
+function addDaysIso(iso, n) {
+  const d = new Date(iso + "T12:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toLocaleDateString("sv-SE");
+}
+function dayCandidates() {
+  const today = hoyISO();
+  return Array.from({ length: DAY_WINDOW * 2 + 1 }, (_, i) => addDaysIso(today, i - DAY_WINDOW));
+}
+
+/** Día seleccionable (B-PeriodoNuevo): botón con el patrón de selección «sobre neutro» del sistema
+ *  (relleno de acento, C1) vía `aria-pressed` — no `role=radio`/`aria-checked`: R-C1 solo permite
+ *  pintar naranja detrás de `[aria-pressed="true"]`, `[aria-selected="true"]` o `:checked`, igual
+ *  que entity.js#pickTileHtml para la baldosa de categoría. */
+function dayTileHtml(iso, selected) {
+  const day = Number(iso.slice(8, 10));
+  return `<button type="button" class="pn-day" aria-pressed="${selected ? "true" : "false"}" data-day="${escAttr(iso)}">
+    <span class="pn-day-dow">${escHtml(fmtDiaIni(iso))}</span>
+    <span class="num pn-day-num">${day}</span>
+  </button>`;
+}
 
 /** Pantalla de error con recuperación: quien llama ya puso `body.onboarding` (chrome oculto,
  *  nav() bloqueado — ver main.js), así que un simple banner sin salida deja a quien lo use
  *  atrapado. "Reintentar" vuelve a montar la pantalla entera; "Volver" (solo en modo 'next',
  *  donde SÍ hay algo a lo que volver sin haber creado nada) llama a onDone() como cancelación. */
-function renderAsistenteError(container, { mode, onDone, onBack, embed }, message) {
+function renderAsistenteError(container, { mode, onDone, onBack, embed, initialSharePct }, message) {
   container.innerHTML = `
-    <div class="banner-aviso red" style="margin-bottom:14px;">${escHtml(message)}</div>
-    <div style="display:flex; gap:8px;">
-      <button type="button" class="btn-primary" id="pn-error-retry" style="flex:1;">${t("common.retry")}</button>
-      ${mode === "next" ? `<button type="button" id="pn-error-back" style="${BTN_SECONDARY}">${t("common.goBack")}</button>` : ""}
+    <div class="banner-aviso is-error">${escHtml(message)}</div>
+    <div class="pn-error-actions">
+      ${buttonHtml({ kind: "primary", id: "pn-error-retry", label: t("common.retry") })}
+      ${mode === "next" ? buttonHtml({ id: "pn-error-back", label: t("common.goBack") }) : ""}
     </div>`;
   container.querySelector("#pn-error-retry").onclick =
-    () => renderPeriodoNuevo(container, { mode, onDone, onBack, embed });
+    () => renderPeriodoNuevo(container, { mode, onDone, onBack, embed, initialSharePct });
   const back = container.querySelector("#pn-error-back");
   if (back) back.onclick = () => (onBack ?? onDone)();
 }
@@ -39,8 +68,10 @@ function renderAsistenteError(container, { mode, onDone, onBack, embed }, messag
  *  el primero (onboarding, sin nada que cerrar). Presupuestos por categoría RAÍZ de gasto:
  *  spentByRootCategory('' ) en modo 'first' no matchea ningún period_id → devuelve todas las
  *  raíces con spent_cents=0 (mismo LEFT JOIN, sin fila cerrada de la que tirar "mes pasado").
- *  onDone() se llama tanto al abrir con éxito como al cancelar con la flecha atrás (modo 'next'). */
-export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embed = false }) {
+ *  onDone() se llama tanto al abrir con éxito como al cancelar con la flecha atrás (modo 'next').
+ *  `initialSharePct` (solo modo 'first', S13): el reparto que el onboarding ya pidió en su paso
+ *  Ajustes, para que el paso a paso de aquí arranque en él y no en el 50 de siempre. */
+export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embed = false, initialSharePct }) {
   let closingPeriod = null, closingSpent = 0, closingIncome = 0, closingCount = 0, rootRows = [], meta = {};
   let closingBudgets = [];
   // Barrido (N4): goals con progreso, cuentas vivas y la cuenta de origen por defecto — solo hace
@@ -50,7 +81,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     if (mode === "next") {
       closingPeriod = await getOpenPeriod();
       if (!closingPeriod) {
-        renderAsistenteError(container, { mode, onDone, onBack, embed }, t("periodo.error.noOpenToClose"));
+        renderAsistenteError(container, { mode, onDone, onBack, embed, initialSharePct }, t("periodo.error.noOpenToClose"));
         return;
       }
       const [spent, income, all, roots, budgetRows, metaAll, goals, accounts, defaultAccId] = await Promise.all([
@@ -72,13 +103,13 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
       [rootRows, meta] = await Promise.all([spentByRootCategory(""), getMetaAll()]);
     }
   } catch (e) {
-    renderAsistenteError(container, { mode, onDone, onBack, embed }, t("periodo.error.load", { error: userMessage(e) }));
+    renderAsistenteError(container, { mode, onDone, onBack, embed, initialSharePct }, t("periodo.error.load", { error: userMessage(e) }));
     return;
   }
   const partnerName = (meta.partner_name || "").trim();
   const accountsById = Object.fromEntries(allAccounts.map((a) => [a.id, a]));
 
-  // byId "de mentira" solo con lo que colorForCategory/iconForCategory necesitan (rootOf sube
+  // byId "de mentira" solo con lo que familyForCategory/iconForCategory necesitan (rootOf sube
   // por parent_id hasta encontrar la raíz): como root_id YA es una raíz, basta con parent_id=''.
   const byId = Object.fromEntries(rootRows.map((r) => [r.root_id, { id: r.root_id, parent_id: "" }]));
 
@@ -95,8 +126,8 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     ? remainderCents({ budgetTotalCents: closingBudgetTotalCents, incomeCents: closingIncome, spentCents: closingSpent })
     : { cents: 0, basis: "income" };
   // Funciones, no consts: el saldo de origen (state.sourceBalanceCents) cambia si el usuario mueve
-  // la fecha de inicio (#pn-fecha), así que los destinos elegibles hay que recalcularlos en cada
-  // render(), no fijarlos una vez con el saldo inicial.
+  // la fecha de inicio, así que los destinos elegibles hay que recalcularlos en cada render(), no
+  // fijarlos una vez con el saldo inicial.
   function currentDestinations() {
     return remainder.cents > 0 && state.sourceBalanceCents > 0
       ? sweepDestinations(goalsProgress, accountsById, remainder.cents, state.sourceAccountId)
@@ -114,7 +145,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
   const state = {
     startDate: hoyISO(),
     name: nombrePorDefecto(),
-    sharePct: mode === "next" ? closingPeriod.my_share_pct : 50,
+    sharePct: mode === "next" ? closingPeriod.my_share_pct : normalizePct(initialSharePct, 50),
     budgets: { ...inherited }, // rootId -> string en euros tal cual lo escribe el usuario ("" = sin límite)
     // Una raíz con límite heredado TIENE que estar visible: totalPresupuestadoCents suma todo lo
     // que haya en state.budgets, así que una fila oculta metería en el «Presupuestado» del pie un
@@ -126,13 +157,17 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     ]),
     addOpen: false,
     saving: false,
+    // Selector de fecha (B-PeriodoNuevo): «Otra fecha» revela el campo nativo aunque la fecha
+    // elegida siga dentro de la ventana de días (bloqueFecha() también lo revela sola si
+    // startDate cae fuera de la ventana, p. ej. al volver a montar la pantalla).
+    showCustomDate: false,
     // Barrido: preseleccionado el primero (más cerca de cumplirse, spec §9.4); precargado con el
     // remanente entero. sourceAccountId/sourceBalanceCents viven en el state porque la fecha de
-    // inicio (#pn-fecha) puede cambiar el saldo de origen (la transferencia lleva esa fecha).
+    // inicio puede cambiar el saldo de origen (la transferencia lleva esa fecha).
     sweepChoice: initialDestinations[0]?.goalId ?? "keep",
-    // La anatomía de importe del sistema (SISTEMA §2.3) es SIEMPRE `type="text" inputmode="decimal"`
-    // + parseCentsRaw (registro.js:342), nunca `type="number"`: con coma decimal, un <input
-    // type="number"> rechaza el valor en silencio y el campo se ve vacío.
+    // La anatomía de importe del sistema es SIEMPRE `type="text" inputmode="decimal"` +
+    // parseCentsRaw, nunca `type="number"`: con coma decimal, un <input type="number"> rechaza el
+    // valor en silencio y el campo se ve vacío.
     sweepAmountRaw: centsToRaw(remainder.cents),
     sourceAccountId,
     sourceBalanceCents,
@@ -142,14 +177,19 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
   };
   let errorMsg = "";
 
-  function totalPresupuestadoCents() {
-    let sum = 0;
-    for (const raw of Object.values(state.budgets)) {
-      if (raw === "" || raw == null) continue;
+  /** Categorías con un límite válido (>0) tecleado, con su familia y su importe en céntimos: base
+   *  de totalPresupuestadoCents() y de la barra apilada de bloqueTotal() (una sola fuente). */
+  function budgetSegments() {
+    return rootRows.filter((r) => state.visible.has(r.root_id)).flatMap((r) => {
+      const raw = state.budgets[r.root_id];
+      if (raw === "" || raw == null) return [];
       const n = Number(raw);
-      if (Number.isFinite(n) && n > 0) sum += eurToCents(raw);
-    }
-    return sum;
+      if (!Number.isFinite(n) || n <= 0) return [];
+      return [{ fam: familyForCategory(r.root_id, byId), name: r.name, value: eurToCents(raw) }];
+    });
+  }
+  function totalPresupuestadoCents() {
+    return budgetSegments().reduce((s, seg) => s + seg.value, 0);
   }
 
   /** Ingresos que alimentan la barra/nota de "Presupuestado" (D11): en modo 'next' es
@@ -161,10 +201,21 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     return cents > 0 ? cents : null;
   }
 
+  /** Barra apilada de "Presupuestado" (C6, C12): un segmento por categoría con límite, en su
+   *  familia, más un segmento gris (--idle) con lo que queda sin asignar de los ingresos. Sin
+   *  ingresos conocidos no hay barra que dibujar (mismo criterio que antes con la barra plana). */
+  function budgetBarHtml(presupuestado, ingresos) {
+    if (ingresos == null) return "";
+    const segs = budgetSegments().map(({ fam, name, value }) => ({ fam, name, value }));
+    const unassigned = ingresos - presupuestado;
+    if (unassigned > 0) segs.push({ fam: null, name: t("periodo.total.unassigned"), value: unassigned });
+    return stackedBarHtml(segs, { size: 8, legend: false, label: t("periodo.total.budgetedTitle") });
+  }
+
   function notaSinAsignarHtml(sinAsignar) {
     return sinAsignar >= 0
-      ? t("periodo.total.remaining", { amount: `<span style="color:var(--green); font-weight:700;">${fmtMoney(sinAsignar)}</span>` })
-      : t("periodo.total.over", { amount: `<span style="color:var(--red); font-weight:700;">${fmtMoney(-sinAsignar)}</span>` });
+      ? t("periodo.total.remaining", { amount: `<span class="num pn-note-amount">${escHtml(fmtMoney(sinAsignar))}</span>` })
+      : t("periodo.total.over", { amount: `<span class="num pn-note-amount is-over">${escHtml(fmtMoney(-sinAsignar))}</span>` });
   }
 
   /** Actualiza SOLO el total/barra/nota tras editar un importe, sin re-renderizar toda la
@@ -173,372 +224,293 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
   function patchTotal() {
     const presupuestado = totalPresupuestadoCents();
     const presupEl = container.querySelector("#pn-presupuestado");
-    // innerHTML (no textContent): #pn-presupuestado ahora lleva moneyPartsHtml (main + <small>
-    // céntimos</small> + sufijo) — un textContent aquí borraría el <small> en el primer tecleo.
     if (presupEl) presupEl.innerHTML = moneyPartsHtml(presupuestado);
-    // D11: en modo 'first' la barra/nota nacen ocultas con display:none (bloqueTotal) porque
-    // ingresos empieza a null — pero el <div> SIGUE en el DOM, para que teclear el primer dígito
-    // de "Ingresos previstos" pueda mostrarlas con un patch, sin el render() completo que le
-    // robaría el foco al campo que se está tecleando.
+    // D11: en modo 'first' la barra/nota nacen ocultas (bloqueTotal) porque ingresos empieza a
+    // null — pero el <div> SIGUE en el DOM, para que teclear el primer dígito de "Ingresos
+    // previstos" pueda mostrarlas con un patch, sin el render() completo que le robaría el foco.
     const ingresos = currentIngresos();
     const barWrapEl = container.querySelector("#pn-total-bar-wrap");
     const notaEl = container.querySelector("#pn-nota");
     if (barWrapEl && notaEl) {
+      barWrapEl.classList.toggle("is-visible", ingresos != null);
+      notaEl.classList.toggle("is-visible", ingresos != null);
       if (ingresos != null) {
-        const pctBarra = ingresos > 0 ? Math.min(100, Math.round((presupuestado / ingresos) * 100)) : 0;
-        const sinAsignar = ingresos - presupuestado;
-        barWrapEl.style.display = "";
-        const barEl = container.querySelector("#pn-bar");
-        if (barEl) barEl.style.width = pctBarra + "%";
-        notaEl.style.display = "";
-        notaEl.innerHTML = notaSinAsignarHtml(sinAsignar);
-      } else {
-        barWrapEl.style.display = "none";
-        notaEl.style.display = "none";
+        barWrapEl.innerHTML = budgetBarHtml(presupuestado, ingresos);
+        notaEl.innerHTML = notaSinAsignarHtml(ingresos - presupuestado);
       }
     }
   }
 
   /** Actualiza SOLO el aviso de tope y el «quedaría en X» de cada destino tras teclear en
    *  «Cantidad a barrer» — mismo criterio que patchTotal(): un render() completo por tecla
-   *  destruiría el input con el foco (comentario de referencia arriba, líneas 112-114). */
+   *  destruiría el input con el foco (comentario de referencia arriba). */
   function patchSweepPreview() {
     if (!currentShowBarrido()) return;
     const plan = sweepPlan({ rawAmount: state.sweepAmountRaw, sourceBalanceCents: state.sourceBalanceCents });
     const cappedEl = container.querySelector("#pn-sweep-capped");
     if (cappedEl) {
-      if (plan.capped) {
-        cappedEl.style.display = "";
-        cappedEl.textContent = t("barrido.capped", {
-          amount: fmtMoney(plan.amountCents), account: accountsById[state.sourceAccountId]?.name ?? "",
-        });
-      } else {
-        cappedEl.style.display = "none";
-      }
+      cappedEl.classList.toggle("is-visible", plan.capped);
+      cappedEl.textContent = plan.capped
+        ? t("barrido.capped", { amount: fmtMoney(plan.amountCents), account: accountsById[state.sourceAccountId]?.name ?? "" })
+        : "";
     }
     const liveDestinations = sweepDestinations(goalsProgress, accountsById, plan.amountCents, state.sourceAccountId);
     for (const d of liveDestinations) {
       const line = container.querySelector(`[data-sweep-afterline="${d.goalId}"]`);
-      // innerHTML, no textContent: sweepAfterLineText ahora devuelve el HTML de metaHtml (el
-      // divisor de 1px), no una cadena plana con "·".
+      // innerHTML, no textContent: sweepAfterLineText devuelve el HTML de metaHtml (el divisor de
+      // 1px), no una cadena plana.
       if (line) line.innerHTML = sweepAfterLineText(d);
     }
   }
 
-  // Cabecera de asistente (§4.2, subHeaderHtml align:"start"): el kicker verde desaparece y su
-  // frase pasa a ser el subtítulo del propio helper — en modo 'next' con el copy nuevo del
-  // artboard (periodo.header.closing, con el nombre YA cargado en closingPeriod.name); en 'first'
-  // no hay periodo que cerrar, así que se conserva "Primer periodo" (periodo.header.first), que no
-  // inventa ningún dato.
+  // Cabecera con atrás (DESIGN.md §9): título a la izquierda con subtítulo — en modo 'next' con
+  // el nombre del periodo que se cierra (periodo.header.closing); en 'first' no hay periodo que
+  // cerrar (periodo.header.first).
   function bloqueHeader() {
     const subtitle = mode === "next" ? t("periodo.header.closing", { name: closingPeriod.name }) : t("periodo.header.first");
     return subHeaderHtml({
       id: mode === "next" || onBack ? "pn-back" : null,
       title: t("periodo.header.title"),
       subtitle,
-      align: "start",
     });
   }
 
-  // Rejilla 2×2 (§9.5): Ingresos, Gastado, Ahorrado y, en la cuarta celda, la frase de ahorro en
-  // vez de la etiqueta "Tasa de ahorro" + su cifra — .stat-grid ya es el componente que informe.js
-  // usa para su propia rejilla de 2×2 (income/spent/saved/available), así que se reutiliza tal
-  // cual en vez de reinventar una rejilla ad hoc.
-  function bloqueCierre() {
+  /** El Display del cierre (F-13, F-02: --pos sin brillo fuera del Display no aplica aquí, no hay
+   *  cifra de ingreso suelta): "{name} ahorró" con el pie de 3 datos (Ingresos/Gastado/Movimientos)
+   *  en --disp-ink, que antes vivía en una tarjeta de rejilla 2×2 aparte. Solo en modo 'next': en
+   *  'first' no hay periodo cerrado del que enseñar ahorro. */
+  function bloqueDisplay() {
     if (mode !== "next") return "";
     const ahorrado = closingIncome - closingSpent;
     const tasa = closingIncome > 0 ? fmtPct(ahorrado / closingIncome) : "—";
     const rangeEnd = prevDayIso(state.startDate || hoyISO());
     const rangeLabel = `${fmtDiaCorto(closingPeriod.start_date)} – ${fmtDiaCorto(rangeEnd)}`;
-    return `
-    <div class="card" style="display:flex; flex-direction:column; gap:14px;">
-      <div style="display:flex; flex-direction:column; gap:3px;">
-        <div style="font-size:15px; font-weight:700;">${t("periodo.closing.title", { name: escHtml(closingPeriod.name) })}</div>
-        ${metaHtml([rangeLabel, t("periodo.closing.movementCount", { n: closingCount })])}
-      </div>
-      <hr class="divider">
-      <div class="stat-grid" style="grid-template-columns:repeat(2,1fr); margin-top:0;">
-        <div>
-          <span style="font-size:11px; color:var(--text-3);">${t("periodo.closing.income")}</span>
-          <span class="num" style="font-size:15px; font-weight:600;">${escHtml(fmtMoney(closingIncome))}</span>
-        </div>
-        <div>
-          <span style="font-size:11px; color:var(--text-3);">${t("periodo.closing.spent")}</span>
-          <span class="num" style="font-size:15px; font-weight:600;">${escHtml(fmtMoney(closingSpent))}</span>
-        </div>
-        <div>
-          <span style="font-size:11px; color:var(--text-3);">${t("periodo.closing.saved")}</span>
-          <span class="num ${ahorrado >= 0 ? "text-green" : "text-red"}" style="font-size:15px; font-weight:600;">${escHtml(fmtMoney(ahorrado))}</span>
-        </div>
-        <div style="justify-content:center;">
-          <span style="font-size:12px; color:var(--text-2); line-height:1.4;">${t("periodo.closing.savingsSentence", { pct: tasa })}</span>
-        </div>
-      </div>
-    </div>`;
+    const filas = [
+      [t("periodo.closing.income"), fmtMoney(closingIncome)],
+      [t("periodo.closing.spent"), fmtMoney(closingSpent)],
+      [t("periodo.closing.count"), String(closingCount)],
+    ];
+    return displayHtml({
+      label: t("periodo.closing.saved", { name: closingPeriod.name }),
+      value: fmtMoney(ahorrado),
+      size: "l",
+      aside: rangeLabel,
+      footHtml: t("periodo.closing.savedPct", { pct: dispInkHtml(tasa) }),
+      slot: `<div class="pn-closing-grid">${filas.map(([label, value]) => `<div class="pn-closing-item">
+        <span class="pn-closing-label">${escHtml(label)}</span>
+        <span class="num disp-ink pn-closing-value">${escHtml(value)}</span>
+      </div>`).join("")}</div>`,
+    });
   }
 
-  /** Fila de un destino elegible (Bloque 2 de PeriodoNuevo.dc.html, N4): tarjeta de radio con
-   *  nombre, current/target, barra y «quedaría en {importe}». El `data-sweep-afterline` es lo que
-   *  patchSweepPreview() reescribe al teclear en el importe, sin re-renderizar toda la pantalla. */
-  function barridoDestinoHtml(d, withDivider) {
+  /** Fila de un destino elegible (N4): tarjeta con borde de acento cuando está elegida (K3: el
+   *  naranja solo por CSS, nunca leído aquí — el radio real es lo que dispara el borde con
+   *  `input:checked + .pn-sweep-tile`, ver screens.css). */
+  function barridoDestinoHtml(d) {
     const checked = state.sweepChoice === d.goalId;
-    const pct = Math.min(100, Math.max(0, d.pct));
-    // Un fondo de emergencia del primer cierre no tiene periodos cerrados de los que sacar el
-    // promedio de gasto (repo.js#goalProgress): targetCents sale 0, así que no hay objetivo real
-    // con el que dar «X / 0,00 €» ni una barra que dibujar (0 % de un objetivo que no existe).
     const hasTarget = d.targetCents > 0;
-    // Tarjeta con borde resaltado cuando está elegida (artboard PeriodoNuevo.dc.html): el margen
-    // negativo compensa el padding para que el borde no desplace el contenido de las demás filas.
     return `
-    ${withDivider ? '<hr class="divider">' : ""}
-    <label style="display:flex; align-items:center; gap:12px; padding:12px; margin:2px -12px;
-      border-radius:12px; border:1.5px solid ${checked ? "var(--accent)" : "transparent"}; cursor:pointer; -webkit-tap-highlight-color:transparent;">
-      <input type="radio" name="pn-sweep-dest" value="${escAttr(d.goalId)}" data-sweep-radio ${checked ? "checked" : ""} style="width:20px; height:20px; flex-shrink:0;">
-      <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:5px;">
-        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px;">
-          <span style="font-size:14px; font-weight:600;">${t("barrido.toGoal", { name: escHtml(d.name) })}</span>
-          <span class="num" style="font-size:11px; color:var(--text-3); flex-shrink:0;">${escHtml(fmtMoney(d.currentCents))}${hasTarget ? ` / ${escHtml(fmtMoney(d.targetCents))}` : ""}</span>
-        </div>
-        ${hasTarget ? `<div class="bar" style="height:6px;"><i style="width:${pct}%;"></i></div>` : ""}
-        <div class="num" style="font-size:11px; color:var(--text-3);" data-sweep-afterline="${escAttr(d.goalId)}">${sweepAfterLineText(d)}</div>
-      </div>
+    <label class="pn-sweep-row">
+      <input type="radio" name="pn-sweep-dest" class="pn-sweep-radio" value="${escAttr(d.goalId)}" ${checked ? "checked" : ""}>
+      <span class="pn-sweep-tile">
+        <span class="pn-sweep-head">
+          <span class="pn-sweep-name">${t("barrido.toGoal", { name: escHtml(d.name) })}</span>
+          <span class="num pn-sweep-amt">${escHtml(fmtMoney(d.currentCents))}${hasTarget ? ` / ${escHtml(fmtMoney(d.targetCents))}` : ""}</span>
+        </span>
+        ${hasTarget ? meterHtml({ value: d.currentCents, max: d.targetCents }) : ""}
+        <span class="num pn-sweep-after" data-sweep-afterline="${escAttr(d.goalId)}">${sweepAfterLineText(d)}</span>
+      </span>
     </label>`;
   }
 
   // metaHtml (no prosa): esta línea se pinta tanto interpolada en barridoDestinoHtml() como
   // reescrita por patchSweepPreview() vía innerHTML — las dos rutas quedan consistentes porque
-  // metaHtml es lo único que se llama en los dos sitios (ver el comentario de patchSweepPreview).
+  // metaHtml es lo único que se llama en los dos sitios.
   function sweepAfterLineText(d) {
     return metaHtml([t("barrido.wouldBe", { amount: fmtMoney(d.afterCents) }), d.completes ? t("barrido.completes") : ""]);
   }
 
   /** El paso «Barrido» del cierre (N4, spec §9.4): entre el resumen del periodo que se cierra y el
    *  nombre del nuevo, y SOLO en modo 'next'. No se pinta si el remanente es 0, si no hay ningún
-   *  destino elegible, o si el saldo de la cuenta de origen es ≤ 0 (D10). */
+   *  destino elegible, o si el saldo de la cuenta de origen es ≤ 0 (D10). No cubierto por el
+   *  brief S11 (no aparece en B-PeriodoNuevo, remanente 0 en el escenario del mockup): se
+   *  retoca con tokens del sistema, no con un componente nuevo. */
   function bloqueBarrido() {
     if (!currentShowBarrido()) return "";
     const destinations = currentDestinations();
     const titleKey = remainder.basis === "budget" ? "barrido.title" : "barrido.titleIncome";
     const plan = sweepPlan({ rawAmount: state.sweepAmountRaw, sourceBalanceCents: state.sourceBalanceCents });
     const sourceAccountName = accountsById[state.sourceAccountId]?.name ?? "";
+    const disabled = state.sweepChoice === "keep";
     return `
-    <div class="card" style="display:flex; flex-direction:column; gap:14px;">
-      <div style="display:flex; flex-direction:column; gap:3px;">
-        <div style="font-size:15px; font-weight:700;">${t(titleKey, { amount: escHtml(fmtMoney(remainder.cents)) })}</div>
-        <div style="font-size:11px; color:var(--text-3);">${t("barrido.question")}</div>
-      </div>
-      <div style="display:flex; flex-direction:column;">
-        ${destinations.map((d, i) => barridoDestinoHtml(d, i > 0)).join("")}
-        <hr class="divider">
-        <label style="display:flex; align-items:center; gap:12px; padding:12px 0; cursor:pointer; -webkit-tap-highlight-color:transparent;">
-          <input type="radio" name="pn-sweep-dest" value="keep" data-sweep-radio ${state.sweepChoice === "keep" ? "checked" : ""} style="width:20px; height:20px; flex-shrink:0;">
-          <span style="font-size:14px; font-weight:600;">${t("barrido.leaveIt")}</span>
+    <div class="box box-chart">
+      ${sectionHeaderHtml({ title: t(titleKey, { amount: fmtMoney(remainder.cents) }) })}
+      <p class="pn-hint">${escHtml(t("barrido.question"))}</p>
+      <div class="pn-sweep-list">
+        ${destinations.map((d, i) => `${i > 0 ? '<hr class="pn-row-sep">' : ""}${barridoDestinoHtml(d)}`).join("")}
+        <hr class="pn-row-sep">
+        <label class="pn-sweep-row">
+          <input type="radio" name="pn-sweep-dest" class="pn-sweep-radio" value="keep" ${disabled ? "checked" : ""}>
+          <span class="pn-sweep-keep">${escHtml(t("barrido.leaveIt"))}</span>
         </label>
       </div>
-      <div style="display:flex; flex-direction:column; gap:6px; ${state.sweepChoice === "keep" ? "opacity:.5;" : ""}">
-        <div class="section-title">${t("barrido.amount")}</div>
-        <div class="amount-display" style="align-items:center;">
+      <div class="pn-sweep-amount${disabled ? " is-disabled" : ""}">
+        <span class="pn-total-label">${escHtml(t("barrido.amount"))}</span>
+        <span class="pn-amount-wrap${state.sweepAmountRaw ? " has-value" : ""}">
           <input type="text" inputmode="decimal" id="pn-sweep-amount" value="${escAttr(state.sweepAmountRaw)}" placeholder="0" autocomplete="off"
-            ${state.sweepChoice === "keep" ? "disabled" : ""}
-            style="border:0; background:none; color:var(--text); font:600 32px var(--font-num); letter-spacing:-0.02em; width:100%; outline:none;">
-          <span class="amount-currency">${escHtml(currencySymbol())}</span>
-        </div>
-        <hr class="divider" style="margin-top:2px;">
-        <div id="pn-sweep-capped" class="num" style="font-size:11px; color:var(--amber, var(--text-3)); ${plan.capped ? "" : "display:none;"}">${plan.capped ? escHtml(t("barrido.capped", { amount: fmtMoney(plan.amountCents), account: sourceAccountName })) : ""}</div>
+            ${disabled ? "disabled" : ""} class="pn-amount-input pn-amount-input-lg${state.sweepAmountRaw ? "" : " is-empty"}">
+          <span class="pn-amount-suffix">${escHtml(currencySymbol())}</span>
+        </span>
+        <p id="pn-sweep-capped" class="pn-hint pn-sweep-capped${plan.capped ? " is-visible" : ""}">${plan.capped ? escHtml(t("barrido.capped", { amount: fmtMoney(plan.amountCents), account: sourceAccountName })) : ""}</p>
       </div>
     </div>`;
   }
 
-  // Tres cards independientes (una por bloque: nombre, fecha, reparto), réplica de la estructura
-  // de PeriodoNuevo.dc.html — antes era un único .card con <hr> entre secciones; el artboard las
-  // separa. Nombre/fecha siguen siendo <input> reales (el input manda, no se convierten a texto),
-  // solo re-vestidos como tile --card2 (antes hex #1b1e21 suelto).
+  // Campo hundido (§9, "Campo hundido"): el nombre editable del periodo nuevo. Sin tarjeta propia
+  // (el sistema ya la da el propio campo); no está en el mockup (no hay forma de renombrar el
+  // periodo en B-PeriodoNuevo) — se conserva por función: sin esto no habría forma de corregir el
+  // nombre por defecto antes de abrir el periodo.
   function bloqueNombre() {
-    return `
-    <div class="card" style="display:flex; flex-direction:column; gap:8px;">
-      <div class="section-title">${t("common.name")}</div>
-      <input type="text" id="pn-nombre" value="${escAttr(state.name)}"
-        style="height:44px; padding:0 14px; background:var(--card2); border:0; border-radius:0; color:var(--text);
-        font:700 15px var(--font-ui); width:100%; outline:none;">
-    </div>`;
+    return fieldHtml({ id: "pn-nombre", label: t("common.name"), value: state.name });
   }
 
-  // Tile calendario decorativo (sin onclick): el input type=date ya trae su propio selector nativo
-  // en toda su superficie — añadirle un handler al tile duplicaría esa interacción sin aportar
-  // nada nuevo, y sería la única pieza de "lógica" de esta tarjeta que no viene ya del navegador.
+  /** Fecha de inicio (B-PeriodoNuevo): 5 días alrededor de hoy como baldosas seleccionables (P1
+   *  abierto: la sugerencia siempre es hoy, nunca un día de cobro fijo), más «Otra fecha» para
+   *  cualquier fecha fuera de esa ventana vía el campo hundido nativo. El botón hace de ida y
+   *  vuelta (#pn-otra-fecha/#pn-dias-cercanos en wire()): sin él, una vez abierto el campo no
+   *  habría manera de volver a las baldosas. */
   function bloqueFecha() {
+    const candidates = dayCandidates();
+    const showField = state.showCustomDate || !candidates.includes(state.startDate);
     return `
-    <div class="card" style="display:flex; flex-direction:column; gap:8px;">
-      <div class="section-title">${t("periodo.date.title")}</div>
-      <div style="display:flex; align-items:center; gap:10px;">
-        <input type="date" id="pn-fecha" value="${state.startDate}"
-          style="flex:1; height:44px; padding:0 14px; background:var(--card2); border:0; border-radius:0;
-          color:var(--text); font:600 14px var(--font-num); min-width:0;">
-        <div style="width:44px; height:44px; border-radius:0; background:var(--card2); flex-shrink:0;
-          display:flex; align-items:center; justify-content:center;" aria-hidden="true">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="stroke:var(--text);" stroke-width="1.6"
-            stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3.5" y="5" width="17" height="16" rx="2.5"></rect><path d="M3.5 9.5h17M8 3v4M16 3v4"></path>
-          </svg>
-        </div>
-      </div>
-    </div>`;
+    <section class="pn-section">
+      ${sectionHeaderHtml({ title: dateTitle(), id: "pn-date-title" })}
+      ${showField
+        ? fieldHtml({ id: "pn-fecha", label: t("periodo.date.customLabel"), type: "date", value: state.startDate })
+        : `<div class="pn-day-grid" role="group" aria-label="${escAttr(t("periodo.date.groupAria"))}">${candidates.map((iso) => dayTileHtml(iso, iso === state.startDate)).join("")}</div>`}
+      ${showField
+        ? buttonHtml({ kind: "tertiary", id: "pn-dias-cercanos", icon: "calendar", label: t("periodo.date.quickPick") })
+        : buttonHtml({ kind: "tertiary", id: "pn-otra-fecha", icon: "calendar", label: t("periodo.date.other") })}
+    </section>`;
+  }
+  function dateTitle() {
+    return t("periodo.date.title", { name: state.name.trim() || nombrePorDefecto() });
   }
 
-  // Steppers 44px/radius14 (antes ▲/▼ apiladas de 20×19 — .stepper-btn base se pisa por instancia,
-  // mismo criterio que .ring 52px en patrimonio.js o el botón "+Nueva" 44px de recurrentes.js) +
-  // el texto del % existente, sin cambios de dato/copy.
+  // Paso a paso (§9, controls.js#stepperHtml): el reparto con la contraparte, dentro de un bloque
+  // --surface con borde (B-PeriodoNuevo, "Pagas de lo compartido").
   function bloqueReparto() {
     if (!partnerName) return "";
     const restante = 100 - state.sharePct;
     return `
-    <div class="card" style="display:flex; flex-direction:column; gap:8px;">
-      <div class="section-title">${t("periodo.share.title")}</div>
-      <div style="display:flex; align-items:center; gap:10px;">
-        <div style="flex:1; min-width:0;">
-          <div style="font-size:14px; font-weight:600;">${t("periodo.share.youPay")}</div>
-          <div style="font-size:11px; color:var(--text-3);">${t("periodo.share.partnerPays", { name: escHtml(partnerName), pct: restante })}</div>
-        </div>
-        <button type="button" id="pn-pct-down" class="stepper-btn lg"
-          aria-label="${t("periodo.share.decreaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
-        <div class="num" style="font-size:20px; font-weight:700; width:56px; text-align:center; flex-shrink:0;">${state.sharePct} %</div>
-        <button type="button" id="pn-pct-up" class="stepper-btn lg"
-          aria-label="${t("periodo.share.increaseAria")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+    <div class="pn-share">
+      <div class="pn-share-body">
+        <span class="pn-share-label">${t("periodo.share.youPay")}</span>
+        <span class="pn-share-sub">${t("periodo.share.partnerPays", { name: escHtml(partnerName), pct: restante })}</span>
       </div>
+      ${stepperHtml({
+        value: `${state.sharePct} %`, decId: "pn-pct-down", incId: "pn-pct-up",
+        decLabel: t("periodo.share.decreaseAria"), incLabel: t("periodo.share.increaseAria"),
+      })}
     </div>`;
   }
 
-  function budgetRowHtml(r, withDivider) {
-    const color = colorForCategory(r.root_id, byId);
-    const icon = iconForCategory(r.root_id, byId);
+  /** Control del límite de una categoría (F-35, "el valor en tinta"): campo de 44 sobre --well,
+   *  centrado y con placeholder mientras está vacío, a la derecha en cuanto tiene importe. */
+  function budgetFieldHtml(r) {
     const raw = state.budgets[r.root_id] ?? "";
     const empty = raw === "";
-    return `
-    ${withDivider ? '<hr class="divider">' : ""}
-    <div style="display:flex; align-items:center; gap:12px; padding:13px 0;">
-      <div class="tx-icon" style="--cat:${color};">${icon}</div>
-      <div style="display:flex; flex-direction:column; gap:3px; flex-grow:1; min-width:0;">
-        <div style="font-size:14px; font-weight:600;">${escHtml(r.name)}</div>
-        ${mode === "next" ? `<div style="font-size:11px; color:var(--text-3);">${t("periodo.budget.lastMonth", { amount: fmtMoney(r.spent_cents) })}</div>` : ""}
-      </div>
-      <div style="position:relative; flex-shrink:0;">
-        <input type="number" min="0" step="0.01" inputmode="decimal" placeholder="${t("periodo.budget.noLimitPlaceholder")}"
-          data-budget="${r.root_id}" value="${escAttr(raw)}" class="budget-input${empty ? " is-empty" : ""}">
-        <span class="budget-eur" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:12px;
-          color:var(--text-3); pointer-events:none; display:${empty ? "none" : ""};">${currencySymbol()}</span>
-      </div>
-    </div>`;
+    return `<span class="pn-amount-wrap${empty ? "" : " has-value"}">
+      <input type="number" min="0" step="0.01" inputmode="decimal" placeholder="${escAttr(t("periodo.budget.noLimitPlaceholder"))}"
+        data-budget="${escAttr(r.root_id)}" value="${escAttr(raw)}" class="pn-amount-input${empty ? " is-empty" : ""}">
+      <span class="pn-amount-suffix">${escHtml(currencySymbol())}</span>
+    </span>`;
+  }
+
+  // Fila de ajuste (§9, entity.js#settingRowHtml, F-35: 48 de alto): baldosa de la categoría,
+  // "Mes pasado" del periodo que se cierra y el control de límite a la derecha.
+  function budgetRowHtml(r) {
+    const sub = mode === "next" ? t("periodo.budget.lastMonth", { name: closingPeriod.name, amount: fmtMoney(r.spent_cents) }) : "";
+    return settingRowHtml({
+      icon: iconForCategory(r.root_id, byId), fam: familyForCategory(r.root_id, byId),
+      label: r.name, sub, controlHtml: budgetFieldHtml(r), id: `pn-budget-row-${r.root_id}`,
+    });
   }
 
   function bloqueLimites() {
+    if (rootRows.length === 0) {
+      return `<div class="pn-empty-cats">${escHtml(t("periodo.budget.noCategories"))}</div>`;
+    }
     const visibleRows = rootRows.filter((r) => state.visible.has(r.root_id));
     const hiddenRows = rootRows.filter((r) => !state.visible.has(r.root_id));
-    if (rootRows.length === 0) {
-      return `
-      <div class="card" style="text-align:center; color:var(--text-3);">
-        <p>${t("periodo.budget.noCategories")}</p>
-      </div>`;
-    }
     return `
-    <div style="display:flex; flex-direction:column; gap:10px;">
-      <div style="display:flex; flex-direction:column; gap:4px;">
-        <div style="font-size:15px; font-weight:700;">${t("periodo.budget.question")}</div>
-        <div style="font-size:11px; color:var(--text-3); line-height:1.5;">
-          ${t("periodo.budget.hint")}
-        </div>
+    <section class="pn-section">
+      <div class="pn-section-head">
+        ${sectionHeaderHtml({ title: t("periodo.budget.question") })}
+        <p class="pn-hint">${escHtml(t("periodo.budget.hint"))}</p>
       </div>
-      <div class="card" style="padding:4px 16px; display:flex; flex-direction:column;">
-        ${visibleRows.map((r, i) => budgetRowHtml(r, i > 0)).join("")}
+      <div class="pn-row-list">
+        ${visibleRows.map((r, i) => `${i > 0 ? '<hr class="pn-row-sep">' : ""}${budgetRowHtml(r)}`).join("")}
         ${hiddenRows.length ? `
-        ${visibleRows.length ? '<hr class="divider">' : ""}
-        <button type="button" id="pn-add-limite"
-          style="display:flex; align-items:center; gap:12px; padding:14px 0; background:none; border:0; width:100%;
-          text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent;">
-          <div class="tx-icon" style="--cat:var(--text);">
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13"></path></svg>
-          </div>
-          <span style="font-size:14px; font-weight:600; color:var(--text);">${t("periodo.budget.addAnother")}</span>
-        </button>
-        ${state.addOpen ? `
-        <div style="display:flex; flex-direction:column; padding-bottom:10px;">
-          ${hiddenRows.map((r) => `
-          <button type="button" data-add-root="${r.root_id}"
-            style="display:flex; align-items:center; gap:10px; padding:9px 0 9px 52px; background:none; border:0;
-            width:100%; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent;">
-            <span style="font-size:16px; line-height:1;">${iconForCategory(r.root_id, byId)}</span>
-            <span style="font-size:13px; color:var(--text-2);">${escHtml(r.name)}</span>
-          </button>`).join("")}
-        </div>` : ""}
-        ` : ""}
+        ${visibleRows.length ? '<hr class="pn-row-sep">' : ""}
+        ${settingRowHtml({ icon: "plus", label: t("periodo.budget.addAnother"), chevron: false, id: "pn-add-limite" })}
+        ${state.addOpen ? `<div class="pn-add-list">${hiddenRows.map((r) => settingRowHtml({
+          icon: iconForCategory(r.root_id, byId), fam: familyForCategory(r.root_id, byId), label: r.name,
+          chevron: false, id: `pn-add-cat-${r.root_id}`, data: { addRoot: r.root_id },
+        })).join("")}</div>` : ""}` : ""}
       </div>
-    </div>`;
+    </section>`;
   }
 
-  // "Presupuestado" con céntimos small (fmtMoneyParts/moneyPartsHtml, patrón inicio.js/
-  // patrimonio.js/gasto-por-categoria.js): es un importe COMPUESTO/derivado (suma de los budget-input,
-  // no un campo editable en sí), así que sí se convierte al patrón .amount-hero — a diferencia de
-  // los budget-input de bloqueLimites, que siguen siendo inputs reales sin tocar. Barra: mismo
-  // patrón que gasto-por-categoria.js — clase .bar con --cat:var(--text) en vez del
-  // var(--accent) suelto de antes. CTA + error se sacan a bloqueCTA() (bloque final separado,
-  // como en el artboard) — el id #pn-presupuestado/#pn-bar/#pn-nota los sigue actualizando
-  // patchTotal() sin re-render completo (ver su comentario más abajo).
+  /** "Presupuestado" a 20 (F-14, C3): ya no es el importe héroe de la pantalla. A la derecha, los
+   *  ingresos ya conocidos (modo 'next') o el campo efímero "Ingresos previstos" (D11, modo
+   *  'first'). Debajo, la barra apilada por familia (budgetBarHtml) y la nota de lo que queda. */
   function bloqueTotal() {
     const presupuestado = totalPresupuestadoCents();
     const ingresos = currentIngresos();
-    const pctBarra = ingresos > 0 ? Math.min(100, Math.round((presupuestado / ingresos) * 100)) : 0;
-    const sinAsignar = ingresos != null ? ingresos - presupuestado : null;
-    // D11: en modo 'first' "Ingresos previstos" es un <input> efímero (no se manda a
-    // openNextPeriod), con la misma anatomía type=text/inputmode=decimal que #pn-sweep-amount —
-    // en modo 'next' sigue siendo la cifra ya conocida, solo lectura.
     const incomeSlotHtml = mode === "next"
-      ? `
-        <div style="font-size:11px; color:var(--text-3);">${t("periodo.total.expectedIncome")}</div>
-        <div class="num" style="font-size:15px; font-weight:600; color:var(--text-2);">${escHtml(fmtMoney(ingresos))}</div>`
-      : `
-        <span style="font-size:11px; color:var(--text-3);">${t("periodo.first.expectedIncome")}</span>
-        <div class="amount-display" style="align-items:center; justify-content:flex-end;">
-          <input type="text" inputmode="decimal" id="pn-expected-income" value="${escAttr(state.expectedIncomeRaw)}" placeholder="0" autocomplete="off"
-            style="border:0; background:none; color:var(--text); font:600 30px var(--font-num); letter-spacing:-0.02em; width:130px; text-align:right; outline:none;">
-          <span class="amount-currency">${escHtml(currencySymbol())}</span>
-        </div>`;
+      ? `<span class="pn-total-income-line">${t("periodo.total.expectedIncome")}</span>
+         <span class="num pn-total-income-value">${escHtml(fmtMoney(ingresos))}</span>`
+      : `<span class="pn-total-income-line">${t("periodo.first.expectedIncome")}</span>
+         <span class="pn-amount-wrap${state.expectedIncomeRaw ? " has-value" : ""}">
+           <input type="text" inputmode="decimal" id="pn-expected-income" value="${escAttr(state.expectedIncomeRaw)}"
+             placeholder="0" autocomplete="off" class="pn-amount-input pn-amount-input-lg${state.expectedIncomeRaw ? "" : " is-empty"}">
+           <span class="pn-amount-suffix">${escHtml(currencySymbol())}</span>
+         </span>`;
     return `
-    <div class="card" style="display:flex; flex-direction:column; gap:14px;">
-      <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
-        <div style="display:flex; flex-direction:column; gap:5px;">
-          <div class="section-title">${t("periodo.total.budgetedTitle")}</div>
-          <div class="amount-hero num" id="pn-presupuestado">${moneyPartsHtml(presupuestado)}</div>
+    <div class="box box-chart">
+      <div class="pn-total-head">
+        <div class="pn-total-figure">
+          <span class="pn-total-label">${escHtml(t("periodo.total.budgetedTitle"))}</span>
+          <span class="num pn-total-amount" id="pn-presupuestado">${moneyPartsHtml(presupuestado)}</span>
         </div>
-        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;">${incomeSlotHtml}</div>
+        <div class="pn-total-income">${incomeSlotHtml}</div>
       </div>
-      <div id="pn-total-bar-wrap" class="bar" style="--cat:var(--text); ${ingresos == null ? "display:none;" : ""}"><i id="pn-bar" style="width:${pctBarra}%;"></i></div>
-      <div id="pn-nota" style="font-size:11px; color:var(--text-3); line-height:1.5; ${ingresos == null ? "display:none;" : ""}">${ingresos != null ? notaSinAsignarHtml(sinAsignar) : ""}</div>
+      <div id="pn-total-bar-wrap" class="pn-total-bar${ingresos == null ? "" : " is-visible"}">${budgetBarHtml(presupuestado, ingresos)}</div>
+      <p id="pn-nota" class="pn-total-note${ingresos == null ? "" : " is-visible"}">${ingresos != null ? notaSinAsignarHtml(ingresos - presupuestado) : ""}</p>
     </div>`;
   }
 
-  // CTA final, fuera de la card del total (como en el artboard): mismo id/label EXISTENTE
-  // ("Abrir periodo"/"Abriendo…" — no el "Abrir Septiembre 2026" fijo del artboard, que fabricaría
-  // un texto con el nombre siempre en mayúscula fija en vez del state.name real). La nota del
-  // informe y el enlace "Ver el informe" (bloque 6 del artboard) suben aquí, DEBAJO del botón —
-  // antes solo vivían en el panel de éxito posterior (renderClosedPanel), que se queda con el
-  // acuse de recibo real sin repetir la nota (ver su comentario).
+  // CTA final: primario con la nota debajo (§9 "Primario", B-PeriodoNuevo es su propio mockup de
+  // referencia) y, solo en modo 'next', el enlace terciario a la previsualización del informe.
   function bloqueCTA() {
     return `
-    <div style="display:flex; flex-direction:column; gap:16px;">
-      ${errorMsg ? `<div class="banner-aviso red">${escHtml(errorMsg)}</div>` : ""}
-      <button type="button" class="btn-primary" id="pn-submit" ${state.saving ? "disabled" : ""}>${state.saving ? t("periodo.cta.saving") : t("periodo.cta.submit")}</button>
-      ${mode === "next" ? `
-      <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
-        <span style="font-size:12px; font-weight:500; color:var(--text-3); line-height:1.5; text-align:center;">${t("periodo.cta.reportNote")}</span>
-        <button type="button" id="pn-preview-informe" style="border:0; background:transparent; color:var(--accent); font-size:14px; font-weight:600; padding:0; height:44px; cursor:pointer;">${t("periodo.finish.seeReport")}</button>
-      </div>` : ""}
+    <div class="pn-cta">
+      ${errorMsg ? `<div class="banner-aviso is-error">${escHtml(errorMsg)}</div>` : ""}
+      ${buttonHtml({
+        kind: "primary", id: "pn-submit", disabled: state.saving,
+        label: state.saving ? t("periodo.cta.saving") : t("periodo.cta.submit"),
+        note: mode === "next" ? t("periodo.cta.reportNote") : "",
+      })}
+      ${mode === "next" ? `<div class="pn-cta-link">${buttonHtml({ kind: "tertiary", id: "pn-preview-informe", label: t("periodo.finish.seeReport") })}</div>` : ""}
     </div>`;
   }
 
   function render() {
     container.innerHTML = `
       ${embed ? "" : bloqueHeader()}
-      <div style="display:flex; flex-direction:column; gap:var(--gap-section);">
-        ${bloqueCierre()}
+      <div class="pn-blocks">
+        ${bloqueDisplay()}
         ${bloqueBarrido()}
         ${bloqueNombre()}
         ${bloqueFecha()}
@@ -555,7 +527,33 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     const back = container.querySelector("#pn-back");
     if (back) back.onclick = () => (onBack ?? onDone)();
 
-    container.querySelector("#pn-fecha").onchange = async (e) => {
+    container.querySelectorAll("[data-day]").forEach((btn) => {
+      btn.onclick = async () => {
+        state.startDate = btn.dataset.day;
+        state.showCustomDate = false;
+        if (state.sourceAccountId) {
+          try { state.sourceBalanceCents = await accountBalanceCents(state.sourceAccountId, state.startDate); }
+          catch { state.sourceBalanceCents = 0; }
+        }
+        render();
+      };
+    });
+    const otraFechaBtn = container.querySelector("#pn-otra-fecha");
+    if (otraFechaBtn) otraFechaBtn.onclick = () => { state.showCustomDate = true; render(); };
+    // Ida y vuelta del campo nativo a las baldosas: sin esto, tras "Otra fecha" no habría forma de
+    // volver — el día vuelve a ser el de hoy (P1: la sugerencia siempre es hoy).
+    const diasCercanosBtn = container.querySelector("#pn-dias-cercanos");
+    if (diasCercanosBtn) diasCercanosBtn.onclick = async () => {
+      state.showCustomDate = false;
+      state.startDate = hoyISO();
+      if (state.sourceAccountId) {
+        try { state.sourceBalanceCents = await accountBalanceCents(state.sourceAccountId, state.startDate); }
+        catch { state.sourceBalanceCents = 0; }
+      }
+      render();
+    };
+    const fechaInput = container.querySelector("#pn-fecha");
+    if (fechaInput) fechaInput.onchange = async (e) => {
       state.startDate = e.target.value || hoyISO();
       // La transferencia del barrido lleva ESTA fecha (no "hoy"): al mover el inicio del periodo
       // nuevo hay que releer el saldo de la cuenta de origen a esa fecha exacta.
@@ -565,7 +563,15 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
       }
       render();
     };
-    container.querySelector("#pn-nombre").oninput = (e) => { state.name = e.target.value; };
+
+    container.querySelector("#pn-nombre").oninput = (e) => {
+      state.name = e.target.value;
+      // "{name} empieza el" (bloqueFecha) se queda con el nombre de cuando se pintó por última
+      // vez: un render() completo aquí perdería el foco del campo, así que se parchea solo el
+      // título (mismo criterio que patchTotal/patchSweepPreview).
+      const titleEl = container.querySelector("#pn-date-title");
+      if (titleEl) titleEl.textContent = dateTitle();
+    };
 
     // D11: solo existe en modo 'first' (bloqueTotal). oninput + patchTotal(), nunca render()
     // completo — perdería el foco a cada dígito, igual que #pn-sweep-amount.
@@ -573,6 +579,9 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     if (expectedIncomeInput) {
       expectedIncomeInput.oninput = (e) => {
         state.expectedIncomeRaw = e.target.value;
+        const empty = state.expectedIncomeRaw === "";
+        expectedIncomeInput.classList.toggle("is-empty", empty);
+        expectedIncomeInput.closest(".pn-amount-wrap")?.classList.toggle("has-value", !empty);
         patchTotal();
       };
     }
@@ -585,13 +594,16 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
       renderInforme(container, () => render(), { periodId: closingPeriod.id });
     };
 
-    container.querySelectorAll("[data-sweep-radio]").forEach((r) => {
+    container.querySelectorAll(".pn-sweep-radio").forEach((r) => {
       r.onchange = () => { state.sweepChoice = r.value; render(); };
     });
     const sweepAmountInput = container.querySelector("#pn-sweep-amount");
     if (sweepAmountInput) {
       sweepAmountInput.oninput = (e) => {
         state.sweepAmountRaw = e.target.value;
+        const empty = state.sweepAmountRaw === "";
+        sweepAmountInput.classList.toggle("is-empty", empty);
+        sweepAmountInput.closest(".pn-amount-wrap")?.classList.toggle("has-value", !empty);
         patchSweepPreview();
       };
     }
@@ -609,8 +621,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
         state.budgets[el.dataset.budget] = raw;
         const empty = raw === "";
         el.classList.toggle("is-empty", empty);
-        const suffix = el.parentElement.querySelector(".budget-eur");
-        if (suffix) suffix.style.display = empty ? "none" : "";
+        el.closest(".pn-amount-wrap")?.classList.toggle("has-value", !empty);
         patchTotal();
       };
     });
@@ -632,12 +643,12 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
       errorMsg = "";
       render();
       try {
-        const budgets = [];
+        const budgetsPayload = [];
         for (const [categoryId, raw] of Object.entries(state.budgets)) {
           if (raw === "" || raw == null) continue;
           const n = Number(raw);
           if (!Number.isFinite(n) || n <= 0) continue;
-          budgets.push({ categoryId, amountCents: eurToCents(raw) });
+          budgetsPayload.push({ categoryId, amountCents: eurToCents(raw) });
         }
         // El sweep solo viaja si hay un destino elegido (no «Dejarlo en la cuenta») Y la cantidad
         // tecleada es válida (sweepPlan) — sin esto, dejar el campo a medias no debe escribir nada.
@@ -653,7 +664,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
           name: state.name.trim() || nombrePorDefecto(),
           startDate: state.startDate || hoyISO(),
           sharePct: partnerName ? Math.min(100, Math.max(0, state.sharePct)) : 100,
-          budgets,
+          budgets: budgetsPayload,
           sweep,
         });
         // Bloque 6 del artboard: en modo 'next' hay un periodo recién cerrado del que enseñar el
@@ -678,9 +689,9 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     // bloqueCTA() ANTES de guardar (periodo.cta.reportNote, §9.5) — este panel es el acuse de
     // recibo real, no un segundo aviso. La clave se queda en el diccionario sin consumidor.
     container.innerHTML = `
-    <div style="display:flex; flex-direction:column; gap:18px; align-items:center; text-align:center; padding-top:40px;">
-      <button type="button" class="btn-primary" id="pn-ver-informe" style="width:100%;">${t("periodo.finish.seeReport")}</button>
-      <button type="button" id="pn-hecho" style="${BTN_SECONDARY}">${t("periodo.finish.done")}</button>
+    <div class="pn-closed-panel">
+      ${buttonHtml({ kind: "primary", id: "pn-ver-informe", label: t("periodo.finish.seeReport") })}
+      ${buttonHtml({ id: "pn-hecho", label: t("periodo.finish.done") })}
     </div>`;
     container.querySelector("#pn-ver-informe").onclick = () => {
       renderInforme(container, renderClosedPanel, { periodId: closingPeriod.id });

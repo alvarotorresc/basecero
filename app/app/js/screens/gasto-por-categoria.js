@@ -2,54 +2,56 @@ import {
   getOpenPeriod, spentByRootCategory, spentByChildCategory, budgetsOfPeriod,
   allCategoriesById, upsertBudget, deleteBudget, rootSpendHistory,
 } from "../repo.js";
-import { colorForCategory, iconForCategory, textColorForCategory } from "../category-colors.js";
-import { budgetStatus, pctOf, relativeWidth, sortRootRows, budgetMap, compareRoots, spentSeriesByRoot } from "../category-spend.js";
-import { trendSvg } from "../charts.js";
+import { familyForCategory, iconForCategory, famClass } from "../category-colors.js";
+import { budgetStatus, pctOf, sortRootRows, budgetMap, compareRoots } from "../category-spend.js";
 import { eurToCents } from "../contract.js";
-import { fmtMoney, moneyPartsHtml, hoyISO, currencySymbol, fmtPct } from "../format.js";
+import { fmtMoney, hoyISO, currencySymbol, fmtPct } from "../format.js";
 import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 import { showToast } from "../toast.js";
-import { subHeaderHtml } from "../ui.js";
+import { subHeaderHtml, buttonHtml } from "../ui.js";
+import { fieldHtml } from "../controls.js";
+import { displayHtml, dispInkHtml, meterHtml } from "../instrument.js";
+import { tileHtml } from "../entity.js";
 import { icon } from "../icons.js";
 
 import { escHtml, escAttr } from "../esc.js";
 
 // Espacio DURO (U+00A0) antes del %: sin él el porcentaje se parte en dos líneas al estrecharse el
-// contenedor. fmtPct de format.js no sirve: emite un decimal ("38,8 %").
-const fmtPctInt = (pct) => `${Math.round(pct)}\u00A0%`;
+// contenedor. fmtPct de format.js no sirve aquí: emite un decimal ("38,8 %").
+const fmtPctInt = (pct) => `${Math.round(pct)} %`;
 
-// Toda anchura de barra pasa por aquí: spentByRootCategory puede devolver spent_cents NEGATIVO
-// (una devolución mayor que el gasto de la raíz) y `width:-12%` es CSS inválido — el navegador
-// descarta la declaración y el relleno se pinta al 100 %.
-const clampPct = (pct) => Math.min(100, Math.max(0, pct));
+/** El medidor dentro del botón de cabecera: un <button> solo admite contenido de frase, así que el
+ *  <div> de meterHtml pasa a <span> (display:block en screens.css). Mismo HTML, otra etiqueta. */
+const meterInline = (o) => meterHtml(o).replace(/^<div/, "<span").replace(/<\/div>$/, "</span>");
 
-// Chevron del repertorio (icons.js#chevronRight), girado por CSS — mismo mecanismo que
-// informe.js#chevronSvg: 0deg apunta a la derecha (fila plegada), 90deg hacia abajo (desplegada).
-const chevronSvg = (deg) => `<span style="display:inline-flex;transform:rotate(${deg}deg);">${icon("chevronRight", { size: 18 })}</span>`;
-
-// Flechas "tendencia sube"/"tendencia baja" del repertorio SISTEMA.md §3 (icons.js), NUNCA un
-// chevron rotado (SISTEMA §4.19 lo dice explícito): son un glifo propio.
+// Flechas "tendencia sube"/"tendencia baja" del repertorio (icons.js), NUNCA un chevron rotado.
 const ICON_TREND_UP = icon("trendUp", { size: 14, width: 2.2 });
 const ICON_TREND_DOWN = icon("trendDown", { size: 14, width: 2.2 });
+// Aviso de límite (≥ 85 % o superado): el icono de aviso del repertorio, en tinta.
+const ICON_WARN = icon("warn", { size: 14 });
 
-/** Pantalla «Gasto por categoría»: total del periodo + TODAS las raíces de gasto activas, cada una
- *  desplegable para ver su detalle por subcategoría y poner, cambiar o quitar su límite.
- *  Réplica de docs/design/gasto-por-categoria/Main.dc.html y Limite.dc.html.
+/** Pantalla «Gasto por categoría» (B-GastoCategoria): Display con el gasto del periodo, su medidor
+ *  frente al presupuesto y la marca del día; debajo, cada raíz de gasto como medidor con nombre,
+ *  desplegable en un bloque teñido con sus subcategorías, la comparativa con el periodo anterior y
+ *  el límite. Las raíces sin gasto ni límite se resumen en una línea «Sin gasto:» que las despliega.
  *
- *  El subtítulo de la cabecera es el mismo «{periodo} · día N de M» de Inicio, con los mismos
- *  helpers (dayIndexOfPeriod/expectedPeriodDays de prevision.js): M es la duración nominal de un
- *  mes desde start_date, no la fecha real de cierre del periodo (eso llega con la nómina).
+ *  El subtítulo de la cabecera es el mismo «{periodo}, día N de M» de Inicio, con los mismos
+ *  helpers (dayIndexOfPeriod/expectedPeriodDays de prevision.js).
  *
- *  La fila tocable es SOLO la cabecera de cada categoría (un <button> de verdad, hermano de la
- *  barra y del bloque desplegado, nunca su envoltorio): el bloque desplegado contiene a su vez
- *  botones y un input, y un botón dentro de otro es HTML inválido que el navegador desarma (mismo
- *  criterio que categorias.js#rootRowHtml). */
+ *  La fila tocable es SOLO la cabecera de cada categoría (un <button> de verdad, hermano del bloque
+ *  desplegado, nunca su envoltorio): el bloque desplegado contiene a su vez botones y un input, y
+ *  un botón dentro de otro es HTML inválido que el navegador desarma. Desplegar NO es seleccionar
+ *  (DESIGN §9, F-18): aria-expanded, sin anillo naranja. */
 export async function renderGastoPorCategoria(container, onBack) {
-  // rootErrors: rootId → mensaje, para la línea roja inline de una raíz cuyo desglose no se pudo
-  // leer. Se limpia al volver a intentarlo y al plegar, para que no se quede pegada para siempre.
-  const state = { expanded: new Set(), editing: null, editRaw: "", editError: "", rootErrors: new Map() };
+  // rootErrors: rootId → mensaje, para la línea inline de una raíz cuyo desglose no se pudo leer.
+  // Se limpia al volver a intentarlo y al plegar. showIdle: la línea «Sin gasto:» desplegada.
+  // focus: el control al que devolver el foco tras el re-render (K12; innerHTML se lo lleva).
+  const state = {
+    expanded: new Set(), editing: null, editRaw: "", editError: "", rootErrors: new Map(),
+    showIdle: false, focus: null,
+  };
   // Cache del desglose por raíz: solo se pide al desplegar, y editar un límite NO cambia el gasto,
   // así que sobrevive a los re-render posteriores a guardar/quitar.
   const childrenByRoot = new Map();
@@ -57,13 +59,10 @@ export async function renderGastoPorCategoria(container, onBack) {
   let rootRows = [];
   let budgetByCategory = {};
   let byId = {};
-  // Comparativa y mini tendencia (N3, Task 14): prevPeriod es el periodo INMEDIATAMENTE anterior
-  // (null si este es el primero), cmpByRoot es compareRoots() indexado por root_id y seriesByRoot
-  // es spentSeriesByRoot() indexado igual — mismo criterio de índice que informe-logic.js#buildCategories
-  // (cmpByRoot), que es de donde se extrajo compareRoots en el Task 6.
+  // Comparativa: prevPeriod es el periodo INMEDIATAMENTE anterior (null si este es el primero) y
+  // cmpByRoot es compareRoots() indexado por root_id.
   let prevPeriod = null;
   let cmpByRoot = {};
-  let seriesByRoot = {};
 
   async function load() {
     period = await getOpenPeriod();
@@ -72,242 +71,200 @@ export async function renderGastoPorCategoria(container, onBack) {
       spentByRootCategory(period.id),
       budgetsOfPeriod(period.id),
       allCategoriesById(),
-      rootSpendHistory(period.id, 3),
+      rootSpendHistory(period.id, 2),
     ]);
     rootRows = rows;
     budgetByCategory = budgetMap(budgetRows);
     byId = cats;
-    // history: del más antiguo al más reciente, el actual siempre al final (repo.rootSpendHistory).
-    // El anterior es el penúltimo elemento; con un único periodo (sin historia previa) no hay
-    // penúltimo y la comparativa entera se omite (Step 3: comparisonLineHtml mira `prevPeriod`, que
-    // queda null, no `prevRows`).
-    // hasPrevPeriod explícito en compareRoots: un periodo anterior REAL sin gasto en ninguna raíz
-    // también llega con prevRows=[], y ahí SÍ hay con qué comparar (0 gastado), así que direction
-    // debe salir "flat" con delta 0,0 % en vez de "new" sin delta (mismo bug que category-spend.js
-    // documenta en su cabecera).
+    // history: del más antiguo al más reciente, el actual siempre al final. hasPrevPeriod
+    // explícito en compareRoots: un periodo anterior REAL sin gasto también llega con prevRows=[],
+    // y ahí SÍ hay con qué comparar (0 gastado).
     const hasPrevPeriod = history.length >= 2;
     prevPeriod = hasPrevPeriod ? history[history.length - 2].period : null;
     const prevRows = hasPrevPeriod ? history[history.length - 2].rows : [];
     cmpByRoot = Object.fromEntries(compareRoots(rows, prevRows, hasPrevPeriod).map((c) => [c.rootId, c]));
-    seriesByRoot = spentSeriesByRoot(history);
     return true;
   }
 
-  /** ¿Esta raíz tiene alguna hija en el árbol? Se mira `byId` (allCategoriesById, que trae TODAS
-   *  las categorías vivas) buscando alguna con `parent_id` = la raíz. NO se filtra `is_archived`:
-   *  esa columna ni siquiera viene en la consulta, y una hija archivada sigue pudiendo tener
-   *  historial. De serie hay cuatro raíces sin hijas (Ropa y cuidado personal, Regalos y
-   *  donaciones, Impuestos y tasas, Otros gastos) y el usuario puede crear más. */
+  /** ¿Esta raíz tiene alguna hija en el árbol? Se mira `byId` (TODAS las categorías vivas). NO se
+   *  filtra `is_archived`: una hija archivada sigue pudiendo tener historial. */
   const hasChildren = (rootId) => Object.values(byId).some((c) => c.parent_id === rootId);
+  const limitOf = (rootId) => budgetByCategory[rootId] ?? 0;
+  /** Sin gasto (exactamente 0) y sin límite: va a la línea «Sin gasto:». Una raíz con neto
+   *  negativo (más devuelto que gastado) o con límite sí tiene algo que contar y va a la lista. */
+  const isIdle = (row) => row.spent_cents === 0 && !(limitOf(row.root_id) > 0);
 
-  /** Filas del desglose que se pintan: las de gasto distinto de cero, ya ordenadas por el SQL. La
-   *  de la propia raíz es el gasto anotado directamente en ella («Sin subcategoría»).
-   *
-   *  Una raíz SIN hijas no tiene desglose que enseñar: todo su gasto es, por definición, directo,
-   *  así que la lista sería una única línea «Sin subcategoría» repitiendo la cifra que está justo
-   *  encima. En esas raíces el bloque desplegado se queda solo con la fila de límite (y su modo
-   *  edición), que es lo único que aporta algo. */
-  function subRowsHtml(rootId) {
-    if (!hasChildren(rootId)) return "";
-    const rows = (childrenByRoot.get(rootId) ?? []).filter((c) => c.spent_cents !== 0);
-    return rows.map((c) => `
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="flex:1;min-width:0;font-size:12.5px;font-weight:600;">${escHtml(c.category_id === rootId ? t("gastoCategoria.detail.noSubcategory") : c.name)}</div>
-        <div class="num" style="font-size:12.5px;font-weight:700;white-space:nowrap;">${escHtml(fmtMoney(c.spent_cents))}</div>
-      </div>`).join("");
-  }
-
-  function limitRowHtml(row, limitCents) {
-    const hasLimit = limitCents > 0;
-    return `
-      <button type="button" data-limit="${escAttr(row.root_id)}"
-        style="display:flex;align-items:center;justify-content:space-between;gap:10px;height:30px;width:100%;
-        background:none;border:0;padding:0;margin:0;color:inherit;font:inherit;text-align:left;cursor:pointer;
-        -webkit-tap-highlight-color:transparent;">
-        <span style="font-size:12.5px;font-weight:700;">${hasLimit ? t("gastoCategoria.detail.changeLimit") : t("gastoCategoria.detail.setLimit")}</span>
-        <span class="num" style="font-size:11px;color:var(--text-2);">${hasLimit ? t("gastoCategoria.detail.limitOfPeriod", { amount: escHtml(fmtMoney(limitCents)) }) : t("gastoCategoria.detail.noLimit")}</span>
-      </button>`;
-  }
-
-  function editHtml(row, limitCents) {
-    const empty = state.editRaw === "";
-    return `
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <div class="section-title" id="gc-limit-label">${t("gastoCategoria.edit.title", { name: escHtml(row.name) })}</div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div style="position:relative;flex-shrink:0;">
-            <input type="number" min="0" step="0.01" inputmode="decimal" id="gc-limit-input" aria-labelledby="gc-limit-label"
-              placeholder="${escAttr(t("gastoCategoria.edit.placeholder"))}" value="${escAttr(state.editRaw)}"
-              class="budget-input${empty ? " is-empty" : ""}">
-            <span class="budget-eur" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
-              font-size:12px;color:var(--text-3);pointer-events:none;display:${empty ? "none" : ""};">${escHtml(currencySymbol())}</span>
-          </div>
-          <button type="button" id="gc-limit-save" class="btn-primary"
-            style="flex:1;width:auto;height:44px;font:700 14px var(--font-ui);">${t("gastoCategoria.edit.save")}</button>
+  /** Subcategorías con gasto distinto de cero, ya ordenadas por el SQL, como medidores sobre el
+   *  tinte relativos al gasto de la raíz. La fila de la propia raíz es lo anotado directamente en
+   *  ella («Sin subcategoría»). Una raíz SIN hijas no tiene desglose: sería una línea repitiendo
+   *  la cifra de la cabecera, así que su bloque se queda con la comparativa y el límite. */
+  function subRowsHtml(row, fam) {
+    if (!hasChildren(row.root_id)) return "";
+    const rows = (childrenByRoot.get(row.root_id) ?? []).filter((c) => c.spent_cents !== 0);
+    if (!rows.length) return "";
+    const max = Math.max(row.spent_cents, ...rows.map((c) => c.spent_cents));
+    return `<div class="gc-subs">${rows.map((c) => `
+      <div class="gc-sub">
+        <div class="gc-sub-line">
+          <span class="gc-sub-name">${escHtml(c.category_id === row.root_id ? t("gastoCategoria.detail.noSubcategory") : c.name)}</span>
+          <span class="num gc-sub-amt">${escHtml(fmtMoney(c.spent_cents))}</span>
         </div>
-        ${state.editError ? `<div style="font-size:11px;color:var(--red);">${escHtml(state.editError)}</div>` : ""}
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-          <div style="font-size:11px;color:var(--text-2);">${t("gastoCategoria.edit.onlyThisPeriod")}</div>
-          ${limitCents > 0 ? `<button type="button" id="gc-limit-remove"
-            style="height:44px;background:none;border:0;padding:0;font-size:13px;font-weight:600;color:var(--red);
-            cursor:pointer;-webkit-tap-highlight-color:transparent;">${t("gastoCategoria.edit.remove")}</button>` : ""}
-        </div>
-      </div>`;
+        ${meterHtml({ fam, value: c.spent_cents, max, onTint: true })}
+      </div>`).join("")}</div>`;
   }
 
-  function expandedHtml(row, limitCents) {
-    const subs = subRowsHtml(row.root_id);
-    return `
-      <div style="margin:2px 0 4px;background:var(--card2);border-radius:0;padding:10px 12px;
-        display:flex;flex-direction:column;gap:10px;">
-        ${subs}
-        ${subs ? '<hr class="divider">' : ""}
-        ${state.editing === row.root_id ? editHtml(row, limitCents) : limitRowHtml(row, limitCents)}
-      </div>`;
-  }
-
-  /** Línea de comparativa (N3, Task 14, artboard etiquetas-design §8): a la izquierda el nombre del
-   *  periodo anterior y su cifra; a la derecha la mini tendencia de 3 periodos (trendSvg) + la
-   *  flecha del repertorio §3 (nunca un chevron) + el delta a un decimal — --danger si "up"
-   *  (gastó más), --pos si "down" (gastó menos: SISTEMA §4.19, "gastar menos es bueno").
-   *  Sin periodo anterior (prevPeriod null) NO se pinta nada (Step 3). Con prevPeriod pero sin un
-   *  tercer periodo, trendSvg da igualmente una tendencia — de dos barras, no null (necesita >=2
-   *  valores, y aquí hay exactamente 2: anterior y actual). "flat"/"new" no llevan flecha: no hay
-   *  "más" ni "menos" que anunciar (flat: mismo gasto exacto; new: no había nada que comparar). */
-  function comparisonLineHtml(row) {
+  /** Comparativa con el periodo anterior: «Agosto 390,00 €» (nombre en -x, cifra en tinta, C7) y
+   *  la flecha del repertorio con el delta a un decimal — --neg si se gastó más, --pos si menos
+   *  (C4: señal en cifras). Sin periodo anterior no se pinta nada; "flat"/"new" sin flecha. */
+  function comparisonHtml(row) {
     if (!prevPeriod) return "";
     const cmp = cmpByRoot[row.root_id];
     if (!cmp) return "";
-    const color = colorForCategory(row.root_id, byId);
-    const spark = trendSvg(seriesByRoot[row.root_id] ?? [], color);
-    const showArrow = cmp.direction === "up" || cmp.direction === "down";
-    const trendColor = cmp.direction === "up" ? "var(--danger)" : cmp.direction === "down" ? "var(--pos)" : "var(--text-2)";
-    const arrowIcon = cmp.direction === "up" ? ICON_TREND_UP : cmp.direction === "down" ? ICON_TREND_DOWN : "";
-    const deltaText = cmp.deltaPct != null
-      ? `${cmp.deltaPct > 0 ? "+" : cmp.deltaPct < 0 ? "−" : ""}${escHtml(fmtPct(Math.abs(cmp.deltaPct) / 100))}`
+    const dir = cmp.direction === "up" || cmp.direction === "down" ? cmp.direction : "";
+    const delta = cmp.deltaPct != null
+      ? `<span class="num gc-delta${dir ? ` is-${dir}` : ""}">${dir === "up" ? ICON_TREND_UP : dir === "down" ? ICON_TREND_DOWN : ""}${escHtml(fmtPct(Math.abs(cmp.deltaPct) / 100))}</span>`
       : "";
+    return `<span class="gc-cmp-group"><span class="gc-cmp">${escHtml(prevPeriod.name)} <span class="num">${escHtml(fmtMoney(cmp.prevCents))}</span></span>${delta}</span>`;
+  }
+
+  function editHtml(row, limitCents) {
     return `
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:1px;">
-        <span class="num" style="font-size:11px;color:var(--text-3);">${t("gastoCategoria.compare.prev", { name: escHtml(prevPeriod.name), amount: escHtml(fmtMoney(cmp.prevCents)) })}</span>
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-          ${spark}
-          ${deltaText ? `
-          <span style="display:flex;align-items:center;gap:3px;color:${trendColor};">
-            ${showArrow ? `<span style="display:flex;" aria-hidden="true">${arrowIcon}</span>` : ""}
-            <span class="num" style="font-size:11px;font-weight:700;">${deltaText}</span>
-          </span>` : ""}
+      <div class="gc-edit">
+        ${fieldHtml({
+          id: "gc-limit-input", label: t("gastoCategoria.edit.title", { name: row.name }), type: "number",
+          value: state.editRaw, placeholder: t("gastoCategoria.edit.placeholder"), inputmode: "decimal",
+          min: "0", step: "0.01", suffix: currencySymbol(),
+        })}
+        ${state.editError ? `<p class="gc-error" role="alert">${escHtml(state.editError)}</p>` : ""}
+        ${buttonHtml({ kind: "primary", id: "gc-limit-save", label: t("gastoCategoria.edit.save") })}
+        <div class="gc-edit-foot">
+          <span class="gc-edit-note">${escHtml(t("gastoCategoria.edit.onlyThisPeriod"))}</span>
+          ${limitCents > 0 ? buttonHtml({ kind: "tertiary-danger", id: "gc-limit-remove", label: t("gastoCategoria.edit.remove") }) : ""}
         </div>
       </div>`;
   }
 
-  function rootRowHtml(row, maxSpent) {
-    const limitCents = budgetByCategory[row.root_id] ?? 0;
+  /** Cabecera de una raíz: baldosa 32 · nombre y cifra · medidor (límite como marca de 2 px) · pie
+   *  con el límite o el exceso · chevron. Desplegada va sobre el tinte (baldosa y pista en --chip,
+   *  cifra 17/600). */
+  function headHtml(row, fam, scaleMax, expanded) {
+    const limitCents = limitOf(row.root_id);
+    // Mismo umbral de siempre (budgetStatus: warn >= 85 %, over > 100 %), sin ámbar: el aviso es
+    // texto en tinta con el icono de aviso; solo la cifra superada va en --neg (C4, «−» que avisa).
     const st = budgetStatus(row.spent_cents, limitCents);
-    const color = colorForCategory(row.root_id, byId);
-    const categoryEmoji = iconForCategory(row.root_id, byId);
-    const expanded = state.expanded.has(row.root_id);
-    const noBar = row.spent_cents <= 0;
-    // Una raíz sin límite y sin gasto no aporta nada este periodo: se atenúa entera para que la
-    // lista completa (12 raíces de serie) no compita con las que sí tienen algo que contar.
-    const dim = !st && noBar;
-
-    // Swap (decisión 6, §9.7): el € ya es la cifra destacada de la cabecera de fila (más abajo),
-    // así que este pie NUNCA vuelve a escribirlo — «de {límite}» en mono si hay límite y no se ha
-    // superado, «superado por {over}» en --danger si se ha superado (sustituye a la línea "de
-    // {límite}", no se pintan las dos a la vez, igual que el artboard), «sin límite» si no hay
-    // ninguno puesto. row.noLimit y row.ofLimitOver (con {spent} en la plantilla) se quedan sin
-    // consumidor: repetirían la cifra de la cabecera.
-    const subHtml = st
-      ? st.level === "over"
-        ? `<span style="font-size:13px;font-weight:500;color:var(--red);">${t("gastoCategoria.row.overBy", { over: escHtml(fmtMoney(row.spent_cents - limitCents)) })}</span>`
-        : `<span class="num" style="font-size:13px;font-weight:500;color:var(--text-2);">${t("gastoCategoria.row.ofLimit", { limit: escHtml(fmtMoney(limitCents)) })}</span>`
-      : `<span style="font-size:13px;font-weight:500;color:var(--text-2);">${t("gastoCategoria.detail.noLimit")}</span>`;
-
-    // Barra + porcentaje EN LA MISMA fila (swap): el % ya no es la cifra destacada de la cabecera,
-    // vive junto a la barra en --cat-x-ink (textColorForCategory), 13/600, ancho mínimo 34px.
-    let barRowHtml = "";
-    if (!noBar && st) {
-      const barColor = st.level === "over" ? "var(--red)" : st.level === "warn" ? "var(--amber)" : color;
-      const pctColor = st.level === "over" ? "var(--red)" : st.level === "warn" ? "var(--amber)" : textColorForCategory(row.root_id, byId);
-      barRowHtml = `
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div class="bar" style="flex:1;--cat:${barColor};"><i style="width:${clampPct(st.pct)}%;"></i></div>
-          <span class="num" style="min-width:34px;text-align:right;flex-shrink:0;font-size:13px;font-weight:600;color:${pctColor};">${fmtPctInt(st.pct)}</span>
-        </div>`;
-    } else if (!noBar) {
-      // Sin límite no hay porcentaje que enseñar: la barra pasa a ser comparativa (su gasto frente
-      // al de la raíz que más gastó) y se tiñe al 55 % para que no se lea como "vas por X %".
-      barRowHtml = `<div class="bar" style="--cat:color-mix(in srgb, ${color} 55%, transparent);"><i style="width:${relativeWidth(row.spent_cents, maxSpent)}%;"></i></div>`;
+    let foot = "";
+    if (st?.level === "over") {
+      const over = escHtml(fmtMoney(row.spent_cents - limitCents));
+      const text = escHtml(t("gastoCategoria.row.overBy", { over: fmtMoney(row.spent_cents - limitCents) }))
+        .replace(over, `<span class="num gc-over">${over}</span>`);
+      foot = `<span class="gc-foot is-alert">${ICON_WARN}<span>${text}</span></span>`;
+    } else if (st?.level === "warn") {
+      foot = `<span class="gc-foot is-alert">${ICON_WARN}<span>${escHtml(t("gastoCategoria.row.nearLimit", { pct: fmtPctInt(st.pct), limit: fmtMoney(limitCents) }))}</span></span>`;
+    } else if (st) {
+      foot = `<span class="gc-foot">${escHtml(t("gastoCategoria.row.limit", { limit: fmtMoney(limitCents) }))}</span>`;
     }
-
-    const rootError = state.rootErrors.get(row.root_id);
-
-    // La atenuación de una raíz sin gasto ni límite se queda SOLO en la cabecera y su barra. Antes
-    // envolvía toda la fila, y `opacity` crea un grupo de composición: todo lo de dentro se pinta
-    // ya fusionado al 50 % y ningún hijo puede recuperarse con opacity:1. Así salían medio
-    // borrados el aviso rojo de un desglose que no se pudo cargar y —peor— el editor de límite al
-    // desplegar una categoría sin gasto, que es justo el caso más habitual de ponerle uno.
     return `
-      <div style="display:flex;flex-direction:column;gap:8px;padding:13px 0;">
-        <div style="display:flex;flex-direction:column;gap:8px;${dim ? "opacity:.5;" : ""}">
-          <button type="button" data-root="${escAttr(row.root_id)}" aria-expanded="${expanded ? "true" : "false"}"
-            style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:0;margin:0;
-            color:inherit;font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-            <div class="dotico sm" style="--cat:${color};">${categoryEmoji}</div>
-            <span style="flex:1;min-width:0;font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(row.name)}</span>
-            <div class="num gc-amount" style="flex-shrink:0;">${moneyPartsHtml(row.spent_cents)}</div>
-            <span style="width:44px;height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
-              color:${expanded ? "var(--text)" : "var(--text-2)"};">${chevronSvg(expanded ? 90 : 0)}</span>
-          </button>
-          ${barRowHtml}
-          ${subHtml}
-          ${comparisonLineHtml(row)}
-        </div>
-        ${rootError ? `<div style="font-size:11px;color:var(--red);">${escHtml(rootError)}</div>` : ""}
-        ${expanded ? expandedHtml(row, limitCents) : ""}
+      <button type="button" class="gc-head" data-root="${escAttr(row.root_id)}" aria-expanded="${expanded ? "true" : "false"}">
+        ${tileHtml({ fam, icon: iconForCategory(row.root_id, byId), size: 32, onTint: expanded })}
+        <span class="gc-main">
+          <span class="gc-line">
+            <span class="gc-name">${escHtml(row.name)}</span>
+            <span class="num gc-amt">${escHtml(fmtMoney(row.spent_cents))}</span>
+          </span>
+          ${meterInline({ fam, value: row.spent_cents, max: scaleMax, limit: limitCents > 0 ? limitCents : null, onTint: expanded })}
+          ${foot}
+        </span>
+        <span class="gc-chev" aria-hidden="true">${icon(expanded ? "chevronDown" : "chevronRight", { size: 16 })}</span>
+      </button>`;
+  }
+
+  function itemHtml(row, scaleMax) {
+    const fam = familyForCategory(row.root_id, byId);
+    const expanded = state.expanded.has(row.root_id);
+    const rootError = state.rootErrors.get(row.root_id);
+    const idle = isIdle(row) ? " is-idle" : "";
+    if (!expanded) {
+      return `<div class="gc-item${idle}">${headHtml(row, fam, scaleMax, false)}${rootError ? `<p class="gc-error" role="alert">${escHtml(rootError)}</p>` : ""}</div>`;
+    }
+    const limitCents = limitOf(row.root_id);
+    const editing = state.editing === row.root_id;
+    return `
+      <div class="gc-item gc-block ${famClass(fam)}">
+        ${headHtml(row, fam, scaleMax, true)}
+        ${subRowsHtml(row, fam)}
+        ${editing ? editHtml(row, limitCents) : `
+        <div class="gc-block-foot">
+          ${comparisonHtml(row)}
+          ${buttonHtml({ kind: "tertiary", id: `gc-limit-btn-${row.root_id}`, label: limitCents > 0 ? t("gastoCategoria.detail.changeLimit") : t("gastoCategoria.detail.setLimit") })}
+        </div>`}
       </div>`;
+  }
+
+  /** «Sin gasto: Coche, Impuestos, Regalos» (B-GastoCategoria): una línea dim con una muestra por
+   *  familia. Es un botón: despliega esas raíces en la lista para poder ponerles límite (antes
+   *  eran filas atenuadas; es el caso más habitual de poner uno). */
+  function idleLineHtml(idleRows) {
+    if (!idleRows.length) return "";
+    // Tres nombres como mucho y «y N más»: con las 12 raíces la línea ocupaba 4+ renglones. El
+    // botón sigue desplegando todas.
+    const names = idleRows.slice(0, 3).map((r) => r.name).join(", ");
+    const rest = idleRows.length - 3;
+    // Como mucho tres muestras (B-GastoCategoria): con más, la fila de muestras se come la línea.
+    const swatches = idleRows.slice(0, 3).map((r) => `<span class="gc-idle-swatch ${famClass(familyForCategory(r.root_id, byId))}"></span>`).join("");
+    return `
+      <button type="button" class="gc-idle" id="gc-idle" aria-expanded="${state.showIdle ? "true" : "false"}">
+        <span class="gc-idle-swatches" aria-hidden="true">${swatches}</span>
+        <span class="gc-idle-text">${escHtml(rest > 0 ? t("gastoCategoria.noSpendMore", { names, n: rest }) : t("gastoCategoria.noSpend", { names }))}</span>
+        <span class="gc-chev" aria-hidden="true">${icon(state.showIdle ? "chevronDown" : "chevronRight", { size: 16 })}</span>
+      </button>`;
   }
 
   function render() {
     const rows = sortRootRows(rootRows, budgetByCategory);
-    const maxSpent = rows.reduce((m, r) => Math.max(m, r.spent_cents), 0);
-    // El héroe es el gasto TOTAL categorizado del periodo (suma de TODAS las raíces), no solo el de
-    // las que tienen límite: la pantalla ya no va del presupuesto, va del gasto.
+    // Una raíz sin gasto que se ha desplegado ya está en la lista: no se repite en «Sin gasto:».
+    const idleRows = rows.filter((r) => isIdle(r) && !state.expanded.has(r.root_id));
+    const listed = rows.filter((r) => !isIdle(r) || state.showIdle || state.expanded.has(r.root_id));
+    // Una sola escala para toda la lista: la mayor entre gasto y límite, así ninguna marca de
+    // límite se sale de su pista.
+    const scaleMax = listed.reduce((m, r) => Math.max(m, r.spent_cents, limitOf(r.root_id)), 0);
+    // El héroe es el gasto TOTAL categorizado del periodo (suma de TODAS las raíces).
     const totalSpent = rows.reduce((s, r) => s + r.spent_cents, 0);
-    // Decisión 6: el presupuesto GENERAL del periodo es la suma de TODOS los budgetsOfPeriod (no
-    // solo el de las categorías con límite) — el mismo total que bloqueTotal de PeriodoNuevo llama
-    // "presupuestado". Sustituye a limitTotals(), que solo sumaba las raíces con límite puesto.
+    // El presupuesto GENERAL del periodo es la suma de TODOS los budgetsOfPeriod.
     const budgetTotalCents = Object.values(budgetByCategory).reduce((s, c) => s + c, 0);
-    const budgetPct = budgetTotalCents > 0 ? clampPct(pctOf(totalSpent, budgetTotalCents)) : 0;
+    const day = dayIndexOfPeriod(period.start_date, hoyISO());
+    const days = expectedPeriodDays(period.start_date);
+    const dayFrac = days > 0 ? Math.min(1, Math.max(0, day / days)) : 0;
+
+    const gauge = budgetTotalCents > 0 ? `
+      <div class="gc-gauge" style="--at:${Number((dayFrac * 100).toFixed(2))}%">
+        ${meterHtml({ value: totalSpent, max: budgetTotalCents, limit: budgetTotalCents * dayFrac, onDisplay: true })}
+        <div class="gc-gauge-scale">
+          <span class="num gc-daymark">${escHtml(t("gastoCategoria.total.dayMark", { day }))}</span>
+          <span class="num gc-pct">${escHtml(fmtPctInt(pctOf(totalSpent, budgetTotalCents)))}</span>
+        </div>
+      </div>` : "";
+
+    // Divisor entre dos filas plegadas seguidas; un bloque desplegado ya se separa por su tinte.
+    const items = listed.map((r, i) => {
+      const prevOpen = i > 0 && state.expanded.has(listed[i - 1].root_id);
+      const div = i > 0 && !prevOpen && !state.expanded.has(r.root_id) ? '<div class="gc-div" aria-hidden="true"></div>' : "";
+      return div + itemHtml(r, scaleMax);
+    }).join("");
 
     container.innerHTML = `
-      ${subHeaderHtml({ id: "gc-back", title: t("gastoCategoria.title"), subtitle: t("gastoCategoria.header.dayOf", { period: period.name, day: dayIndexOfPeriod(period.start_date, hoyISO()), total: expectedPeriodDays(period.start_date) }) })}
-
-      <div class="card" style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;">
-        <span style="font-size:13px;font-weight:500;color:var(--text-3);">${t("gastoCategoria.total.title")}</span>
-        <div class="amount-hero num">${moneyPartsHtml(totalSpent)}</div>
-        ${budgetTotalCents > 0 ? `
-        <span class="num" style="font-size:13px;font-weight:500;color:var(--text-2);">${t("gastoCategoria.total.ofBudget", { budget: escHtml(fmtMoney(budgetTotalCents)) })}</span>
-        <div class="bar"><i style="width:${budgetPct}%;"></i></div>` : `
-        <div style="font-size:11px;color:var(--text-2);">${t("gastoCategoria.total.noLimits")}</div>`}
-      </div>
-
-      <div style="font-size:15px;font-weight:700;padding-top:2px;margin-bottom:12px;">${t("gastoCategoria.byCategory.title")}</div>
-
-      ${rows.length === 0 ? `
-      <div class="card" style="text-align:center;color:var(--text-3);margin-bottom:16px;">
-        <p>${t("gastoCategoria.byCategory.empty")}</p>
-      </div>` : `
-      <div class="card" style="padding:6px 16px;display:flex;flex-direction:column;margin-bottom:16px;">
-        ${rows.map((r) => rootRowHtml(r, maxSpent)).join('<hr class="divider">')}
-      </div>`}
-
-      ${prevPeriod ? `
-      <div style="font-size:11px;color:var(--text-3);margin:-6px 0 16px;">${t("informe.categories.orientativo", {
-        prev: escHtml(prevPeriod.name), current: escHtml(period.name),
-        day: dayIndexOfPeriod(period.start_date, hoyISO()), total: expectedPeriodDays(period.start_date),
-      })}</div>` : ""}
-    `;
+      <div class="gc">
+        ${subHeaderHtml({ id: "gc-back", title: t("gastoCategoria.title"), subtitle: t("gastoCategoria.header.dayOf", { period: period.name, day, total: days }) })}
+        ${displayHtml({
+          label: t("gastoCategoria.total.title"), value: fmtMoney(totalSpent), size: "l",
+          ...(budgetTotalCents > 0
+            ? { footHtml: t("gastoCategoria.total.ofBudget", { budget: dispInkHtml(fmtMoney(budgetTotalCents)) }), slot: gauge }
+            : { foot: t("gastoCategoria.total.noLimits") }),
+        })}
+        ${rows.length === 0
+          ? `<p class="gc-empty">${escHtml(t("gastoCategoria.byCategory.empty"))}</p>`
+          : `${listed.length ? `<section class="gc-list" aria-label="${escAttr(t("gastoCategoria.byCategory.title"))}">${items}</section>` : ""}
+             ${idleLineHtml(idleRows)}`}
+      </div>`;
 
     wire();
   }
@@ -320,30 +277,27 @@ export async function renderGastoPorCategoria(container, onBack) {
   }
 
   /** Escribe el límite y vuelve a leer los datos. Dos try SEPARADOS a propósito: si lo que falla es
-   *  la RECARGA, el límite ya está guardado y decir «No se pudo guardar el límite» sería mentira —
-   *  el usuario volvería a darle a Guardar sobre un dato que ya está en la base. Se muestra
-   *  entonces el error de carga de la pantalla, el mismo que su banner de arranque.
-   *  Si falla la escritura, el modo edición SE QUEDA abierto con el error debajo del input: el
-   *  usuario no pierde lo que había escrito. */
+   *  la RECARGA, el límite ya está guardado y decir «No se pudo guardar el límite» sería mentira.
+   *  Se muestra entonces el error de carga de la pantalla.
+   *  Si falla la escritura, el modo edición SE QUEDA abierto con el error: no se pierde lo escrito. */
   async function saveLimit(rootId, cents) {
     try {
       if (cents === null) await deleteBudget(period.id, rootId);
       else await upsertBudget(period.id, rootId, cents);
     } catch (e) {
       state.editError = t("gastoCategoria.edit.saveFailed", { error: userMessage(e) });
+      state.focus = "#gc-limit-input";
       render();
       return;
     }
-    // Acuse de recibo: al guardar, el bloque desplegado se cierra y la lista vuelve a pintarse
-    // parecida — sin esto no se distingue de no haber hecho nada.
+    // Acuse de recibo: sin esto no se distingue de no haber hecho nada.
     showToast(t(cents === null ? "toast.limitRemoved" : "toast.limitSaved"));
     try {
-      // load() a false = ya no hay periodo abierto: otra pestaña lo cerró mientras esta pantalla
-      // estaba encima. `period` se queda a null y el render() de abajo reventaría en period.name,
-      // así que se sale a la pantalla anterior, que sí sabe qué pintar sin periodo. El límite ya
-      // está guardado: no se pierde nada.
+      // load() a false = ya no hay periodo abierto: otra pestaña lo cerró. Se sale a la pantalla
+      // anterior, que sí sabe qué pintar sin periodo. El límite ya está guardado.
       if (!(await load())) { onBack(); return; }
       closeEdit();
+      state.focus = `[data-root="${rootId}"]`;
     } catch (e) {
       state.editError = t("gastoCategoria.error.load", { error: userMessage(e) });
     }
@@ -353,10 +307,16 @@ export async function renderGastoPorCategoria(container, onBack) {
   function wire() {
     container.querySelector("#gc-back").onclick = () => onBack();
 
+    const idleBtn = container.querySelector("#gc-idle");
+    if (idleBtn) idleBtn.onclick = () => {
+      state.showIdle = !state.showIdle;
+      state.focus = "#gc-idle";
+      render();
+    };
+
     container.querySelectorAll("[data-root]").forEach((el) => {
       el.onclick = async () => {
-        // Mismo caso que en saveLimit: si otra pestaña cerró el periodo, `period` es null y el
-        // spentByChildCategory(period.id, …) de más abajo reventaría con un TypeError crudo.
+        // Si otra pestaña cerró el periodo, `period` es null y spentByChildCategory reventaría.
         if (!period) { onBack(); return; }
         const id = el.dataset.root;
         if (state.expanded.has(id)) {
@@ -367,49 +327,45 @@ export async function renderGastoPorCategoria(container, onBack) {
           // Reintentar limpia el error anterior: si vuelve a fallar, se vuelve a poner abajo.
           state.rootErrors.delete(id);
           state.expanded.add(id);
-          // Una raíz sin hijas no tiene desglose que pedir (ver subRowsHtml): se despliega
-          // directamente con su fila de límite, sin ir a la BD.
+          // Una raíz sin hijas no tiene desglose que pedir: se despliega sin ir a la BD.
           if (hasChildren(id) && !childrenByRoot.has(id)) {
             try {
               childrenByRoot.set(id, await spentByChildCategory(period.id, id));
             } catch (e) {
-              // Antes se plegaba en SILENCIO y la pantalla quedaba igual que antes de tocarla: el
-              // usuario tocaba, no pasaba nada, y no había forma de saber por qué. Ahora se pliega
-              // igual (el bloque desplegado sin datos no aporta nada) pero la fila explica el fallo.
+              // Se pliega (el bloque sin datos no aporta nada) pero la fila explica el fallo.
               state.expanded.delete(id);
               state.rootErrors.set(id, t("gastoCategoria.error.detail", { error: userMessage(e) }));
             }
           }
         }
+        state.focus = `[data-root="${id}"]`;
         render();
       };
     });
 
-    container.querySelectorAll("[data-limit]").forEach((el) => {
+    container.querySelectorAll('[id^="gc-limit-btn-"]').forEach((el) => {
       el.onclick = () => {
-        const id = el.dataset.limit;
-        const cents = budgetByCategory[id] ?? 0;
+        const id = el.id.slice("gc-limit-btn-".length);
+        const cents = limitOf(id);
         // Solo una raíz en edición a la vez: abrir una cierra la anterior.
         state.editing = id;
         // El input admite céntimos (step 0.01); se prefiere el valor exacto guardado, sin redondear,
-        // para que un «Guardar» sin cambios no reescriba el límite. periodo-nuevo.js sigue capturando euros enteros.
+        // para que un «Guardar» sin cambios no reescriba el límite.
         state.editRaw = cents > 0 ? String(cents / 100) : "";
         state.editError = "";
+        state.focus = "#gc-limit-input";
         render();
-        container.querySelector("#gc-limit-input")?.focus();
       };
     });
 
-    // querySelector en singular a propósito: `state.editing` es UN rootId, así que en el DOM
-    // solo puede existir un #gc-limit-input. Si algún día se permitieran dos ediciones a la vez,
-    // esto cablearía solo la primera en silencio.
+    // querySelector en singular a propósito: `state.editing` es UN rootId, así que solo puede
+    // existir un #gc-limit-input.
     const input = container.querySelector("#gc-limit-input");
     const saveBtn = container.querySelector("#gc-limit-save");
 
-    /** Guarda lo que hay escrito. UNA sola función, compartida por el botón «Guardar» y por el
-     *  Enter del teclado: con una copia en cada handler acabarían tratando distinto el campo
-     *  vacío. Vacío o 0 equivale a quitar el límite; cualquier otra cosa va a upsertBudget, cuyo
-     *  guard rechaza lo que no sea un entero de céntimos > 0 (NaN de un texto, negativos...). */
+    /** Guarda lo que hay escrito. UNA sola función para «Guardar» y para el Enter del teclado.
+     *  Vacío o 0 equivale a quitar el límite; lo demás va a upsertBudget, cuyo guard rechaza lo
+     *  que no sea un entero de céntimos > 0. */
     const submitLimit = () => {
       if (saveBtn && saveBtn.disabled) return;
       const rootId = state.editing;
@@ -420,17 +376,10 @@ export async function renderGastoPorCategoria(container, onBack) {
     };
 
     if (input) {
-      input.oninput = (e) => {
-        // Sin render(): re-pintar aquí perdería el foco a media escritura (mismo motivo que el
-        // handler de [data-budget] en periodo-nuevo.js). Se parchean la clase y el símbolo en sitio.
-        state.editRaw = e.target.value;
-        const empty = state.editRaw === "";
-        input.classList.toggle("is-empty", empty);
-        const suffix = input.parentElement.querySelector(".budget-eur");
-        if (suffix) suffix.style.display = empty ? "none" : "";
-      };
-      // El input va suelto (aquí no hay <form>), así que el Enter del teclado no dispara nada por
-      // su cuenta: sin esto, en el móvil hay que cerrar el teclado para poder tocar «Guardar».
+      // Sin render(): re-pintar aquí perdería el foco a media escritura. La unidad se oculta sola
+      // con el campo vacío (controls.js#fieldHtml, :placeholder-shown).
+      input.oninput = (e) => { state.editRaw = e.target.value; };
+      // Sin <form>, el Enter del teclado no dispara nada por su cuenta.
       input.onkeydown = (e) => {
         if (e.key !== "Enter") return;
         e.preventDefault();
@@ -446,15 +395,22 @@ export async function renderGastoPorCategoria(container, onBack) {
       removeBtn.disabled = true;
       saveLimit(rootId, null);
     };
+
+    // K12: el innerHTML se lleva el foco al <body>; se devuelve al control que lo tenía.
+    if (state.focus) {
+      const sel = state.focus;
+      state.focus = null;
+      container.querySelector(sel)?.focus();
+    }
   }
 
   try {
     if (!(await load())) {
-      container.innerHTML = `<div class="banner-aviso red">${t("common.noOpenPeriod")}</div>`;
+      container.innerHTML = `<div class="banner-aviso is-error">${t("common.noOpenPeriod")}</div>`;
       return;
     }
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso red">${t("gastoCategoria.error.load", { error: escHtml(userMessage(e)) })}</div>`;
+    container.innerHTML = `<div class="banner-aviso is-error">${t("gastoCategoria.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
   }
   render();

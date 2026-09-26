@@ -97,9 +97,9 @@ export const ES = {
   },
   main: {
     banner: {
-      locked: "⚠ BaseCero ya está abierta en otra pestaña o ventana. Ciérrala y reintenta; mientras tanto, lo que hagas aquí NO se guardará. ",
-      memory: "⚠ Este navegador no soporta almacenamiento persistente: tus datos NO se guardarán al cerrar.",
-      boot_failed: "⚠ BaseCero no ha podido arrancar: {error}. Recarga la página.",
+      locked: "BaseCero ya está abierta en otra pestaña o ventana. Ciérrala y reintenta; mientras tanto, lo que hagas aquí NO se guardará. ",
+      memory: "Este navegador no soporta almacenamiento persistente: tus datos NO se guardarán al cerrar.",
+      boot_failed: "BaseCero no ha podido arrancar: {error}. Recarga la página.",
     },
     tabs: {
       inicio: "Inicio",
@@ -181,6 +181,32 @@ export const ES = {
       },
       dismiss: "Ahora no",
     },
+    // Sistema B (S1, B-Home / B-Inicio-Vacio). Las claves de arriba que ya no pinta Inicio
+    // (saludo, racha, Gastado/Ingresos/Ahorrado, «Disponible del periodo») se quedan hasta la
+    // PR-99: alguna la leen otras pantallas (header.dayOf, savings.negative).
+    b: {
+      sub: { one: "Día {day} de {total}, queda {n} día", other: "Día {day} de {total}, quedan {n} días" },
+      led: "Periodo abierto",
+      left: "Quedan {amount} de {budget}",
+      over: "Te has pasado {amount} de {budget}",
+      todayMark: "hoy",
+      endMark: "día {n}",
+      balanceToday: "Saldo de hoy",
+      balanceStart: "Saldo de partida, sin movimientos",
+      savings: "Ahorras",
+      savingsOf: "de {amount}",
+      rest: "Resto",
+      lastMovements: "Últimos movimientos",
+      emptyTitle: "Aún no hay movimientos",
+      emptyText: "El primer gasto se apunta con el botón de abajo.",
+      yesterday: "Ayer",
+      weekdayShort: { 0: "dom", 1: "lun", 2: "mar", 3: "mié", 4: "jue", 5: "vie", 6: "sáb" },
+      renewalTitle: "{name} se renueva el {date}",
+      renewalAsk: "¿Lo sigues usando?",
+      afterPay: "Tras pagarlo te quedarán {amount}",
+      review: "Revisar",
+      switchAccount: "{name}, cambiar de cuenta",
+    },
   },
   semana: {
     title: "Semana",
@@ -188,11 +214,18 @@ export const ES = {
       sameMonth: "Del {from} al {to} de {month}",
       crossMonth: "Del {from} de {fromMonth} al {to} de {toMonth}",
     },
-    avgPerDay: "media al día",
-    today: "Hoy",
-    noSpend: "sin gastos",
+    display: { label: "Gastado esta semana" },
+    avgPerDay: "Media al día",
+    chart: { label: "Gasto por día, apilado por categoría", avg: "media" },
+    day: {
+      name: "{weekday} {day}",
+      today: "Hoy, {day}",
+      aria: "{day}, {amount}",
+      ariaToday: "{day}, hoy, {amount}",
+    },
+    noSpend: "Sin gastos",
     uncategorized: "Sin categoría",
-    where: { title: "Dónde se ha ido esta semana" },
+    where: { title: "Dónde se ha ido" },
     empty: "Esta semana no hay nada apuntado todavía.",
     emptyPeriod: "En este periodo aún no hay nada apuntado esta semana.",
     error: { load: "No se pudo cargar la semana: {error}" },
@@ -201,9 +234,10 @@ export const ES = {
     error: { load: "No se pudo cargar la pantalla de registro: {error}" },
     title: "Registrar",
     close: "Cerrar",
-    type: { transfer: "Transfer.", more: "Más tipos de apunte" },
+    type: { label: "Tipo de movimiento", transfer: "Transferencia", others: "Devolución o ajuste" },
     natural: {
-      placeholder: "Dilo o escríbelo: «12,50 en el bar»",
+      placeholder: "o dicta «12,50 en el bar»",
+      placeholderNoMic: "o escribe «12,50 en el bar»",
       mic: "Dictar el gasto",
       micListening: "Escuchando…",
       micDenied: "No se pudo usar el micro. Escríbelo.",
@@ -213,7 +247,7 @@ export const ES = {
       // §13.10 de la spec (a validar por Álvaro): el reconocimiento de voz del navegador no es
       // local, el audio sale a un servidor del fabricante. Se dice bajo la caja, solo con el micro
       // disponible.
-      micNotice: "El dictado usa el reconocimiento de voz del navegador, que envía lo que dices a su servidor. Escribirlo no sale de tu móvil.",
+      micNotice: "Al dictar, el navegador envía tu voz a su servidor.",
     },
     save: {
       expense: "Guardar gasto",
@@ -232,16 +266,17 @@ export const ES = {
       summaryPhoto: "con foto",
       summaryToday: "hoy",
     },
-    merchant: {
-      remembered: "recordado de la última vez",
-    },
+    merchant: { placeholder: "Comercio o concepto" },
+    chosen: { remembered: "La que usas en {merchant}" },
+    date: { today: "Hoy" },
+    shared: { row: "Con {name}" },
     limit: {
       remaining: "Con este gasto quedan {amount} de {name}",
       over: "Con este gasto te pasas {amount} de {name}",
     },
     refund: {
       unlink: "Quitar vínculo",
-      toggle: "¿Devuelve un gasto? {arrow}",
+      toggle: "¿Devuelve un gasto?",
       empty: "No hay gastos recientes.",
       sharedSuffix: " (compartido)",
       alreadyRefunded: "Ya devuelto, {amount}",
@@ -273,7 +308,28 @@ export const ES = {
     uncategorizedChip: "Sin categoría {n}",
     chipAll: "Todos",
     // filter.toggle sustituye a search.toggle (embudo en vez de lupa, Movimientos.dc.html:24).
-    filter: { toggle: "Filtrar" },
+    // Hoja de filtros (S5, B-Movimientos-Filtros) con la semántica de siempre: una categoría raíz,
+    // «sin categoría» y una etiqueta. apply cuenta los movimientos que dejaría el filtro elegido.
+    filter: {
+      toggle: "Filtrar",
+      title: "Filtros",
+      clear: "Quitar filtros",
+      category: "Categoría",
+      tag: "Etiqueta",
+      apply: { one: "Ver {n} movimiento", other: "Ver {n} movimientos" },
+    },
+    // Sistema B (S5, B-Movimientos): cabecera de raíz con el periodo que se mira y Display compacto.
+    header: {
+      sub: { one: "Día {day} de {total}, queda {n} día", other: "Día {day} de {total}, quedan {n} días" },
+      closed: "Periodo cerrado",
+    },
+    display: {
+      label: "Gastado en el periodo",
+      of: "de {amount}",
+      meter: "Gastado frente a los límites del periodo",
+    },
+    yesterday: "Ayer",
+    weekdayShort: { 0: "dom", 1: "lun", 2: "mar", 3: "mié", 4: "jue", 5: "vie", 6: "sáb" },
     // Sustituyen al <select id="mov-period"> (Movimientos.dc.html:30-40): aria-label de los dos
     // botones circulares de 40px que mueven state.periodId por índice sobre `periods`.
     period: { prev: "Periodo anterior", next: "Periodo siguiente" },
@@ -284,15 +340,18 @@ export const ES = {
     type: { transfer: "Transferencia" },
     detail: {
       lockedNote: "Tiene un apunte de liquidación enlazado (devolución o ajuste): para cambiar el importe o el reparto, bórralo antes.",
-      typeLabel: "Tipo",
-      // Sin consumidor EN ESTE FICHERO desde la Task 1.5 (la etiqueta del bloque Fecha+Etiqueta
-      // desaparece: el artboard no la lleva), pero registro.js:461 (P8) sigue llamando a esta
-      // misma clave para el mismo control — borrarla habría roto Registro. No se toca.
+      // Fila «Etiqueta» del detalle (S6) y botón de etiqueta de Registro.
       tagLabel: "Etiqueta",
       noTag: "Sin etiqueta",
       newTag: "Nueva etiqueta",
       // Foto del ticket (N5): aria-label del velo a pantalla completa que enseña la foto.
       photoClose: "Cerrar la foto",
+      // S6 (B-Movimiento-Detalle): vista con «Editar», fecha de la fila y resumen del reparto.
+      edit: "Editar",
+      dateToday: "Hoy, {date}",
+      dateYesterday: "Ayer, {date}",
+      sharedMine: "Tu parte {amount}, el {pct} %",
+      sharedPartnerPaid: "Pagó {name}, tu parte {amount}",
     },
     tagCard: {
       movements: { one: "{n} movimiento", other: "{n} movimientos" },
@@ -319,10 +378,8 @@ export const ES = {
     delete: {
       button: "Borrar",
       title: "¿Borrar este movimiento?",
-      message: "{what}. Desaparecerá de las listas y de los totales del periodo.",
-      // Sustituye a la concatenación con · de movimientos.js (ModalBorrar.dc.html:137: «Bar La
-      // Plaza, 18,50 € del 9 de septiembre»). fmtDiaLargo para el día, como pide la spec §2.2.
-      what: "{merchant}, {amount} del {date}",
+      // S6 (B-Borrar): la fila va en la vista previa del aviso; esta es la línea de debajo.
+      body: "Desaparecerá de las listas y de los totales del periodo.",
     },
     empty: {
       noUncategorized: "No hay movimientos sin categorizar.",
@@ -336,8 +393,19 @@ export const ES = {
       settle: "No se pudo liquidar: {error}",
     },
     title: { withPartner: "Liquidar con {name}" },
-    net: { title: "Neto" },
-    account: { title: "Cuenta de la liquidación" },
+    // sub: subtítulo de la cabecera con el reparto común de las filas (B-Liquidar).
+    sub: {
+      half: "Gastos a medias, {pct} %",
+      split: "Su parte, {pct} %",
+    },
+    balance: {
+      favor: "A tu favor",
+      against: "En contra",
+    },
+    account: {
+      in: "Entra en",
+      out: "Sale de",
+    },
     empty: "No queda nada pendiente de liquidar.",
     // select.aria: aria-label de la casilla de selección por fila (SISTEMA.md §4.8bis).
     // select.none: texto del botón de pie cuando no hay ninguna fila marcada.
@@ -345,17 +413,20 @@ export const ES = {
       aria: "Incluir {merchant} en la liquidación",
       none: "Elige al menos un gasto",
     },
-    // row.theirPct/myPct: tercer segmento del sub de una fila (metaHtml), junto a
-    // common.dateValue/amountValue — sustituyen a subTheirs/subMine (spec §1.4/§4).
+    // row.*: línea 2 de una fila; theirPct/myPct se añaden solo si el reparto de la fila no es el
+    // del subtítulo.
     row: {
+      of: "{date}, de {amount}",
+      paidBy: "{date}, pagó {name} {amount}",
       theirPct: "su {pct} %",
       myPct: "tu {pct} %",
     },
+    // footer.*: el primario; el importe va detrás, en mono (B-Liquidar).
     footer: {
-      collect: "Cobrar {amount} de {name}",
-      collectConfirm: "Sí, cobrar {amount}",
-      pay: "Pagar {amount} a {name}",
-      payConfirm: "Sí, pagar {amount}",
+      collect: "Liquidar y cobrar",
+      collectConfirm: "Sí, cobrar",
+      pay: "Liquidar y pagar",
+      payConfirm: "Sí, pagar",
       even: "Liquidar, queda a cero",
       evenConfirm: "Sí, liquidar",
     },
@@ -382,7 +453,10 @@ export const ES = {
       // límite") se borren en este mismo commit: son la lectura antigua que se aparta del artboard.
       ofBudget: "de {budget} presupuestados",
       noLimits: "Ninguna categoría tiene límite este periodo",
+      dayMark: "día {day}",
     },
+    noSpend: "Sin gasto: {names}",
+    noSpendMore: "Sin gasto: {names} y {n} más",
     byCategory: {
       title: "Por categoría",
       empty: "No tienes ninguna categoría de gasto activa.",
@@ -394,19 +468,17 @@ export const ES = {
       prev: "{name} {amount}",
     },
     row: {
-      // Swap (§9.7): el € ya es la cifra destacada de la cabecera de fila, así que este pie deja
-      // de repetirlo — de "{spent} de {limit}" a solo "de {limit}".
-      ofLimit: "de {limit}",
-      // Solo cuando se ha pasado del límite: el exceso, ya calculado, para no tener que restar de
-      // cabeza. Sustituye a la línea ofLimit entera (no se pintan las dos a la vez).
+      // Pie de la fila (B-GastoCategoria): el límite puesto, o el exceso si se ha pasado (sustituye
+      // a la línea del límite: no se pintan las dos a la vez).
+      limit: "límite {limit}",
+      // Aviso al 85 % (category-spend.js#budgetStatus, nivel warn): neutro, con icono de aviso.
+      nearLimit: "llevas el {pct} de {limit}",
       overBy: "superado por {over}",
     },
     detail: {
       noSubcategory: "Sin subcategoría",
       changeLimit: "Cambiar límite",
       setLimit: "Poner límite",
-      limitOfPeriod: "{amount} este periodo",
-      noLimit: "sin límite",
     },
     edit: {
       title: "Límite de {name}",
@@ -423,32 +495,38 @@ export const ES = {
       openAccount: "No se pudo abrir la cuenta: {error}",
     },
     title: "Patrimonio",
-    subtitle: "Calculado con todos tus movimientos",
     netWorth: {
       title: "Patrimonio neto",
       thisPeriod: "este periodo",
+      // LED del Display (B-Patrimonio): el color nunca es la única señal, el LED lleva texto.
+      up: "Sube",
+      down: "Baja",
     },
-    operational: "Operativo, sin ahorro ni deudas: {amount}",
+    // Bloque de composición bajo el Display (B-Patrimonio): barra apilada + Tienes / Debes.
+    composition: {
+      label: "Composición del patrimonio",
+      have: "Tienes",
+      owe: "Debes",
+      operational: "Operativo, sin ahorro ni deudas",
+    },
     accountType: {
       checking: "Corriente",
       savings: "Ahorro",
       liability: "Pasivo",
     },
-    accountSubtitle: {
-      // Task 7 (P2, rediseño v2): el subtítulo de fila ya no es una frase hecha — es
-      // metaHtml([tipo, "Por defecto" | "quedan {n} cuotas"]), así que "tipo" reutiliza
-      // accountType.* (los mismos textos de los chips) y aquí solo queda lo que no está ya ahí.
-      default: "Por defecto",
-      installmentsLeft: { one: "queda {n} cuota", other: "quedan {n} cuotas" },
+    // Línea 2 de la tarjeta de cuenta (B-Patrimonio): tipo, o lo que la distingue.
+    accountLine: {
+      checkingDefault: "{type}, por defecto",
+      installments: { one: "{amount}/mes, queda {n} cuota", other: "{amount}/mes, quedan {n} cuotas" },
     },
     accounts: {
       title: "Cuentas",
-      countActive: { one: "{n} activa", other: "{n} activas" },
       new: "Nueva cuenta",
       empty: "Todavía no tienes ninguna cuenta.",
     },
     account: {
       title: { edit: "Editar cuenta" },
+      settings: "Ajustes de la cuenta",
       openingBalance: "Saldo inicial",
       note: {
         liability: "El saldo de un pasivo es lo que debes: normalmente negativo.",
@@ -457,14 +535,17 @@ export const ES = {
       create: "Crear cuenta",
       validation: { name: "Ponle un nombre a la cuenta." },
       monthlyInstallment: "Cuota mensual",
+      // Selector de familia (C8): el nombre del color sale de families.*.
+      color: "Color de la cuenta",
+      colorUsedBy: "{color}, la usa {name}",
+      colorShared: "{color}, la misma que {name}. El icono las distingue.",
     },
     goals: {
       title: "Objetivos",
-      countActive: { one: "{n} activo", other: "{n} activos" },
       new: "Nuevo objetivo",
       empty: "Todavía no tienes ningún objetivo activo.",
       ofTarget: "{current} de {target}",
-      kind: { savings: "Hucha", cap: "Límite de gasto" },
+      progress: "{name}: {pct} %",
     },
     goalType: {
       emergency_fund: "Fondo de emergencia",
@@ -475,8 +556,11 @@ export const ES = {
     },
     goal: {
       title: { edit: "Editar objetivo" },
-      monthsLabel: "Meses de gasto a cubrir",
-      pctLabel: "Objetivo de ahorro (%)",
+      settings: "Ajustes del objetivo",
+      monthsLabel: "Meses a cubrir",
+      monthLess: "Un mes menos",
+      monthMore: "Un mes más",
+      pctLabel: "Objetivo de ahorro",
       amountLabel: { annual: "Objetivo anual", default: "Importe objetivo" },
       dateLabel: "Fecha objetivo (opcional)",
       typeLockedNote: "El tipo no se puede cambiar una vez creado el objetivo. Para cambiarlo, bórralo y crea uno nuevo.",
@@ -503,8 +587,13 @@ export const ES = {
     hero: {
       pending: "Pendiente este periodo",
       perMonth: "al mes",
+      pendingCount: { one: "{n} pendiente", other: "{n} pendientes" },
+      allSettled: "Todo pagado",
+      remaining: "Te quedarán {amount}",
+      paidLabel: "Pagado",
+      meterAria: "Pendiente {pending} de {total} este periodo",
     },
-    section: { all: "Todas" },
+    section: { all: "Todas", pending: "Pendiente", paidPeriod: "Pagado este periodo", other: "Otras reglas" },
     state: {
       paid: "pagado",
       pending: "pendiente",
@@ -512,7 +601,7 @@ export const ES = {
     },
     newRule: "Nueva regla recurrente",
     toggle: { aria: "Activar {name}" },
-    footNote: "El toggle pausa la regla sin borrarla: no se generará el próximo cargo hasta que la vuelvas a activar.",
+    footNote: "El interruptor pausa la regla sin borrarla.",
     type: { transfer: "Transfer." },
     freq: {
       weekly: "Semanal",
@@ -556,18 +645,20 @@ export const ES = {
   categorias: {
     error: { load: "No se pudieron cargar las categorías: {error}" },
     title: "Categorías",
-    needLabel: { need: "necesario", want: "prescindible", savings: "ahorro" },
+    flowLabel: "Tipo de categoría",
     needType: { need: "Necesario", want: "Prescindible" },
     subcatCount: { one: "{n} subcategoría", other: "{n} subcategorías" },
+    archivedCount: { one: "{n} archivada", other: "{n} archivadas" },
+    noSubcats: "Sin subcategorías",
     archivedLabel: "Archivada",
-    addSubcategory: "+ Añadir subcategoría",
+    addSubAria: "Añadir subcategoría a {name}",
+    archivedChipAria: "{name}, archivada",
     empty: {
       expense: "Todavía no hay categorías de gasto.",
       income: "Todavía no hay categorías de ingreso.",
     },
     list: {
-      hint: "Toca una categoría para editarla. El asa la reordena.",
-      archiveInfo: "Archivar oculta la categoría de los selectores sin tocar tu historial: los periodos cerrados siguen sumando igual. Nada se borra si algo lo usa.",
+      hint: "Toca un nombre para editarlo. El asa reordena; en subcategorías, mantén pulsado.",
     },
     archive: {
       archive: "Archivar categoría",
@@ -580,40 +671,36 @@ export const ES = {
       title: { edit: "Editar categoría", newChild: "Nueva subcategoría", new: "Nueva categoría" },
       closeAria: "Cerrar",
       namePlaceholder: "Nombre de la categoría",
-      typeLockedNote: "El tipo no se puede cambiar una vez creada la categoría.",
+      placeLabel: "Dónde va",
+      place: { root: "Categoría", child: "Subcategoría de…" },
       needSectionTitle: "¿Necesario o prescindible?",
-      needHint: "Separa lo imprescindible del capricho en los resúmenes del periodo.",
       parentSectionTitle: "Dentro de",
-      rootChip: "Raíz",
-      rootLockedNote: "Una raíz con subcategorías no puede colgarse de otra.",
-      newRootChip: "Raíz nueva",
-      inheritNote: "Una subcategoría hereda el color y el icono de su raíz.",
-      colorSectionTitle: "Color",
-      pickColorAria: "Elegir color",
-      colorHint: "El pool de 12 del sistema — legible con daltonismo. Te sugerimos uno; puedes cambiarlo.",
+      rootLockedNote: "Una categoría con subcategorías no puede colgarse de otra.",
+      inheritNote: "Una subcategoría hereda el color y el icono de su categoría.",
+      famLabel: "Familia de color",
+      famUsedBy: "{fam}, la usa {name}",
+      famShared: ", la misma que {name}. El icono las distingue.",
+      famFree: ", no la usa ninguna otra categoría.",
       iconSectionTitle: "Icono",
-      pickIconAria: "Elegir icono",
-      iconHint: "Set curado — sin picker de emojis del sistema (v1.1 si acaso).",
-      colorIconSectionTitle: "Color e icono",
       create: "Crear categoría",
-      previewTitle: "Vista previa",
-      previewKind: "{type}, {need}",
-      previewSpend: "{spent} de {limit} este periodo",
       archiveBtn: "Archivar categoría",
       unarchiveBtn: "Desarchivar categoría",
     },
   },
   etiquetas: {
     title: "Etiquetas de proyecto",
-    intro: "Cruzan las categorías: agrupan lo que gastas en un viaje, una reforma o una boda, sin importar en qué categoría caiga cada gasto.",
-    footerNote: "Archivar una etiqueta la quita de los selectores, pero sus movimientos la siguen enseñando.",
+    hint: "Cruzan categorías: un viaje, una reforma, un cumple.",
+    empty: "Todavía no hay etiquetas.",
+    open: "Abiertas",
+    archived: "Archivadas",
     new: "Nueva etiqueta",
+    archivedAria: "{name}, archivada, {movements}, {amount}",
+    uncategorized: "Sin categoría",
     row: {
       movements: { one: "{n} movimiento", other: "{n} movimientos" },
-      open: "abierta",
-      archived: "archivada",
-      noLimit: "sin límite",
-      ofLimit: "{spent} de {limit}",
+      noLimit: "{movements}, sin límite",
+      ofLimit: "{movements}, de {limit}",
+      left: "quedan",
       seeMovements: "Ver sus movimientos",
     },
     form: {
@@ -644,15 +731,22 @@ export const ES = {
       first: "Primer periodo",
       title: "Nuevo periodo",
     },
+    // El Display del cierre (F-13, F-02): la etiqueta y el pie de esta pantalla, con el desglose
+    // de 3 datos que antes vivía en una tarjeta aparte.
     closing: {
-      title: "Cierras {name}",
-      movementCount: { one: "{n} movimiento", other: "{n} movimientos" },
+      saved: "{name} ahorró",
+      savedPct: "El {pct} de lo que ingresaste",
       income: "Ingresos",
       spent: "Gastado",
-      saved: "Ahorrado",
-      savingsSentence: "Ahorras el {pct} de lo que ingresas",
+      count: "Movimientos",
     },
-    date: { title: "Empieza el" },
+    date: {
+      title: "{name} empieza el",
+      other: "Otra fecha",
+      quickPick: "Elegir un día cercano",
+      customLabel: "Fecha de inicio",
+      groupAria: "Día de inicio",
+    },
     share: {
       title: "Gastos compartidos",
       youPay: "Pagas de lo compartido",
@@ -661,17 +755,18 @@ export const ES = {
       increaseAria: "Subir porcentaje",
     },
     budget: {
-      lastMonth: "Mes pasado: {amount}",
+      lastMonth: "{name} {amount}",
       noLimitPlaceholder: "Sin límite",
       noCategories: "No hay categorías de gasto configuradas.",
-      question: "¿Cuánto quieres gastar este periodo?",
-      hint: "Pon un límite solo donde te sirva. Si lo dejas vacío, esa categoría irá sin presupuesto.",
+      question: "¿Cuánto quieres gastar?",
+      hint: "Límite solo donde te sirva.",
       addAnother: "Añadir límite a otra categoría",
     },
     total: {
       budgetedTitle: "Presupuestado",
       expectedIncome: "Ingresos previstos",
-      remaining: "Quedan {amount} sin asignar: de ahí salen la cuota del coche, las provisiones y lo que ahorres.",
+      unassigned: "Sin asignar",
+      remaining: "Quedan {amount} sin asignar.",
       over: "Te pasas por {amount} de los ingresos previstos.",
     },
     // Primer periodo (D11): campo efímero de "Ingresos previstos" que solo existe mientras el
@@ -782,28 +877,30 @@ export const ES = {
       body: "Tus datos viven solo en este dispositivo. Sin cuentas, sin nube.",
       exportBtn: "Exportar copia de seguridad (JSON)",
     },
+    // Rediseño B (S4, B-Ajustes): etiquetas de grupo y textos de fila nuevos.
+    groups: { period: "Periodo y reparto", prefs: "Preferencias", organize: "Organizar", data: "Tus datos" },
+    rows: {
+      partnerNone: "Nadie",
+      partnerField: "Nombre de la otra persona",
+      informeSub: "{name}, abierto el {date}",
+      quickRegisterSub: "Solo importe y categoría",
+      enc: "Copia cifrada",
+      sheet: "Hoja de cálculo",
+      sheetNote: "Importar sustituye los datos actuales y también abre una copia cifrada (.bce).",
+      bank: "Importar del banco",
+      json: "Copia de emergencia",
+    },
     about: {
       title: "Acerca de BaseCero",
       feedback: "¿No funciona?",
-      privacy: "Política de privacidad",
+      privacy: "Privacidad",
       source: "Código fuente",
       license: "Licencia MIT",
       feedbackNote: "El formulario se abre en Tally, fuera de la app: solo viaja lo que escribas ahí.",
     },
-    importResult: {
-      summary: "Nuevas: {created}, conciliadas: {reconciled}, duplicadas (saltadas): {skipped}",
-      omitted: { one: ", 1 fila ilegible omitida", other: ", {n} filas ilegibles omitidas" },
-      categorized: { one: ", 1 categorizado por el comercio", other: ", {n} categorizados por el comercio" },
-      tail: ". Revisa la bandeja «sin categorizar» en Movimientos.",
-      bizumHint: " Liquida en Inicio antes de importar: el Bizum que recibes se concilia solo; el que envías entra como movimiento nuevo.",
-    },
     assist: {
-      title: "Configura tu banco",
-      // rowCount/unknownFormat: segmentos de metaHtml (spec §7.2 bloque 2) para la fila de
-      // fichero — sustituyen a la vieja "rows" (una sola cadena con el aviso "dinos qué es cada
-      // columna" ya cubierto por footNote, así que no se traslada).
+      // rowCount: cifra de filas de la ficha del fichero del importador (screens/importar.js, S12).
       rowCount: { one: "{n} fila", other: "{n} filas" },
-      unknownFormat: "formato no reconocido",
       dateTitle: "Fecha",
       conceptTitle: "Concepto",
       counterpartyTitle: "Contraparte",
@@ -821,7 +918,6 @@ export const ES = {
       // citaba solo el PRIMER error (errors[0]) en una sola línea.
       counterWarnLine: { one: "1 fila no se lee", other: "{n} filas no se leen" },
       counterReasons: "{reasons}",
-      saveBtn: "Guardar perfil e importar",
       footNote: "El perfil se guarda en tu dispositivo: la próxima vez este banco se importa directo. Los CSV de N26 se reconocen solos, sin configurar nada.",
       dateFormat: { iso: "año-mes-día", dmy: "día/mes/año" },
       date: {
@@ -840,57 +936,87 @@ export const ES = {
       },
     },
   },
+  importar: {
+    title: "Importar extracto",
+    steps: { aria: "Pasos", file: "Fichero", columns: "Columnas", result: "Resultado" },
+    led: {
+      unknown: "Formato no reconocido",
+      n26: "N26, reconocido solo",
+      profile: "Reconocido con tu perfil guardado",
+      saved: "Perfil guardado para la próxima vez",
+    },
+    cta: { one: "Importar 1 movimiento", other: "Importar {n} movimientos" },
+    ctaIdle: "Importar movimientos",
+    summaryAria: "Resultado del import",
+    tiles: {
+      created: { one: "nueva", other: "nuevas" },
+      reconciled: { one: "conciliada", other: "conciliadas" },
+      skipped: { one: "duplicada, saltada", other: "duplicadas, saltadas" },
+    },
+    omitted: { one: "1 fila no se pudo leer y se ha omitido.", other: "{n} filas no se pudieron leer y se han omitido." },
+    inbox: { one: "La que no tiene categoría está en la bandeja de Movimientos.", other: "Las {n} sin categoría están en la bandeja de Movimientos." },
+    allCategorized: "Todas llevan categoría, puesta por el comercio.",
+    nothingNew: "No había movimientos nuevos en este fichero.",
+    bizumHint: "Liquida en Inicio antes de importar: el Bizum que recibes se concilia solo; el que envías entra como movimiento nuevo.",
+    done: "Listo",
+  },
   onboarding: {
     cta: { next: "Seguir" },
+    // Progreso (controls.js#stepsHtml): «1 de 3» junto a los segmentos; el aria del progressbar.
+    progress: { count: "{n} de {total}", aria: "Paso {n} de {total}" },
+    // Bienvenida (S13, B-Onb-Bienvenida): marca, Display «Saldo de partida» y tres promesas.
     welcome: {
-      // Titular audaz (SISTEMA.md §1.7): una sola cadena a 34/600, no dos claves con <br>.
-      title: "Tu dinero, desde cero.",
-      feature1: { title: "Todo se queda aquí", subtitle: "Sin servidor y sin registro. Funciona hasta sin conexión." },
-      feature2: { title: "Tu dato es una hoja de cálculo", subtitle: "Exporta e importa tus datos cuando quieras: nunca están atrapados." },
-      feature3: { title: "Tu mes empieza cuando cobras", subtitle: "Los periodos van de nómina a nómina, no del 1 al 30." },
-      startBtn: "Empezar",
-      // startHint: recortada de startBtn («Empezar · 2 minutos» → PROSA en P0 → aquí SEGMENTOS,
-      // línea propia bajo el CTA, Onboarding1.dc.html:66).
-      startHint: "Dos minutos",
-      importPrompt: "¿Vienes de otra copia?",
-      importLink: "Importar una hoja o backup",
+      brand: "basecero",
+      tagline: "Gastos, ingresos y ahorro de cada mes.",
+      displayLabel: "Saldo de partida",
+      ready: "Listo",
+      promise1: "Sin registro ni contraseña",
+      promise2: "Funciona sin conexión",
+      promise3: "Tus datos se quedan en este móvil",
+      startBtn: "Empezar de cero",
+      importBtn: "Importar una hoja o copia",
+      // «Hoja .xlsx o copia cifrada .bce»: las extensiones van en mono entre los trozos.
+      importHint: { pre: "Hoja ", mid: " o copia cifrada ", post: "" },
     },
     account: {
       title: "Tus cuentas",
-      subtitle: "Las de verdad: tu banco del día a día, tu hucha, tu préstamo. Con al menos una basta para empezar.",
+      subtitle: "Con una basta. El resto, luego en Patrimonio.",
       addAnotherTitle: "Añadir otra",
       firstTitle: "Tu primera cuenta",
-      namePlaceholder: "p. ej. Hucha del banco",
+      // Las cuatro baldosas (onboarding-steps.js#ACCOUNT_KINDS). Hucha = ahorro con familia imp.
+      kindGroup: "Tipo de cuenta",
+      kind: { checking: "Corriente", savings: "Ahorro", hucha: "Hucha", liability: "Deuda" },
+      checkingDefault: "Corriente, por defecto",
+      namePlaceholder: "p. ej. Fondo de emergencia",
       balanceTitle: "Saldo de hoy",
-      addBtn: "Añadir",
-      liabilityNote: "El saldo de un pasivo es lo que debes: se guarda en negativo.",
-      infoNote: "Aquí no se conecta ningún banco: tú apuntas o importas su CSV. Podrás añadir y renombrar cuentas cuando quieras en Patrimonio.",
-      // importDefault: SEGMENTOS (spec §1.4) — línea propia de 11px bajo la fila, ya no un sufijo
-      // con coma inicial concatenado tras el tipo (Onboarding2.dc.html:44).
-      importDefault: "será la cuenta de tus imports",
+      addBtn: "Añadir cuenta",
+      liabilityNote: "Lo que debes se guarda en negativo.",
       needOne: "Crea al menos una cuenta para seguir.",
       createFailed: "No se pudo crear la cuenta: {error}",
       nameRequired: "Ponle un nombre a la cuenta.",
-      type: { checking: "Corriente", savings: "Ahorro", liability: "Pasivo" },
-      // Borrar (D9, spec §8 punto 4): solo desde el paso 2, solo cuentas sin movimientos.
+      // Borrar (D9, spec §8 punto 4): solo desde el paso Cuentas, solo cuentas sin movimientos.
       deleteAria: "Borrar {name}",
       deleteTitle: "¿Borrar esta cuenta?",
       deleteBody: "{name}, {amount}. Todavía no tiene movimientos.",
       deleteFailed: "No se pudo borrar la cuenta: {error}",
-      // deleteHasMovements: NO está en la tabla de copy de la spec — deleteEmptyAccount no lanza
-      // cuando el guard frena el borrado (D9: "no se lanza"), así que ese camino necesita su
-      // propio texto para rellenar el {error} de deleteFailed en vez de dejarlo literal.
+      // deleteHasMovements: deleteEmptyAccount no lanza cuando el guard frena el borrado (D9), así
+      // que ese camino necesita su propio texto para rellenar el {error} de deleteFailed.
       deleteHasMovements: "Ya tiene movimientos.",
     },
     prefs: {
       title: "A tu manera",
-      subtitle: "Cuatro cosas rápidas. Todas se cambian luego en Ajustes.",
-      language: "Idioma",
+      subtitle: "Todo se cambia luego en Ajustes.",
+      sharedTitle: "Gastos compartidos",
+      partnerLabel: "Con quién, opcional",
+      partnerPlaceholder: "Su nombre",
+      shareLabel: "Tu parte",
+      shareYou: "Tú",
+      prefsTitle: "Preferencias",
       currencyLabel: "Moneda",
+      currencyOther: "Otra",
+      currencyOtherLabel: "Otra moneda",
+      language: "Idioma",
       formatLabel: "Formato",
-      partnerTitle: "¿Compartes gastos con alguien?",
-      partnerPlaceholder: "Su nombre — o déjalo vacío si vas por libre",
-      partnerNote: "Con nombre, cada gasto puede marcarse como compartido y la app lleva las cuentas de quién debe qué. Vacío = ni rastro de esa parte de la app.",
     },
     // Paso 4 (D10/D11, spec §8 punto 6): título + subtítulo del paso — el formulario real vive
     // embebido debajo (renderPeriodoNuevo, embed:true), sin pantalla ilustrativa.
@@ -946,15 +1072,17 @@ export const ES = {
       label: "Te cuestan al año",
       perMonth: "al mes",
       activeCount: { one: "{n} activa", other: "{n} activas" },
+      chartLabel: "Renovaciones de los próximos 30 días",
     },
     notice: {
-      question: "{name} se renueva el {when} por {amount}. ¿Lo sigues usando?",
+      title: "{name} se renueva el {when}",
+      question: "¿Lo sigues usando?",
       keep: "Lo sigo usando",
       cancel: "Voy a cancelarlo",
     },
     section: {
       active: "Activas",
-      activeHint: "por fecha de renovación",
+      activeHint: "Por fecha de renovación",
       candidates: "Puede que sea una suscripción",
       cancelled: "Canceladas",
     },
@@ -980,7 +1108,6 @@ export const ES = {
       message: "{name}. Dejará de contar como pendiente y empezaremos a contar lo que te ahorras. Puedes volver a activarla cuando quieras.",
       confirm: "Cancelar",
     },
-    footer: "Salen de tus recurrentes marcados como suscripción y de los cargos que se repiten con el mismo importe. Cancelar una aquí desactiva su recurrente y empieza a contar lo que te ahorras.",
   },
   // Task 5 (PR i18n): errores de capas no-UI (repo/n26/xlsx/csv-generic/backup-crypto/db-worker) —
   // el string ES es el mensaje literal que ya lanzaban esas capas (byte-exacto, lo pinnean los
@@ -1107,6 +1234,8 @@ export const ES = {
     undone: "Movimiento deshecho",
     myPart: "Tu parte",
     tagLabel: "Etiqueta",
+    left: "Quedan en {month}",
+    today: "Hoy puedes gastar",
     undoFailed: "No se pudo deshacer: {error}",
   },
   // Informe del periodo (F1). screens/informe.js.
@@ -1114,56 +1243,57 @@ export const ES = {
     title: "Informe",
     openPeriod: "Periodo en curso, día {n} de {m}",
     closedPeriod: "Cerrado, del {start} al {end}",
-    generatedAt: "Generado hoy {time}",
     download: "Descargar el PDF",
     downloading: "Generando…",
-    downloadHint: "Se genera en tu móvil, con las mismas gráficas y sin salir de aquí.",
+    // downloadNote: la única nota bajo el primario (F-11, B-Informe).
+    downloadNote: { one: "Se genera en tu móvil, con {n} movimiento.", other: "Se genera en tu móvil, con los {n} movimientos." },
+    downloadNoteEmpty: "Se genera en tu móvil.",
     selector: { label: "Periodo" },
+    older: {
+      label: "Anteriores",
+      title: "Periodos cerrados",
+      viewing: "Viendo",
+      none: "Aún no hay periodos cerrados.",
+    },
+    display: {
+      rate: "Ahorras de lo que ingresas",
+      overspent: "Gastas más de lo que ingresas",
+      vsPrev: "En {name}, el {pct}",
+    },
+    split: {
+      income: "Ingresado",
+      aria: "De {income} ingresados, {spent} gastados y {saved} ahorrados",
+    },
     summary: {
-      title: "Resumen",
-      income: "Ingresos",
       spent: "Gastado",
       saved: "Ahorrado",
-      available: "Disponible",
-      savingsRate: "Ahorras el {pct} % de lo que ingresas.",
-      savingsRateVsPrev: " En {name}, el {pct} %.",
     },
-    accounts: {
-      title: "Tus cuentas",
-      total: "Total operativo",
+    compare: {
+      title: "Frente a {name}",
+      up: "Sube",
+      down: "Baja",
     },
     categories: {
-      title: "Gasto por categoría",
-      vsPrev: "frente a {name}",
-      total: "Total",
+      byCategory: "Por categoría",
+      vsPrev: "vs {name}",
+      rest: "Resto",
       orientativo: "{prev} está cerrado y {current} va por el día {day} de {total}, así que la comparación es orientativa hasta el cierre.",
-      noPrev: "Sin periodo anterior con el que comparar.",
     },
     shared: {
-      title: "Con {name}",
-      periodTotal: "Gastos compartidos del periodo",
-      myPart: "Tu parte",
       net: {
         theyOwe: "{name} te debe",
         youOwe: "Debes a {name}",
         even: "Estáis en paz",
       },
     },
-    subscriptions: {
-      title: "Suscripciones",
-      active: "{n} activas, al mes",
-      yearly: "Lo que suman al año",
-      link: "El radar",
-    },
+    bento: { movements: "Movimientos" },
     movements: {
-      title: "Movimientos por categoría",
-      count: "{n} en total",
-      groupCount: { one: "{n} movimiento", other: "{n} movimientos" },
-      andMore: "y {n} movimientos más",
-      others: "Otros",
       tag: "Etiqueta: {name}",
     },
-    footer: "El PDF lleva todo esto más la lista completa de los {n} movimientos, y se guarda igual en cualquier móvil.",
+    empty: {
+      title: "Este periodo aún no tiene movimientos",
+      text: "El informe se llena con lo que apuntes.",
+    },
     error: {
       load: "No se pudo cargar el informe: {error}",
       pdf: "No se pudo generar el PDF: {error}",
@@ -1208,5 +1338,26 @@ export const ES = {
     amount: "Cantidad a barrer",
     capped: "Como mucho puedes barrer {amount}: es lo que hay en {account}",
     note: "Barrido de fin de periodo",
+  },
+  // Tema de la app (DESIGN §3): fila de Ajustes. Las claves de valor son las preferencias de theme.js.
+  theme: {
+    label: "Tema",
+    light: "Claro",
+    dark: "Oscuro",
+    system: "Sistema",
+  },
+  // Familias de color de categoría (PR-04): el NOMBRE del color, no el de la categoría que lo usa.
+  families: {
+    casa: "Arena", ali: "Salvia", res: "Mostaza", tra: "Cielo", coc: "Pizarra", sal: "Agua",
+    sus: "Lavanda", oci: "Rosa", rop: "Ciruela", reg: "Arcilla", imp: "Oliva", otr: "Piedra",
+  },
+  // Etiquetas accesibles de los iconos de categoría (selector de la pantalla de edición).
+  icons: {
+    cat: {
+      casa: "Casa", ali: "Cesta de la compra", res: "Taza", tra: "Autobús", coc: "Coche", sal: "Pulso",
+      sus: "Renovación", oci: "Entrada", rop: "Camiseta", reg: "Regalo", imp: "Recibo", otr: "Puntos",
+      huella: "Huella", hoja: "Hoja", libro: "Libro", nota: "Nota musical", avion: "Avión", estrella: "Estrella",
+      billete: "Billete", bebe: "Bebé", portatil: "Portátil", mando: "Mando de juego", paquete: "Paquete", birrete: "Birrete",
+    },
   },
 };

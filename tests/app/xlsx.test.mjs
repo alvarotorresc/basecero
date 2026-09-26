@@ -289,9 +289,10 @@ test("validate: id con caracteres no válidos se rechaza — en meta.key y en ca
 });
 test("validate: PK duplicada (dentro de la misma pestaña, meta usa key)", () => {
   const d = parse((x) => { x.meta.push({ key: "schema_version", value: "1" }); });
-  // el duplicado se reporta en la fila de la SEGUNDA aparición (fila 16: las 14 semillas —incluidas
-  // quick_register (Registro v2 §4.1) y subscription_ignored/renewal_snoozed (Suscripciones)— + esta)
-  assert.match(validateImport(d).join("\n"), /pestaña «meta» fila 16: id duplicado \(«schema_version»\)/);
+  // el duplicado se reporta en la fila de la SEGUNDA aparición (fila 17: las 15 semillas —incluidas
+  // quick_register (Registro v2 §4.1), subscription_ignored/renewal_snoozed (Suscripciones) y
+  // account_style (PR-10)— + esta)
+  assert.match(validateImport(d).join("\n"), /pestaña «meta» fila 17: id duplicado \(«schema_version»\)/);
 });
 test("validate: dos periodos open", () => {
   const d = parse((x) => { x.periods.push({ ...x.periods[0], id: "per-2", name: "Otro" }); });
@@ -1043,4 +1044,119 @@ test("validate: tag_id vacío no es fkEmpty; a un id inexistente es fkMissing; a
   });
   assert.deepEqual(validateImport(etiquetaBorrada), [],
     "la app nunca produce tags.deleted=1 (archivar es is_archived), pero una hoja editada a mano sí puede");
+});
+
+// PR-04: meta.category_style en formato ANTIGUO ({color:hex, icon:emoji}) sigue entrando para
+// siempre (hay xlsx viejos). Se importa, se exporta y se reimporta: la familia y el icono resueltos
+// no cambian por el camino, y lo que queda escrito ya es el formato nuevo {fam, icon}.
+test("round-trip: un category_style antiguo se importa, exporta y reimporta sin perder familia ni icono", async () => {
+  const { parseStyle, initCategoryStyle, familyForCategory, iconForCategory } = await import("../../app/app/js/category-colors.js");
+  const OLD = JSON.stringify({ "cat-x": { color: "#629D3B", icon: "🐾" } });
+  const byId = { "cat-x": { id: "cat-x", parent_id: "", flow: "expense" } };
+  const resolve = (raw) => {
+    initCategoryStyle(parseStyle(raw));
+    const out = { fam: familyForCategory("cat-x", byId), icon: iconForCategory("cat-x", byId) };
+    initCategoryStyle({});
+    return out;
+  };
+  const before = resolve(OLD);
+  assert.deepEqual(before, { fam: "ali", icon: "huella" }, "verde v1 → ranura v2 → salvia; huella → huella");
+
+  const styleOf = (db) => db.prepare("SELECT value FROM meta WHERE key='category_style'").get().value;
+  const importInto = (wb) => {
+    const { data, errors } = workbookToRows(X, wb);
+    assert.deepEqual(errors, []);
+    assert.deepEqual(validateImport(data), []);
+    const db = openDb(); seedMinimal(db);
+    for (const s of replaceAllStmts(data)) db.prepare(s.sql).run(...(s.bind ?? []));
+    return db;
+  };
+
+  const db1 = importInto(wbFromSeed((d) => {
+    d.meta = d.meta.filter((m) => m.key !== "category_style");
+    d.meta.push({ key: "category_style", value: OLD });
+  }));
+  const db2 = importInto(rowsToWorkbook(X, dumpAll(db1)));
+  const finalRaw = styleOf(db2);
+  assert.deepEqual(JSON.parse(finalRaw), { "cat-x": { fam: "ali", icon: "huella" } }, "formato nuevo tras el viaje");
+  assert.deepEqual(resolve(finalRaw), before);
+});
+
+test("import: replaceAllStmts escribe category_style ya normalizado; el resto de meta pasa tal cual", () => {
+  const data = {
+    meta: [
+      { key: "category_style", value: JSON.stringify({ "cat-a": { color: "#E85F72", icon: "🎮" }, "cat-b": { fam: "oci", icon: "libro" } }) },
+      { key: "currency", value: "USD" },
+    ],
+    accounts: [], categories: [], periods: [], transactions: [], recurring_rules: [], goals: [], budgets: [], tags: [],
+  };
+  const binds = Object.fromEntries(replaceAllStmts(data).filter((s) => s.bind?.length === 2).map((s) => s.bind));
+  assert.deepEqual(JSON.parse(binds.category_style), { "cat-a": { fam: "reg", icon: "mando" }, "cat-b": { fam: "oci", icon: "libro" } });
+  assert.equal(binds.currency, "USD");
+});
+
+// ---- PR-10: meta.account_style (D-2, C8) — sin traducción de formato antiguo (nace en esta PR),
+// así que a diferencia de category_style, replaceAllStmts NO la normaliza: pasa tal cual, como
+// account_loans (defensa en profundidad únicamente al LEER, con parseAccountStyle). ------------
+
+test("round-trip: account_style presente sobrevive export -> import -> replaceAllStmts", async () => {
+  const { familyForAccount } = await import("../../app/app/js/account-colors.js");
+  const db = openDb(); seedMinimal(db);
+  db.prepare("UPDATE meta SET value=? WHERE key='account_style'")
+    .run(JSON.stringify({ "acc-revolut": { fam: "sus" } }));
+
+  const original = dumpAll(db);
+  const wb = rowsToWorkbook(X, original);
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(validateImport(data), []);
+
+  const db2 = openDb();
+  for (const s of replaceAllStmts(data)) db2.prepare(s.sql).run(...(s.bind ?? []));
+  assert.deepEqual(dumpAll(db2), original);
+
+  const meta2 = Object.fromEntries(db2.prepare("SELECT * FROM meta").all().map((r) => [r.key, r.value]));
+  assert.deepEqual(JSON.parse(meta2.account_style), { "acc-revolut": { fam: "sus" } });
+  const revolut = db2.prepare("SELECT * FROM accounts WHERE id='acc-revolut'").get();
+  assert.equal(familyForAccount(revolut, JSON.parse(meta2.account_style), []), "sus");
+});
+
+// Simula una hoja de ANTES de esta PR: la pestaña meta nunca tuvo la clave account_style.
+// workbookToRows la materializa solo con las claves que trae el libro (a diferencia de accounts/
+// categories/…, que rellenan huecos de columna con TEXT_DEFAULTS, meta no tiene "columnas": cada
+// fila es una clave, y una clave ausente sencillamente no aparece en data.meta).
+test("import: una hoja SIN account_style (antigua) no se queja; en una BD nueva, ausente = '{}' = por defecto", async () => {
+  const { defaultFamilyForAccount } = await import("../../app/app/js/account-colors.js");
+  const wb = wbFromSeed((d) => { d.meta = d.meta.filter((m) => m.key !== "account_style"); });
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  assert.ok(!data.meta.some((m) => m.key === "account_style"), "la hoja de origen no trae la clave");
+  assert.deepEqual(validateImport(data), [], "validateImport no exige account_style");
+
+  const db2 = openDb(); // schema.sql siembra account_style='{}' en una BD nueva
+  for (const s of replaceAllStmts(data)) db2.prepare(s.sql).run(...(s.bind ?? []));
+  const row = db2.prepare("SELECT value FROM meta WHERE key='account_style'").get();
+  assert.equal(row.value, "{}", "ausente en la hoja -> se queda el valor por defecto de la BD destino");
+
+  const revolut = db2.prepare("SELECT * FROM accounts WHERE id='acc-revolut'").get();
+  assert.equal(defaultFamilyForAccount(revolut, []), "ali", "sin override: cae al valor por defecto de su tipo");
+});
+
+// Documenta el riesgo señalado en el plan de la PR-10: meta se FUSIONA en el import (upsert de las
+// claves que trae la hoja), NUNCA se sustituye entera — una hoja sin account_style no borra el
+// account_style ya guardado en la BD destino. Mismo comportamiento, ya probado, que category_style
+// y account_loans; aquí queda para account_style con su propio caso.
+test("import: una hoja SIN account_style no borra el account_style YA GUARDADO en la BD destino (meta se fusiona, no se sustituye)", () => {
+  const wb = wbFromSeed((d) => { d.meta = d.meta.filter((m) => m.key !== "account_style"); });
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+
+  const db2 = openDb(); seedMinimal(db2);
+  db2.prepare("UPDATE meta SET value=? WHERE key='account_style'")
+    .run(JSON.stringify({ "acc-n26": { fam: "oci" } }));
+  for (const s of replaceAllStmts(data)) db2.prepare(s.sql).run(...(s.bind ?? []));
+
+  const row = db2.prepare("SELECT value FROM meta WHERE key='account_style'").get();
+  assert.deepEqual(JSON.parse(row.value), { "acc-n26": { fam: "oci" } },
+    "el valor previo de la BD destino sobrevive: la hoja importada no lo tocó");
 });

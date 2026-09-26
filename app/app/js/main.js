@@ -12,8 +12,14 @@ import { renderPatrimonio } from "./screens/patrimonio.js";
 import { renderAjustes } from "./screens/ajustes.js";
 import { pushBack, goBack, clearBack, resetBack } from "./back.js";
 import { userMessage } from "./errors.js";
-import { scrollScreenTop } from "./viewport.js";
+import { scrollScreenTop, trackTabbarHeight } from "./viewport.js";
 import { setTabNavigator } from "./tabs.js";
+import { applyTheme, readPref, getStorage, systemDarkQuery } from "./theme.js";
+
+// El script en línea del <head> ya fijó data-theme antes del CSS. Aquí se vuelve a aplicar para
+// dos cosas que él no puede hacer: engancharse al cambio de modo del sistema (con «Sistema») y
+// tomar theme-color del --bg real del CSS.
+applyTheme(document, readPref(getStorage(window)), systemDarkQuery(window));
 
 const screen = document.getElementById("screen");
 const RUTAS = {
@@ -36,10 +42,9 @@ export function nav(tab, opts) {
   // historial con «volver a Inicio» como callback, en la misma pila que las subpantallas.
   if (tab === "inicio") clearBack();
   else resetBack(() => nav("inicio"));
+  // La pestaña activa se pinta por [aria-current="page"] (components.css, §9): sin clase aparte.
   document.querySelectorAll(".tab").forEach((b) => {
-    const isActive = b.dataset.tab === tab;
-    b.classList.toggle("active", isActive);
-    if (isActive) b.setAttribute("aria-current", "page");
+    if (b.dataset.tab === tab) b.setAttribute("aria-current", "page");
     else b.removeAttribute("aria-current");
   });
   // clearBack()/resetBack() no ejecutan callbacks (su history.go cae en el guard del popstate,
@@ -50,7 +55,7 @@ export function nav(tab, opts) {
 setTabNavigator(nav);   // deja que una pantalla pida un cambio de pestaña sin importar main.js
 
 // Se llama en boot y de nuevo tras el onboarding, donde el usuario puede haber cambiado el idioma:
-// el tabbar y el FAB están ocultos durante el asistente, así que sin este segundo rotulado
+// la barra de pestañas (con su botón de añadir) está oculta durante el asistente, así que sin este segundo rotulado
 // quedarían con el idioma del arranque durante toda la sesión.
 function relabelChrome() {
   document.querySelectorAll(".tab").forEach((b) => {
@@ -72,11 +77,12 @@ async function boot() {
       // Otra pestaña o la PWA instalada ya tienen la base abierta (opfs-sahpool
       // es de instancia única): recuperable cerrando la otra y reintentando.
       const aviso = document.createElement("div");
-      aviso.className = "banner-aviso red";
+      aviso.className = "banner-aviso is-error";
       aviso.textContent = t("main.banner.locked");
       const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "banner-aviso-btn";
       btn.textContent = t("common.retry");
-      btn.style.cssText = "margin-left:8px;padding:4px 12px;border-radius:8px;border:1px solid currentColor;background:none;color:inherit;font:inherit;cursor:pointer";
       btn.onclick = () => location.reload();
       aviso.appendChild(btn);
       document.body.prepend(aviso);
@@ -101,13 +107,14 @@ async function boot() {
   } catch (err) {
     console.error(err);
     const aviso = document.createElement("div");
-    aviso.className = "banner-aviso red";
+    aviso.className = "banner-aviso is-error";
     aviso.textContent = t("main.banner.boot_failed", { error: userMessage(err) });
     document.body.prepend(aviso);
   }
 }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => nav(b.dataset.tab)));
+trackTabbarHeight(window, document.querySelector(".tabbar"));   // hueco inferior de main#screen = alto real de la barra
 document.getElementById("btn-registro").onclick = () => {
   pushBack(() => nav("inicio"));
   renderRegistro(screen, goBack, undefined, () => nav("inicio"));

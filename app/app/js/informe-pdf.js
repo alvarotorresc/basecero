@@ -1,4 +1,6 @@
 import { barRowsGeometry } from "./charts.js";
+import { famToken } from "./category-colors.js";
+import { rgbOf } from "./pdf-palette.js";
 import { fmtMoney, fmtDiaCorto, fmtPct } from "./format.js";
 import { t } from "./i18n/index.js";
 
@@ -13,8 +15,8 @@ import { t } from "./i18n/index.js";
 
 // pdf-lib, con las fuentes estándar (Helvetica/Courier), codifica el texto en WinAnsi (Windows-1252)
 // y LANZA si aparece un carácter fuera de esa tabla (verificado: `WinAnsi cannot encode "→"
-// (0x2192)`). En esta app los nombres de categoría admiten emoji por diseño (CURATED_ICONS,
-// category-colors.js:63) y los comercios llegan de un CSV ajeno: sin este saneo, el PDF de un
+// (0x2192)`). En esta app los nombres de categoría son texto libre (pueden llevar emoji) y los
+// comercios llegan de un CSV ajeno: sin este saneo, el PDF de un
 // usuario normal revienta la primera vez que use un emoji o le llegue un comercio con una flecha.
 
 // Mapa de los puntos de código Unicode que WinAnsi codifica en el rango 0x80-0x9F (Windows-1252),
@@ -33,8 +35,8 @@ function isWinAnsiCodePoint(cp) {
   return (cp >= 0x20 && cp <= 0x7e) || (cp >= 0xa0 && cp <= 0xff) || WIN_ANSI_SPECIALS.has(cp);
 }
 
-// Marcas combinantes y caracteres de formato de ancho cero (p.ej. el ZWJ que encadena un emoji
-// compuesto como "❤️‍🩹"): se DESCARTAN en silencio en vez de convertirse en "?", porque no ocupan
+// Marcas combinantes y caracteres de formato de ancho cero (p.ej. el ZWJ, U+200D, que encadena un
+// emoji compuesto): se DESCARTAN en silencio en vez de convertirse en "?", porque no ocupan
 // espacio visual propio — un "?" ahí sería un carácter que nunca estuvo.
 function isZeroWidthOrMark(cp) {
   return /^[\p{M}\p{Cf}]$/u.test(String.fromCodePoint(cp));
@@ -92,9 +94,13 @@ const BAR_H = 6;
 // hacerle sitio (BADGE_SIZE + el hueco).
 const BADGE_SIZE = 6;
 const BADGE_INDENT = BADGE_SIZE + 6;
-// La barra atenuada del periodo anterior (mismo color, menos opacidad): mismo 0.35 que
-// charts.js#comparisonBarsSvg, para que pantalla y PDF lean la misma comparativa.
+// La barra atenuada del periodo anterior (mismo color, menos opacidad, 0.35).
 const COMPARISON_OPACITY = 0.35;
+
+// Color de barra/insignia de una categoría: el NOMBRE del token (--f-<fam>-b), que buildPdfBytes
+// resuelve con la paleta de tokens.css (pdf-palette.js, D-impl-3). Sin familia (sin categoría) →
+// --idle, el gris de gráfico.
+const famBarToken = (fam) => (fam ? famToken(fam, "b") : "--idle");
 
 function newPage() {
   return { blocks: [] };
@@ -134,8 +140,7 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
     page().blocks.push({ kind: "rule", section, x: margin, y, w: contentW });
   }
   // `opacity` (Task: comparativa por categoría): la barra atenuada del periodo anterior reutiliza
-  // el color de la categoría con menos opacidad, mismo criterio que charts.js#comparisonBarsSvg
-  // (fill-opacity 0.35) — nunca un gris nuevo que la pantalla y el PDF no comparten.
+  // el color de la categoría con menos opacidad (0.35), nunca un gris nuevo.
   function bar(section, { value, max, color, opacity = 1 }) {
     ensure(BAR_ROW_H);
     y -= BAR_ROW_H;
@@ -204,12 +209,12 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
     // antes de que las barras/el texto de más abajo puedan disparar ensure() y saltar de página
     // — si no, la insignia acabaría en la página siguiente con la `y` de la anterior.
     const rowPage = page();
-    bar("categories", { value: c.spentCents, max: maxSpent, color: c.color });
+    bar("categories", { value: c.spentCents, max: maxSpent, color: famBarToken(c.fam) });
     if (hasPrevCategories) {
       // Segunda barra, atenuada, con el gasto del periodo anterior — misma escala (mismo
       // maxSpent, mismo bar()) que la barra de arriba: el pie del Informe promete esta
       // comparativa (informe.footer) y hasta ahora el PDF no la llevaba.
-      bar("categories", { value: c.prevCents ?? 0, max: maxSpent, color: c.color, opacity: COMPARISON_OPACITY });
+      bar("categories", { value: c.prevCents ?? 0, max: maxSpent, color: famBarToken(c.fam), opacity: COMPARISON_OPACITY });
       if (c.deltaPct != null) {
         // Flecha ASCII en vez de ↓/↑ (winAnsiSafe no las codifica, ver cabecera del fichero):
         // "+3,2 %" / "-12,8 %", igual que la pantalla pero sin depender de un glifo Unicode.
@@ -221,7 +226,7 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
       // primer rect de este color" (barRowsGeometry) tiene que seguir encontrando la barra real.
       // En `rowPage` (no `page()`): tiene que quedarse en la página del nombre, no en la que
       // esté abierta después de las barras/el texto del signo.
-      rowPage.blocks.push({ kind: "rect", section: "categories", x: margin, y: rowY, w: BADGE_SIZE, h: BADGE_SIZE, color: c.color });
+      rowPage.blocks.push({ kind: "rect", section: "categories", x: margin, y: rowY, w: BADGE_SIZE, h: BADGE_SIZE, color: famBarToken(c.fam) });
     }
   }
   text("categories", t("informe.pdf.categoriesTotal", { amount: fmtMoney(report.categories.totalCents) }), { bold: true, mono: true });
@@ -295,20 +300,41 @@ export function layoutReport(report, { pageSize = A4, margin = MARGIN } = {}) {
  *  texto libre del usuario). Mismo estilo que basecero-{hoy}.xlsx. */
 export const reportFilename = (report) => `basecero-informe-${report.meta.startDate}.pdf`;
 
-const PAPER = [0xed, 0xe6, 0xda];
-const PAPER_INK = [0x1b, 0x1a, 0x16];
-const PAPER_DIM = [0x6b, 0x64, 0x59];
+// Materiales del papel (D-impl-3): TODOS salen de la paleta clara de tokens.css, ninguno se
+// escribe aquí. El papel es --raised (el blanco roto del sistema), la tinta --text, lo secundario
+// --text-dim y los filetes --border. El PDF va siempre en claro: parseRootTokens solo lee `:root{`.
+export const PAPER_TOKENS = { paper: "--raised", ink: "--text", dim: "--text-dim", rule: "--border" };
 
-function rgbFromParts(PDFLib, [r, g, b]) {
-  return PDFLib.rgb(r / 255, g / 255, b / 255);
+// Sin paleta (tokens.css no se pudo leer), el PDF sale igual en blanco y gris neutro: la escala de
+// grises de PDF-lib (0 negro, 1 blanco), no un color del sistema.
+const GRAY_FALLBACK = { paper: 1, ink: 0.1, dim: 0.4, rule: 0.75 };
+
+/** El constructor de color de PDF-lib (su `rgb`), leído en cada llamada: un test puede cambiarlo
+ *  en el objeto. Con alias, ningún literal de color queda en el fuente (C13 sin excepciones). */
+function pdfColor(PDFLib, r, g, b) {
+  const { rgb: toColor } = PDFLib;
+  return toColor(r, g, b);
 }
 
-function rgbFromHex(PDFLib, hex) {
-  const s = String(hex ?? "").replace("#", "");
-  const r = parseInt(s.slice(0, 2), 16) || 0;
-  const g = parseInt(s.slice(2, 4), 16) || 0;
-  const b = parseInt(s.slice(4, 6), 16) || 0;
-  return rgbFromParts(PDFLib, [r, g, b]);
+function rgbFromParts(PDFLib, [r, g, b]) {
+  return pdfColor(PDFLib, r / 255, g / 255, b / 255);
+}
+
+// Un bloque trae el NOMBRE de un token; la paleta (tokens.css) lo convierte en números. Un token
+// que la paleta no trae cae al respaldo que decide quien llama.
+function colorOf(PDFLib, token, palette, fallback) {
+  const rgb = rgbOf(token, palette);
+  return rgb ? rgbFromParts(PDFLib, rgb) : fallback;
+}
+
+/** Los cuatro materiales del papel ya convertidos a color de PDF-lib. */
+function paperColors(PDFLib, palette) {
+  const out = {};
+  for (const [k, token] of Object.entries(PAPER_TOKENS)) {
+    const g = GRAY_FALLBACK[k];
+    out[k] = colorOf(PDFLib, token, palette, pdfColor(PDFLib, g, g, g));
+  }
+  return out;
 }
 
 // Alineación derecha y truncado con elipsis vía font.widthOfTextAtSize (§7.3): busca por
@@ -325,31 +351,32 @@ function truncateToFit(font, text, size, maxWidth) {
   return text.slice(0, lo) + ellipsis;
 }
 
-/** Adaptador: recorre layoutReport y dibuja con pdf-lib. Fondo `--paper`, StandardFonts
+/** Adaptador: recorre layoutReport y dibuja con pdf-lib. Fondo `--raised` (PAPER_TOKENS), StandardFonts
  *  Helvetica/HelveticaBold/Courier/CourierBold (Courier para las cifras, `--font-mono` del
  *  sistema; CourierBold cuando además son totales — bold Y mono a la vez).
  *  `drawText` con `winAnsiSafe` SIEMPRE — es la única frontera de saneo del módulo (Task 2).
+ *  `opts.palette`: {token: hex} del bloque claro de tokens.css (pdf-palette.js#loadPdfPalette), para
+ *  resolver los colores de familia y del papel; sin ella el PDF sale en blanco y grises neutros.
  *  Devuelve Uint8Array. */
-export async function buildPdfBytes(PDFLib, report, opts) {
+export async function buildPdfBytes(PDFLib, report, opts = {}) {
   const { pageSize, pages } = layoutReport(report, opts);
+  const palette = opts.palette ?? {};
   const doc = await PDFLib.PDFDocument.create();
   const helvetica = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
   const helveticaBold = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
   const courier = await doc.embedFont(PDFLib.StandardFonts.Courier);
   const courierBold = await doc.embedFont(PDFLib.StandardFonts.CourierBold);
-  const paper = rgbFromParts(PDFLib, PAPER);
-  const ink = rgbFromParts(PDFLib, PAPER_INK);
-  const dim = rgbFromParts(PDFLib, PAPER_DIM);
+  const { paper, ink, dim, rule } = paperColors(PDFLib, palette);
 
   for (const p of pages) {
     const pdfPage = doc.addPage([pageSize.w, pageSize.h]);
     pdfPage.drawRectangle({ x: 0, y: 0, width: pageSize.w, height: pageSize.h, color: paper });
     for (const b of p.blocks) {
       if (b.kind === "rule") {
-        pdfPage.drawRectangle({ x: b.x, y: b.y, width: b.w, height: 1, color: dim });
+        pdfPage.drawRectangle({ x: b.x, y: b.y, width: b.w, height: 1, color: rule });
       } else if (b.kind === "rect") {
         if (b.w > 0 && b.h > 0) {
-          pdfPage.drawRectangle({ x: b.x, y: b.y, width: b.w, height: b.h, color: rgbFromHex(PDFLib, b.color), opacity: b.opacity ?? 1 });
+          pdfPage.drawRectangle({ x: b.x, y: b.y, width: b.w, height: b.h, color: colorOf(PDFLib, b.color, palette, dim), opacity: b.opacity ?? 1 });
         }
       } else if (b.kind === "text") {
         // Los totales van bold Y mono (cifras): CourierBold, no HelveticaBold — hasta ahora el
@@ -359,7 +386,7 @@ export async function buildPdfBytes(PDFLib, report, opts) {
         const fitted = truncateToFit(font, safe, b.size, b.maxWidth);
         const width = font.widthOfTextAtSize(fitted, b.size);
         const x = b.align === "right" ? b.maxX - width : b.x;
-        pdfPage.drawText(fitted, { x, y: b.y, size: b.size, font, color: b.color ? rgbFromHex(PDFLib, b.color) : ink });
+        pdfPage.drawText(fitted, { x, y: b.y, size: b.size, font, color: b.color ? colorOf(PDFLib, b.color, palette, ink) : ink });
       }
     }
   }

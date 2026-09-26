@@ -1,0 +1,1319 @@
+/* BaseCero · componentes canónicos del sistema B (DESIGN.md §9).
+   Vacío a propósito: cada PR de componente (PR-04 a PR-10) rellena su sección. Solo lee tokens
+   con var(); ningún valor de color, radio, sombra o tamaño de letra se escribe aquí en crudo. */
+
+/* ===== Familias de categoría: .fam-* (PR-04) ===== */
+/* La familia es un dato (category-colors.js#familyForCategory → famClass). Esta clase es el ÚNICO
+   sitio que traduce la clave a sus tokens: los componentes leen solo --ft (tinte), --fb (barra) y
+   --fx (texto sobre tinte), nunca --f-<k>-* directamente (C6). Los ingresos y «sin categoría» no
+   llevan clase: se pintan en --well (C9). */
+.fam-casa{--ft:var(--f-casa-t);--fb:var(--f-casa-b);--fx:var(--f-casa-x)} /* arena */
+.fam-ali{--ft:var(--f-ali-t);--fb:var(--f-ali-b);--fx:var(--f-ali-x)}  /* salvia */
+.fam-res{--ft:var(--f-res-t);--fb:var(--f-res-b);--fx:var(--f-res-x)}  /* mostaza */
+.fam-tra{--ft:var(--f-tra-t);--fb:var(--f-tra-b);--fx:var(--f-tra-x)}  /* cielo */
+.fam-coc{--ft:var(--f-coc-t);--fb:var(--f-coc-b);--fx:var(--f-coc-x)}  /* pizarra */
+.fam-sal{--ft:var(--f-sal-t);--fb:var(--f-sal-b);--fx:var(--f-sal-x)}  /* agua */
+.fam-sus{--ft:var(--f-sus-t);--fb:var(--f-sus-b);--fx:var(--f-sus-x)}  /* lavanda */
+.fam-oci{--ft:var(--f-oci-t);--fb:var(--f-oci-b);--fx:var(--f-oci-x)}  /* rosa */
+.fam-rop{--ft:var(--f-rop-t);--fb:var(--f-rop-b);--fx:var(--f-rop-x)}  /* ciruela */
+.fam-reg{--ft:var(--f-reg-t);--fb:var(--f-reg-b);--fx:var(--f-reg-x)}  /* arcilla */
+.fam-imp{--ft:var(--f-imp-t);--fb:var(--f-imp-b);--fx:var(--f-imp-x)}  /* oliva */
+.fam-otr{--ft:var(--f-otr-t);--fb:var(--f-otr-b);--fx:var(--f-otr-x)}  /* piedra */
+
+/* ===== Chrome: cabeceras, barra de pestañas, botones, foco y pulsación (PR-05) ===== */
+
+/* --- Foco (§11): todo lo enfocable, campos incluidos. Nunca outline:none sin sustituto. --- */
+:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+
+/* --- Pulsación (§10): se hunde como una tecla. :where() deja la especificidad a 0 para que
+   cualquier regla de componente con su propio transform o transition mande sobre esta. --- */
+:where(button) {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease-out, background-color 150ms ease-out;
+}
+:where(button:not(:disabled)):active { transform: scale(.97); }
+@media (prefers-reduced-motion: reduce) {
+  /* Mismo selector que arriba y después: con movimiento reducido no hay transform (K13). */
+  :where(button) { transition: none; }
+  :where(button:not(:disabled)):active { transform: none; }
+}
+
+/* --- Cabecera de raíz (§9, B-Home · ui.js#rootHeaderHtml): h1 24 + subtítulo 13/500 dim. --- */
+.root-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-12);
+}
+.root-header-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-24);
+  line-height: var(--lh-title);
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+.root-header-sub { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+/* Subtítulo pulsable (rootHeaderHtml subtitleAction): alto de toque 44 (§8) sin mover la cabecera;
+   el margen negativo devuelve lo que el alto mínimo añade alrededor de la línea de 13. */
+.root-header-sub-btn {
+  align-self: flex-start;
+  min-height: 44px;
+  margin-block: calc((44px - var(--lh-title) * 1em) / -2);
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* --- Cabecera con atrás (§9, B-Categorias · ui.js#subHeaderHtml): atrás 44 · h1 20 a la
+   izquierda con subtítulo opcional · acción 44 opcional. Alto mínimo 48. --- */
+.sub-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  min-height: 48px;
+  margin-bottom: var(--sp-16);
+}
+.sub-header-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.sub-header-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-20);
+  line-height: var(--lh-title);
+  letter-spacing: -.01em;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.sub-header-sub { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+
+/* --- Botón icono (§9): 44 redondo, raised con borde. --- */
+.icon-btn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* --- Primario (§9, B-PeriodoNuevo): 56 píldora --accent 17/700 --sh-key, ancho completo. La
+   nota va DEBAJO (I-67) dentro de .btn-stack. Es uno de los tres sitios del naranja (K3). --- */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-8);
+  width: 100%;
+  min-height: 56px;
+  padding: 0 var(--sp-24);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--sh-key);
+  font-family: var(--font-body);
+  font-size: var(--fs-17);
+  font-weight: 700;
+  line-height: var(--lh-title);
+  cursor: pointer;
+}
+/* La cifra del primario (`amount`, p. ej. «Liquidar y cobrar 24,00 €») va en mono a 600. */
+.btn-primary .num { font-weight: 600; }
+.btn-stack { display: flex; flex-direction: column; gap: var(--sp-8); }
+.btn-note {
+  font-size: var(--fs-12);
+  font-weight: 500;
+  line-height: var(--lh-body);
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* --- Secundario (§9, B-Home) M 48/15 · S 44/14 (.btn-s), y entrada destructiva (§9, D-1, C5,
+   B-Borrar): la misma forma con texto y borde --neg. En oscuro, --lift y --border-strong. --- */
+.btn-secondary,
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-8);
+  min-height: 48px;
+  padding: 0 var(--sp-16);
+  border-radius: var(--radius-pill);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-15);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  cursor: pointer;
+}
+.btn-s { min-height: 44px; font-size: var(--fs-14); }
+.btn-danger { width: 100%; color: var(--neg); border-color: var(--neg); }
+/* La entrada destructiva se queda en --raised también en oscuro (BD-Borrar): --neg sobre --lift
+   da 4,1:1 y no llega a AA (§11); sobre --raised da 5,2:1. */
+:root[data-theme="dark"] .btn-secondary { background: var(--lift); border-color: var(--border-strong); }
+
+/* --- Terciario (§9, B-Objetivo): texto 13/600 dim, alto de toque 44, icono opcional. --- */
+.btn-tertiary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-8);
+  min-height: 44px;
+  padding: 0 var(--sp-16);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-dim);
+  font-family: var(--font-body);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  cursor: pointer;
+}
+
+/* Terciario destructivo (D-1, B-Objetivo «Borrar objetivo»): el mismo terciario en --neg. */
+.btn-tertiary-danger { color: var(--neg); }
+
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-danger:disabled,
+.btn-tertiary:disabled,
+.icon-btn:disabled { opacity: .5; cursor: default; box-shadow: none; }
+
+/* --- Barra de pestañas + añadir (§9, B-Home): 84 de alto en --surface con línea superior;
+   ítem de 56 (icono 24 + 12/600 dim); activo en --accent-text 700 (solo sobre --surface);
+   añadir 60×48 píldora --accent con --sh-key en la columna central. Alturas MÍNIMAS: con la
+   letra al 200 % la barra crece en vez de recortar (§11). --- */
+/* Alto real de la barra, para el hueco inferior de main#screen (app.css). Este es el valor sin JS
+   (84 + safe-area); viewport.js#trackTabbarHeight lo reescribe en línea sobre <html> con un
+   ResizeObserver cuando la barra crece (letra al 200 %). */
+:root { --tabbar-real: calc(84px + env(safe-area-inset-bottom, 0px)); }
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: calc(84px + env(safe-area-inset-bottom, 0px));
+  padding: var(--sp-8) var(--sp-8) calc(var(--sp-16) + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: center;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.tab {
+  min-width: 0;
+  min-height: 56px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-dim);
+  font-family: var(--font-body);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  cursor: pointer;
+}
+.tab svg { flex: none; width: 24px; height: 24px; }
+.tab-label { max-width: 100%; text-align: center; overflow-wrap: anywhere; hyphens: auto; }
+.tab[aria-current="page"] { color: var(--accent-text); font-weight: 700; }
+.tab-add {
+  justify-self: center;
+  width: 60px;
+  height: 48px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--sh-key);
+  cursor: pointer;
+}
+
+/* ===== Controles: Segmented, interruptor, casilla, paso a paso, progreso, campo, chip (PR-06) =====
+   Prefijo ctl- a propósito: .segmented, .toggle*, .check-box, .stepper-btn y .field* YA EXISTEN en
+   app.css con otra anatomía (el scroller de chips de Movimientos, el <input type=checkbox> oculto
+   del toggle viejo…) y siguen en uso en pantallas sin migrar (grep antes de tocar app.css — ver
+   PR-06-report.md). Reusar esos nombres aquí chocaría: app.css carga DESPUÉS de este fichero, así
+   que sus reglas ganarían sobre las de abajo en cualquier propiedad compartida. */
+
+/* Segmented (§9): pozo píldora con relleno 4 y --sh-well; ítems de 44, 14/600 dim; el activo va en
+   --raised + --sh-thumb y 700 — NUNCA naranja (C1, K3, F-*). */
+.ctl-segmented {
+  display: flex;
+  padding: var(--sp-4);
+  border-radius: var(--radius-pill);
+  background: var(--well);
+  box-shadow: var(--sh-well);
+}
+.ctl-segmented [role="radio"] {
+  flex: 1;
+  height: 44px;
+  padding: 0 var(--sp-12);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: center;
+  white-space: nowrap;
+  transition: background-color 150ms ease-out, color 150ms ease-out;
+}
+.ctl-segmented [role="radio"][aria-checked="true"] {
+  background: var(--raised);
+  color: var(--text);
+  font-weight: 700;
+  box-shadow: var(--sh-thumb);
+}
+/* Muestra de familia delante del texto (opción `fam`, B-Liquidar): 10 de radio 3, en la barra -b (C6).
+   El radio 3 es la constante nombrada «muestra de 10 del chip de filtro, radio 3» que R-RAD admite
+   para selectores con muestra|swatch (design-rules.test.mjs, RAD_NOMBRADO; DESIGN §9 Chip de filtro). */
+.ctl-segmented [role="radio"]:has(.ctl-seg-muestra) { display: flex; align-items: center; justify-content: center; gap: var(--sp-8); min-width: 0; padding: 0 var(--sp-8); }
+.ctl-seg-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ctl-seg-muestra { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--fb); }
+.ctl-segmented [role="radio"]:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+/* Contador detrás del texto (opción `count`, B-Categorias): mono 500 dim, también en el activo. */
+.ctl-seg-count { font-weight: 500; color: var(--text-dim); }
+@media (prefers-reduced-motion: reduce) { .ctl-segmented [role="radio"] { transition: none; } }
+
+/* Interruptor (§9): 44×26, pomo 20. Apagado: pista --well + --sh-well, pomo --idle. Encendido:
+   pista --text, pomo --raised — tinta, nunca naranja (F-04, K3). El área de toque real tiene que
+   llegar a 44×44 (§11, K10) sin tocar el dibujo: el ::before amplía el hit area 9px arriba y abajo
+   (26 + 9 + 9 = 44) sin pintar nada, así que la pastilla se sigue viendo de 26 de alto. */
+.ctl-switch {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--well);
+  box-shadow: var(--sh-well);
+}
+.ctl-switch::before {
+  content: "";
+  position: absolute;
+  inset: -9px 0;
+}
+.ctl-switch[aria-checked="true"] { background: var(--text); }
+.ctl-switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--idle);
+  box-shadow: var(--sh-knob);
+  transition: transform 150ms ease-out, background-color 150ms ease-out;
+}
+.ctl-switch[aria-checked="true"] .ctl-switch-knob {
+  background: var(--raised);
+  transform: translateX(18px);
+}
+.ctl-switch:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+@media (prefers-reduced-motion: reduce) { .ctl-switch-knob { transition: none; } }
+
+/* Casilla (§9): 24 de radio 7 (única excepción al radio de tokens, K10) dentro de un área de toque
+   de 44. Marcada: --text con el check en --raised. Vacía: --raised con borde interior --idle
+   (F-22) — tinta, nunca naranja (F-05, K3). */
+.ctl-checkbox {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ctl-checkbox-box {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1.5px var(--idle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--raised);
+}
+.ctl-checkbox[aria-checked="true"] .ctl-checkbox-box {
+  background: var(--text);
+  box-shadow: none;
+}
+.ctl-checkbox:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+
+/* Paso a paso (§9): pozo píldora con relleno 4, teclas de 44 en --raised + --sh-thumb, valor mono
+   17/600. */
+.ctl-stepper {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  border-radius: var(--radius-pill);
+  background: var(--well);
+  box-shadow: var(--sh-well);
+}
+.ctl-stepper-btn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--raised);
+  box-shadow: var(--sh-thumb);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ctl-stepper-btn:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+.ctl-stepper-value {
+  min-width: 24px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-17);
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Progreso por pasos (§9): segmentos de 6 en píldora; hecho y actual en --text, pendiente en el
+   pozo (I-35/F-27). grid-auto-flow reparte N columnas iguales sin conocer `total` de antemano. */
+.ctl-steps {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: var(--sp-4);
+}
+.ctl-steps-seg {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--well);
+  box-shadow: var(--sh-well);
+}
+.ctl-steps-seg.is-done { background: var(--text); box-shadow: none; }
+/* Con etiquetas (B-Importar): lista sin viñetas, columnas de 8 y etiqueta 12/600 dim bajo cada
+   segmento; la del paso actual en --text 700. */
+.ctl-steps-labelled {
+  margin: 0;
+  padding: 0 var(--sp-4);
+  list-style: none;
+  gap: var(--sp-8);
+}
+.ctl-steps-step {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  color: var(--text-dim);
+}
+.ctl-steps-step[aria-current="step"] { color: var(--text); font-weight: 700; }
+
+/* Campo hundido (§9): 48 de alto, --well + --sh-well, radio 10, input de 16 (--fs-input, evita el
+   zoom de iOS: K9) y etiqueta 13/600 dim encima. */
+.ctl-field-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+.ctl-field-label {
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.ctl-field {
+  height: 48px;
+  padding: 0 var(--sp-16);
+  border-radius: var(--radius);
+  background: var(--well);
+  box-shadow: var(--sh-well);
+  display: flex;
+  align-items: center;
+}
+.ctl-field-input {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-input);
+  font-weight: 600;
+}
+.ctl-field-input.is-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+/* Con baldosa delante (opción `lead`, B-Categorias-Nueva): relleno 8 a la izquierda, hueco 12. */
+.ctl-field.has-lead { padding: 0 var(--sp-12) 0 var(--sp-8); gap: var(--sp-12); }
+.ctl-field-lead { flex: none; display: flex; }
+.ctl-field-input::placeholder { color: var(--text-dim); font-weight: 500; }
+.ctl-field-suffix { flex: none; margin-left: var(--sp-8); font-size: var(--fs-15); font-weight: 600; color: var(--text-dim); }
+/* El foco va en el input, no en el pozo que lo envuelve (R-C1 exige que un var(--focus) viva
+   siempre bajo un selector :focus-visible — un :focus-within en .ctl-field no vale). */
+.ctl-field-input:focus { outline: none; }
+.ctl-field-input:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+
+/* Chip neutro (§9): 44 píldora, --raised, 14/500 — subcategoría o etiqueta, nunca color propio (el
+   chip de filtro con tinte de familia es de otra PR). is-tag añade borde e icono de etiqueta. */
+.ctl-chip {
+  flex: none;
+  height: 44px;
+  padding: 0 var(--sp-12);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--raised);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  font-size: var(--fs-14);
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+}
+.ctl-chip.is-tag {
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.ctl-chip:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+
+/* ===== Instrumento: Display, LED, bento, barras, medidor (PR-07) ===== */
+
+/* --- Display (§9, B-Home, B-Movimientos · instrument.js#displayHtml): panel hundido, relleno
+   16 20 (el único 20 del sistema, §8). Alto por contenido: con la letra al 200 % crece (§11). --- */
+.disp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+  padding: var(--sp-16) var(--sp-20);
+  border-radius: var(--radius-lg);
+  background: var(--disp);
+  box-shadow: var(--sh-display);
+  color: var(--disp-ink);
+}
+.disp-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); min-width: 0; }
+.disp-label { display: inline-flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--disp-dim); }
+/* C2: la cifra que manda es la única en ámbar; K9: solo 52/44/34. */
+.disp-value {
+  font-weight: 500;
+  line-height: var(--lh-disp);
+  color: var(--disp-text);
+  text-shadow: var(--disp-glow);
+  overflow-wrap: anywhere;
+}
+.disp-value-xl { font-size: var(--disp-xl); }
+.disp-value-l { font-size: var(--disp-l); }
+.disp-value-m { font-size: var(--disp-m); }
+.disp-foot { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--disp-dim); }
+.disp-ink { color: var(--disp-ink); }
+/* Corner del Display (instrument.js#displayHtml `aside`, B-PeriodoNuevo): texto plano junto al
+   label cuando no hay LED — un rango de fechas, no un estado. */
+.disp-aside { font-size: var(--fs-12); font-weight: 500; color: var(--disp-dim); }
+.disp-slot { min-width: 0; }
+
+/* Línea del Display (charts.js#sparklineSvg): ámbar en la línea, su área y el punto de hoy (C2). */
+.disp-chart { margin-top: var(--sp-8); }
+.disp-chart-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.disp-chart-base { stroke: var(--disp-line); }
+.disp-chart-line { stroke: var(--disp-text); }
+.disp-chart-line.is-area,
+.disp-chart-line.is-dot { fill: var(--disp-text); stroke: none; }
+circle.disp-today { fill: var(--disp-text); stroke: var(--disp); }
+/* Línea del periodo (charts.js#periodChartSvg, B-Home/B-Inicio-Vacio): la guía discontinua del
+   ritmo parejo y los rótulos «hoy» / «día 30» en --disp-dim; la línea y el punto, en ámbar (C2). */
+.disp-chart-guide { stroke: var(--disp-dim); stroke-opacity: .5; stroke-dasharray: 3 5; }
+.disp-chart-label { fill: var(--disp-dim); font-family: var(--font-mono); font-size: var(--fs-12); }
+/* Eje de meses: cada etiqueta centrada bajo su punto (los puntos van de PAD=--sp-4 a ancho−PAD). */
+.disp-chart-axis {
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+  margin-inline: calc((100% - 2 * var(--sp-4)) / (var(--n) - 1) / -2 + var(--sp-4));
+  font-size: var(--fs-12);
+  line-height: var(--lh-title);
+  text-align: center;
+  color: var(--disp-dim);
+}
+.disp-chart-axis .disp-today { color: var(--disp-text); }
+
+/* --- LED (§9, B-Suscripciones · instrument.js#ledHtml): punto 8 + texto 12/500. ok · idle ·
+   espera (solo en el Display). Fuera del Display, «ok» es un punto --pos sin brillo. --- */
+.led {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  font-size: var(--fs-12);
+  font-weight: 500;
+  line-height: var(--lh-title);
+  color: var(--disp-dim);
+}
+.led-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--idle);
+  transition: background-color 160ms ease-out, box-shadow 400ms ease-out;
+}
+.led-ok .led-dot { background: var(--ok); box-shadow: var(--led-glow); }
+.led-wait .led-dot { background: var(--disp-text); box-shadow: var(--led-glow-wait); }
+.led-out { color: var(--text-dim); }
+.led-out.led-ok .led-dot { background: var(--pos); box-shadow: none; }
+@media (prefers-reduced-motion: reduce) { .led-dot { transition: none; } }
+
+/* --- Bloque bento (§9, B-Home, B-Patrimonio · instrument.js#bentoHtml): --raised con borde, o el
+   tinte de su familia (C6) sin borde. Cifra mono 20/600 en tinta (C3, C7). --- */
+.bento {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  min-width: 0;
+  padding: var(--sp-16);
+  border-radius: var(--radius-lg);
+  background: var(--raised);
+  border: 1px solid var(--border);
+}
+.bento-tint { background: var(--ft); border-color: transparent; }
+.bento-head { display: flex; align-items: center; gap: var(--sp-8); min-width: 0; }
+.bento-ico {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  background: var(--chip);
+  color: var(--text);
+}
+.bento-label { font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.bento-tint .bento-ico,
+.bento-tint .bento-label { color: var(--fx); }
+.bento-body { display: flex; flex-direction: column; gap: var(--sp-2); }
+.bento-figure { font-size: var(--fs-20); font-weight: 600; line-height: var(--lh-title); color: var(--text); }
+.bento-foot { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+
+/* --- Contenedor (inventario-B · instrument.js#containerHtml): --surface con borde; relleno 16 en
+   gráficos y 4 en listas. Título de sección 15 en Unbounded y total mono 15/600. --- */
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  min-width: 0;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.box-chart { padding: var(--sp-16); }
+.box-list { padding: var(--sp-4); gap: var(--sp-4); }
+.box-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
+.box-list .box-head { padding: var(--sp-8) var(--sp-12) 0; }
+.box-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-15);
+  font-weight: 700;
+  line-height: var(--lh-title);
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+.box-total { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+
+/* --- Barra apilada (§9, B-Home, B-Patrimonio · instrument.js#stackedBarHtml): grande 24 radio
+   --radius, fina 8 píldora sobre pozo; 2 de separación. Leyenda con nombre (C12). --- */
+.sbar-wrap { display: flex; flex-direction: column; gap: var(--sp-12); }
+.sbar { display: flex; gap: var(--sp-2); overflow: hidden; }
+.sbar-24 { height: 24px; border-radius: var(--radius); }
+.sbar-8 { height: 8px; border-radius: var(--radius-pill); background: var(--well); }
+.sbar-seg { flex-grow: 0; flex-shrink: 1; min-width: var(--sp-2); }
+.sbar-seg,
+.sbar-muestra { background: var(--fb); }
+.sbar-seg.is-idle,
+.sbar-muestra.is-idle { background: var(--idle); }
+.sbar-seg.is-debt,
+.sbar-muestra.is-debt { background: var(--stripe-debt); }
+.sbar-legend { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); }
+.sbar-key { display: flex; align-items: center; gap: var(--sp-8); min-height: 24px; }
+.sbar-muestra { flex: none; width: 10px; height: 10px; border-radius: 3px; }
+.sbar-name { flex: 1; min-width: 0; font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-title); color: var(--text); }
+.sbar-amt { font-size: var(--fs-14); font-weight: 500; color: var(--text); }
+.sbar-key.is-rest .sbar-name,
+.sbar-key.is-rest .sbar-amt { color: var(--text-dim); }
+
+/* --- Medidor (§9, B-GastoCategoria · instrument.js#meterHtml): 8 píldora. Pista --well, --chip
+   sobre tinte, --disp-line en el Display. Relleno -b (C6); sin familia en el Display, la línea
+   ámbar del Display (C2); sin familia fuera, --idle. Límite: 2 px que sobresale 3. --- */
+.meter { position: relative; height: 8px; border-radius: var(--radius-pill); background: var(--well); }
+.meter-on-tint { background: var(--chip); }
+.meter-on-disp { background: var(--disp-line); }
+.meter-fill { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--fb); }
+.meter-fill.is-idle { background: var(--idle); }
+.meter-fill.disp-chart-line { background: var(--disp-text); }
+.meter-limit {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: calc(var(--at) - 1px);
+  width: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--text);
+}
+.meter-on-disp .meter-limit { background: var(--disp-ink); }
+
+/* --- Columnas (§9, B-Home «Esta semana», B-Semana · instrument.js#columnsHtml): radio xs arriba;
+   hoy en --text (o en la barra de su familia), el resto en --idle (C11); cifra 12/600 encima. --- */
+.cols-wrap { display: flex; flex-direction: column; gap: var(--sp-8); }
+.cols,
+.cols-labels { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: var(--sp-8); }
+.cols { height: 72px; align-items: end; }
+.col { height: 100%; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: var(--sp-4); }
+.col-bar { flex: none; width: 100%; border-radius: var(--radius-xs) var(--radius-xs) 0 0; background: var(--idle); }
+.col.is-today .col-bar { background: var(--text); }
+.col.is-today.has-fam .col-bar { background: var(--fb); }
+.col-amt { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); white-space: nowrap; color: var(--text); }
+.cols-labels { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); text-align: center; color: var(--text-dim); }
+.cols-labels .is-today { color: var(--text); }
+/* Apiladas (B-Semana): tramos por familia (-b, C6), el mayor abajo, 2 de separación; solo el de
+   arriba lleva el radio xs. La columna elegida se hunde en un pozo (--well + --sh-well). */
+.col-stack { flex: none; width: 100%; display: flex; flex-direction: column; gap: var(--sp-2); }
+.col-seg { flex-grow: 0; flex-shrink: 1; min-height: var(--sp-2); background: var(--fb); }
+.col-seg.is-idle { background: var(--idle); }
+.col-seg:first-child { border-radius: var(--radius-xs) var(--radius-xs) 0 0; }
+.col.is-selected { border-radius: var(--radius) var(--radius) 0 0; background: var(--well); box-shadow: var(--sh-well); }
+
+/* --- Estado vacío (§9, B-Inicio-Vacio · instrument.js#emptyStateHtml): filas fantasma en pozo,
+   15/600 + 13/500 dim, flecha discontinua hacia el botón de añadir. --- */
+.empty { display: flex; flex-direction: column; align-items: center; gap: var(--sp-12); }
+.ghost-rows { align-self: stretch; display: flex; flex-direction: column; gap: var(--sp-8); }
+.ghost-row { display: flex; align-items: center; gap: var(--sp-12); }
+.ghost-row.is-faded { opacity: .6; }
+.ghost { display: block; border-radius: var(--radius-xs); background: var(--well); box-shadow: var(--sh-well); }
+.ghost-ico { flex: none; width: 40px; height: 40px; border-radius: var(--radius); }
+.ghost-lines { flex: 1; display: flex; flex-direction: column; gap: var(--sp-8); }
+.ghost-l1 { width: 46%; height: 10px; }
+.ghost-l2 { width: 30%; height: 8px; opacity: .7; }
+.ghost-amt { flex: none; width: 58px; height: 10px; }
+.empty-copy { display: flex; flex-direction: column; gap: var(--sp-4); padding-top: var(--sp-4); text-align: center; }
+.empty-title { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); }
+.empty-text { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+.empty-arrow { display: block; color: var(--text-dim); fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ===== Entidad: baldosas, ficha, filas, chips, cabeceras (PR-08) ===== */
+/* Marcado en js/entity.js. Prefijo único .ent-* (las clases viejas .tx-*, .chip, .list-row… siguen
+   en app.css para las pantallas sin migrar). La familia llega como .fam-<k> y aquí solo se leen
+   --ft (tinte), --fb (barra/muestra) y --fx (icono y texto pequeño que la nombra), C6. Sin familia
+   (.ent-neutral: ingreso, «sin categoría», lo que no es entidad) → --well y tinta (C9, C11).
+   Alturas MÍNIMAS: con la letra al 200 % la pieza crece en vez de recortar. */
+
+/* --- Baldosa de icono (§9): 40 / 32, radio 10, tinte + icono --fx; sobre tinte --chip. --- */
+.ent-tile {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  background: var(--ft);
+  color: var(--fx);
+}
+.ent-tile-32 { width: 32px; height: 32px; }
+.ent-tile.ent-neutral { background: var(--well); color: var(--text); }
+.ent-tile.ent-on-tint { background: var(--chip); }
+
+/* --- Baldosa seleccionable (§9, B-Gasto): 56, tinte, icono --fx, nombre 13/600 --text. --- */
+.ent-pick {
+  min-width: 0;
+  min-height: 56px;
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--ft);
+  color: var(--fx);
+  font-family: var(--font-body);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  text-align: center;
+  cursor: pointer;
+}
+.ent-pick svg { flex: none; }
+.ent-pick-label { max-width: 100%; color: var(--text); overflow-wrap: anywhere; }
+.ent-pick.ent-neutral { background: var(--well); color: var(--text); }
+/* Seleccionado (§9): sobre tinte, anillo --ring-sel + 700; sobre neutro, relleno --accent. */
+.ent-pick[aria-pressed="true"] { box-shadow: var(--ring-sel); font-weight: 700; }
+.ent-pick.ent-neutral[aria-pressed="true"] { box-shadow: none; background: var(--accent); color: var(--on-accent); }
+.ent-pick.ent-neutral[aria-pressed="true"] .ent-pick-label { color: var(--on-accent); }
+
+/* --- Ficha (§9, B-Importar): 28 píldora, estática; tinte + icono 14 y texto 12/600 --fx.
+   Ingreso (C9): --well sin borde, tinta. Etiqueta (C10): --raised con borde. --- */
+.ent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  max-width: 100%;
+  min-height: 28px;
+  padding: 0 var(--sp-12) 0 var(--sp-8);
+  border-radius: var(--radius-pill);
+  background: var(--ft);
+  color: var(--fx);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  white-space: nowrap;
+}
+.ent-badge svg { flex: none; }
+.ent-badge-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ent-badge-income { background: var(--well); color: var(--text); }
+.ent-badge-tag { background: var(--raised); color: var(--text); border: 1px solid var(--border); }
+
+/* --- Tarjeta de categoría elegida (§9, F-42): tinte, --radius-lg, SIN borde; baldosa 40 sobre
+   --chip; nombre 15/600 arriba y ruta 12/500 --fx debajo; chevron dim. --- */
+.ent-chosen {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-12);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--ft);
+  color: var(--text);
+  font-family: var(--font-body);
+  text-align: left;
+}
+button.ent-chosen { cursor: pointer; }
+.ent-chosen.ent-neutral { background: var(--well); }
+.ent-chosen.ent-neutral .ent-line2 { color: var(--text-dim); }
+
+/* --- Chip de filtro (§9, B-Movimientos-Filtros): 44 píldora. Con familia: tinte + muestra 10
+   --fb + 14/600 --text; neutro: --raised 14/500; etiqueta: + borde e icono (C10). --- */
+.ent-chip {
+  flex: none;
+  min-height: 44px;
+  padding: 0 calc(var(--sp-12) + var(--sp-2)) 0 var(--sp-12);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--ft);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-14);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ent-chip svg { flex: none; }
+.ent-swatch { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--fb); }
+.ent-chip.ent-neutral { padding: 0 calc(var(--sp-12) + var(--sp-2)); background: var(--raised); font-weight: 500; }
+.ent-chip-tag { border: 1px solid var(--border); }
+.ent-chip[aria-pressed="true"] { box-shadow: var(--ring-sel); font-weight: 700; }
+.ent-chip.ent-neutral[aria-pressed="true"] { box-shadow: none; border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+
+/* --- Fila de movimiento (§9, B-Movimientos): 60; baldosa 40 · nombre 15/600 · línea 2 12/500
+   --fx · cifra mono 15/600 en tinta, «+» en --pos (C4, C7). Pulsar: fondo, no escala. --- */
+.ent-row {
+  width: 100%;
+  min-height: 60px;
+  padding: var(--sp-8) var(--sp-12);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.ent-row:active { transform: none; background: var(--raised); }
+.ent-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.ent-name {
+  font-size: var(--fs-15);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ent-line2 {
+  font-size: var(--fs-12);
+  font-weight: 500;
+  line-height: var(--lh-title);
+  color: var(--fx, var(--text-dim));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ent-amount-col { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-2); }
+.ent-amount {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-15);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  color: var(--text);
+  white-space: nowrap;
+}
+.ent-amount.pos { color: var(--pos); }
+.ent-amount.neg { color: var(--neg); }
+/* format.js#moneyPartsHtml no se toca: aquí la cifra es plana (mismo tamaño y color). */
+.ent-amount .money-cents,
+.ent-amount .money-cur { font-size: inherit; color: inherit; margin-left: 0; }
+.ent-amount-note { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+/* Sin familia (ingreso, sin categoría): la línea 2 en dim aunque la fila cuelgue de un contenedor
+   con familia (no hereda su --fx), como .ent-chosen.ent-neutral. */
+.ent-row.ent-neutral .ent-line2 { color: var(--text-dim); }
+
+/* --- Fila de ajuste (§9, B-Ajustes): 48 (60 con dos líneas); baldosa 32 opcional · etiqueta
+   15/500 · valor 15/600 --text (nunca familia, I-61) · chevron 16 dim o control. --- */
+.ent-set {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--sp-8);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  text-align: left;
+}
+button.ent-set { cursor: pointer; }
+button.ent-set:active { transform: none; background: var(--raised); }
+button.ent-set:disabled { opacity: .5; cursor: default; background: none; }
+.ent-set-2 { min-height: 60px; }
+.ent-set-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.ent-set-label {
+  font-size: var(--fs-15);
+  font-weight: 500;
+  line-height: var(--lh-title);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Sin white-space:nowrap, text-overflow:ellipsis no hace nada (el texto envuelve en su lugar): una
+   fila con un control ancho al lado (B-PeriodoNuevo, categorías largas como «Impuestos y tasas»)
+   partía el nombre en 2-3 líneas y estiraba la fila entera. */
+.ent-set-sub {
+  font-size: var(--fs-13);
+  font-weight: 500;
+  line-height: var(--lh-title);
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ent-set-value { flex: none; font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); }
+.ent-set-value.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.ent-chev { flex: none; display: flex; color: var(--text-dim); }
+
+/* --- Cabecera de día (§9): 24; «Hoy» 13/700 + fecha 13/500 dim; total mono 14/600. Sin familia. --- */
+.ent-day {
+  min-height: 24px;
+  padding: 0 var(--sp-4);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-8);
+}
+.ent-day-label { font-size: var(--fs-13); font-weight: 700; line-height: var(--lh-title); color: var(--text); }
+.ent-day-date { font-weight: 500; color: var(--text-dim); }
+.ent-day-total {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-14);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  color: var(--text);
+  white-space: nowrap;
+}
+.ent-day-total .money-cents,
+.ent-day-total .money-cur { font-size: inherit; color: inherit; margin-left: 0; }
+
+/* --- Divisor entre filas de una lista con baldosa (§9, B-Suscripciones, B-Recurrentes): 1px
+   alineado tras la baldosa 40 (12 relleno + 40 + 12 gap), para no repetir el borde de cada fila
+   dentro de un box-list. Sin familia (C6): siempre --border. --- */
+.ent-divider { height: 1px; margin: 0 var(--sp-8) 0 64px; background: var(--border); }
+
+/* --- Encabezado de sección (§9, I-42): ttl 15 --text + contador 13 dim, o 13/600 dim sobre un
+   grupo. Nunca en color de familia (C6). --- */
+.ent-sec { display: flex; align-items: baseline; gap: var(--sp-8); }
+.ent-sec-text { margin: 0; line-height: var(--lh-title); color: var(--text); }
+.ent-sec-title .ent-sec-text {
+  font-family: var(--font-display);
+  font-size: var(--fs-15);
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+.ent-sec-group { padding: 0 var(--sp-4); }
+.ent-sec-group .ent-sec-text { font-family: var(--font-body); font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }
+.ent-sec-count { font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+
+/* ===== Hoja inferior, aviso y toast (PR-09) ===== */
+
+/* --- Movimiento común (§10): entran 250ms ease-out y salen 180ms ease-in; con movimiento
+   reducido, solo fundido (K13) — ni deslizamiento ni escalado. La hoja y el aviso comparten este
+   fundido para su velo y, en reducido, para sí mismos (sustituye a su deslizamiento/escalado). --- */
+@keyframes bc-fade-in { from { opacity: 0; } }
+@keyframes bc-fade-out { to { opacity: 0; } }
+
+/* --- Hoja inferior (§9, B-Movimientos-Filtros / B-Categorias-Nueva): <dialog> nativo como
+   modal.js — trampa de foco, Escape y velo inerte los da el navegador. Se reancla abajo (en vez
+   del centrado que trae de fábrica) y con padding:0: el relleno real vive en .sheet-content, su
+   único hijo, para que un clic en el velo (fuera de esa caja) llegue con target=dlg (sheet.js). --- */
+.sheet {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 480px;         /* mismo tope que .tabbar */
+  max-height: 92vh;         /* con soporte de dvh, la línea de abajo la sustituye (barras móviles) */
+  max-height: 92dvh;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: var(--surface);
+  box-shadow: var(--sh-sheet);
+  /* El navegador pone overflow:auto en dialog:modal (para que el <dialog> entero haga scroll si no
+     cabe): lo anulamos porque el scroll real tiene que quedarse dentro de .sheet-body, no arrastrar
+     el asa y la cabecera con él (ver [open] más abajo). */
+  overflow: hidden;
+  animation: bc-sheet-in 250ms ease-out;
+}
+/* display:flex en el propio <dialog> (no en .sheet-content vía height:100%, que NO resuelve contra
+   el alto recortado por max-height — un alto "fit-content" cuenta como "no explícito" a efectos de
+   porcentajes, CSS2.1 §10.5 — así que un height:100% en el hijo se quedaría en auto y el scroll
+   recaería en el <dialog> entero). Con flex-direction:column, .sheet-content (su único hijo, con
+   flex:1;min-height:0) se reparte exactamente el alto ya recortado del <dialog>, y solo su propio
+   .sheet-body hace scroll. Con [open]: si el <dialog> no estuviera abierto, manda dialog:not([open])
+   {display:none} del navegador, no esto. */
+.sheet[open] { display: flex; flex-direction: column; }
+/* pointer-events:none: durante los 180ms de salida el <dialog> sigue abierto (y tocable) —
+   sin esto, un segundo toque ahí dentro podría disparar una acción aunque la hoja ya se esté yendo. */
+.sheet.is-leaving { animation: bc-sheet-out 180ms ease-in forwards; pointer-events: none; }
+.sheet::backdrop { background: var(--scrim); animation: bc-fade-in 250ms ease-out; }
+.sheet.is-leaving::backdrop { animation: bc-fade-out 180ms ease-in forwards; }
+@keyframes bc-sheet-in { from { transform: translateY(100%); } }
+@keyframes bc-sheet-out { to { transform: translateY(100%); } }
+
+/* flex:1 1 auto (no height:100%, ver el comentario de .sheet[open]): se reparte el alto que el
+   <dialog> ya tenga (intrínseco si el contenido cabe, recortado a max-height si no), y dentro,
+   .sheet-body es quien hace scroll — el asa y la cabecera (flex:none) se quedan fijos arriba.
+   Base "auto" (el alto del contenido), no "0%" (el atajo `flex:1`): con un alto de partida
+   indefinido (el del <dialog>, intrínseco salvo que max-height recorte), una base 0% deja más
+   margen a que un motor la resuelva distinto — "auto" es el contenido, y luego encoge si no cabe. */
+.sheet-content {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--sp-8) var(--sp-16) calc(var(--sp-24) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+}
+.sheet-handle { flex: none; align-self: center; width: 36px; height: 4px; border-radius: var(--radius-pill); background: var(--border); }
+.sheet-header { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); padding-left: var(--sp-4); }
+.sheet-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-17);
+  line-height: var(--lh-title);
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+.sheet-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--sp-16); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet { animation: bc-fade-in 120ms linear; }
+  .sheet.is-leaving { animation: bc-fade-out 120ms linear forwards; }
+  .sheet::backdrop { animation: bc-fade-in 120ms linear; }
+  .sheet.is-leaving::backdrop { animation: bc-fade-out 120ms linear forwards; }
+}
+
+/* --- Aviso de confirmación (§9, B-Borrar): margen 8, --radius-xl, --sh-alert; título 17, vista
+   previa opcional en pozo, una línea de ayuda dim y dos botones 48/15 en rejilla — Cancelar
+   primero en el DOM (foco inicial y salida segura). Mismo padding:0 + envoltorio que .sheet y por
+   el mismo motivo (clic en el velo, modal.js). "Aparece": sin deslizamiento, solo fundido+escala. --- */
+.modal {
+  left: var(--sp-8);
+  right: var(--sp-8);
+  /* + safe-area: mismo motivo que .sheet-content y #toast — el margen de 8 no puede quedar debajo
+     de la zona segura del dispositivo (el borde curvo, el home indicator). */
+  bottom: calc(var(--sp-8) + env(safe-area-inset-bottom, 0px));
+  top: auto;
+  margin: 0;
+  /* El navegador da al <dialog> width:fit-content y a dialog:modal max-width:calc(100% - 6px - 2em):
+     sin anularlos, left+right (arriba) quedan sobreconstreñidos y el navegador ignora uno de los
+     dos — el aviso saldría encogido a su contenido y pegado a un lado, no estirado de borde a
+     borde con 8px de margen. width:auto (con left, right y margin ya fijos) sí activa el reparto
+     de CSS2.1 §10.3.7: el ancho se calcula para llenar exactamente ese hueco. */
+  width: auto;
+  max-width: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--sh-alert);
+  animation: bc-modal-in 250ms ease-out;
+}
+/* pointer-events:none: durante los 180ms de salida el <dialog> sigue abierto (y tocable) — sin
+   esto, un segundo toque en Cancelar/Borrar dentro de esa ventana podría alcanzarlos igual (el
+   guard `closing` de modal.js ya lo bloquea en lógica; esto lo bloquea también en el toque). */
+.modal.is-leaving { animation: bc-modal-out 180ms ease-in forwards; pointer-events: none; }
+.modal::backdrop { background: var(--scrim); animation: bc-fade-in 250ms ease-out; }
+.modal.is-leaving::backdrop { animation: bc-fade-out 180ms ease-in forwards; }
+@keyframes bc-modal-in { from { opacity: 0; transform: scale(.96); } }
+@keyframes bc-modal-out { to { opacity: 0; transform: scale(.96); } }
+
+.modal-content { box-sizing: border-box; display: flex; flex-direction: column; gap: var(--sp-16); padding: var(--sp-24) var(--sp-16) var(--sp-16); }
+.modal-title {
+  margin: 0;
+  padding: 0 var(--sp-4);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-17);
+  line-height: var(--lh-title);
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+/* Vista previa de la fila (opcional, DESIGN.md §9): pozo con la anatomía de una baldosa de icono
+   más su cifra — el contenido (icono, nombre, importe…) lo trae YA ESCAPADO quien llama
+   (modal.js#modalHtml), como cualquier otro `preview`/`html` de confianza del proyecto. */
+.modal-preview { display: flex; align-items: center; gap: var(--sp-12); padding: var(--sp-8) var(--sp-12); border-radius: var(--radius-lg); background: var(--well); box-shadow: var(--sh-well); }
+.modal-text { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-14); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+/* Rejilla de dos columnas, NO column-reverse: Cancelar ya va primero en el DOM (modal.js), así que
+   aparece a la izquierda sin reordenar nada — antes salía apilado y con las alturas descuadradas
+   (Cancelar 48 vs. Borrar 52); ahora los dos son 48/15 (F-24 de inventario-B.md). */
+.modal-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+
+/* Confirmación destructiva (D-1, C5): la ÚNICA excepción a «rojo solo en cifras» — relleno --neg,
+   texto --on-neg. 48/15, igual que el secundario de al lado. */
+.btn-danger-confirm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-8);
+  min-height: 48px;
+  padding: 0 var(--sp-16);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--neg);
+  color: var(--on-neg);
+  font-family: var(--font-body);
+  font-size: var(--fs-15);
+  font-weight: 700;
+  line-height: var(--lh-title);
+  cursor: pointer;
+}
+.btn-danger-confirm:disabled { opacity: .5; cursor: default; }
+
+@media (prefers-reduced-motion: reduce) {
+  .modal { animation: bc-fade-in 120ms linear; }
+  .modal.is-leaving { animation: bc-fade-out 120ms linear forwards; }
+  .modal::backdrop { animation: bc-fade-in 120ms linear; }
+  .modal.is-leaving::backdrop { animation: bc-fade-out 120ms linear forwards; }
+}
+
+/* --- Toast (toast.js): acuse de recibo, un único nodo colgado de <body>, por encima de la barra
+   de pestañas (z-index 20) y por debajo de la franja de aviso de almacenamiento (30).
+   pointer-events:none — es un acuse, no un control: no intercepta el toque siguiente. Con una
+   subpantalla abierta (body.subscreen) no hay tab bar que esquivar: baja casi hasta el borde. --- */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-real) + var(--sp-16));
+  z-index: 25;
+  box-sizing: border-box;
+  width: calc(100% - 2 * var(--sp-16));
+  max-width: 440px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  padding: var(--sp-12) var(--sp-16);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-size: var(--fs-15);
+  font-weight: 500;
+  line-height: var(--lh-body);
+  text-align: left;
+  box-shadow: var(--sh-alert);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%) translateY(var(--sp-8));
+  transition: opacity .18s ease, transform .18s ease;
+}
+/* body.subscreen (subpantalla abierta) y body.onboarding (asistente inicial) esconden la tabbar
+   por caminos distintos (back.js / app.css) — ninguno de los dos deja tab bar que esquivar. */
+body.subscreen #toast, body.onboarding #toast { bottom: calc(var(--sp-16) + env(safe-area-inset-bottom, 0px)); }
+#toast.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  #toast { transition: opacity .12s linear; }
+}
+
+/* ===== Familias de cuenta (PR-10) ===== */
+/* Deuda (C8): la cuenta de tipo pasivo se pinta con la trama --stripe-debt (sobre ella, el icono
+   en --fx). La barra apilada ya la usa en .sbar-seg.is-debt; aquí la llevan la baldosa y lo que
+   la pantalla marque con .acc-debt. */
+.acc-debt { background: var(--stripe-debt); }
+.ent-tile.acc-debt { background: var(--stripe-debt); color: var(--fx); }
+
+/* Selector de familia (entity.js#familySwatchesHtml, B-Categorias-Nueva): 6 columnas de muestras
+   de 48, tinte con la barra de 12 abajo. Elegida: --ring-sel y check en --fx; la barra se mete 2
+   para que el anillo se vea entero. */
+.ent-fam-picker { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sp-8); }
+.ent-fam-pick {
+  position: relative;
+  min-width: 0;
+  height: 48px;
+  padding: var(--sp-8) 0 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--ft);
+  color: var(--fx);
+  cursor: pointer;
+}
+.ent-fam-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 12px; background: var(--fb); }
+.ent-fam-pick[aria-pressed="true"] { box-shadow: var(--ring-sel); }
+.ent-fam-pick[aria-pressed="true"] .ent-fam-bar { left: 2px; right: 2px; bottom: 2px; }
+
+/* ===== Piezas sueltas: metadatos, aviso de error y esqueleto (PR-99, antes en app.css) ===== */
+
+/* --- Metadatos con divisor de 1px (ui.js#metaHtml): la alternativa al punto medio, que el sistema
+   no usa. 13/500 dim; divisor de 11 en --border-strong. --- */
+.meta-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font: 500 var(--fs-13)/var(--lh-body) var(--font-body); color: var(--text-dim); }
+.meta-sep { width: 1px; height: 11px; background: var(--border-strong); flex-shrink: 0; }
+
+/* --- Aviso (.banner-aviso): el patrón neutro de los avisos en línea del sistema B (como .aj-msg de
+   Ajustes): --raised con borde, texto 13/500 en --text. El de error (.is-error) lleva el icono de
+   aviso delante y el borde fuerte; nunca rojo en fondo, borde ni texto (C4: el rojo solo en cifras).
+   El icono es el «warn» de icons.js pintado con máscara (currentColor), porque muchas pantallas
+   crean el aviso con una sola clase y un texto. main.js lo antepone a <body> cuando el almacenamiento
+   no es persistente o la base está bloqueada: franja pegada arriba, a todo el ancho del layout. --- */
+.banner-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-8);
+  min-height: 44px;
+  padding: var(--sp-12);
+  border-radius: var(--radius);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: var(--fs-13);
+  font-weight: 500;
+  line-height: var(--lh-body);
+}
+.banner-aviso[hidden] { display: none; }
+.banner-aviso svg { flex-shrink: 0; width: 18px; height: 18px; color: var(--text); }
+.banner-aviso.is-error {
+  position: relative;
+  padding-left: calc(var(--sp-12) + 18px + var(--sp-8));
+  border-color: var(--border-strong);
+  --banner-warn: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4.5 21 19.5H3z'/%3E%3Cpath d='M12 10v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E");
+}
+.banner-aviso.is-error::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--sp-12) + 1px);
+  left: var(--sp-12);
+  width: 18px;
+  height: 18px;
+  background: currentColor;
+  -webkit-mask: var(--banner-warn) center / contain no-repeat;
+  mask: var(--banner-warn) center / contain no-repeat;
+}
+/* «Reintentar» del aviso de base bloqueada (main.js): terciario en tinta, alto de toque 44. */
+.banner-aviso-btn {
+  flex: none;
+  align-self: center;
+  min-height: 44px;
+  margin: calc((44px - var(--lh-body) * 1em) / -2) 0;
+  padding: 0 var(--sp-12);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  cursor: pointer;
+}
+/* Franja de main.js, antepuesta a <body>: pegada arriba (sticky) en su propio hueco, así no tapa
+   la pantalla crezca lo que crezca el texto. .is-error pone position:relative (0,2,0): esta regla
+   (0,2,1) la vuelve a pegar. */
+body > .banner-aviso,
+body > .banner-aviso.is-error {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-radius: 0;
+  background: var(--surface);
+  border-width: 0 0 1px;
+}
+
+/* --- Esqueleto de carga (skeleton.js): bloques en --raised con el radio de las tarjetas y un pulso
+   (@keyframes bc-skeleton en app.css); quieto con movimiento reducido. --- */
+.skeleton-stack { display: flex; flex-direction: column; gap: var(--sp-16); }
+.skeleton {
+  background: var(--raised);
+  border-radius: var(--radius);
+  animation: bc-skeleton 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}

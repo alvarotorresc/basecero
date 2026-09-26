@@ -1,6 +1,6 @@
-/** Recibo de guardado: el ticket de papel que se imprime y se sella al guardar en Registro
- *  (SISTEMA.md §4.13 + docs/design/final-v2/ReciboGuardado.dc.html). Sustituye al toast SOLO en ese
- *  guardado; el toast sigue siendo el acuse de recibo de todo lo demás.
+/** Recibo de guardado: el ticket que aparece y se sella al guardar en Crear gasto (sistema B,
+ *  mockups B-Recibo/BD-Recibo). Sustituye al toast SOLO en ese guardado; el toast sigue siendo el
+ *  acuse de recibo de todo lo demás.
  *
  *  Por qué un <div> y no un <dialog>: un <dialog> modal atrapa el foco y deja inerte el fondo, que
  *  es lo contrario de lo que pide el diseño («cualquier toque lo corta: nunca bloquea a quien
@@ -15,55 +15,86 @@
  *  llevarían por delante (el recibo aparece justo DESPUÉS de que Registro haya cedido el sitio). */
 
 import { escHtml } from "./esc.js";
+import { icon } from "./icons.js";
+import { badgeHtml } from "./entity.js";
+import { displayHtml } from "./instrument.js";
+import { famClass } from "./category-colors.js";
 
-const ENTER_MS = 600;   // velo 140 + impresión 420 + sello (arranca a 380, dura 220) = 600
-const HOLD_MS = 900;    // §4.13 fase 4
+const ENTER_MS = 600;   // velo + entrada del ticket + sello; el CSS cabe dentro de este margen
+const HOLD_MS = 900;    // tiempo quieto antes de irse solo
 const HOLD_REDUCED_MS = 600;
-const EXIT_MS = 260;    // §4.13 fase 5
+const EXIT_MS = 260;    // el CSS de salida dura menos (180 ms, DESIGN §10); se desmonta al final
 
-// Los dos zigzags del borde, copiados de ReciboGuardado.dc.html:37,106 como constantes: mismo
-// `d`, pero `fill="currentColor"` en vez del hex a fuego, así que el color lo pone
-// `.recibo-ticket { color: var(--paper) }` en CSS, no el markup.
-const ZIGZAG_TOP = `<svg viewBox="0 0 296 10" preserveAspectRatio="none" width="296" height="10" style="display:block;" aria-hidden="true"><path d="M0 10 L0 5 L6 0 L12 5 L18 0 L24 5 L30 0 L36 5 L42 0 L48 5 L54 0 L60 5 L66 0 L72 5 L78 0 L84 5 L90 0 L96 5 L102 0 L108 5 L114 0 L120 5 L126 0 L132 5 L138 0 L144 5 L150 0 L156 5 L162 0 L168 5 L174 0 L180 5 L186 0 L192 5 L198 0 L204 5 L210 0 L216 5 L222 0 L228 5 L234 0 L240 5 L246 0 L252 5 L258 0 L264 5 L270 0 L276 5 L282 0 L288 5 L294 0 L300 5 L296 10 Z" fill="currentColor"></path></svg>`;
-const ZIGZAG_BOTTOM = `<svg viewBox="0 0 296 10" preserveAspectRatio="none" width="296" height="10" style="display:block;" aria-hidden="true"><path d="M0 0 L0 5 L6 10 L12 5 L18 10 L24 5 L30 10 L36 5 L42 10 L48 5 L54 10 L60 5 L66 10 L72 5 L78 10 L84 5 L90 10 L96 5 L102 10 L108 5 L114 10 L120 5 L126 10 L132 5 L138 10 L144 5 L150 10 L156 5 L162 10 L168 5 L174 10 L180 5 L186 10 L192 5 L198 10 L204 5 L210 10 L216 5 L222 10 L228 5 L234 10 L240 5 L246 10 L252 5 L258 10 L264 5 L270 10 L276 5 L282 10 L288 5 L294 10 L300 5 L296 0 Z" fill="currentColor"></path></svg>`;
+// Los dos zigzags del borde (B-Recibo): dientes de 5 sobre 310 de ancho. `fill="currentColor"`:
+// el color del papel lo pone `.recibo-edge { color: var(--raised) }` en CSS, nunca el markup.
+const teeth = (up) => {
+  let d = up ? "M0 10 L0 5" : "M0 0 L0 5";
+  for (let x = 5; x <= 310; x += 5) d += ` L${x} ${(x / 5) % 2 === 1 ? (up ? 0 : 10) : 5}`;
+  return `${d} L310 ${up ? 10 : 0} Z`;
+};
+const edge = (up) => `<svg class="recibo-edge" viewBox="0 0 310 10" preserveAspectRatio="none" width="310" height="10" aria-hidden="true"><path d="${teeth(up)}" fill="currentColor"></path></svg>`;
+const ZIGZAG_TOP = edge(true);
+const ZIGZAG_BOTTOM = edge(false);
 
-/** El ticket: cabecera BaseCero + fecha/hora, líneas etiqueta/valor (solo las que traen valor),
- *  TOTAL en mono grande y el sello circular. Puro: string, escapa todo lo que entra. No incluye el
- *  botón «Deshacer» (vive FUERA del papel, ver SISTEMA.md §4.13) ni el velo — eso lo monta
- *  createReceipt(). */
-export function ticketHtml({ dateTime, lines, total, stampDate, labels }) {
-  const rows = (lines ?? []).filter((l) => l?.value).map((l) => `
-        <div style="display:flex;align-items:baseline;gap:6px;">
-          <span class="recibo-label" style="flex-shrink:0;">${escHtml(l.label)}</span>
+/** El ticket (B-Recibo): cabecera BaseCero + hora, Display con el total, el comercio con su tipo
+ *  y el sello, la ficha de la categoría y las líneas etiqueta/valor (solo las que traen valor).
+ *  Puro: string, escapa todo lo que entra. No incluye «Deshacer» (vive FUERA del papel) ni el
+ *  velo — eso lo monta createReceipt().
+ *  @param {object} o
+ *  @param {string} o.dateTime          Hora (o fecha y hora) de la cabecera.
+ *  @param {string} [o.title]           Comercio o concepto, 20/700.
+ *  @param {string} [o.subtitle]        Tipo de movimiento, 13/500 dim.
+ *  @param {object|null} [o.badge]      Ficha de 28 (entity.js#badgeHtml): {fam, income, icon, label}.
+ *  @param {Array<{label:string, value:string, fam?:string|null}>} [o.lines]  `fam` pinta la
+ *                                      muestra de 10 de una cuenta delante del valor.
+ *                                      `num` pone el valor en la mono tabular (importes);
+ *                                      `neg`, en --neg (C4: la cifra negativa que avisa).
+ *  @param {Array<{label:string, value:string, num?:boolean}>} [o.periodLines]  Segundo grupo, tras otra
+ *                                      perforación: «Quedan en septiembre», «Hoy puedes gastar».
+ *  @param {{main:string, cents:string, suffix:string}} o.total  fmtMoneyParts.
+ *  @param {string} o.stampDate
+ *  @param {string|null} [o.stampFam]   Familia del sello (la de la categoría); sin ella, tinta.
+ *  @param {{brand:string, stamp:string, total:string}} o.labels */
+export function ticketHtml({ dateTime, title = "", subtitle = "", badge = null, lines, periodLines = [], total, stampDate, stampFam = null, labels }) {
+  const linesHtml = (list) => (list ?? []).filter((l) => l?.value).map((l) => {
+    const fc = famClass(l.fam);
+    return `
+        <div class="recibo-line">
+          <span class="recibo-label">${escHtml(l.label)}</span>
           <span class="recibo-dots"></span>
-          <span class="recibo-value" style="flex-shrink:0;">${escHtml(l.value)}</span>
-        </div>`).join("");
+          <span class="recibo-value${l.num ? " num" : ""}${l.neg ? " is-neg" : ""}">${fc ? `<span class="recibo-swatch ${fc}" aria-hidden="true"></span>` : ""}${escHtml(l.value)}</span>
+        </div>`;
+  }).join("");
+  const group = (list) => {
+    const html = linesHtml(list);
+    return html ? `<div class="recibo-perf"></div>
+      <div class="recibo-lines">${html}
+      </div>` : "";
+  };
+  const totalText = `${total?.main ?? ""}${total?.cents ?? ""}${total?.suffix ?? ""}`;
+  const stampCls = famClass(stampFam);
   return `${ZIGZAG_TOP}
     <div class="recibo-body">
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:6px;">
-        <span style="font-size:15px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;">${escHtml(labels.brand)}</span>
-        <span class="num" style="font-size:11px;font-weight:500;color:var(--paper-dim);">${escHtml(dateTime)}</span>
+      <div class="recibo-head">
+        <span class="recibo-brand">${escHtml(labels.brand)}</span>
+        <span class="num recibo-time">${escHtml(dateTime)}</span>
       </div>
-      <div class="recibo-perf"></div>
-      <div style="display:flex;flex-direction:column;gap:9px;">${rows}
-      </div>
-      <div class="recibo-perf"></div>
-      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;">
-        <span style="font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;">${escHtml(labels.total)}</span>
-        <div class="num" style="display:flex;align-items:baseline;gap:2px;">
-          <span style="font-size:32px;font-weight:600;letter-spacing:-.02em;">${escHtml(total.main)}</span>
-          <span style="font-size:18px;font-weight:600;color:var(--paper-dim);">${escHtml(total.cents)}</span>
-          <span style="font-size:14px;font-weight:500;color:var(--paper-dim);margin-left:3px;">${escHtml(total.suffix)}</span>
+      ${displayHtml({ label: labels.total, value: totalText, size: "l" })}
+      <div class="recibo-id">
+        <div class="recibo-id-text">
+          ${title ? `<span class="recibo-title">${escHtml(title)}</span>` : ""}
+          ${subtitle ? `<span class="recibo-sub">${escHtml(subtitle)}</span>` : ""}
         </div>
-      </div>
-      <div style="display:flex;justify-content:center;padding:2px 0 8px;">
-        <div class="recibo-stamp" style="width:104px;height:104px;border-radius:50%;border:3px solid currentColor;display:flex;align-items:center;justify-content:center;">
-          <div style="width:88px;height:88px;border-radius:50%;border:1px solid currentColor;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;">
-            <span style="font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;">${escHtml(labels.stamp)}</span>
-            <span class="num" style="font-size:9px;font-weight:600;letter-spacing:.06em;">${escHtml(stampDate)}</span>
+        <div class="recibo-stamp${stampCls ? ` ${stampCls}` : ""}">
+          <div class="recibo-stamp-in">
+            <span class="recibo-stamp-label">${escHtml(labels.stamp)}</span>
+            <span class="num recibo-stamp-date">${escHtml(stampDate)}</span>
           </div>
         </div>
       </div>
+      ${badge?.label ? `<div class="recibo-badge">${badgeHtml(badge)}</div>` : ""}
+      ${group(lines)}
+      ${group(periodLines)}
     </div>
     ${ZIGZAG_BOTTOM}`;
 }
@@ -99,11 +130,11 @@ export function createReceipt(doc, { holdMs } = {}) {
       el.setAttribute("role", "status");
       el.setAttribute("aria-live", "polite");
       el.innerHTML = `<div class="recibo-ticket">${ticketHtml(data)}</div>` +
-        `<button type="button" class="recibo-undo">${escHtml(data?.labels?.undo ?? "")}</button>`;
+        `<button type="button" class="btn-secondary recibo-undo">${icon("undo", { size: 18 })}<span>${escHtml(data?.labels?.undo ?? "")}</span></button>`;
 
       let undone = false;
-      // Fase 5 (§4.13): el ticket sube y se desvanece, y solo AL TERMINAR esa salida se desmonta
-      // de verdad — para que la animación de salida llegue a verse.
+      // Salida: el ticket se desvanece, y solo AL TERMINAR esa salida se desmonta de verdad —
+      // para que la animación de salida llegue a verse.
       function leave(runUndo) {
         if (node !== el) return;      // ya se cerró (Deshacer + el temporizador tardío después)
         clearTimers();

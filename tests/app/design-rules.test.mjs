@@ -1,0 +1,414 @@
+// Reglas de diseño del sistema B (design/DESIGN.md §5, §7, §8, §11 y §13) comprobadas solas.
+// Cubre las casillas K1 (C13), K3 (C1), K4 (C2), K6 (C7), K9 (escala de letra) y K10 (radios) del
+// checklist de PR, más foco, emoji, estilos en línea, el «atrás» y que no vuelvan los alias de
+// legacy.css (R-LEGACY, PR-99).
+//
+// Escanea el TEXTO de app/app/css/*.css (salvo tokens.css) y de app/app/js/**/*.js, plantillas
+// incluidas: el naranja y los estilos en línea viven sobre todo en los template strings de las
+// pantallas. Son regex, no un parser de CSS: reglas simples, y cada excepción cita su línea de DESIGN.
+//
+// PENDIENTES: ficheros aún sin migrar, que las reglas se saltaban durante la migración a B. Se vació
+// en la PR-99 (todas las pantallas y app.css migradas) y un test vigila que siga vacía: un fichero
+// que no cumple se arregla, no se añade a la lista.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+import { ES as es } from "../../app/app/js/i18n/es.js";
+import { EN as en } from "../../app/app/js/i18n/en.js";
+
+const APP = fileURLToPath(new URL("../../app/app/", import.meta.url));
+
+export const PENDIENTES = new Set();
+
+// ---------- lectura ----------
+
+function listar(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) return e.name === "vendor" ? [] : listar(p);
+    return [p];
+  });
+}
+const FICHEROS = [
+  ...listar(APP + "css").filter((f) => f.endsWith(".css") && !f.endsWith("/tokens.css")),
+  ...listar(APP + "js").filter((f) => f.endsWith(".js")),
+].map((abs) => ({ rel: relative(APP, abs), text: readFileSync(abs, "utf8") }));
+
+const sinComentariosCss = (css) => css.replace(/\/\*[\s\S]*?\*\//g, "");
+/** Sin comentarios de bloque ni de línea (JS): los comentarios pueden citar nombres retirados. */
+const sinComentarios = (txt) => sinComentariosCss(txt).replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
+
+/** Reglas CSS {sel, decls:[{prop, value}]}. La regex coge solo los bloques más internos, así que
+ *  las reglas dentro de @media salen con su selector limpio. No es un parser: basta para el repo. */
+export function reglasCss(css) {
+  const out = [];
+  for (const m of sinComentariosCss(css).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const sel = m[1].trim();
+    const decls = m[2].split(";").map((d) => d.trim()).filter(Boolean).map((d) => {
+      const i = d.indexOf(":");
+      return i < 0 ? { prop: d, value: "" } : { prop: d.slice(0, i).trim().toLowerCase(), value: d.slice(i + 1).trim() };
+    });
+    out.push({ sel, decls });
+  }
+  return out;
+}
+const selectores = (sel) => sel.split(",").map((s) => s.trim());
+
+/** Contenidos de style="…" y style='…' de un fichero JS (plantillas incluidas). */
+export function estilosEnLinea(js) {
+  return [...js.matchAll(/\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)')/g)].map((m) => m[1] ?? m[2]);
+}
+
+// ---------- reglas: cada una devuelve una lista de mensajes ----------
+
+// R-C13 · DESIGN §5 C13, la regex literal y sin excepciones: la llamada a PDFLib.rgb de
+// informe-pdf.js va por un alias desde la PR-99, así que el comando de C13 sale vacío tal cual.
+const C13 = /#[0-9a-fA-F]{3,8}\b|rgba?\(/;
+export function rC13(rel, text) {
+  return text.split("\n").flatMap((l, i) =>
+    C13.test(l) ? [`${rel}:${i + 1} color literal: ${l.trim().slice(0, 90)}`] : []);
+}
+
+// R-C1 · DESIGN §5 C1: naranja solo en el primario y lo seleccionado. En JS, nunca (va por clase).
+// En CSS, la regla que lee --accent/--accent-text/--ring-sel tiene un selector de la lista blanca, y
+// --focus (que es naranja) solo se lee en :focus-visible (§11).
+// Única desviación registrada fuera de primario y seleccionado: el logo del onboarding (D-impl-5,
+// DESIGN §Desviaciones «Logo de onboarding en tokens»): es marca, no sistema, y su fondo es el
+// naranja. Se retira cuando se decida P7 (marca/).
+const C1_BLANCA = [/\.btn-primary\b/, /\.tab-add\b/, /\.tab\[aria-current/, /\[aria-selected="?true"?\]/,
+  /\[aria-pressed="?true"?\]/, /:checked\b/, /::selection\b/, /^\.onb-logo-bg$/];
+// §5 C1: el :checked que pinta naranja es de chip, día o baldosa.
+const C1_CHECKED = /chip|day|dia|tile|baldosa/i;
+export function rC1(rel, text) {
+  if (rel.endsWith(".js")) {
+    return text.includes("var(--accent") ? [`${rel}: lee var(--accent…) en JS; el naranja va por clase`] : [];
+  }
+  const errs = [];
+  for (const { sel, decls } of reglasCss(text)) {
+    const v = decls.map((d) => d.value).join(";");
+    if (/var\(--(accent|ring-sel)\b/.test(v)) {
+      for (const s of selectores(sel)) {
+        const ok = C1_BLANCA.some((re) => re.test(s)) && (!/:checked\b/.test(s) || C1_CHECKED.test(s));
+        if (!ok) errs.push(`${rel}: «${s}» lee --accent/--ring-sel fuera de primario o seleccionado`);
+      }
+    }
+    if (/var\(--focus\)/.test(v)) {
+      for (const s of selectores(sel)) {
+        if (!/:focus-visible\b/.test(s)) errs.push(`${rel}: «${s}» lee --focus fuera de :focus-visible`);
+      }
+    }
+  }
+  return errs;
+}
+
+// R-C2 · DESIGN §5 C2: ámbar solo en la cifra principal del Display, su línea y el «hoy». Más el
+// LED en espera (DESIGN §9 LED: «espera» solo en el Display; inventario-B LED/I-19 y el token
+// --led-glow-wait: su punto es ámbar). Es un punto de 8 dentro del Display, no una cifra.
+const C2_BLANCA = /\.disp-value\b|\.disp-chart-line\b|\.disp-today\b|\.led-wait\b/;
+export function rC2(rel, text) {
+  if (rel.endsWith(".js")) return text.includes("--disp-text") ? [`${rel}: --disp-text en JS`] : [];
+  const errs = [];
+  for (const { sel, decls } of reglasCss(text)) {
+    if (!decls.some((d) => d.value.includes("var(--disp-text)"))) continue;
+    for (const s of selectores(sel)) if (!C2_BLANCA.test(s)) errs.push(`${rel}: «${s}» lee --disp-text`);
+  }
+  return errs;
+}
+
+// R-C7 · DESIGN §5 C7: las cifras van en tinta, nunca en color de familia.
+const C7_FAM = /var\(--(f-[a-z]+-[xbt]|fx|fb|ft)\)/;
+export function rC7(rel, text) {
+  if (!rel.endsWith(".css")) return [];
+  return reglasCss(text).flatMap(({ sel, decls }) =>
+    /num|amount|value/i.test(sel) && decls.some((d) => C7_FAM.test(d.value))
+      ? [`${rel}: «${sel}» pinta una cifra con color de familia`] : []);
+}
+
+// R-FS · DESIGN §7: escala de cuerpo --fs-*, Display --disp-xl/l/m y el 16 (--fs-input) solo en inputs.
+const TAM = /var\(--(fs-(12|13|14|15|17|20|24)|disp-(xl|l|m))\)/;
+const TAM_INPUT = /var\(--fs-input\)/;
+const LITERAL = /(^|[\s/])\d*\.?\d+(px|rem|em|pt|%|vw|vh)\b/;
+export function rFS(rel, text) {
+  if (!rel.endsWith(".css")) return [];
+  const errs = [];
+  for (const { sel, decls } of reglasCss(text)) {
+    for (const { prop, value } of decls) {
+      if (prop !== "font-size" && prop !== "font") continue;
+      if (value === "inherit") continue;
+      const input = TAM_INPUT.test(value);
+      if (input && !selectores(sel).every((s) => /input|select|textarea/.test(s))) {
+        errs.push(`${rel}: «${sel}» usa --fs-input fuera de input/select/textarea`);
+        continue;
+      }
+      const soloVar = value.replace(/var\([^)]*\)/g, "");
+      if ((!TAM.test(value) && !input) || LITERAL.test(soloVar)) errs.push(`${rel}: «${sel}» ${prop}: ${value}`);
+    }
+  }
+  return errs;
+}
+
+// R-RAD · DESIGN §8: radios solo de --radius*. Constantes de componente con nombre del inventario
+// (§9): la casilla, radio 7, y la muestra de 10 del chip de filtro, radio 3.
+const RAD_TOKEN = /^var\(--radius(-xs|-lg|-xl|-pill)?\)$/;
+const RAD_NOMBRADO = [{ v: "7px", sel: /casilla|checkbox|check-box/ }, { v: "3px", sel: /muestra|swatch/ }];
+export function rRAD(rel, text) {
+  if (!rel.endsWith(".css")) return [];
+  const errs = [];
+  for (const { sel, decls } of reglasCss(text)) {
+    for (const { prop, value } of decls) {
+      if (!/^border(-[a-z]+)*-radius$/.test(prop)) continue;
+      const partes = value.replace(/\s*\/\s*/g, " ").split(/\s+(?![^(]*\))/);
+      for (const p of partes) {
+        if (p === "0" || p === "inherit" || RAD_TOKEN.test(p)) continue;
+        if (RAD_NOMBRADO.some((n) => n.v === p && n.sel.test(sel))) continue;
+        errs.push(`${rel}: «${sel}» ${prop}: ${value}`);
+      }
+    }
+  }
+  return errs;
+}
+
+// R-FOCUS · DESIGN §11: nunca outline:none sin sustituto visible en el mismo fichero.
+export function rFOCUS(rel, text) {
+  if (!/outline\s*:\s*(none|0)\b/.test(text)) return [];
+  const sustituto = reglasCss(text).some(({ sel, decls }) =>
+    /:focus-visible/.test(sel) && decls.some((d) => d.prop === "outline" && d.value.includes("var(--focus)")));
+  return sustituto ? [] : [`${rel}: outline:none sin :focus-visible con var(--focus)`];
+}
+
+// R-EMOJI · DESIGN §6: cero emoji en la UI (iconos SVG de trazo).
+const EMOJI = /\p{Extended_Pictographic}/u;
+export function rEMOJI(rel, text) {
+  return text.split("\n").flatMap((l, i) => (EMOJI.test(l) ? [`${rel}:${i + 1} emoji: ${l.trim().slice(0, 60)}`] : []));
+}
+
+// R-INLINE · plan §4 punto 2: en línea solo geometría dinámica (propiedades personalizadas, width,
+// height, flex-basis). Lo demás va a su sección de screens.css o a components.css.
+const INLINE_OK = /^(--[a-zA-Z0-9-]+|width|height|flex-basis)$/;
+export function rINLINE(rel, text) {
+  if (!rel.endsWith(".js")) return [];
+  const errs = [];
+  for (const s of estilosEnLinea(text)) {
+    for (const d of s.split(";").map((x) => x.trim()).filter(Boolean)) {
+      const i = d.indexOf(":");
+      const prop = i < 0 ? d : d.slice(0, i).trim();
+      if (!INLINE_OK.test(prop)) errs.push(`${rel}: style="${s.slice(0, 60)}" (${prop})`);
+    }
+  }
+  return errs;
+}
+
+// R-BACK · DESIGN §11: el atrás lleva aria-label «Atrás», es decir t("common.back").
+// Se reconoce por id o clase con «back» en la etiqueta del botón: palabra suelta («mov-back»,
+// «back-btn») o tramo camelCase («goBack», «backBtn»), nunca dentro de otra palabra («background»).
+const ATRAS_ID = /\b(id|class)="[^"]*(\bback(?![a-z])|[a-z0-9]Back(?![a-z]))/;
+export function rBACK(rel, text) {
+  if (!rel.endsWith(".js")) return [];
+  const errs = [];
+  for (const m of text.matchAll(/(<button\b[^>]*>)([\s\S]*?)<\/button>/g)) {
+    const [, tag, cuerpo] = m;
+    const esAtras = ATRAS_ID.test(tag) || cuerpo.includes('icon("back"');
+    if (!esAtras) continue;
+    if (!/aria-label="\$\{(escAttr\()?t\("common\.back"\)\)?\}"/.test(tag)) errs.push(`${rel}: atrás sin aria-label t("common.back"): ${tag.slice(0, 90)}`);
+  }
+  return errs;
+}
+
+// R-LEGACY · DESIGN §4 («sin alias»): legacy.css (los alias var() de «Neto») se borró en la PR-99.
+// Ningún fichero lee ni declara uno de sus nombres: foto fija de la lista, tomada del fichero antes
+// de borrarlo (más --surface-1 y --r-1, que ya se usaban sin definir). Se comprueban las lecturas y
+// también las declaraciones, para que un `--ink:` local no reabra la puerta. Que toda lectura
+// var(--x) esté definida en algún sitio lo mira aparte el test de huérfanas de más abajo.
+export const NOMBRES_LEGACY = new Set([
+  "--ink", "--ink-2", "--ink-3", "--text-2", "--text-3", "--surface-1", "--surface-2", "--card2", "--card",
+  "--hairline", "--rule", "--hairline-strong", "--accent-ink", "--danger", "--red", "--green", "--warn",
+  "--amber", "--accent-tint", "--pos-tint", "--danger-tint", "--warn-tint", "--shadow-float", "--paper",
+  "--paper-ink", "--paper-dim", "--stamp", "--r-0", "--r-1", "--radius-sm", "--r-pill", "--r-circle",
+  "--s-1", "--s-2", "--s-3", "--s-4", "--s-5", "--s-6", "--s-7", "--s-8", "--s-9", "--pad-screen",
+  "--gap-section", "--tabbar-h", "--font-sans", "--font-ui", "--font-num", "--t-hero", "--t-figure-xl",
+  "--t-figure-l", "--t-figure-m", "--t-figure-s", "--t-title", "--t-section", "--t-body", "--t-label",
+  "--t-micro",
+]);
+const NOMBRE_PROP = /--[a-zA-Z0-9-]*[a-zA-Z0-9]/g;
+export function rLEGACY(rel, text) {
+  const errs = [];
+  for (const [i, l] of sinComentarios(text).split("\n").entries()) {
+    for (const [n] of l.matchAll(NOMBRE_PROP)) {
+      if (NOMBRES_LEGACY.has(n)) errs.push(`${rel}:${i + 1} nombre de legacy.css: ${n}`);
+    }
+  }
+  return errs;
+}
+
+/** Lecturas var(--x) que nadie declara: ni tokens.css (`tokens`, un Set) ni el propio código de la
+ *  app (una declaración `--x:` en CSS o en un style="--x:…" de plantilla). Sin definir, la propiedad
+ *  cae a su valor inicial en silencio (color negro, radio 0…) y ningún otro test lo pinta. */
+export function huerfanas(textos, tokens) {
+  const limpios = textos.map(sinComentarios);
+  const locales = new Set(limpios.flatMap((s) => [...s.matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)].map((m) => m[1])));
+  const leidas = new Set(limpios.flatMap((s) => [...s.matchAll(/var\((--[a-zA-Z0-9-]+)/g)].map((m) => m[1])));
+  return [...leidas].filter((n) => !tokens.has(n) && !locales.has(n)).sort();
+}
+
+const REGLAS = { rC13, rC1, rC2, rC7, rFS, rRAD, rFOCUS, rEMOJI, rINLINE, rBACK, rLEGACY };
+const migrados = FICHEROS.filter((f) => !PENDIENTES.has(f.rel));
+const incumple = (regla) => migrados.flatMap((f) => REGLAS[regla](f.rel, f.text));
+
+// ---------- las reglas, sobre los ficheros migrados ----------
+
+test("hay ficheros migrados que escanear, y los de las otras PRs de fundación entran solos", () => {
+  assert.ok(migrados.length >= 30, `solo ${migrados.length}`);
+  assert.ok(migrados.some((f) => f.rel === "css/components.css"));
+  assert.ok(!FICHEROS.some((f) => f.rel === "css/tokens.css" || f.rel.startsWith("vendor")));
+});
+test("R-C13: ningún hex ni rgb( fuera de tokens.css", () => assert.deepEqual(incumple("rC13"), []));
+test("R-C1: naranja solo en primario y seleccionado; nada de var(--accent en JS", () => assert.deepEqual(incumple("rC1"), []));
+test("R-C2: --disp-text solo en .disp-value, .disp-chart-line y .disp-today", () => assert.deepEqual(incumple("rC2"), []));
+test("R-C7: ninguna cifra (num|amount|value) en -x/-b/-t de familia", () => assert.deepEqual(incumple("rC7"), []));
+test("R-FS: font-size/font solo de la escala; --fs-input solo en inputs", () => assert.deepEqual(incumple("rFS"), []));
+test("R-RAD: border-radius solo de --radius* (casilla 7, muestra 3)", () => assert.deepEqual(incumple("rRAD"), []));
+test("R-FOCUS: ningún outline:none sin :focus-visible con var(--focus)", () => assert.deepEqual(incumple("rFOCUS"), []));
+test("R-EMOJI: cero emoji en los ficheros migrados", () => assert.deepEqual(incumple("rEMOJI"), []));
+test("R-EMOJI: cero emoji en los valores de i18n (es y en)", () => {
+  const valores = (o) => Object.values(o).flatMap((v) => (typeof v === "string" ? [v] : valores(v)));
+  for (const [lang, dic] of [["es", es], ["en", en]]) {
+    assert.deepEqual(valores(dic).filter((v) => EMOJI.test(v)), [], lang);
+  }
+});
+test("R-INLINE: style=\"…\" solo con geometría dinámica", () => assert.deepEqual(incumple("rINLINE"), []));
+test("R-LEGACY: ningún fichero lee ni declara un nombre de legacy.css (tampoco index.html)", () => {
+  // Sobre TODOS los ficheros, también los de PENDIENTES: legacy.css ya no existe para nadie.
+  const html = readFileSync(APP + "index.html", "utf8");
+  assert.deepEqual([...FICHEROS.flatMap((f) => rLEGACY(f.rel, f.text)), ...rLEGACY("index.html", html)], []);
+});
+test("R-LEGACY: cada var(--x) que se lee lo declara tokens.css o el propio código", () => {
+  const tokensCss = readFileSync(APP + "css/tokens.css", "utf8");
+  const tokens = new Set([...sinComentariosCss(tokensCss).matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)].map((m) => m[1]));
+  assert.ok(tokens.size > 50, "tokens.css no se ha leído");
+  assert.deepEqual(huerfanas([...FICHEROS.map((f) => f.text), readFileSync(APP + "index.html", "utf8")], tokens), []);
+});
+test("R-BACK: el atrás lleva aria-label t(\"common.back\") y vale «Atrás»", () => {
+  assert.equal(es.common.back, "Atrás");
+  assert.deepEqual(incumple("rBACK"), []);
+});
+
+test("C4: el aviso de error (.banner-aviso) es neutro: ni rojo en CSS ni la clase «red» en JS", () => {
+  const css = FICHEROS.filter((f) => f.rel.endsWith(".css")).flatMap((f) => reglasCss(f.text));
+  const aviso = css.filter(({ sel }) => /\.banner-aviso/.test(sel));
+  assert.ok(aviso.length > 0, "no hay reglas de .banner-aviso");
+  for (const { sel, decls } of aviso) {
+    assert.ok(!decls.some((d) => /var\(--neg\)/.test(d.value)), `«${sel}» lee --neg`);
+  }
+  const js = FICHEROS.filter((f) => f.rel.endsWith(".js") && /banner-aviso red\b/.test(f.text)).map((f) => f.rel);
+  assert.deepEqual(js, []);
+});
+
+test("screens.css: una sección sembrada por fichero de js/screens/, en su orden", () => {
+  const pantallas = readdirSync(APP + "js/screens").filter((f) => f.endsWith(".js")).map((f) => f.slice(0, -3)).sort();
+  const css = readFileSync(APP + "css/screens.css", "utf8");
+  const abren = [...css.matchAll(/\/\* === pantalla: ([a-z-]+) === \*\//g)].map((m) => m[1]);
+  const cierran = [...css.matchAll(/\/\* === fin: ([a-z-]+) === \*\//g)].map((m) => m[1]);
+  assert.deepEqual(abren, pantallas);
+  assert.deepEqual(cierran, pantallas);
+});
+
+// ---------- los detectores, sobre casos sintéticos (para que un falso verde no pase) ----------
+
+test("detectores: cazan lo que prohíben y dejan pasar lo permitido", () => {
+  assert.equal(rC13("x.js", "// antes #1b1e21\nconst a = 1;").length, 1);
+  assert.equal(rC13("x.js", "#acc-name").length, 1, "los ids #acc-* son falsos positivos reales: se renombran");
+  assert.equal(rC13("x.js", "PDFLib.rgb(r, g, b)").length, 1, "ya sin excepción: el PDF usa un alias");
+  assert.equal(rC13("x.css", "a{color:rgba(0,0,0,.1)}").length, 1);
+
+  assert.equal(rC1("x.js", "`<b style=\"color:var(--accent)\">`").length, 1);
+  assert.equal(rC1("x.css", ".btn-primary{background:var(--accent)}").length, 0);
+  assert.equal(rC1("x.css", ".tab[aria-current=\"page\"]{color:var(--accent-text)}").length, 0);
+  assert.equal(rC1("x.css", ".chip[aria-pressed=\"true\"]{background:var(--accent)}").length, 0);
+  assert.equal(rC1("x.css", ".tile:checked{box-shadow:var(--ring-sel)}").length, 0);
+  assert.equal(rC1("x.css", ".switch:checked{background:var(--accent)}").length, 1, "el interruptor va en tinta (F-04)");
+  assert.equal(rC1("x.css", ".link{color:var(--accent)}").length, 1);
+  assert.equal(rC1("x.css", "@media (x){.btn-primary,.h2{color:var(--accent)}}").length, 1);
+  assert.equal(rC1("x.css", "button:focus-visible{outline:var(--focus)}").length, 0);
+  assert.equal(rC1("x.css", ".onb-logo-bg{fill:var(--accent)}").length, 0, "logo del onboarding (D-impl-5)");
+  assert.equal(rC1("x.css", ".onb-logo-x{fill:var(--accent)}").length, 1, "solo el fondo del logo, nada más");
+  assert.equal(rC1("x.css", ".onb-title{color:var(--accent)}").length, 1, "el resto del onboarding, no");
+  assert.equal(rC1("x.css", ".a:hover{outline:var(--focus)}").length, 1);
+
+  assert.equal(rC2("x.css", ".disp-value{color:var(--disp-text)}").length, 0);
+  assert.equal(rC2("x.css", ".disp-foot{color:var(--disp-text)}").length, 1);
+  assert.equal(rC2("x.css", ".led-wait .led-dot{background:var(--disp-text)}").length, 0);
+  assert.equal(rC2("x.css", ".led-ok .led-dot{background:var(--disp-text)}").length, 1);
+
+  assert.equal(rC7("x.css", ".row-amount{color:var(--fx)}").length, 1);
+  assert.equal(rC7("x.css", ".row-sub{color:var(--fx)}").length, 0);
+  assert.equal(rC7("x.css", ".num{color:var(--f-casa-x)}").length, 1);
+
+  assert.equal(rFS("x.css", ".a{font-size:var(--fs-15)}").length, 0);
+  assert.equal(rFS("x.css", ".a{font:700 var(--fs-17)/1.2 var(--font-body)}").length, 0);
+  assert.equal(rFS("x.css", ".a{font-size:18px}").length, 1);
+  assert.equal(rFS("x.css", ".a{font:600 15px var(--font-body)}").length, 1);
+  assert.equal(rFS("x.css", ".a{font-size:var(--fs-input)}").length, 1);
+  assert.equal(rFS("x.css", ".campo input{font-size:var(--fs-input)}").length, 0);
+  assert.equal(rFS("x.css", ".d{font-size:var(--disp-xl)}").length, 0);
+  assert.equal(rFS("x.css", "button{font:inherit}").length, 0);
+
+  assert.equal(rRAD("x.css", ".a{border-radius:var(--radius-lg)}").length, 0);
+  assert.equal(rRAD("x.css", ".a{border-radius:var(--radius-xl) var(--radius-xl) 0 0}").length, 0);
+  assert.equal(rRAD("x.css", ".a{border-radius:8px}").length, 1);
+  assert.equal(rRAD("x.css", ".casilla{border-radius:7px}").length, 0);
+  assert.equal(rRAD("x.css", ".chip{border-radius:7px}").length, 1);
+  assert.equal(rRAD("x.css", ".muestra{border-top-left-radius:3px}").length, 0);
+
+  assert.equal(rFOCUS("x.css", "button{outline:none}").length, 1);
+  assert.equal(rFOCUS("x.css", "button{outline:none}button:focus-visible{outline:var(--focus)}").length, 0);
+
+  assert.equal(rEMOJI("x.js", "const a = \"🐾\";").length, 1);
+  assert.equal(rEMOJI("x.js", "const a = \"Hoy → mañana · 12 €\";").length, 0);
+
+  assert.equal(rINLINE("x.js", "`<div style=\"width:${p}%; --cat:${c}\"></div>`").length, 0);
+  assert.equal(rINLINE("x.js", "`<div style=\"display:none\"></div>`").length, 1);
+  assert.equal(rINLINE("x.js", "`<div style=\"flex-basis:40%; font-size:18px\"></div>`").length, 1);
+
+  assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"mov-back\" aria-label=\"${escAttr(t(\"common.back\"))}\"></button>`").length, 0);
+  assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"mov-back\" aria-label=\"${t(\"common.goBack\")}\"></button>`").length, 1);
+  assert.equal(rBACK("x.js", "`<button id=\"${escAttr(id)}\" aria-label=\"${t(\"common.goBack\")}\">${icon(\"back\")}</button>`").length, 1);
+  assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"goBack\" aria-label=\"Volver\">x</button>`").length, 1, "id camelCase");
+  assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"backBtn\" aria-label=\"Volver\">x</button>`").length, 1, "id camelCase delante");
+  assert.equal(rBACK("x.js", "`<button type=\"button\" id=\"goBack\" aria-label=\"${t(\"common.back\")}\">x</button>`").length, 0);
+  assert.equal(rBACK("x.js", "`<button type=\"button\" class=\"background feedback\">x</button>`").length, 0, "back dentro de otra palabra no es atrás");
+
+  assert.equal(rLEGACY("x.css", ".a{color:var(--ink-3)}").length, 1, "lectura de un alias retirado");
+  assert.equal(rLEGACY("x.css", ".a{--ink:red}").length, 1, "declararlo en local tampoco vale");
+  assert.equal(rLEGACY("x.js", "`<b style=\"--gap-section:4px\"></b>`").length, 1);
+  assert.equal(rLEGACY("x.css", ".a{color:var(--text-dim);border-radius:var(--radius-pill)}").length, 0);
+  assert.equal(rLEGACY("x.css", "/* antes --ink-3 */ .a{color:var(--text-dim)}").length, 0, "un comentario no cuenta");
+  assert.equal(rLEGACY("x.css", ".a{color:var(--ink-30)}").length, 0, "solo el nombre exacto");
+  assert.deepEqual(huerfanas([".a{color:var(--nada)}"], new Set(["--text"])), ["--nada"]);
+  assert.deepEqual(huerfanas([".a{color:var(--text)}"], new Set(["--text"])), []);
+  assert.deepEqual(huerfanas([".a{--cat:x}", "`<b style=\"color:var(--cat)\">`"], new Set()), [], "declarada en el código");
+  assert.deepEqual(huerfanas(["/* var(--vieja) */ .a{}"], new Set()), [], "un comentario no cuenta");
+
+});
+
+// ---------- la lista PENDIENTES solo encoge ----------
+
+test("PENDIENTES: vacía desde la PR-99 (todo app/app pasa por todas las reglas)", () => {
+  assert.equal(PENDIENTES.size, 0, `vuelve a haber ficheros exentos: ${[...PENDIENTES].join(", ")}`);
+  assert.equal(migrados.length, FICHEROS.length);
+});
+
+test("PENDIENTES: cada entrada existe y está dentro del escaneo", () => {
+  const rels = new Set(FICHEROS.map((f) => f.rel));
+  for (const p of PENDIENTES) {
+    assert.ok(existsSync(APP + p), `${p} no existe: se sacó o se renombró, quítalo de PENDIENTES`);
+    assert.ok(rels.has(p), `${p} no se escanea`);
+  }
+});
+
+test("PENDIENTES: ningún fichero de la lista cumple ya todas las reglas (si cumple, sácalo)", () => {
+  const yaCumplen = FICHEROS.filter((f) => PENDIENTES.has(f.rel))
+    .filter((f) => Object.values(REGLAS).every((r) => r(f.rel, f.text).length === 0)).map((f) => f.rel);
+  assert.deepEqual(yaCumplen, [], "ya cumplen todas las reglas de diseño: sácalos de PENDIENTES");
+});

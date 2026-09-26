@@ -33,3 +33,39 @@ export function matchesFilter(row, filter, byId) {
   if (filter.tagId && row.tag_id !== filter.tagId) return false;
   return true;
 }
+
+/** Agrupa las filas de listAllByDay (ya vienen ordenadas por date DESC) en bloques por día,
+ *  preservando el orden de llegada (mismo patrón que inicio.js). */
+export function groupByDay(rows) {
+  const groups = [];
+  let current = null;
+  for (const r of rows) {
+    if (!current || current.date !== r.date) {
+      current = { date: r.date, rows: [] };
+      groups.push(current);
+    }
+    current.rows.push(r);
+  }
+  return groups;
+}
+
+/** Total de la cabecera de día de Movimientos (B-Movimientos): lo gastado ese día entre las filas
+ *  VISIBLES (con el filtro puesto, lo gastado en lo filtrado). Mismo criterio que spentOfPeriod
+ *  (sql.js), fila a fila: cada gasto suma MI parte (`my_amount_cents`) y cada devolución la resta,
+ *  salvo que liquide un gasto compartido (su `ref_id` apunta a un gasto con is_shared: ahí lo que
+ *  vuelve es la parte de la contraparte, y mi gasto ya contaba solo la mía). Ingresos,
+ *  transferencias y ajustes no son gasto y no cuentan.
+ *  `rowsById`: las filas del periodo por id, para mirar el gasto enlazado. Una devolución cuyo gasto
+ *  no está en el periodo cargado se trata como no liquidación (resta), como el huérfano de SQL. */
+export function daySpentCents(dayRows, rowsById = {}) {
+  let total = 0;
+  for (const r of dayRows) {
+    const mine = Number(r.my_amount_cents ?? r.amount_cents) || 0;
+    if (r.type === "expense") total += mine;
+    else if (r.type === "refund") {
+      const linked = r.ref_id ? rowsById[r.ref_id] : null;
+      if (!(linked && linked.type === "expense" && linked.is_shared)) total -= mine;
+    }
+  }
+  return total;
+}

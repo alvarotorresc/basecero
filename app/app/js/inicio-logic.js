@@ -39,7 +39,7 @@ export const remainingAfterRecurringCents = (availableCents, pendingRecurringCen
  *  ÚLTIMO día (daysLeft=0) y en un periodo que se alarga (daysLeft negativo) el divisor cae
  *  igualmente a 1 — mismo resultado que antes en esos dos casos límite, el usuario ve que puede
  *  gastar TODO lo que queda, no una división por cero. Sin margen (remaining ≤ 0) el resultado
- *  sale negativo a propósito: la pantalla lo pinta en --danger con 0,00 €, esta función no lo capa. */
+ *  sale negativo a propósito: la pantalla lo pinta en --neg con 0,00 €, esta función no lo capa. */
 export function dailyAllowanceCents(availableCents, pendingRecurringCents, startDateIso, todayIso) {
   const remaining = remainingAfterRecurringCents(availableCents, pendingRecurringCents);
   const daysLeft = daysLeftOfPeriod(startDateIso, todayIso);
@@ -169,4 +169,36 @@ export function huchaMessage(ctx) {
   }
 
   return null;
+}
+
+/** Serie de la línea del Display de Inicio (sistema B, B-Home): lo que queda del presupuesto al
+ *  empezar el periodo y al cerrar cada día hasta hoy. `dailyCents` es el gasto de cada día en
+ *  orden (semana-logic.js#daysWithCategories → totalCents, con el mismo criterio que spentOfPeriod:
+ *  un día con más devoluciones que gasto resta en negativo, es decir, sube). Devuelve
+ *  dailyCents.length + 1 valores; el primero es `budgetCents`. Sin recortar: puede bajar de cero
+ *  (lo recorta quien lo pinta, charts.js#periodChartSvg).
+ *  Con `totalSpentCents` (spentOfPeriod), el ÚLTIMO punto —hoy— es budget − total: así cuadra con
+ *  el «Quedan X» del Display aunque el periodo tenga apuntes fuera de los días pintados (con fecha
+ *  futura o anterior al inicio); la diferencia cae entera en hoy. */
+export function periodRemainingSeries(budgetCents, dailyCents, totalSpentCents = null) {
+  const out = [budgetCents];
+  let left = budgetCents;
+  for (const c of dailyCents ?? []) {
+    left -= Number.isFinite(c) ? c : 0;
+    out.push(left);
+  }
+  if (Number.isFinite(totalSpentCents)) out[out.length - 1] = budgetCents - totalSpentCents;
+  return out;
+}
+
+/** Barra apilada de «Gasto por categoría» en Inicio (sistema B, B-Home; C11/C12): las `top` raíces
+ *  con más gasto (> 0) y todo lo demás sumado en `restCents` («Resto», en --idle). `rows` es
+ *  spentByRootCategory (ya ordenado DESC); una raíz con más devoluciones que gasto (≤ 0) no entra
+ *  ni en la barra ni en el total. `totalCents` = la suma de lo que se pinta. */
+export function topCategoriesWithRest(rows, top = 5) {
+  const positive = (rows ?? []).filter((r) => r.spent_cents > 0).sort((a, b) => b.spent_cents - a.spent_cents);
+  const head = positive.slice(0, top);
+  const restCents = positive.slice(top).reduce((s, r) => s + r.spent_cents, 0);
+  const totalCents = head.reduce((s, r) => s + r.spent_cents, 0) + restCents;
+  return { top: head, restCents, totalCents };
 }

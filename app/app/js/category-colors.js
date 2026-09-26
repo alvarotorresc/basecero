@@ -1,170 +1,186 @@
-// Paleta v2 resaturada para el fondo oscuro #0B0B0C (reskin, SISTEMA.md §2.2). El ORDEN de las
-// claves no importa aquí (a diferencia de POOL más abajo): cada categoría raíz seedeada tiene su
-// propio hex fijo, no depende de una ranura.
-const ROOT_COLORS = {
-  "cat-casa": "#5B9BFF", "cat-alimentacion": "#6BCB3E", "cat-restauracion": "#FF7A45",
-  "cat-transporte": "#2FC4E0", "cat-coche": "#E8A93B", "cat-ocio": "#8B7CF6",
-  "cat-salud": "#2BD9C9", "cat-suscripciones": "#C264D9",
-  "cat-ropa": "#E85F72", "cat-regalos": "#DE5FA8", "cat-impuestos": "#C4B72F",
-  "cat-nomina": "#22C58B", "cat-puntuales": "#22C58B", "cat-intereses": "#22C58B",
-};
-export const DEFAULT_COLOR = "#8A8794";
-// Tinta legible de los neutros (cat-otros, ""): antes compartía DEFAULT_COLOR con el propio color
-// de fondo del neutro; en v2 son valores distintos, como en el resto de la paleta (--cat-x vs
-// --cat-x-ink, SISTEMA.md §2.2).
-export const DEFAULT_TEXT_COLOR = "#B4B1BC";
-// Contraste texto/insignia (WCAG 1.4.3 AA ≥4.5:1), verificado sobre la insignia tintada al 16%
-// de --cat sobre --bg #0B0B0C (SISTEMA.md §2.2, columna "ink / insignia tintada 16%"): Casa 7.45 ·
-// Alimentación 9.38 · Restauración 7.64 · Transporte 8.95 · Coche 9.32 · Ocio 6.90 (el peor) ·
-// Salud 9.72 · Suscripciones 7.00 · Ropa 6.91 · Regalos 7.08 · Impuestos 9.02 · Ingresos 8.85 ·
-// Otras/neutro 7.79. Las 13 pasan de sobra el mínimo 4.5:1.
-const TEXT_COLORS = {
-  "cat-casa": "#7FB3FF", "cat-alimentacion": "#8FE05F", "cat-restauracion": "#FF9A6E",
-  "cat-transporte": "#63D6EC", "cat-coche": "#F2C463", "cat-ocio": "#A99CFA",
-  "cat-salud": "#5CE6D8", "cat-suscripciones": "#D98CE8",
-  "cat-ropa": "#F08997", "cat-regalos": "#EA8BC4", "cat-impuestos": "#D6CB5E",
-  "cat-nomina": "#4FDBA6", "cat-puntuales": "#4FDBA6", "cat-intereses": "#4FDBA6",
-};
-export const CATEGORY_ICONS = {
-  "cat-casa": "🏠", "cat-alimentacion": "🛒", "cat-restauracion": "🍽️", "cat-transporte": "🚌",
-  "cat-coche": "🚗", "cat-salud": "❤️‍🩹", "cat-suscripciones": "📺", "cat-ocio": "🎉",
-  "cat-ropa": "👕", "cat-regalos": "🎁", "cat-impuestos": "🧾", "cat-otros": "▫️",
-  "cat-nomina": "💶", "cat-puntuales": "💶", "cat-intereses": "💶",
+// Familias de categoría (dirección B, DESIGN.md C6/C7/C9/C11/C12 y §6). La familia es un DATO —una
+// de 12 claves—, no un hex: el color lo pone el CSS con `.fam-<clave>` (components.css), que expone
+// --ft/--fb/--fx a partir de los tokens --f-<clave>-t/-b/-x de tokens.css. Este módulo no conoce
+// ningún color de interfaz (C13); los únicos hex que quedan aquí son DATOS DE MIGRACIÓN
+// (LEGACY_COLORS y POOL_TO_FAMILY), escritos en minúsculas y sin almohadilla.
+
+export const FAMILIES = ["casa", "ali", "res", "tra", "coc", "sal", "sus", "oci", "rop", "reg", "imp", "otr"];
+const FAMILY_SET = new Set(FAMILIES);
+
+// Raíces sembradas de gasto → su familia fija (seeds.js). Cada una comparte clave con su icono.
+export const ROOT_FAMILY = {
+  "cat-casa": "casa", "cat-alimentacion": "ali", "cat-restauracion": "res", "cat-transporte": "tra",
+  "cat-coche": "coc", "cat-salud": "sal", "cat-suscripciones": "sus", "cat-ocio": "oci",
+  "cat-ropa": "rop", "cat-regalos": "reg", "cat-impuestos": "imp", "cat-otros": "otr",
 };
 
-// cat-otros no tiene entrada en ROOT_COLORS/TEXT_COLORS (se queda en gris a propósito): sin este
-// guard caería al hash del pool y cambiaría de color en cada release. Es un set explícito y no
-// "todo lo que falte de ROOT_COLORS" porque una categoría nueva de usuario SÍ debe hashear.
-// "" también es neutro: category_id NOT NULL DEFAULT '' (schema.sql) es el id real de "sin
-// categorizar" (movimientos.js isUncategorized, transacciones importadas antes de categorizar,
-// transferencias) que llega sin guardar a colorForCategory/textColorForCategory en más de un
-// call site (p.ej. inicio.js txRowHtml) — sin esta entrada, rootOf("", byId) devuelve "" y
-// hashIndex("") cae en un color del pool en vez de quedarse en gris.
-const NEUTRAL_IDS = new Set(["cat-otros", ""]);
+// Raíces sembradas de ingreso: siguen siendo ingreso aunque el byId que llega no traiga `flow`
+// (hay call sites que construyen byId parciales).
+const INCOME_SEEDS = new Set(["cat-nomina", "cat-puntuales", "cat-intereses"]);
 
-// Pool de 12 colores validados (contraste + distinción) para categorías sin seed ni override.
-// ORDEN preservado del pool v1: hashIndex mapea id → RANURA, así que una categoría de usuario ya
-// hasheada mantiene su ranura (y por tanto su identidad de color) y solo cambia de tono con el
-// reskin — no salta de "el azul" a "el rosa" para nadie.
-export const POOL = [
-  "#6BCB3E", "#8B7CF6", "#C4B72F", "#C264D9", "#22C58B", "#E8A93B",
-  "#2BD9C9", "#FF7A45", "#2FC4E0", "#DE5FA8", "#5B9BFF", "#E85F72",
+// ---- Compatibilidad del category_style antiguo: SE LEE PARA SIEMPRE --------------------------
+// Hay xlsx exportados con {color:"<hex>", icon:"<emoji>"} y bases locales que nunca se reescriben.
+// Cadena: hex v1 → hex v2 (LEGACY_COLORS, misma ranura del antiguo POOL) → familia
+// (POOL_TO_FAMILY, por el tono OKLCH más cercano a la barra clara de cada familia; se permiten
+// colisiones, §6). Hex en minúsculas y sin almohadilla: son datos de migración, no colores de UI.
+export const LEGACY_COLORS = {
+  "629d3b": "6bcb3e", "6b61c2": "8b7cf6", "a09600": "c4b72f", "9153ab": "c264d9",
+  "15ac7d": "22c58b", "986603": "e8a93b", "12a7a7": "2bd9c9", "b45018": "ff7a45",
+  "00a1cb": "2fc4e0", "aa4985": "de5fa8", "4f94e9": "5b9bff", "b64656": "e85f72",
+};
+export const POOL_TO_FAMILY = {
+  "6bcb3e": "ali", "8b7cf6": "sus", "c4b72f": "imp", "c264d9": "rop", "22c58b": "ali", "e8a93b": "casa",
+  "2bd9c9": "sal", "ff7a45": "reg", "2fc4e0": "sal", "de5fa8": "oci", "5b9bff": "tra", "e85f72": "reg",
+};
+
+// Emoji antiguos (CATEGORY_ICONS y CURATED_ICONS de v2) → clave de icono SVG. Todos tienen
+// equivalente (los que no lo tenían en B salen de Lucide, ver icons.js); un emoji ajeno a estas
+// listas se descarta y la categoría cae al icono de su familia. La clave es la
+// secuencia de code points en hex sin el selector de variación FE0F (ver emojiKey): así el
+// módulo no lleva ningún emoji literal (R-EMOJI) y un emoji con o sin FE0F resuelve igual.
+//   casa 1f3e0 · ali 1f6d2 · res 1f37d · tra 1f68c · coc 1f697 · sal 2764+200d+1fa79 · sus 1f4fa
+//   oci 1f389 · rop 1f455 · reg 1f381 · imp 1f9fe · otr 25ab · billete 1f4b6
+//   curados: huella 1f43e · birrete 1f393 · avion 2708 · bebe 1f476 · portatil 1f4bb
+//   mando 1f3ae · hoja 1f331 · paquete 1f4e6.
+export const LEGACY_EMOJI = {
+  "1f3e0": "casa", "1f6d2": "ali", "1f37d": "res", "1f68c": "tra", "1f697": "coc",
+  "2764-200d-1fa79": "sal", "1f4fa": "sus", "1f389": "oci", "1f455": "rop", "1f381": "reg",
+  "1f9fe": "imp", "25ab": "otr", "1f4b6": "billete",
+  "1f43e": "huella", "1f393": "birrete", "2708": "avion", "1f476": "bebe", "1f4bb": "portatil",
+  "1f3ae": "mando", "1f331": "hoja", "1f4e6": "paquete",
+};
+
+/** Code points en hex, sin FE0F, unidos por «-» (el corazón vendado da "2764-200d-1fa79"). */
+export function emojiKey(str) {
+  const out = [];
+  for (const ch of String(str ?? "")) {
+    const cp = ch.codePointAt(0);
+    if (cp !== 0xfe0f) out.push(cp.toString(16));
+  }
+  return out.join("-");
+}
+
+// Iconos elegibles para una categoría (los mismos que ofrece el selector: icons.js#CAT_ICONS).
+// Se repite la lista de claves en vez de importar icons.js para que este módulo siga sin
+// dependencias; tests/app/category-colors.test.mjs comprueba que coinciden.
+export const CAT_ICON_KEYS = [
+  ...FAMILIES, "huella", "hoja", "libro", "nota", "avion", "estrella",
+  "billete", "bebe", "portatil", "mando", "paquete", "birrete",
 ];
-// Mismos hexes que TEXT_COLORS (misma justificación arriba): POOL_TEXT es la fuente para overrides
-// de usuario y categorías hasheadas, así que debe llevar los mismos valores o esos caminos
-// volverían a renderizar el hex sin aclarar sobre la insignia tintada.
-const POOL_TEXT = {
-  "#6BCB3E": "#8FE05F", "#8B7CF6": "#A99CFA", "#C4B72F": "#D6CB5E", "#C264D9": "#D98CE8",
-  "#22C58B": "#4FDBA6", "#E8A93B": "#F2C463", "#2BD9C9": "#5CE6D8", "#FF7A45": "#FF9A6E",
-  "#2FC4E0": "#63D6EC", "#DE5FA8": "#EA8BC4", "#5B9BFF": "#7FB3FF", "#E85F72": "#F08997",
-};
-// meta.category_style guarda el hex que el usuario eligió. Al resaturar la paleta (reskin v2) esos
-// hexes dejarían de estar en POOL y sanitizeStyleMap los descartaría EN SILENCIO: el usuario
-// perdería el color que eligió sin ver ni un aviso. Este mapa los sube a su equivalente v2 (misma
-// ranura de POOL, mismo tono). Idempotente: un hex nuevo (ya en POOL) no matchea y pasa de largo.
-const LEGACY_COLORS = {
-  "#629D3B": "#6BCB3E", "#6B61C2": "#8B7CF6", "#A09600": "#C4B72F", "#9153AB": "#C264D9",
-  "#15AC7D": "#22C58B", "#986603": "#E8A93B", "#12A7A7": "#2BD9C9", "#B45018": "#FF7A45",
-  "#00A1CB": "#2FC4E0", "#AA4985": "#DE5FA8", "#4F94E9": "#5B9BFF", "#B64656": "#E85F72",
-};
-// 8 iconos curados ofrecidos en el selector de icono de categoría (pantalla de edición).
-export const CURATED_ICONS = ["🐾", "🎓", "✈️", "👶", "💻", "🎮", "🌱", "📦"];
+const ICON_SET = new Set(CAT_ICON_KEYS);
 
-// djb2 sobre el id de categoría → índice estable 0..11 en POOL. Determinista y sin dependencias:
-// misma categoría, mismo color, en cualquier dispositivo/sesión.
+export const isFamily = (fam) => typeof fam === "string" && FAMILY_SET.has(fam);
+export const isCatIcon = (key) => typeof key === "string" && ICON_SET.has(key);
+
+function legacyColorToFamily(color) {
+  if (typeof color !== "string") return null;
+  const hex = color.trim().replace(/^#/, "").toLowerCase();
+  const v2 = Object.hasOwn(LEGACY_COLORS, hex) ? LEGACY_COLORS[hex] : hex;
+  return Object.hasOwn(POOL_TO_FAMILY, v2) ? POOL_TO_FAMILY[v2] : null;
+}
+
+function toIconKey(icon) {
+  if (typeof icon !== "string") return null;
+  if (isCatIcon(icon)) return icon;
+  const k = emojiKey(icon);
+  return Object.hasOwn(LEGACY_EMOJI, k) ? LEGACY_EMOJI[k] : null;
+}
+
+// djb2 sobre el id de categoría → ranura estable 0..11. Determinista y sin dependencias: misma
+// categoría, misma familia, en cualquier dispositivo. Mismo algoritmo y módulo que el antiguo
+// POOL, así que una categoría de usuario conserva su ranura.
 export function hashIndex(id) {
   let h = 5381;
   for (const ch of String(id)) h = ((h * 33) ^ ch.codePointAt(0)) >>> 0;
-  return h % POOL.length;
+  return h % FAMILIES.length;
 }
 
-// Defensa en profundidad (CRITICAL, review final): meta.category_style llega de un import xlsx sin
-// más validación que "es JSON válido" (parseStyle) — un color/icono corrupto (p.ej. un payload de
-// XSS) pasaría intacto a colorForCategory/iconForCategory y de ahí, SIN escapar, a los template
-// strings de categorias.js (style="--cat:${color}" / contenido ${icon}). sanitizeStyleMap descarta
-// en SILENCIO (sin throw: esto es la última línea de defensa para datos que ya pudieron entrar sin
-// pasar por setCategoryStyle, que sí lanza) cualquier entrada que no encaje en las listas cerradas.
+// Defensa en profundidad: meta.category_style llega de un import xlsx sin más validación que «es
+// JSON válido». sanitizeStyleMap traduce el formato antiguo y descarta EN SILENCIO (sin throw: es la
+// última línea de defensa para datos que no pasaron por repo.setCategoryStyle, que sí lanza) todo
+// lo que no encaje en las listas cerradas. Siempre devuelve el formato nuevo {fam?, icon?}.
 function sanitizeStyleMap(map) {
   if (!map || typeof map !== "object" || Array.isArray(map)) return {};
-  const allowedIcons = new Set([...CURATED_ICONS, ...Object.values(CATEGORY_ICONS)]);
   const out = {};
   for (const [k, v] of Object.entries(map)) {
-    // JSON.parse crea "__proto__" como own property normal (no como el prototipo real) — pero
-    // out[k]= con k="__proto__" SÍ dispara el setter especial de Object.prototype y envenenaría el
-    // prototipo de `out`. Saltarla evita tocar out.__proto__ por completo.
+    // out["__proto__"]= dispararía el setter de Object.prototype: se salta la clave.
     if (k === "__proto__") continue;
     if (!v || typeof v !== "object") continue;
     const entry = {};
-    // Migrar ANTES del filtro: un hex de la paleta v1 no está en el POOL v2 y se descartaría en
-    // silencio (ver LEGACY_COLORS arriba) si no se sube primero a su sucesor.
-    const color = typeof v.color === "string" ? (LEGACY_COLORS[v.color] ?? v.color) : v.color;
-    if (typeof color === "string" && POOL.includes(color)) entry.color = color;
-    if (typeof v.icon === "string" && allowedIcons.has(v.icon)) entry.icon = v.icon;
+    const fam = isFamily(v.fam) ? v.fam : legacyColorToFamily(v.color);
+    if (fam) entry.fam = fam;
+    const icon = toIconKey(v.icon);
+    if (icon) entry.icon = icon;
     if (Object.keys(entry).length > 0) out[k] = entry;
   }
   return out;
 }
 
-// Overrides de usuario por categoría raíz: { [catId]: { color?, icon? } }. Se inicializan en el
-// boot desde meta.category_style (ver parseStyle) y los reutiliza la pantalla de edición.
+// Overrides de usuario por categoría raíz: { [catId]: { fam?, icon? } }. Se inicializan en el boot
+// desde meta.category_style (ver parseStyle) y los refresca repo.setCategoryStyle.
 let style = {};
 export function initCategoryStyle(map) {
   style = sanitizeStyleMap(map);
 }
 
-// JSON.parse seguro para meta.category_style: cualquier fallo (valor ausente, corrupto, no-objeto)
-// vuelve a {} en vez de romper el boot. sanitizeStyleMap aplica el saneo de datos (Item 1) sobre
-// cualquier JSON que sí parsee pero traiga colores/iconos fuera de las listas cerradas.
+/** JSON.parse seguro de meta.category_style, ya saneado y en formato nuevo. Cualquier fallo
+ *  (ausente, corrupto, no objeto) devuelve {}. */
 export function parseStyle(raw) {
   try {
-    const parsed = JSON.parse(raw);
-    return sanitizeStyleMap(parsed);
+    return sanitizeStyleMap(JSON.parse(raw));
   } catch {
     return {};
   }
 }
 
-// A1 (review de seguridad): un category_id cuyo parent_id apunta a sí mismo (o un ciclo A↔B) puede
-// entrar en la DB vía un xlsx importado a mano (validateImport hoy solo comprueba que el padre
-// exista — Task 3 cierra esa vía de entrada). rootOf corre en CADA render de Inicio/Movimientos, así
-// que sin guard un ciclo ya presente en la DB cuelga la pestaña en cada carga: este Set de
-// visitados es la única vía de recuperación una vez el ciclo ya está guardado.
+// Un ciclo de parent_id (xlsx importado a mano) no debe colgar la pestaña: Set de visitados.
 export function rootOf(catId, byId) {
-  let c = byId[catId];
+  let c = own(byId, catId);
   const seen = new Set();
   while (c && c.parent_id && !seen.has(c.id)) {
     seen.add(c.id);
-    c = byId[c.parent_id];
+    c = own(byId, c.parent_id);
   }
   return c ? c.id : catId;
 }
 
-// Precedencia (Decisión 2): override de usuario > seed de ROOT_COLORS > neutro (cat-otros) > hash.
+// Búsquedas por clave con Object.hasOwn: un id como "toString" o "constructor" no debe resolver a
+// lo que hereda de Object.prototype (style, ROOT_FAMILY y byId son objetos planos).
+const own = (obj, k) => (obj && Object.hasOwn(obj, k) ? obj[k] : undefined);
+const isIncomeRoot = (root, byId) => own(byId, root)?.flow === "income" || INCOME_SEEDS.has(root);
+
+/** Familia de una categoría (la de su raíz: una subcategoría nunca tiene color propio, §6).
+ *  null para «sin categoría» ("") y para los ingresos (C9): ambos se pintan neutros en --well.
+ *  Precedencia: override de category_style > ROOT_FAMILY > FAMILIES[hashIndex(raíz)]. */
+export function familyForCategory(catId, byId) {
+  if (!catId) return null;
+  const root = rootOf(catId, byId ?? {});
+  if (!root || isIncomeRoot(root, byId)) return null;
+  return own(style, root)?.fam ?? own(ROOT_FAMILY, root) ?? FAMILIES[hashIndex(root)];
+}
+
+/** Clave de icono (icons.js#catIcon), nunca un emoji. Ingresos → "income"; «sin categoría» → "otr".
+ *  Precedencia: override > icono de la raíz sembrada > icono de su familia. Cambiar la familia de
+ *  una raíz sembrada no le cambia el icono. */
+export function iconForCategory(catId, byId) {
+  if (!catId) return "otr";
+  const root = rootOf(catId, byId ?? {});
+  if (isIncomeRoot(root, byId)) return "income";
+  return own(style, root)?.icon ?? own(ROOT_FAMILY, root) ?? familyForCategory(catId, byId) ?? "otr";
+}
+
+/** "fam-casa"; cadena vacía para null o una clave desconocida (nunca una clase inventada). */
+export const famClass = (fam) => (isFamily(fam) ? `fam-${fam}` : "");
+
+/** Nombre del token de una familia: famToken("casa", "b") → "--f-casa-b" (part: t tinte, b barra,
+ *  x texto). Para los pocos sitios que necesitan el color fuera de una clase `.fam-*`: el PDF
+ *  (pdf-palette.js) y el puente de abajo. */
+export const famToken = (fam, part = "b") => `--f-${fam}-${part}`;
+
+// ---- Puente para las pantallas aún en PENDIENTES ---------------------------------------------
+// Las pantallas sin migrar interpolan un color en `--cat:` o `background:`. Hasta que cada una pase
+// a `.fam-*` (S1-S13), reciben el token de la familia como var(), nunca un hex.
 export const colorForCategory = (catId, byId) => {
-  const root = rootOf(catId, byId);
-  const override = style[root];
-  if (override?.color) return override.color;
-  if (ROOT_COLORS[root]) return ROOT_COLORS[root];
-  if (NEUTRAL_IDS.has(root)) return DEFAULT_COLOR;
-  return POOL[hashIndex(root)];
-};
-
-// Mismo orden que colorForCategory. Con override de usuario el tinte SIEMPRE sale del pool
-// (el color elegido en el selector es del pool): POOL_TEXT[color], o DEFAULT_TEXT_COLOR si datos
-// corruptos lo dejaran fuera del pool.
-export const textColorForCategory = (catId, byId) => {
-  const root = rootOf(catId, byId);
-  const override = style[root];
-  if (override?.color) return POOL_TEXT[override.color] ?? DEFAULT_TEXT_COLOR;
-  if (TEXT_COLORS[root]) return TEXT_COLORS[root];
-  if (NEUTRAL_IDS.has(root)) return DEFAULT_TEXT_COLOR;
-  return POOL_TEXT[POOL[hashIndex(root)]];
-};
-
-// El icono no hashea: sin override ni seed, cae al icono por defecto (▫️), igual que siempre.
-export const iconForCategory = (catId, byId) => {
-  const root = rootOf(catId, byId);
-  const override = style[root];
-  if (override?.icon) return override.icon;
-  return CATEGORY_ICONS[root] ?? "▫️";
+  const fam = familyForCategory(catId, byId);
+  return fam ? `var(${famToken(fam, "b")})` : "var(--idle)";
 };
