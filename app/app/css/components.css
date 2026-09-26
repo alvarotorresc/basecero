@@ -519,6 +519,10 @@
 .disp-chart-line.is-area,
 .disp-chart-line.is-dot { fill: var(--disp-text); stroke: none; }
 circle.disp-today { fill: var(--disp-text); stroke: var(--disp); }
+/* Línea del periodo (charts.js#periodChartSvg, B-Home/B-Inicio-Vacio): la guía discontinua del
+   ritmo parejo y los rótulos «hoy» / «día 30» en --disp-dim; la línea y el punto, en ámbar (C2). */
+.disp-chart-guide { stroke: var(--disp-dim); stroke-opacity: .5; stroke-dasharray: 3 5; }
+.disp-chart-label { fill: var(--disp-dim); font-family: var(--font-mono); font-size: var(--fs-12); }
 /* Eje de meses: cada etiqueta centrada bajo su punto (los puntos van de PAD=--sp-4 a ancho−PAD). */
 .disp-chart-axis {
   display: grid;
