@@ -30,31 +30,15 @@ main#screen {
   min-height: 100dvh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 20px var(--pad-screen) calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 88px);
+  padding: var(--sp-12) var(--sp-16) calc(84px + env(safe-area-inset-bottom, 0px) + var(--sp-24));
 }
 
 /* ===== componentes base (docs/design/final-v2/SISTEMA.md) =====
    .card ya no es una tarjeta: SISTEMA.md §1 principio 3 — se agrupa con aire y filete, no con caja.
    Se mantiene la clase (54 markups la emiten) pero deja de pintar nada. */
 .card { background: transparent; border: 0; border-radius: var(--r-0); padding: 0; }
-.btn-primary {
-  background: var(--accent); color: var(--accent-ink);
-  border: 0; border-radius: var(--r-pill);
-  height: 52px; padding: 0 28px; width: 100%;
-  font: 600 16px var(--font-sans); cursor: pointer;
-}
 .text-red { color: var(--danger); }
 .text-green { color: var(--pos); }
-.btn-secondary {
-  background: transparent;
-  color: var(--ink);
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--r-pill);
-  height: 46px;
-  padding: 0 28px;
-  font: 600 16px var(--font-sans);
-  cursor: pointer;
-}
 
 .section-title {
   font: var(--t-section);
@@ -67,38 +51,26 @@ main#screen {
   border: 0;
 }
 
-/* ===== cabecera de pantalla ===== */
+/* ===== cabecera de pantalla (PENDIENTE de migrar a ui.js#rootHeaderHtml) ===== */
+/* Clase vieja que siguen emitiendo Ajustes, Patrimonio y Movimientos (×2); se restila con los
+   valores de la cabecera de raíz B (components.css .root-header) hasta que sus pantallas migren
+   (S1-S5) y entonces se borra. */
 .screen-header {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  margin-bottom: 16px;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-12);
 }
 .screen-header h1 {
-  font: var(--t-title);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-24);
+  line-height: var(--lh-title);
   letter-spacing: -.01em;
 }
-.screen-header p {
-  font: var(--t-label);
-  color: var(--ink-3);
-}
+.screen-header p { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
 
-/* ===== botón icono (p.ej. cerrar pantalla) ===== */
-.icon-btn {
-  width: 44px;
-  height: 44px;
-  flex-shrink: 0;
-  border-radius: var(--r-circle);
-  background: transparent;
-  border: 1px solid var(--hairline-strong);
-  color: var(--ink);
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
 
 /* ===== enlace de texto que en realidad es un <button> ===== */
 /* Pies y cabeceras tocables de Inicio: reset total del chrome nativo del botón + la tipografía de
@@ -198,80 +170,7 @@ main#screen {
   color: var(--ink-3);
 }
 
-/* ===== barra de pestañas + FAB ===== */
-/* ===== tab bar + FAB (SISTEMA.md §4.14) ===== */
-.tabbar {
-  position: fixed;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 480px;
-  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
-  padding: 0 0 env(safe-area-inset-bottom, 0px);
-  display: flex;
-  align-items: stretch;
-  background: var(--surface);
-  border-top: 1px solid var(--hairline);
-  z-index: 20;
-}
-
-.tab {
-  flex: 1 1 0;
-  min-width: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background: none;
-  border: 0;
-  padding: 0;
-  color: var(--ink-3);
-  font-size: 10px;
-  font-weight: 500;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.tab svg {
-  width: 24px;
-  height: 24px;
-  stroke: currentColor;
-  fill: none;
-}
-.tab.active {
-  color: var(--accent);
-  font-weight: 600;
-}
-.tab.active svg { stroke-width: 2; }
-
-/* Sigue siendo hijo de <nav class="tabbar">: body.onboarding .fab { display:none } (más abajo)
-   sigue funcionando sin tocarlo, aunque flote fuera del flujo de la barra. */
-.fab {
-  position: fixed;
-  flex-shrink: 0;
-  width: 56px;
-  height: 56px;
-  border-radius: var(--r-circle);
-  background: var(--accent);
-  color: var(--accent-ink);
-  border: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
-  line-height: 1;
-  font-weight: 400;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  box-shadow: var(--shadow-float);
-  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 16px);
-  /* position:fixed se resuelve contra el viewport, no contra el body de 480px: sin el max(),
-     en escritorio el FAB se iría al borde de la ventana en vez de quedarse junto a la columna. */
-  right: max(18px, calc(50% - 240px + 18px));
-}
-.fab:active { background: color-mix(in srgb, var(--accent) 88%, var(--bg)); }
+/* barra de pestañas y botón de añadir: components.css (sección Chrome, PR-05) */
 
 /* ===== chips de categoría ===== */
 .chips {
@@ -701,17 +600,15 @@ body:has(> .banner-aviso) main#screen { margin-top: 46px; }
 .budget-input[type="number"] { -moz-appearance: textfield; }
 
 /* chrome oculto durante el asistente de periodo (onboarding y cierre normal, ver main.js nav()) */
-body.onboarding .tabbar,
-body.onboarding .fab { display: none; }
+body.onboarding .tabbar { display: none; }
 
 /* chrome oculto en cualquier subpantalla (SISTEMA.md §4.14: solo Inicio/Movimientos/Patrimonio/
    Ajustes llevan tab bar). La clase la pone/quita back.js (createBackStack#syncChrome) exactamente
-   mientras la pila de subpantallas tenga alguna entrada — ver el comentario ahí. Con el FAB fuera,
-   main#screen ya no necesita reservarle sitio abajo: el hueco del padding original (tabbar + FAB +
+   mientras la pila de subpantallas tenga alguna entrada — ver el comentario ahí. Sin la barra,
+   main#screen ya no necesita reservarle sitio abajo: el hueco del padding original (barra +
    holgura) se cambia por uno mucho menor, solo para que los botones «Guardar»/«Borrar» del final de
    los formularios no queden pegados al borde de la pantalla, respetando el notch inferior. */
-body.subscreen .tabbar,
-body.subscreen .fab { display: none; }
+body.subscreen .tabbar { display: none; }
 body.subscreen main#screen {
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--s-6));
 }
@@ -775,12 +672,7 @@ body.subscreen main#screen {
 .shake { animation: bc-shake 0.4s; }
 
 /* ===== accesibilidad (Task 2 P2) ===== */
-/* foco visible global: reemplaza los `outline: none` de .field input/select y .budget-input
-   eliminados más arriba — todo elemento enfocable por teclado queda con anillo visible. */
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
+/* foco visible global: components.css (sección Chrome, PR-05), con var(--focus). */
 
 /* ===== toast de confirmación (toast.js) ===== */
 /* Un solo nodo, colgado de <body>: por encima de la tabbar (z-index 20) y por debajo de la franja
@@ -968,30 +860,7 @@ body.subscreen main#screen {
 
 /* ===================== P0 · Transversal (SISTEMA.md §4.2, §4.6, §4.7, §1) ===================== */
 
-/* ===== cabecera de subpantalla (SISTEMA.md §4.2 · helper ui.js#subHeaderHtml) ===== */
-/* Tres celdas 44 / flex:1 / 44: el título queda centrado de verdad, lleve acción a la derecha o
-   un hueco. Va a sangre —filete inferior de borde a borde y pegada al techo— con márgenes
-   negativos que compensan el `padding: 20px var(--pad-screen)` de main#screen (app.css:21),
-   igual que .limit-band. NO reutiliza .screen-header: esa es la cabecera de PESTAÑA (§4.1). */
-.sub-header {
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  margin: -20px calc(var(--pad-screen) * -1) var(--s-5);
-  padding: 18px var(--pad-screen);
-  border-bottom: 1px solid var(--hairline);
-}
-.sub-header-body { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-/* 17px sans 600 sin token propio, igual que .modal-title: §2.3 no publica ese tamaño y no se
-   amplía la escala del sistema por un solo uso (ver D2 de la spec). */
-.sub-header-title { font: var(--t-section); font-size: 17px; color: var(--ink); margin: 0; }
-.sub-header-sub { font: var(--t-micro); font-size: 12px; color: var(--ink-3); text-align: center; }
-.sub-header-slot { width: 44px; height: 44px; flex-shrink: 0; }
-/* Variante de asistente (PeriodoNuevo.dc.html:24, Onboarding2-4): título --t-title a la
-   izquierda, subtítulo --t-label, sin hueco derecho. */
-.sub-header.is-start .sub-header-body { align-items: flex-start; }
-.sub-header.is-start .sub-header-title { font: var(--t-title); letter-spacing: -.01em; }
-.sub-header.is-start .sub-header-sub { font: var(--t-label); text-align: left; }
+/* cabecera de subpantalla: components.css .sub-header (sección Chrome, PR-05) */
 
 /* ===== metadatos con divisor de 1px (SISTEMA.md §1 · helper ui.js#metaHtml) ===== */
 /* Sustituye al punto medio, que §1 prohíbe explícitamente. La altura del divisor es la del
@@ -1000,19 +869,7 @@ body.subscreen main#screen {
 .meta-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font: var(--t-label); color: var(--ink-3); }
 .meta-sep { width: 1px; height: 11px; background: var(--hairline-strong); flex-shrink: 0; }
 
-/* ===== botón destructivo de pantalla (SISTEMA.md §4.7) ===== */
-/* 46px. El del MODAL es .modal-danger (52px, app.css:881): son dos alturas distintas porque §4.12
-   le da al destructivo del modal la altura del primario, y §4.7 al de pantalla la del secundario. */
-.btn-danger {
-  height: 46px;
-  width: 100%;
-  border-radius: var(--r-pill);
-  background: var(--danger-tint);
-  color: var(--danger);
-  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
-  font: 600 15px var(--font-sans);
-  cursor: pointer;
-}
+/* botón destructivo de entrada (.btn-danger): components.css (sección Chrome, PR-05) */
 
 /* .amount-hero es el TOTAL DE SECCIÓN de §2.3 (34px). El número héroe de una pantalla —el saldo
    de Inicio, el neto de Liquidar, el patrimonio, el pendiente de Recurrentes— es 56px: §2.3 lo
