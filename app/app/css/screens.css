@@ -816,8 +816,18 @@
 /* === fin: inicio === */
 
 /* === pantalla: liquidar === */
-/* B-Liquidar / BD-Liquidar. Pila de bloques a 12 (§8). */
-.liq { display: flex; flex-direction: column; gap: var(--sp-12); padding-bottom: var(--sp-24); }
+/* B-Liquidar / BD-Liquidar. Pila de bloques a 12 (§8), y el primario abajo del todo (margin-top
+   auto): la pila ocupa al menos el alto de la pantalla menos cabecera y márgenes de main#screen. */
+.sub-header:has(+ .liq) { margin-bottom: var(--sp-12); }
+.liq {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  min-height: calc(100dvh - 96px - env(safe-area-inset-bottom, 0px));
+}
+.liq > .btn-primary { margin-top: auto; }
+/* Display del original: relleno 18 20 16 y pila de 6. */
+.liq .disp { padding: 18px var(--sp-20) var(--sp-16); gap: 6px; }
 
 /* Pie del Display: A tu favor / En contra, con el filete --disp-line encima; cifras en --disp-ink (C2). */
 .liq-split {
@@ -834,11 +844,15 @@
   color: var(--disp-dim);
 }
 
-.liq-account { display: flex; flex-direction: column; gap: var(--sp-8); }
+.liq-account { display: flex; flex-direction: column; gap: 6px; }
 .liq-account-label { padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
-.liq .ctl-segmented [role="radio"] { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* Tres cuentas o más: chips con la muestra de la familia, que envuelven de línea. */
-.liq-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+.liq .ctl-segmented [role="radio"] { min-width: 0; gap: 6px; overflow: hidden; text-overflow: ellipsis; }
+/* Muchas cuentas o nombres largos: el Segmented envuelve de línea, cada cuenta a su ancho (y
+   repartiendo lo que sobra), en vez de recortar el nombre. En varias líneas (is-wrapped, wire())
+   el pozo deja la píldora por el radio grande. */
+.liq-accounts-wrap .ctl-segmented { flex-wrap: wrap; }
+.liq-accounts-wrap .ctl-segmented [role="radio"] { flex: 1 1 auto; }
+.liq-accounts-wrap .ctl-segmented.is-wrapped { border-radius: var(--radius-lg); }
 
 /* Un solo contenedor --surface con los dos grupos; filas de 60 con filete que empieza tras la baldosa. */
 .liq-list {
@@ -849,14 +863,18 @@
   background: var(--surface);
   border: 1px solid var(--border);
 }
-.liq-group { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); padding: 0 var(--sp-8) var(--sp-4); }
-.liq-row + .liq-group { margin-top: var(--sp-4); padding-top: var(--sp-12); border-top: 1px solid var(--border); }
-.liq-group-title { margin: 0; font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+/* Grupos «A tu favor» / «En contra»: título en Unbounded 13 y tinta, total mono 13/600 dim. */
+.liq-group { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); padding: 0 var(--sp-8) var(--sp-2); }
+.liq-row + .liq-group { margin-top: var(--sp-4); padding-top: 10px; border-top: 1px solid var(--border); }
+.liq-group-title { margin: 0; font-family: var(--font-display); font-size: var(--fs-13); font-weight: 700; letter-spacing: -0.01em; line-height: var(--lh-title); color: var(--text); }
 .liq-group-total { font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); white-space: nowrap; }
 .liq-row { display: flex; align-items: center; gap: var(--sp-8); min-height: 60px; }
+/* Baldosa de 36 con icono 18 sobre el tinte (B-Liquidar). */
+.liq-row .ent-tile { width: 36px; height: 36px; }
+.liq-row .ent-tile svg { width: 18px; height: 18px; }
 .liq-amount { flex: none; padding-right: var(--sp-4); font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
-/* 44 de casilla + 8 + 40 de baldosa + 8. */
-.liq-sep { height: 1px; margin-left: 100px; background: var(--border); }
+/* 44 de casilla + 8 + 36 de baldosa + 8. */
+.liq-sep { height: 1px; margin-left: 96px; background: var(--border); }
 
 /* === fin: liquidar === */
 
