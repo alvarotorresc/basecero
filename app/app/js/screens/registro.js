@@ -69,6 +69,8 @@ function limitBandHtml(warning) {
 /** Ancho del input del importe en `ch` (la mono es tabular: un carácter, un ch). Así el símbolo de
  *  la moneda va pegado a la cifra, como en B-Gasto, en vez de al otro extremo del Display. */
 const amountWidth = (raw) => `${Math.max(1, String(raw ?? "").length)}ch`;
+/** Cifra del Display de Crear gasto: 48, la de B-Gasto (displayHtml `size` libre, --disp-fs). */
+const AMOUNT_PX = 48;
 
 /** Etiqueta del primario: «Guardar gasto de 18,50 €» (cifra en mono) solo para gasto con importe.
  *  HTML: el importe va escapado dentro de su <span>. */
@@ -274,24 +276,31 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
   const naturalAllowed = () => state.tipo === "expense" || state.tipo === "income";
   const micAvailable = () => naturalAllowed() && !!speech?.supported && !state.natural.micOff;
 
-  /** Pie del Display (F-48, B-Gasto): la caja de lenguaje natural. Vacía, es un input con «o dicta
-   *  «12,50 en el bar»» de placeholder; mientras el micro escucha, «Escuchando…»; con una frase ya
-   *  interpretada, la frase entre comillas y «Borrar». */
-  function displayFootHtml() {
-    if (!naturalAllowed()) return "";
-    const { text } = state.natural;
-    let inner;
-    if (state.natural.listening) {
-      inner = `<span class="reg-nat-status">${t("registro.natural.micListening")}</span>`;
-    } else if (!text.trim()) {
-      const ph = micAvailable() ? t("registro.natural.placeholder") : t("registro.natural.placeholderNoMic");
-      inner = `<input type="text" id="reg-nat-input" class="reg-nat-input" value="${escAttr(text)}" placeholder="${escAttr(ph)}" aria-label="${escAttr(ph)}" autocomplete="off">`;
-    } else {
-      const understood = naturalChips().length > 0;
-      inner = `<span class="reg-nat-quote">${understood ? `«${escHtml(text)}»` : escHtml(t("registro.natural.notUnderstood"))}</span>
+  /** Pie del Display (B-Gasto): a la izquierda el comercio (14/600 en tinta del Display; input con
+   *  el formulario completo, texto fijo plegado) y a la derecha la caja de lenguaje natural, que en
+   *  reposo es la pista «o dicta «12,50 en el bar»» 12/500 dim. Mientras el micro escucha,
+   *  «Escuchando…»; con una frase ya interpretada, la frase entre comillas y «Borrar». */
+  function displayFootHtml(open) {
+    const merchant = open
+      ? `<input type="text" id="reg-merchant" class="reg-merchant-input" list="reg-merchants" value="${escAttr(state.merchant)}"
+          placeholder="${escAttr(t("registro.merchant.placeholder"))}" aria-label="${escAttr(t("common.merchant"))}" autocomplete="off">`
+      : (state.merchant.trim() ? `<span class="reg-merchant-text">${escHtml(state.merchant.trim())}</span>` : "");
+    let nat = "";
+    if (naturalAllowed()) {
+      const { text } = state.natural;
+      if (state.natural.listening) {
+        nat = `<span class="reg-nat-status">${t("registro.natural.micListening")}</span>`;
+      } else if (!text.trim()) {
+        const ph = micAvailable() ? t("registro.natural.placeholder") : t("registro.natural.placeholderNoMic");
+        nat = `<input type="text" id="reg-nat-input" class="reg-nat-input" value="${escAttr(text)}" placeholder="${escAttr(ph)}" aria-label="${escAttr(ph)}" autocomplete="off">`;
+      } else {
+        const understood = naturalChips().length > 0;
+        nat = `<span class="reg-nat-quote">${understood ? `«${escHtml(text)}»` : escHtml(t("registro.natural.notUnderstood"))}</span>
         <button type="button" id="reg-nat-reset" class="reg-nat-reset">${t("registro.natural.reset")}</button>`;
+      }
     }
-    return `<div class="reg-disp-foot">${inner}</div>`;
+    if (!merchant && !nat) return "";
+    return `<div class="reg-disp-foot">${merchant ? `<span class="reg-foot-left">${merchant}</span>` : ""}${nat ? `<span class="reg-foot-right">${nat}</span>` : ""}</div>`;
   }
 
   /** Chips de lo que el parser SÍ entendió (spec: "lo que el parser no entendió simplemente no
@@ -467,8 +476,8 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     </div>`;
   }
 
-  /** Fila «Más» del registro rápido plegado (Registro v2 §4.3, anatomía B de fila de 60): «Más»
-   *  15/600, el resumen de registro-mode.js#foldedSummaryParts con el divisor de metaHtml (nunca un
+  /** Fila «Más» del registro rápido plegado (Registro v2 §4.3), con la receta de las píldoras de 48
+   *  de B-Gasto: «Más» 14/600, el resumen de registro-mode.js#foldedSummaryParts con el divisor de metaHtml (nunca un
    *  «·») y el chevron. Despliega cuenta, fecha, «Con Marta», etiqueta, foto y nota. */
   function moreRowHtml() {
     const accountName = partnerPaid() ? "" : (accounts.find((a) => a.id === state.accountId)?.name ?? "");
@@ -484,20 +493,21 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
         <span class="reg-more-label">${t("registro.more.toggle")}</span>
         ${metaHtml(parts, { cls: "reg-more-sum" })}
       </span>
-      ${icon("chevronDown", { size: 20, cls: "reg-pill-chev" })}
+      ${icon("chevronDown", { size: 16, cls: "reg-pill-chev" })}
     </button>`;
   }
 
-  /** Tarjeta de la categoría elegida (§9, sin borde): nombre de la hoja y, debajo, «La que usas en
-   *  Bar Pepe» si la ha puesto la memoria de comercios, o la ruta de su familia. */
+  /** Tarjeta de la categoría elegida (B-Gasto, chosenCategoryHtml `pick`): borde -b, «Restauración ›
+   *  Bares y cafés» 15/700 y, debajo, «La que usas en Bar Pepe» si la ha puesto la memoria de
+   *  comercios; la marca de aplicada al final. */
   function chosenHtml() {
     const c = state.categoryId ? byId[state.categoryId] : null;
     if (!c) return "";
     const root = rootOf(c.id, byId);
+    const name = root !== c.id && byId[root] ? `${byId[root].name} › ${c.name}` : c.name;
     const path = state.merchantRemembered && state.merchant.trim()
-      ? t("registro.chosen.remembered", { merchant: state.merchant.trim() })
-      : (root !== c.id ? (byId[root]?.name ?? "") : "");
-    return chosenCategoryHtml({ fam: catFam(c.id), icon: iconForCategory(c.id, byId), name: c.name, path });
+      ? t("registro.chosen.remembered", { merchant: state.merchant.trim() }) : "";
+    return chosenCategoryHtml({ fam: catFam(c.id), icon: iconForCategory(c.id, byId), name, path, variant: "pick", check: true });
   }
 
   /** Píldora de cuenta (B-Gasto): muestra de 10 en la familia de la cuenta (C8) + nombre + chevron.
@@ -656,19 +666,17 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
       <section class="disp reg-disp">
         <div class="reg-disp-main">
           <div class="reg-disp-fields">
-            ${open ? `<input type="text" id="reg-merchant" class="reg-merchant-input" list="reg-merchants" value="${escAttr(state.merchant)}"
-              placeholder="${escAttr(t("registro.merchant.placeholder"))}" aria-label="${escAttr(t("common.merchant"))}" autocomplete="off">`
-              : `<span class="disp-label">${escHtml(state.merchant.trim() || t("common.amount"))}</span>`}
-            <div class="num disp-value disp-value-xl reg-amount">
+            <span class="disp-label">${escHtml(t("common.amount"))}</span>
+            <div class="num disp-value disp-value-free reg-amount" style="--disp-fs:${AMOUNT_PX}px">
               ${state.tipo === "adjustment" ? `<button type="button" class="reg-sign" id="reg-sign" aria-label="${escAttr(t("common.changeSign"))}">${state.adjustmentSign === "-" ? "−" : "+"}</button>` : ""}
               <input type="text" inputmode="decimal" id="reg-raw" class="reg-amount-input" value="${escAttr(state.raw)}" placeholder="0" autocomplete="off"
                 aria-label="${escAttr(t("common.amount"))}" style="width:${amountWidth(state.raw)}">
               <span class="reg-amount-cur" aria-hidden="true">${escHtml(currencySymbol())}</span>
             </div>
           </div>
-          ${micAvailable() && !state.natural.text.trim() && !state.natural.listening ? `<button type="button" class="reg-mic" id="reg-nat-mic" aria-label="${escAttr(t("registro.natural.mic"))}">${icon("mic", { size: 22 })}</button>` : ""}
+          ${micAvailable() && !state.natural.text.trim() && !state.natural.listening ? `<button type="button" class="reg-mic disp-amber" id="reg-nat-mic" aria-label="${escAttr(t("registro.natural.mic"))}">${icon("mic", { size: 22 })}</button>` : ""}
         </div>
-        ${displayFootHtml()}
+        ${displayFootHtml(open)}
       </section>
       <datalist id="reg-merchants">
         ${merchantOptions.map((e) => `<option value="${escAttr(e.display)}"></option>`).join("")}

@@ -29,7 +29,8 @@ test("ticketHtml B: título, tipo, ficha de 28 con familia, muestra de cuenta y 
   const html = ticketHtml(BASE);
   assert.match(html, /recibo-title">Bar Pepe</);
   assert.match(html, /recibo-sub">Gasto</);
-  assert.match(html, /class="ent-badge fam-res"/);
+  assert.match(html, /class="ent-badge ent-badge-36 fam-res"/);
+  assert.match(html, /recibo-stamp-date is-fam-ink/, "la fecha del sello, en el color del sello (B-Recibo)");
   assert.match(html, /recibo-swatch fam-tra/);
   assert.match(html, /class="recibo-stamp fam-res"/);
 });

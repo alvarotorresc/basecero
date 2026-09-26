@@ -847,6 +847,10 @@ circle.disp-today { fill: var(--disp-text); stroke: var(--disp); }
 .ent-badge-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ent-badge-income { background: var(--well); color: var(--text); }
 .ent-badge-tag { background: var(--raised); color: var(--text); border: 1px solid var(--border); }
+/* Ficha de 36 (badgeHtml `size:36`, B-Recibo; F-41 retirada, Álvaro 2026-09-27): icono 16 en un
+   círculo --raised de 26, texto 13/600. */
+.ent-badge-36 { min-height: 36px; gap: var(--sp-8); padding: 0 14px 0 5px; font-size: var(--fs-13); }
+.ent-badge-ico { flex: none; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-pill); background: var(--raised); }
 
 /* --- Tarjeta de categoría elegida (§9, F-42): tinte, --radius-lg, SIN borde; baldosa 40 sobre
    --chip; nombre 15/600 arriba y ruta 12/500 --fx debajo; chevron dim. --- */
@@ -877,6 +881,9 @@ button.ent-chosen { cursor: pointer; }
 .ent-chosen-detail .ent-name { font-size: var(--fs-17); font-weight: 700; }
 .ent-chosen-pick.ent-neutral,
 .ent-chosen-detail.ent-neutral { border-color: transparent; }
+/* Marca de «aplicada» (chosenCategoryHtml `check`, B-Gasto): check de 22 al final, en -x. */
+.ent-chosen-check { flex: none; display: flex; color: var(--fx); }
+.ent-chosen.ent-neutral .ent-chosen-check { color: var(--text-dim); }
 
 /* --- Chip de filtro (§9, B-Movimientos-Filtros): 44 píldora. Con familia: tinte + muestra 10
    --fb + 14/600 --text; neutro: --raised 14/500; etiqueta: + borde e icono (C10). --- */

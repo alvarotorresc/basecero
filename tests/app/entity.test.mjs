@@ -35,6 +35,19 @@ test("tileHtml: tinte por familia, 32 compacta, --chip sobre tinte y neutra sin 
   assert.ok(!tileHtml({ fam: "inventada" }).includes("fam-"), "una clave desconocida no inventa clase");
 });
 
+test("badgeHtml: size 36 (B-Recibo) lleva el icono de 16 en su círculo; por defecto, la de 28", () => {
+  const def = badgeHtml({ fam: "res", label: "Bares" });
+  assert.doesNotMatch(def, /ent-badge-36|ent-badge-ico/);
+  assert.match(def, /width="14"/);
+  const big = badgeHtml({ fam: "res", icon: "res", label: "Restauración › Bares y cafés", size: 36 });
+  assert.match(big, /^<span class="ent-badge ent-badge-36 fam-res"><span class="ent-badge-ico"><svg[^>]*width="16"/);
+  assert.match(big, /ent-badge-label">Restauración › Bares y cafés</);
+  // C9: el ingreso sigue neutro también a 36.
+  assert.match(badgeHtml({ income: true, fam: "res", label: "Nómina", size: 36 }), /class="ent-badge ent-badge-36 ent-badge-income"/);
+  assert.equal(decl(".ent-badge-36", "min-height"), "36px");
+  assert.equal(decl(".ent-badge-ico", "background"), "var(--raised)");
+});
+
 test("badgeHtml: la ficha de ingreso (C9) no lleva clase fam- ni borde de etiqueta", () => {
   const html = badgeHtml({ income: true, fam: "res", label: "Intereses de ahorro" });
   assert.ok(!html.includes("fam-"), html);
@@ -237,6 +250,18 @@ test("chosenCategoryHtml: variant pick (B-Gasto) y detail (B-Movimiento-Detalle)
   assert.equal(decl(".ent-chosen-pick", "border"), "1px solid var(--fb)");
   assert.equal(decl(".ent-chosen-detail .ent-name", "font-size"), "var(--fs-17)");
   assert.equal(decl(".ent-chosen-pick .ent-name", "font-weight"), "700");
+});
+
+test("chosenCategoryHtml: check (B-Gasto) pinta la marca de 22 al final, en -x; por defecto no", () => {
+  assert.doesNotMatch(chosenCategoryHtml({ fam: "res", name: "Bares" }), /ent-chosen-check/);
+  const html = chosenCategoryHtml({ fam: "res", name: "Restauración › Bares y cafés", variant: "pick", check: true });
+  assert.match(html, /<span class="ent-chosen-check"><svg[^>]*width="22"[^>]*aria-hidden="true"/);
+  assert.ok(html.indexOf("ent-chosen-check") > html.indexOf("ent-body"), "la marca va al final");
+  // Con chevron (tarjeta pulsable), gana el chevron: nunca las dos.
+  const both = chosenCategoryHtml({ fam: "res", name: "x", id: "c", check: true });
+  assert.match(both, /ent-chev/);
+  assert.doesNotMatch(both, /ent-chosen-check/);
+  assert.equal(decl(".ent-chosen-check", "color"), "var(--fx)");
 });
 
 test("txRowHtml: height 52 y amountWeight 500 (B-Home); por defecto, 60 y 600", () => {

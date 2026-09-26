@@ -97,14 +97,20 @@ export function pickTileHtml({ fam = null, icon: key = "", label, selected = fal
  *  @param {boolean} [o.tag]
  *  @param {string} [o.icon]   Por defecto: "income", "tag" o la clave de la familia.
  *  @param {string} o.label    Se escapa aquí.
+ *  @param {28|36} [o.size]    Por defecto 28. 36 (B-Recibo, F-41 retirada): píldora de 36, icono 16
+ *                             dentro de un círculo --raised de 26 y texto 13/600, con el mismo color
+ *                             por variante (el ingreso sigue neutro, C9).
  *  @returns {string} HTML */
-export function badgeHtml({ fam = null, income = false, tag = false, icon: key = "", label }) {
+export function badgeHtml({ fam = null, income = false, tag = false, icon: key = "", label, size = 28 }) {
   let variant;
   let iconKey = key;
   if (income) { variant = "ent-badge-income"; iconKey ||= "income"; }
   else if (tag) { variant = "ent-badge-tag"; iconKey ||= "tag"; }
   else if (famClass(fam)) { variant = famClass(fam); iconKey ||= fam; }
   else { variant = "ent-badge-income"; iconKey ||= "otr"; }
+  if (size === 36) {
+    return `<span class="ent-badge ent-badge-36 ${variant}"><span class="ent-badge-ico">${entityIcon(iconKey, 16)}</span><span class="ent-badge-label">${escHtml(label)}</span></span>`;
+  }
   return `<span class="ent-badge ${variant}">${entityIcon(iconKey, 14)}<span class="ent-badge-label">${escHtml(label)}</span></span>`;
 }
 
@@ -119,6 +125,8 @@ export function badgeHtml({ fam = null, income = false, tag = false, icon: key =
  *   - "detail" (B-Movimiento-Detalle, B-Borrar): relleno 12; `path` 13/600 -x ARRIBA («Restauración»)
  *              y `name` 17/700 debajo («Bares y cafés»).
  *  Por defecto "" (la tarjeta sin borde de siempre). Sin familia, la variante no pinta borde.
+ *  `check` (por defecto false): marca de «aplicada» de 22 al final, en -x (B-Gasto). Decorativa: el
+ *  nombre ya dice cuál está elegida. Si hay chevron, gana el chevron.
  *  @param {object} o
  *  @param {string|null} [o.fam]
  *  @param {string} [o.icon]
@@ -128,8 +136,9 @@ export function badgeHtml({ fam = null, income = false, tag = false, icon: key =
  *  @param {string} [o.id]
  *  @param {object} [o.data]
  *  @param {""|"pick"|"detail"} [o.variant]
+ *  @param {boolean} [o.check]
  *  @returns {string} HTML */
-export function chosenCategoryHtml({ fam = null, icon: key = "", name, path = "", chevron, id = "", data = null, variant = "" }) {
+export function chosenCategoryHtml({ fam = null, icon: key = "", name, path = "", chevron, id = "", data = null, variant = "", check = false }) {
   const fc = famClass(fam);
   const tag = id ? "button" : "div";
   const showChev = chevron ?? Boolean(id);
@@ -139,7 +148,8 @@ export function chosenCategoryHtml({ fam = null, icon: key = "", name, path = ""
   return `<${tag}${tag === "button" ? ' type="button"' : ""} class="${cls("ent-chosen", v && `ent-chosen-${v}`, fc, !fc && "ent-neutral")}"${attrs({ id, data })}>`
     + tileHtml({ fam, icon: key, size: 40, onTint: true })
     + `<span class="ent-body">${v === "detail" ? pathHtml + nameHtml : nameHtml + pathHtml}</span>`
-    + `${showChev ? `<span class="ent-chev">${icon("chevronRight", { size: 16 })}</span>` : ""}</${tag}>`;
+    + `${showChev ? `<span class="ent-chev">${icon("chevronRight", { size: 16 })}</span>`
+      : check ? `<span class="ent-chosen-check">${icon("check", { size: 22 })}</span>` : ""}</${tag}>`;
 }
 
 /** Chip de filtro (§9, B-Movimientos-Filtros): 44 píldora con aria-pressed.
