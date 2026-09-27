@@ -624,6 +624,110 @@
 }
 .imp-msg > svg { flex: none; margin-top: var(--sp-2); }
 .imp-msg p { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+/* --- Revisar (B-3): lista editable antes de escribir nada. Bloque --surface con cabeceras de día
+   y filas de 68 (nombre 15/600 + importe mono, y debajo la ficha de categoría + su origen), como
+   B-Importar; delante, la casilla que quita la fila. Las que ya estaban, aparte y atenuadas. --- */
+.imp-rev-list {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--sp-4) var(--sp-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.imp-rev-list .ent-day { padding: 10px var(--sp-8) var(--sp-2); }
+.imp-rev-row { display: flex; align-items: center; gap: var(--sp-4); padding-left: var(--sp-4); }
+.imp-rev-row > .ctl-checkbox { flex: none; }
+.imp-rev-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 68px;
+  box-sizing: border-box;
+  padding: var(--sp-8);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  text-align: left;
+}
+.imp-rev-l1 { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-12); }
+.imp-rev-name {
+  min-width: 0;
+  font-size: var(--fs-15);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.imp-rev-amount { flex: none; font-size: var(--fs-15); font-weight: 500; }
+.imp-rev-amount.is-pos { color: var(--pos); font-weight: 600; }
+.imp-rev-l2 { display: flex; align-items: center; gap: var(--sp-8); min-width: 0; }
+.imp-rev-l2 .ent-badge { min-width: 0; max-width: 100%; }
+.imp-rev-l2 .ent-badge-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imp-rev-src { flex: none; font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
+/* Sin categoría: píldora punteada «Elegir categoría» (B-Importar). */
+.imp-rev-pick {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  border: 1.5px dashed var(--text-dim);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.imp-rev-sep { height: 1px; margin: 0 var(--sp-8); background: var(--border); }
+/* Fila quitada: se queda en la lista (se puede volver a marcar), atenuada y sin abrir la hoja. */
+.imp-rev-row.is-off .imp-rev-body { opacity: .45; }
+.imp-rev-row.is-known { padding-left: 0; }
+.imp-rev-row.is-known .imp-rev-name,
+.imp-rev-row.is-known .imp-rev-amount { color: var(--text-dim); }
+.imp-rev-mark { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-12); font-weight: 600; color: var(--text-dim); }
+
+/* Pie fijo abajo (B-Importar): la nota de la bandeja y el primario, sobre --surface con filete. */
+.imp-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: 0 calc(-1 * var(--sp-16));
+  padding: var(--sp-12) var(--sp-16) calc(var(--sp-24) + env(safe-area-inset-bottom, 0px));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+/* Hoja de categoría: «Sin categorizar» arriba y las baldosas de familia de B-Gasto en filas de 3;
+   el panel de subcategorías cuelga de la fila de la desplegada (misma geometría que Registro). */
+.imp-sheet-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); margin-bottom: var(--sp-12); }
+.imp-grid-wrap { display: flex; flex-direction: column; gap: var(--sp-8); }
+.imp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-8); }
+.imp-subs {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  padding: var(--sp-8);
+  border-radius: var(--radius);
+  background: var(--ft);
+}
+.imp-subs-neutral { background: var(--well); }
+.imp-subs::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: calc(var(--col, 0) * ((100% - 2 * var(--sp-8)) / 3 + var(--sp-8)) + (100% - 2 * var(--sp-8)) / 6 - 6px);
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  border-radius: var(--radius-xs);
+  transform: rotate(45deg);
+}
+.imp-subs .ent-chip.ent-neutral { position: relative; }
+.imp-subs .ent-chip.ent-neutral[aria-pressed="false"] { background: var(--lift); box-shadow: inset 0 0 0 1px var(--border); font-weight: 600; }
+:root[data-theme="dark"] .imp-subs .ent-chip.ent-neutral[aria-pressed="false"] { box-shadow: inset 0 0 0 1px var(--border-strong); }
 /* === fin: importar === */
 
 /* === pantalla: informe === */

@@ -11,8 +11,8 @@ import { renderCategorias } from "./categorias.js";
 import { renderEtiquetas } from "./etiquetas.js";
 import { renderInforme } from "./informe.js";
 import { pushBack, goBack } from "../back.js";
-import { importCsv } from "../n26.js";
-import { renderImportAssistant, newAssistantState, newResultState } from "./importar.js";
+import { previewCsv } from "../n26.js";
+import { renderImportAssistant, newAssistantState, newReviewState } from "./importar.js";
 import { encryptBackup, decryptBackup, isEncryptedBackup, WrongPassphraseError, MIN_PASSPHRASE } from "../backup-crypto.js";
 import { t, LANGS, activeLang } from "../i18n/index.js";
 import { loadXlsx } from "../xlsx-loader.js";
@@ -653,20 +653,22 @@ export async function renderAjustes(container) {
       state.busy = true; state.n26Error = null; render();
       try {
         const text = await file.text();
-        const res = await importCsv(text);
+        // Ensayo (B-3): nada se escribe hasta que el usuario revisa y pulsa «Importar» en importar.js.
+        const res = await previewCsv(text);
         if (res.needsMapping) {
           // Banco sin soporte dedicado y sin perfil guardado que case: abre el asistente en vez
-          // de tocar la base de datos. Nada se ha escrito todavía (importCsv con needsMapping no
+          // de tocar la base de datos. Nada se ha escrito todavía (previewCsv nunca
           // ejecuta ningún INSERT/UPDATE — ver n26.js).
           pushBack(backToMain);
           state.view = "assistant";
           state.assistant = newAssistantState(file.name, text, res.needsMapping);
         } else {
-          // Ya importado solo (N26 o perfil guardado): el importador abre directamente en su paso
-          // «Resultado», con el mismo «atrás» que el asistente.
+          // Reconocido solo (N26 o perfil guardado): el importador abre directamente en su paso
+          // «Revisar», con el mismo «atrás» que el asistente.
+          const review = await newReviewState(file.name, text, res);
           pushBack(backToMain);
           state.view = "assistant";
-          state.assistant = newResultState(file.name, text, res);
+          state.assistant = review;
         }
       } catch (err) {
         state.n26Error = userMessage(err);
