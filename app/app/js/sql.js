@@ -180,6 +180,18 @@ export const SQL = {
   hasSharedRule: `SELECT 1 FROM recurring_rules WHERE is_shared=1 AND deleted=0 LIMIT 1`,
 
   closePeriod: `UPDATE periods SET end_date=?, status='closed', updated_at=? WHERE id=?`,
+  // Cierre tardío con día de cobro (decisión de Álvaro 2026-09-27: «mover los apuntes»): al abrir
+  // el periodo nuevo con un inicio anterior a hoy, lo apuntado desde ese inicio pasa al periodo
+  // nuevo en el MISMO execMany (repo.openNextPeriodStmts). Primero se congela el reparto de los
+  // compartidos que se mueven y aún seguían al periodo (override NULL) en el % del periodo que se
+  // cierra —con el que se apuntaron—, así el cambio de periodo no mueve ningún importe ya
+  // calculado. Bind: [closingId, now, closingId, startDate].
+  lateCloseFreezeShare: `UPDATE transactions
+    SET share_pct_override=(SELECT my_share_pct FROM periods WHERE id=?), updated_at=?
+    WHERE period_id=? AND date>=? AND is_shared=1 AND share_pct_override IS NULL AND deleted=0`,
+  // Los borrados también se mueven: si se restauran, que caigan en el periodo de su fecha.
+  // Bind: [newId, now, closingId, startDate].
+  lateCloseMoveTx: `UPDATE transactions SET period_id=?, updated_at=? WHERE period_id=? AND date>=?`,
   // Cambia el reparto por defecto del periodo (Ajustes). Va SIEMPRE precedido, en el mismo
   // execMany, de freezePeriodShareOverrides: los gastos compartidos del periodo que aún seguían al
   // periodo (override NULL: filas de antes de que la UI guardara el % explícito, o importadas de

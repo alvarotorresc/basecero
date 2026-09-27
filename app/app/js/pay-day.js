@@ -114,3 +114,13 @@ export function payDayDue({ payDay, openStartIso, todayIso }) {
   const due = nextPayDateAfter(payDay, addDays(openStartIso, MIN_PERIOD_DAYS - 1));
   return due <= todayIso ? due : null;
 }
+
+/** Cierre tardío (decisión 2026-09-27): con día de cobro (≥ 2), al abrir el periodo nuevo los
+ *  apuntes del que se cierra con fecha desde el nuevo inicio pasan a él. Cuántos son, para la línea
+ *  de Nuevo periodo antes de confirmar; `rows` son los VIVOS del periodo que se cierra
+ *  (listAllByDay). Sin día de cobro, 0: no se mueve nada (repo.openNextPeriodStmts). */
+export const movesLateRows = (payDay) => normalizePayDay(payDay) > PAY_DAY_MIN;
+export function lateMoveCount({ payDay, rows, startIso }) {
+  if (!movesLateRows(payDay) || !startIso) return 0;
+  return (rows ?? []).filter((r) => r.date >= startIso).length;
+}

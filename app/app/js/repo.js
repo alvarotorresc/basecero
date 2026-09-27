@@ -17,6 +17,7 @@ import { DETECT_WINDOW_DAYS } from "./subscription-detect.js";
 import { previousPeriodOf, previousPeriodsOf } from "./informe-logic.js";
 import { transferError } from "./objetivo-logic.js";
 import { monthEndDates } from "./cuenta-logic.js";
+import { movesLateRows } from "./pay-day.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -56,15 +57,29 @@ export function sweepTransferStmt({ periodId, date, amountCents, fromAccountId, 
  *  execMany que cierra/abre/presupuesta: o queda el periodo abierto CON su barrido, o no queda
  *  nada (D8 de la spec: es lo que hace inmutable el informe del periodo recién cerrado). Sin
  *  `sweep`, cero cambios de comportamiento. */
-export async function openNextPeriod({ name, startDate, sharePct, budgets = [], sweep }) {
+export async function openNextPeriod({ name, startDate, sharePct, budgets = [], sweep, payDay }) {
   const current = await getOpenPeriod();
   if (periodStartTooEarly(current, startDate))
     throw new UserError(t("errors.repo.periodStartTooEarly"));
-  const now = nowIso();
   const newId = bcUlid();
+  await execMany(openNextPeriodStmts({ current, newId, now: nowIso(), name, startDate, sharePct, budgets, sweep, payDay }));
+  return newId;
+}
+
+/** Statements de openNextPeriod, PUROS (reciben periodo abierto, id y hora ya resueltos): así el
+ *  test ejecuta la lista real sobre SQLite. Orden: cerrar, abrir, [cierre tardío], límites,
+ *  barrido. Cierre tardío (decisión de Álvaro 2026-09-27): SOLO con día de cobro (`payDay` ≥ 2,
+ *  pay-day.js#movesLateRows) y periodo que cerrar, los apuntes del que se cierra con fecha
+ *  ≥ startDate pasan al nuevo —con el reparto de los compartidos congelado antes—; sin día de
+ *  cobro la lista es EXACTAMENTE la de antes, aunque la fecha elegida sea anterior a hoy. */
+export function openNextPeriodStmts({ current, newId, now, name, startDate, sharePct, budgets = [], sweep, payDay }) {
   const stmts = [];
   if (current) stmts.push({ sql: SQL.closePeriod, bind: [prevDayIso(startDate), now, current.id] });
   stmts.push({ sql: SQL.insertPeriod, bind: [newId, name, startDate, sharePct, now, now] });
+  if (current && movesLateRows(payDay)) {
+    stmts.push({ sql: SQL.lateCloseFreezeShare, bind: [current.id, now, current.id, startDate] });
+    stmts.push({ sql: SQL.lateCloseMoveTx, bind: [newId, now, current.id, startDate] });
+  }
   for (const b of budgets) {
     stmts.push({ sql: SQL.insertBudget, bind: [bcUlid(), newId, b.categoryId, b.amountCents, now, now] });
   }
@@ -74,8 +89,7 @@ export async function openNextPeriod({ name, startDate, sharePct, budgets = [], 
       fromAccountId: sweep.fromAccountId, toAccountId: sweep.toAccountId, goalName: sweep.goalName, now,
     }));
   }
-  await execMany(stmts);
-  return newId;
+  return stmts;
 }
 
 /** Reparto por defecto del periodo (Ajustes). Valida ANTES de tocar la BD (guard puro, testeable
