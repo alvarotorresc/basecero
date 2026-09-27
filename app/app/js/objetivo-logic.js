@@ -97,14 +97,6 @@ export function coverMonths(savedCents, avgSpentCents) {
   return Math.max(0, savedCents) / avgSpentCents;
 }
 
-/** Gasto medio de los `n` últimos periodos cerrados. `spents` va del más antiguo al más reciente
- *  (el orden de listClosedPeriods). Sin ninguno, 0. */
-export function avgOfLastClosed(spents, n = 3) {
-  const last = (spents ?? []).slice(-n);
-  if (!last.length) return 0;
-  return Math.round(last.reduce((s, c) => s + c, 0) / last.length);
-}
-
 /** Validación de «Pasar a la hucha»: la clave del error, o "" si vale. La usan la hoja (mensaje)
  *  y repo.transferToGoal (última línea, antes de escribir). */
 export function transferError({ cents, fromId, toId }) {
@@ -120,13 +112,3 @@ const HUCHA_TYPES = new Set(["emergency_fund", "savings_target", "provision"]);
 
 /** ¿El objetivo tiene hucha a la que pasar dinero? Techo de gasto y tasa de ahorro, no. */
 export const hasHucha = (goal) => !!goal && HUCHA_TYPES.has(goal.type) && !!goal.account_id;
-
-/** Argumentos de repo.addTransaction para «Pasar a la hucha» (B-4): una transferencia de HOY de
- *  la cuenta elegida a la hucha, sin categoría ni reparto; el comercio es el nombre del objetivo
- *  (como el barrido de fin de periodo) para que en Movimientos se lea a dónde fue. */
-export function goalTransferTx({ cents, fromId, toId, goalName, note = "", todayIso }) {
-  return {
-    type: "transfer", amountCents: cents, date: todayIso, accountId: fromId, counterAccountId: toId,
-    categoryId: "", merchant: goalName ?? "", note, isShared: false,
-  };
-}

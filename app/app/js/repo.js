@@ -15,7 +15,7 @@ import { MEMORY_WINDOW, merchantMemory } from "./merchant-memory.js";
 import { IGNORED_MAX, parseIgnored, parseSnoozed } from "./subscriptions.js";
 import { DETECT_WINDOW_DAYS } from "./subscription-detect.js";
 import { previousPeriodOf, previousPeriodsOf } from "./informe-logic.js";
-import { avgOfLastClosed, transferError, goalTransferTx } from "./objetivo-logic.js";
+import { transferError } from "./objetivo-logic.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -39,12 +39,12 @@ export const periodStartTooEarly = (open, startDate) => !!open && startDate <= o
  *  `type='transfer'`, `category_id=''`, `merchant` = nombre del objetivo (saneado), `is_shared=0`,
  *  `paid_by='me'`, `has_attachment=0` (un barrido nunca lleva foto). OJO TDZ: aquí NO puede
  *  declararse ningún `const t` local. */
-export function sweepTransferStmt({ periodId, date, amountCents, fromAccountId, toAccountId, goalName, now }) {
+export function sweepTransferStmt({ periodId, date, amountCents, fromAccountId, toAccountId, goalName, now, note }) {
   return {
     sql: SQL.insertTransaction,
     bind: [
       bcUlid(), date, periodId, "transfer", amountCents, fromAccountId, toAccountId,
-      "", bcSanitizeCell(goalName ?? ""), t("barrido.note"),
+      "", bcSanitizeCell(goalName ?? ""), note ?? t("barrido.note"),
       0, null, "me", 0, "", "", "", "", 0, "pending", now, now,
     ],
   };
@@ -1352,25 +1352,19 @@ export const setTagArchived = (id, archived) => exec(SQL.setTagArchived, [archiv
 // Bloque propio (retrocompatible): no toca goalsWithProgress ni avgSpentOfClosedPeriods. OJO TDZ:
 // ningún `const t` local en estas funciones.
 
-/** Gasto medio de los `n` últimos periodos CERRADOS («cubre N meses», B-7). 0 sin ninguno. */
-export async function avgSpentOfLastClosedPeriods(n = 3) {
-  const closed = await listClosedPeriods();
-  const spents = await Promise.all(closed.slice(-n).map((p) => spentOfPeriod(p.id)));
-  return avgOfLastClosed(spents, n);
-}
-
 /** Todo lo que pinta el detalle de un objetivo, activo o pausado (getGoal no filtra is_active):
  *  el objetivo, su progreso (goalProgress, el mismo de la tarjeta de Patrimonio), su hucha con el
- *  saldo a hoy, los movimientos de la hucha y el gasto medio de los 3 últimos cerrados. null si
+ *  saldo a hoy, los movimientos de la hucha y el gasto medio (el MISMO de goalProgress, para que
+ *  «cubre N meses» cuadre con el % del objetivo). null si
  *  el objetivo ya no existe (borrado). El ctx de goalProgress se arma igual que en
  *  goalsWithProgress, pero solo para este objetivo. */
 export async function goalDetail(id) {
   const goal = await getGoal(id);
   if (!goal) return null;
   const today = hoyISO();
-  const [account, avgSpentCents, avgSpent3Cents, openPeriod] = await Promise.all([
+  const [account, avgSpentCents, openPeriod] = await Promise.all([
     goal.account_id ? getAccount(goal.account_id) : Promise.resolve(null),
-    avgSpentOfClosedPeriods(), avgSpentOfLastClosedPeriods(3), getOpenPeriod(),
+    avgSpentOfClosedPeriods(), getOpenPeriod(),
   ]);
   const [balanceCents, movements] = account
     ? await Promise.all([accountBalanceCents(account.id, today), query(SQL.goalAccountMovements, [account.id, account.id])])
@@ -1393,19 +1387,32 @@ export async function goalDetail(id) {
     progress: goalProgress(goal, ctx),
     account: account ? { ...account, balance_cents: balanceCents } : null,
     movements,
-    avgSpent3Cents,
+    avgSpentCents,
     todayIso: today,
   };
 }
 
-/** «Pasar a la hucha» (B-4): transferencia de hoy desde `fromAccountId` a la hucha del objetivo,
- *  con addTransaction (la misma función que Registro; exige periodo abierto). Valida antes de
- *  escribir con objetivo-logic.js#transferError. Devuelve el id del movimiento nuevo. */
-export async function transferToGoal({ goal, fromAccountId, amountCents }) {
-  const err = transferError({ cents: amountCents, fromId: fromAccountId, toId: goal?.account_id ?? "" });
+/** Statement de «Pasar a la hucha» (B-4). PURO (mismo patrón que sweepTransferStmt, que es quien
+ *  arma la fila): valida y lanza UserError antes de construir nada. `fromAccount` es la fila de
+ *  getAccount (null si no existe o está borrada). Nota «A la hucha»; comercio, el objetivo. */
+export function goalTransferStmt({ goal, fromAccount, amountCents, periodId, date, now }) {
+  let err = transferError({ cents: amountCents, fromId: fromAccount?.id ?? "", toId: goal?.account_id ?? "" });
+  if (!err && (!fromAccount || fromAccount.deleted)) err = "account";
   if (err) throw new UserError(t(`objetivo.transfer.error.${err}`));
-  return addTransaction(goalTransferTx({
-    cents: amountCents, fromId: fromAccountId, toId: goal.account_id,
-    goalName: goal.name, note: t("objetivo.transfer.note"), todayIso: hoyISO(),
-  }));
+  return sweepTransferStmt({
+    periodId, date, amountCents, fromAccountId: fromAccount.id, toAccountId: goal.account_id,
+    goalName: goal.name, now, note: t("objetivo.transfer.note"),
+  });
+}
+
+/** «Pasar a la hucha» (B-4): transferencia de hoy, en el periodo abierto, desde `fromAccountId` a
+ *  la hucha del objetivo. La cuenta origen se relee aquí: si ya no existe, no se escribe nada. */
+export async function transferToGoal({ goal, fromAccountId, amountCents }) {
+  const [period, fromAccount] = await Promise.all([
+    getOpenPeriod(), fromAccountId ? getAccount(fromAccountId) : Promise.resolve(null),
+  ]);
+  if (!period) throw new UserError(t("errors.common.noOpenPeriod"));
+  const stmt = goalTransferStmt({ goal, fromAccount, amountCents, periodId: period.id, date: hoyISO(), now: nowIso() });
+  await exec(stmt.sql, stmt.bind);
+  return stmt.bind[0];
 }

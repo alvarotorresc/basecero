@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   monthKey, addMonths, accountFlowCents, contributionsByMonth, avgMonthlyContribution,
-  projectCompletion, coverMonths, avgOfLastClosed, transferError, hasHucha, goalTransferTx,
+  projectCompletion, coverMonths, transferError, hasHucha,
 } from "../../app/app/js/objetivo-logic.js";
 
 const HUCHA = "acc-hucha";
@@ -99,12 +99,6 @@ test("coverMonths: ahorrado / gasto medio; sin gasto medio, null", () => {
   assert.equal(coverMonths(-500, 60000), 0, "una hucha en negativo no cubre meses negativos");
 });
 
-test("avgOfLastClosed: media de los 3 últimos gastos (del más antiguo al más reciente)", () => {
-  assert.equal(avgOfLastClosed([100, 200, 300, 400]), 300);
-  assert.equal(avgOfLastClosed([100, 201]), 151, "redondeo a céntimo");
-  assert.equal(avgOfLastClosed([]), 0);
-});
-
 test("transferError: importe > 0, cuenta origen y distinta de la hucha", () => {
   assert.equal(transferError({ cents: 0, fromId: "a", toId: "b" }), "amount");
   assert.equal(transferError({ cents: -5, fromId: "a", toId: "b" }), "amount");
@@ -123,11 +117,4 @@ test("hasHucha: solo los tipos con hucha y con cuenta enlazada", () => {
   assert.equal(hasHucha({ type: "spending_cap", account_id: "x" }), false);
   assert.equal(hasHucha({ type: "savings_rate", account_id: "" }), false);
   assert.equal(hasHucha(null), false);
-});
-
-test("goalTransferTx: transferencia de hoy de la cuenta elegida a la hucha, sin categoría ni reparto", () => {
-  assert.deepEqual(goalTransferTx({ cents: 15000, fromId: "acc-c", toId: HUCHA, goalName: "Vacaciones", note: "A la hucha", todayIso: "2026-09-27" }), {
-    type: "transfer", amountCents: 15000, date: "2026-09-27", accountId: "acc-c", counterAccountId: HUCHA,
-    categoryId: "", merchant: "Vacaciones", note: "A la hucha", isShared: false,
-  });
 });
