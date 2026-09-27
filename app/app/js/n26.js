@@ -71,31 +71,123 @@ export function signedAmountCents(type, amountCentsAbs) {
   return Math.abs(amountCentsAbs) * ((type === "expense" || type === "transfer") ? -1 : 1);
 }
 
-/** Cuerpo compartido de todo import de movimientos (N26 o CSV genérico vía perfil, Task 5 PR E):
- *  dedupe por external_id, concilia pendientes manuales que casen en importe/sentido/±3 días,
- *  crea el resto sin categorizar. `rows` ya viene parseado — misma forma exacta que produce
- *  bcParseN26Csv y que produce applyProfile (csv-generic.js): {bookingDate, partnerName,
- *  paymentReference, amountCents}. Devuelve los contadores para el banner de Ajustes. Un único
- *  execMany al final (todo o nada). Extraído literal de importN26Csv (antes de Task 5 era todo
- *  el cuerpo de esa función) — CERO cambio de comportamiento, solo se movió el parseo del CSV
- *  (bcParseN26Csv) fuera, al llamador.
- *  M4 (review-seguridad-2026-08-29.md): una fila de 0,00 (verificación de tarjeta) o con importe
- *  no numérico (CSV corrupto) se salta ANTES de entrar al pipeline — se cuenta en `omitted` en
- *  vez de dejar que insertTransaction viole el CHECK amount_cents>0 y tire abajo el execMany
- *  entero (todo el resto de filas del import se perdía con un error SQL crudo). */
-async function runImportPipeline(rows) {
+/** ENSAYO del import (B-3, paso de revisión): decide qué haría el pipeline con cada fila SIN
+ *  escribir nada. Es el bucle de siempre de runImportPipeline (dedupe por external_id, concilia
+ *  pendientes manuales que casen en importe/sentido/±3 días, crea el resto con la categoría de la
+ *  memoria de comercios si la hay), separado de la escritura para que la pantalla pueda enseñarlo
+ *  y dejar al usuario quitar filas o cambiar su categoría antes de importar.
+ *  PURA salvo el hash (async, inyectable): no muta `rows` ni `ctx.existing` — trabaja sobre copias
+ *  (el pipeline viejo sí escribía `r.externalId` en la fila y empujaba a `existing`).
+ *  `rows`: forma de bcParseN26Csv/applyProfile ({bookingDate, partnerName, paymentReference,
+ *  amountCents}). `ctx`: { existing (ya firmado con signedAmountCents), memory, expenseCatIds,
+ *  incomeCatIds }.
+ *  Devuelve { items, counts, expenseCatIds, incomeCatIds }: un item por fila, en su orden, con
+ *  `index` (posición en `rows`, la clave con la que la UI dice qué quita o recategoriza), `row`
+ *  (copia con su externalId), `action` (create | reconcile | skip | omit), `matchId` (reconcile),
+ *  `externalId` ("" si omit), `type` (por el signo) y, para create, `categoryId` + `fromMemory`.
+ *  M4 (review-seguridad-2026-08-29.md): una fila de 0,00 (verificación de tarjeta) o con importe no
+ *  numérico (CSV corrupto) es `omit` ANTES de hashear — nunca llega a insertTransaction (violaría
+ *  el CHECK amount_cents>0 y tiraría el execMany entero). */
+export async function planImportRows(rows, ctx, { hashFn = sha256Hex } = {}) {
+  const existing = ctx.existing.map((e) => ({ ...e }));
+  const expenseCatIds = ctx.expenseCatIds || [];
+  const incomeCatIds = ctx.incomeCatIds || [];
+  const counts = { created: 0, reconciled: 0, skipped: 0, omitted: 0, categorized: 0 };
+  const items = [];
+
+  for (let index = 0; index < rows.length; index++) {
+    const row = { ...rows[index] };
+    const type = row.amountCents < 0 ? "expense" : "income";
+    if (row.amountCents === 0 || !Number.isFinite(row.amountCents)) {
+      counts.omitted++;
+      items.push({ index, row, action: "omit", matchId: "", externalId: "", type, categoryId: "", fromMemory: false });
+      continue;
+    }
+    row.externalId = await externalIdFor(row, hashFn);
+    const decision = bcDecideImportAction(row, existing);
+    const item = { index, row, action: decision.action, matchId: "", externalId: row.externalId, type, categoryId: "", fromMemory: false };
+
+    if (decision.action === "skip") {
+      counts.skipped++;
+    } else if (decision.action === "reconcile") {
+      const match = existing.find((t) => t.id === decision.matchId);
+      item.matchId = match.id;
+      match.externalId = row.externalId; // para que filas posteriores del MISMO CSV ya no casen con ella
+      counts.reconciled++;
+    } else {
+      // Solo categoría (§5.5): ni cuenta ni compartido — ver el comentario de categoryForImportedRow.
+      item.categoryId = categoryForImportedRow(row, ctx.memory, type === "expense" ? expenseCatIds : incomeCatIds);
+      item.fromMemory = Boolean(item.categoryId);
+      if (item.fromMemory) counts.categorized++;
+      // id provisional: solo sirve para que una fila idéntica posterior del MISMO CSV salga skip
+      // (mismo external_id); el id real lo pone importStatements.
+      existing.push({ id: `plan-${index}`, dateIso: row.bookingDate, type, amountCents: row.amountCents,
+        externalId: row.externalId, status: "reconciled" });
+      counts.created++;
+    }
+    items.push(item);
+  }
+  return { items, counts, expenseCatIds, incomeCatIds };
+}
+
+/** ESCRITURA del import (B-3): convierte un ensayo de planImportRows en las sentencias del
+ *  execMany, aplicando lo que el usuario decidió en el paso de revisión. PURA.
+ *  - `excluded`: índices de fila (item.index) que el usuario quitó. Solo afecta a filas `create`:
+ *    conciliar o saltar una duplicada no es algo que se elija (se escriben/cuentan como siempre).
+ *  - `categories`: { [index]: categoryId } elegida a mano; "" = sin categorizar. Se valida contra
+ *    las categorías del TIPO de la fila (mismo criterio que categoryForImportedRow): una de otro
+ *    tipo o inexistente se descarta y queda la sugerida.
+ *  Devuelve { stmts, res } con `res` en la forma de siempre ({created, reconciled, skipped,
+ *  omitted, categorized}), contando solo lo que de verdad se escribe. */
+export function importStatements(plan, { periodId, accountId, now, newId = () => bcUlid(), excluded = [], categories = {} }) {
+  const out = new Set((excluded || []).map(Number));
+  const res = { created: 0, reconciled: 0, skipped: 0, omitted: 0, categorized: 0 };
+  const stmts = [];
+  for (const item of plan.items) {
+    if (item.action === "omit") { res.omitted++; continue; }
+    if (item.action === "skip") { res.skipped++; continue; }
+    if (item.action === "reconcile") {
+      stmts.push({ sql: SQL.reconcileTx, bind: [item.externalId, now, item.matchId] });
+      res.reconciled++;
+      continue;
+    }
+    if (out.has(item.index)) continue;
+    const r = item.row;
+    const valid = item.type === "expense" ? plan.expenseCatIds : plan.incomeCatIds;
+    const chosen = Object.prototype.hasOwnProperty.call(categories, item.index) ? categories[item.index] : undefined;
+    let categoryId = item.categoryId;
+    if (chosen === "") categoryId = "";
+    else if (typeof chosen === "string" && (valid || []).includes(chosen)) categoryId = chosen;
+    if (categoryId) res.categorized++;
+    stmts.push({
+      sql: SQL.insertTransaction,
+      // tag_id='' SIEMPRE (el "" tras rule_id): el import nunca etiqueta — qué es de un proyecto
+      // lo decide una persona, no un CSV bancario (etiquetas-design §6).
+      // has_attachment=0 SIEMPRE: un CSV bancario nunca trae una foto del ticket.
+      bind: [newId(), r.bookingDate, periodId, item.type, Math.abs(r.amountCents), accountId, "",
+        categoryId, bcSanitizeCell(r.partnerName), bcSanitizeCell(r.paymentReference),
+        0, null, "me", 0, "", "", "", item.externalId, 0, "reconciled", now, now],
+    });
+    res.created++;
+  }
+  return { stmts, res };
+}
+
+/** Lee de la base lo que necesita el ensayo: periodo abierto, cuenta del import, movimientos ya
+ *  existentes de esa cuenta (firmados), memoria de comercios y categorías válidas por tipo. */
+async function loadImportContext() {
   const period = await getOpenPeriod();
   if (!period) throw new UserError(t("errors.common.noOpenPeriod"));
   const accountId = await importAccountId();
   if (!accountId) throw new UserError(t("errors.n26.noAccount"));
 
-  const existing = (await n26Existing(accountId)).map((t) => ({
-    id: t.id,
-    dateIso: t.date,
-    type: t.type,
-    amountCents: signedAmountCents(t.type, t.amount_cents),
-    externalId: t.external_id,
-    status: t.status,
+  const existing = (await n26Existing(accountId)).map((tx) => ({
+    id: tx.id,
+    dateIso: tx.date,
+    type: tx.type,
+    amountCents: signedAmountCents(tx.type, tx.amount_cents),
+    externalId: tx.external_id,
+    status: tx.status,
   }));
   // Cargada UNA vez antes del bucle (Registro v2 §5.5), no por fila: es la misma ventana de 500
   // movimientos que usa Registro, y no cambia mientras dure este import.
@@ -106,93 +198,76 @@ async function runImportPipeline(rows) {
     listExpenseLeafCategories().then((cats) => cats.map((c) => c.id)),
     listIncomeCategories().then((cats) => cats.map((c) => c.id)),
   ]);
+  return { period, accountId, existing, memory, expenseCatIds, incomeCatIds };
+}
 
-  const res = { created: 0, reconciled: 0, skipped: 0, omitted: 0, categorized: 0 };
-  const now = nowIso();
-  const stmts = [];
-
-  for (const r of rows) {
-    if (r.amountCents === 0 || !Number.isFinite(r.amountCents)) { res.omitted++; continue; }
-    r.externalId = await externalIdFor(r);
-    const decision = bcDecideImportAction(r, existing);
-
-    if (decision.action === "skip") {
-      res.skipped++;
-    } else if (decision.action === "reconcile") {
-      const match = existing.find((t) => t.id === decision.matchId);
-      stmts.push({ sql: SQL.reconcileTx, bind: [r.externalId, now, match.id] });
-      match.externalId = r.externalId; // para que filas posteriores del MISMO CSV ya no casen con ella
-      res.reconciled++;
-    } else {
-      const id = bcUlid();
-      const type = r.amountCents < 0 ? "expense" : "income";
-      // Solo categoría (§5.5): ni cuenta ni compartido — ver el comentario de categoryForImportedRow.
-      const categoryId = categoryForImportedRow(r, memory, type === "expense" ? expenseCatIds : incomeCatIds);
-      if (categoryId) res.categorized++;
-      stmts.push({
-        sql: SQL.insertTransaction,
-        // tag_id='' SIEMPRE (el "" tras rule_id): el import nunca etiqueta — qué es de un proyecto
-        // lo decide una persona, no un CSV bancario (etiquetas-design §6).
-        // has_attachment=0 SIEMPRE: un CSV bancario nunca trae una foto del ticket.
-        bind: [id, r.bookingDate, period.id, type, Math.abs(r.amountCents), accountId, "",
-          categoryId, bcSanitizeCell(r.partnerName), bcSanitizeCell(r.paymentReference),
-          0, null, "me", 0, "", "", "", r.externalId, 0, "reconciled", now, now],
-      });
-      existing.push({ id, dateIso: r.bookingDate, type, amountCents: r.amountCents,
-        externalId: r.externalId, status: "reconciled" });
-      res.created++;
-    }
-  }
-
+/** Cuerpo compartido de todo import de movimientos (N26 o CSV genérico vía perfil, Task 5 PR E):
+ *  ensayo (planImportRows) + escritura (importStatements) en un único execMany al final (todo o
+ *  nada). `choices` ({excluded, categories}) es lo que el usuario decidió en el paso de revisión;
+ *  sin él, el comportamiento es el de siempre. El ensayo se REHACE aquí contra la base actual
+ *  aunque la pantalla ya haya enseñado uno: no hay índice único sobre external_id, así que un
+ *  doble toque o un ensayo viejo duplicaría filas; re-planeando, un segundo commit sale todo skip.
+ *  Las decisiones del usuario viajan por índice de fila, estable porque las filas son las mismas. */
+async function runImportPipeline(rows, choices = {}) {
+  const ctx = await loadImportContext();
+  const plan = await planImportRows(rows, ctx);
+  const { stmts, res } = importStatements(plan, {
+    periodId: ctx.period.id, accountId: ctx.accountId, now: nowIso(),
+    excluded: choices.excluded, categories: choices.categories,
+  });
   await execMany(stmts);
   return res;
 }
 
-/** Importa un CSV de N26. Conservada como export propio (no solo camino interno del router):
- *  la sigue llamando directamente Ajustes (Task 15, previa a esta PR) y es lo que reproduce el
- *  test de paridad de este fichero — cambiar su firma o retirarla habría obligado a tocar la UI
- *  fuera del alcance de esta tarea (Task 6). El router (importCsv) también la usa cuando detecta
- *  cabeceras N26. */
-export async function importN26Csv(text) {
-  return runImportPipeline(bcParseN26Csv(text));
-}
-
-/** Aplica un perfil de CSV genérico (csv-generic.js) y mete las filas válidas por el MISMO
- *  pipeline de dedupe/conciliación que N26. Las filas con error de applyProfile (fecha/importe
- *  inválidos) NO entran al pipeline: se cuentan aparte como `omitted` y no bloquean el resto.
- *  `res.omitted` ya trae su propio conteo (M4: filas de 0,00 o no numéricas descartadas DENTRO
- *  del pipeline) — se SUMA a errors.length, nunca se pisa. */
-export async function importWithProfile(text, profile) {
-  const { rows, errors } = applyProfile(text, profile, bcParseCsvLine);
-  const res = await runImportPipeline(rows);
-  return { ...res, omitted: res.omitted + errors.length };
-}
-
-/** Router de import (Task 5, PR E): detecta el formato del CSV y elige camino sin que la UI
- *  tenga que saber nada de N26 ni de perfiles. Orden de detección: (1) cabeceras N26 exactas →
- *  camino de siempre; (2) si no, perfil guardado en meta.csv_profile cuyas cabeceras casen
- *  exactamente → import genérico; (3) si no hay match, `needsMapping` con cabecera+muestra para
- *  que la UI (Task 6) abra el asistente — SIN tocar la base de datos más allá de la lectura de
- *  meta necesaria para decidir. */
-export async function importCsv(text) {
-  // Guard temprano (ruling de la review de Task 5): sin periodo abierto, CUALQUIER CSV — incluso
-  // basura irreconocible que de otro modo caería en needsMapping — debe fallar con este mensaje
-  // accionable ANTES de llegar al sniff, para que gane siempre sobre "cabecera no reconocida"
-  // (runImportPipeline ya repetía esta misma comprobación, pero solo se alcanza en los caminos
-  // N26/perfil; needsMapping no pasaba nunca por ahí).
-  if (!(await getOpenPeriod())) throw new UserError(t("errors.common.noOpenPeriod"));
+/** Router PURO del import (Task 5 PR E; B-3): detecta el formato del CSV y devuelve sus filas
+ *  parseadas sin tocar la base. Orden de detección: (1) cabeceras N26 exactas → bcParseN26Csv;
+ *  (2) si no, el perfil guardado (`savedProfileRaw` = meta.csv_profile tal cual) si sus cabeceras
+ *  casan exactamente → applyProfile; (3) si no, `needsMapping` con cabecera + muestra para el
+ *  asistente. `parseErrors`: filas que applyProfile no pudo leer (fecha/importe), que no entran al
+ *  pipeline y se suman a `omitted`. */
+export function routeCsv(text, savedProfileRaw) {
   const { headers, sample } = sniffCsv(text, bcParseCsvLine);
-  if (isN26Headers(headers)) {
-    const res = await importN26Csv(text);
-    return { ...res, via: "n26" };
-  }
-
-  const meta = await getMetaAll();
-  const profile = parseCsvProfile(meta.csv_profile);
+  if (isN26Headers(headers)) return { via: "n26", rows: bcParseN26Csv(text), parseErrors: 0 };
+  const profile = parseCsvProfile(savedProfileRaw);
   if (profile && profileMatches(profile, headers)) {
-    const res = await importWithProfile(text, profile);
-    return { ...res, via: "profile" };
+    const { rows, errors } = applyProfile(text, profile, bcParseCsvLine);
+    return { via: "profile", rows, parseErrors: errors.length };
   }
-
   return { needsMapping: { headers, sample } };
+}
+
+async function previewRows(rows, parseErrors, via) {
+  const ctx = await loadImportContext();
+  const plan = await planImportRows(rows, ctx);
+  plan.counts.omitted += parseErrors;
+  return { via, rows, parseErrors, plan };
+}
+
+/** Ensayo de un CSV con el perfil indicado (el que acaba de configurar el asistente): nada se
+ *  escribe. `plan.counts.omitted` ya suma las filas que applyProfile no pudo leer. */
+export async function previewWithProfile(text, profile) {
+  const { rows, errors } = applyProfile(text, profile, bcParseCsvLine);
+  return previewRows(rows, errors.length, "profile");
+}
+
+/** Router del paso de revisión (B-3) SIN escribir nada: devuelve { via, rows, parseErrors, plan }
+ *  para que la pantalla enseñe la lista, o { needsMapping } para abrir el asistente. La escritura
+ *  la hace commitImport. */
+export async function previewCsv(text) {
+  // Guard temprano (ruling de la review de Task 5): sin periodo abierto, CUALQUIER CSV — incluso
+  // basura irreconocible que de otro modo caería en needsMapping — falla con este mensaje
+  // accionable ANTES de llegar al sniff.
+  if (!(await getOpenPeriod())) throw new UserError(t("errors.common.noOpenPeriod"));
+  const meta = await getMetaAll();
+  const routed = routeCsv(text, meta.csv_profile);
+  if (routed.needsMapping) return routed;
+  return previewRows(routed.rows, routed.parseErrors, routed.via);
+}
+
+/** Escribe un import revisado: `rows`/`parseErrors` son los de previewCsv/previewWithProfile y
+ *  `choices` = { excluded: [index], categories: {index: categoryId} }. Re-planea contra la base
+ *  actual (ver runImportPipeline) y devuelve los contadores de lo escrito. */
+export async function commitImport(rows, parseErrors = 0, choices = {}) {
+  const res = await runImportPipeline(rows, choices);
+  return { ...res, omitted: res.omitted + parseErrors };
 }

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { matchesFilter, isUncategorized } from "../../app/app/js/movimientos-filter.js";
+import { matchesFilter, isUncategorized, isFilterActive, initialFilter } from "../../app/app/js/movimientos-filter.js";
 
 // byId con una raíz y una hoja bajo ella (mismo shape que allCategoriesById): rootOf necesita
 // parent_id para subir hasta la raíz.
@@ -114,4 +114,16 @@ test("isUncategorized: expense/income/refund sin categoría, no transfer/adjustm
   assert.equal(isUncategorized({ type: "transfer", category_id: "" }), false);
   assert.equal(isUncategorized({ type: "adjustment", category_id: "" }), false);
   assert.equal(isUncategorized({ type: "expense", category_id: "cat-alimentacion" }), false);
+});
+
+// ---- initialFilter (entrada con filtro desde otra pantalla: Etiquetas, detalle de cuenta B-6) ----
+
+test("initialFilter: neutro sin opciones; tagId y accountId de goToTab entran tal cual", () => {
+  const neutral = { query: "", rootCatIds: [], uncat: false, tagId: null, accountId: null, minCents: null, maxCents: null, sharedOnly: false };
+  assert.deepEqual(initialFilter(), neutral);
+  assert.deepEqual(initialFilter({ tagId: "tag-1" }), { ...neutral, tagId: "tag-1" });
+  assert.deepEqual(initialFilter({ accountId: "acc-1" }), { ...neutral, accountId: "acc-1" });
+  assert.equal(isFilterActive(initialFilter({ accountId: "acc-1" })), true);
+  assert.equal(matchesFilter({ account_id: "acc-2", counter_account_id: "acc-1", category_id: "", type: "transfer" }, initialFilter({ accountId: "acc-1" }), {}), true);
+  assert.equal(matchesFilter({ account_id: "acc-2", counter_account_id: "", category_id: "", type: "expense" }, initialFilter({ accountId: "acc-1" }), {}), false);
 });

@@ -6,8 +6,7 @@ import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 import { SQL } from "../../app/app/js/sql.js";
 import { seedStatements } from "../../app/app/js/seeds.js";
-import { sha256Hex, externalIdFor, signedAmountCents, categoryForImportedRow } from "../../app/app/js/n26.js";
-import { sniffCsv, isN26Headers, applyProfile, parseCsvProfile, profileMatches } from "../../app/app/js/csv-generic.js";
+import { sha256Hex, externalIdFor, signedAmountCents, categoryForImportedRow, planImportRows, importStatements, routeCsv } from "../../app/app/js/n26.js";
 import { merchantMemory } from "../../app/app/js/merchant-memory.js";
 
 const require = createRequire(import.meta.url);
@@ -18,6 +17,11 @@ const pure = require("../../app/app/vendor/pure.js");
 // app/vendor/pure.js vía CommonJS (require, no globales); se expone la única función de pure.js
 // que n26.js invoca de verdad (externalIdFor) para que funcione igual bajo Node.
 globalThis.bcBuildExternalId = pure.bcBuildExternalId;
+// B-3: el pipeline real (planImportRows/importStatements/routeCsv) usa además estos globales.
+globalThis.bcDecideImportAction = pure.bcDecideImportAction;
+globalThis.bcSanitizeCell = pure.bcSanitizeCell;
+globalThis.bcParseN26Csv = pure.bcParseN26Csv;
+globalThis.bcParseCsvLine = pure.bcParseCsvLine;
 
 const T = "2026-08-24T18:00:00Z";
 const NOW = "2026-08-24T19:00:00Z";
@@ -35,7 +39,7 @@ function db() {
   return d;
 }
 
-/** Misma base que db() pero SIN periodo abierto — para el test del guard temprano de importCsv. */
+/** Misma base que db() pero SIN periodo abierto — para el test del guard temprano de previewCsv. */
 function dbNoPeriod() {
   const d = new DatabaseSync(":memory:");
   d.exec(readFileSync(new URL("../../app/app/js/schema.sql", import.meta.url), "utf8"));
@@ -56,63 +60,29 @@ function csvRow({ date = "2026-08-20", partner = "MERCADONA", iban = "", type = 
 const CSV_2ROWS = [CSV_HEADER, csvRow(), csvRow({ date: "2026-08-21", partner: "MARTA G.",
   iban: "ES9121000000000000000000", type: "MoneyBeam", ref: "Bizum alquiler", amount: "360.00" })].join("\n");
 
-/** Reproduce runImportPipeline (app/js/n26.js, extraída en Task 5 PR E del cuerpo de
- *  importN26Csv) contra node:sqlite: no hay Worker disponible en Node (db.js depende de él),
- *  así que — mismo patrón que el resto de tests/app/*.test.mjs (repo-sql, recurrentes...) — se
- *  compone la SQL a mano en vez de invocar repo.js/n26.js directamente. `rows` ya viene parseado
- *  (misma forma que produce pure.bcParseN26Csv o csv-generic.applyProfile). Usa las MISMAS
- *  funciones puras que la implementación real: pure.bcDecideImportAction (app/vendor/pure.js), el
- *  signedAmountCents/externalIdFor REALES de n26.js (adaptador de captura incluido).
- *  M4 (Task 5, PR fix-security): las sentencias se acumulan y se ejecutan en un ÚNICO
- *  BEGIN/COMMIT/ROLLBACK al final — mismo patrón que db-worker.js execMany (app/js/db-worker.js) —
- *  en vez de un `.run()` inmediato por fila. Antes de este cambio el harness NO reproducía el
- *  bug real (una fila que violase el CHECK solo tiraba ESA fila, las anteriores ya habían
- *  quedado commiteadas); con el batching, una fila que lanza en medio del bucle revierte TODO el
- *  import, igual que en producción — condición necesaria para poder testear el fix de M4 (saltar
- *  la fila mala en vez de dejar que reviente el execMany). No cambia el resultado de NINGÚN test
- *  preexistente: ninguno provoca hoy un throw a mitad de bucle, y el estado final tras un import
- *  con éxito es idéntico (todo commiteado de una vez o fila a fila da el mismo resultado si nada
- *  falla). */
-async function runPipeline(d, rows, hashFn = sha256hex) {
-  const existing = d.prepare(SQL.n26Existing).all("acc-n26").map((t) => ({
-    id: t.id, dateIso: t.date, type: t.type,
-    amountCents: signedAmountCents(t.type, t.amount_cents),
-    externalId: t.external_id, status: t.status,
-  }));
-  // Registro v2 §5.5: memoria de comercios cargada UNA vez, igual que en n26.js real —
-  // merchantHistory() + merchantMemory() puros contra la MISMA base de test.
-  const memory = merchantMemory(d.prepare(SQL.merchantHistory).all(500));
-  // Igual que en n26.js real: ids válidos por tipo, cargados una vez (ver categoryForImportedRow).
-  const expenseCatIds = d.prepare(SQL.listExpenseLeafCategories).all().map((c) => c.id);
-  const incomeCatIds = d.prepare(SQL.listIncomeCategories).all().map((c) => c.id);
-  const res = { created: 0, reconciled: 0, skipped: 0, omitted: 0, categorized: 0 };
-  const stmts = [];
-  for (const r of rows) {
-    // M4: fila de 0,00 (verificación de tarjeta) o importe no numérico (CSV corrupto) — se
-    // salta ANTES de decide/externalIdFor, se cuenta en omitted, no bloquea el resto.
-    if (r.amountCents === 0 || !Number.isFinite(r.amountCents)) { res.omitted++; continue; }
-    r.externalId = await externalIdFor(r, hashFn);
-    const decision = pure.bcDecideImportAction(r, existing);
-    if (decision.action === "skip") {
-      res.skipped++;
-    } else if (decision.action === "reconcile") {
-      const match = existing.find((t) => t.id === decision.matchId);
-      stmts.push({ sql: SQL.reconcileTx, bind: [r.externalId, NOW, match.id] });
-      match.externalId = r.externalId;
-      res.reconciled++;
-    } else {
-      const id = "tx" + Math.floor(Math.random() * 1e9);
-      const type = r.amountCents < 0 ? "expense" : "income";
-      const categoryId = categoryForImportedRow(r, memory, type === "expense" ? expenseCatIds : incomeCatIds);
-      if (categoryId) res.categorized++;
-      stmts.push({ sql: SQL.insertTransaction, bind: [id, r.bookingDate, "p1", type, Math.abs(r.amountCents),
-        "acc-n26", "", categoryId, pure.bcSanitizeCell(r.partnerName), pure.bcSanitizeCell(r.paymentReference),
-        0, null, "me", 0, "", "", "", r.externalId, 0, "reconciled", NOW, NOW] });
-      existing.push({ id, dateIso: r.bookingDate, type, amountCents: r.amountCents,
-        externalId: r.externalId, status: "reconciled" });
-      res.created++;
-    }
-  }
+/** runImportPipeline de n26.js contra node:sqlite (B-3): no hay Worker en Node (db.js depende de
+ *  él), así que se lee el contexto con la MISMA SQL que usa repo.js y se ejecutan las funciones
+ *  REALES del ensayo (planImportRows) y de la escritura (importStatements) — antes este harness
+ *  reproducía el bucle a mano. Las sentencias se ejecutan en un ÚNICO BEGIN/COMMIT/ROLLBACK, como
+ *  db-worker.js#execMany: una fila que lanzase revertiría TODO el import, igual que en producción
+ *  (condición para testear M4). `choices` = lo que el usuario decide en el paso de revisión. */
+async function runPipeline(d, rows, hashFn = sha256hex, choices = {}) {
+  const ctx = {
+    existing: d.prepare(SQL.n26Existing).all("acc-n26").map((t) => ({
+      id: t.id, dateIso: t.date, type: t.type,
+      amountCents: signedAmountCents(t.type, t.amount_cents),
+      externalId: t.external_id, status: t.status,
+    })),
+    // Registro v2 §5.5: memoria de comercios cargada UNA vez, igual que en n26.js real.
+    memory: merchantMemory(d.prepare(SQL.merchantHistory).all(500)),
+    // Igual que en n26.js real: ids válidos por tipo (ver categoryForImportedRow).
+    expenseCatIds: d.prepare(SQL.listExpenseLeafCategories).all().map((c) => c.id),
+    incomeCatIds: d.prepare(SQL.listIncomeCategories).all().map((c) => c.id),
+  };
+  const plan = await planImportRows(rows, ctx, { hashFn });
+  const { stmts, res } = importStatements(plan, {
+    periodId: "p1", accountId: "acc-n26", now: NOW, newId: () => "tx" + Math.floor(Math.random() * 1e9), ...choices,
+  });
   d.exec("BEGIN");
   try {
     for (const s of stmts) d.prepare(s.sql).run(...s.bind);
@@ -121,7 +91,7 @@ async function runPipeline(d, rows, hashFn = sha256hex) {
   return res;
 }
 
-/** Reproduce el flujo de n26.importN26Csv: parsea con pure.bcParseN26Csv y entra al pipeline. */
+/** Flujo N26: parsea con pure.bcParseN26Csv y entra al pipeline real. */
 async function runImport(d, text, hashFn = sha256hex) {
   return runPipeline(d, pure.bcParseN26Csv(text), hashFn);
 }
@@ -129,32 +99,16 @@ async function runImport(d, text, hashFn = sha256hex) {
 const metaValue = (d, key) => d.prepare(`SELECT value FROM meta WHERE key=?`).get(key).value;
 const setMetaValue = (d, key, value) => d.prepare(`UPDATE meta SET value=? WHERE key=?`).run(value, key);
 
-/** Reproduce n26.importCsv (router de Task 5, PR E) contra node:sqlite, mismo patrón que
- *  runImport/runPipeline: sniff con pure.bcParseCsvLine, N26 → runImport; si no, perfil guardado
- *  en meta.csv_profile (leído a mano, sin repo.js) + profileMatches → applyProfile + runPipeline;
- *  si no hay match → needsMapping SIN tocar la base de datos (ni siquiera se llega a leer meta si
- *  ya hace falta la comprobación N26, pero tampoco se escribe nada en ningún camino). */
+/** Reproduce n26.previewCsv + commitImport contra node:sqlite: el guard temprano de periodo, el
+ *  router PURO real (routeCsv, con meta.csv_profile leído a mano) y el pipeline real de arriba.
+ *  needsMapping no toca la base de datos. `omitted` suma las filas que applyProfile no pudo leer
+ *  (M4, igual que commitImport). */
 async function runImportRouter(d, text, hashFn = sha256hex) {
-  // Guard temprano (ruling de la review de Task 5, replicado del importCsv real de n26.js): sin
-  // periodo abierto, ni siquiera CSV basura irreconocible llega al sniff.
   if (!d.prepare(SQL.getOpenPeriod).get()) throw new Error("No hay ningún periodo abierto");
-  const { headers, sample } = sniffCsv(text, pure.bcParseCsvLine);
-  if (isN26Headers(headers)) {
-    const res = await runImport(d, text, hashFn);
-    return { ...res, via: "n26" };
-  }
-
-  const profile = parseCsvProfile(metaValue(d, "csv_profile"));
-  if (profile && profileMatches(profile, headers)) {
-    const { rows, errors } = applyProfile(text, profile, pure.bcParseCsvLine);
-    const res = await runPipeline(d, rows, hashFn);
-    // M4: res.omitted (filas de 0,00/no numéricas descartadas DENTRO del pipeline) se SUMA a
-    // errors.length (fecha/importe irreconocibles por applyProfile), nunca se pisa — mismo fix
-    // que importWithProfile en n26.js.
-    return { ...res, via: "profile", omitted: res.omitted + errors.length };
-  }
-
-  return { needsMapping: { headers, sample } };
+  const routed = routeCsv(text, metaValue(d, "csv_profile"));
+  if (routed.needsMapping) return routed;
+  const res = await runPipeline(d, routed.rows, hashFn);
+  return { ...res, via: routed.via, omitted: res.omitted + routed.parseErrors };
 }
 
 const n26Rows = (d) => d.prepare(`SELECT * FROM transactions WHERE account_id='acc-n26' AND deleted=0`).all();
@@ -379,11 +333,11 @@ test("sha256Hex: vector conocido sha256('abc')", async () => {
   assert.ok(hex.startsWith("ba7816bf"));
 });
 
-test("parseN26Csv: cabecera no reconocida lanza error (propagado a importN26Csv)", () => {
+test("parseN26Csv: cabecera no reconocida lanza error (propagado a routeCsv)", () => {
   assert.throws(() => pure.bcParseN26Csv('"foo","bar"\n"1","2"'), /Cabecera CSV de N26 no reconocida/);
 });
 
-// -------------------------------------------------------------- router (importCsv, Task 5 PR E)
+// -------------------------------------------------------------- router (previewCsv + commitImport, B-3)
 
 const PROFILE = {
   headers: ["Fecha", "Concepto", "Importe"],
@@ -402,14 +356,14 @@ const GENERIC_HEADER = '"Fecha","Concepto","Importe"';
 const GENERIC_2ROWS = [GENERIC_HEADER, genericRow(),
   genericRow({ date: "2026-08-21", concept: "Nomina", amount: "1500,00" })].join("\n");
 
-test("importCsv (router): cabeceras N26 -> mismo resultado que importN26Csv, via:'n26'", async () => {
+test("previewCsv+commitImport (router): cabeceras N26 -> mismo resultado que el flujo N26, via:'n26'", async () => {
   const d = db();
   const res = await runImportRouter(d, CSV_2ROWS);
   assert.deepEqual(res, { created: 2, reconciled: 0, skipped: 0, omitted: 0, categorized: 0, via: "n26" });
   assert.equal(n26Rows(d).length, 2);
 });
 
-test("importCsv (router): cabeceras desconocidas sin perfil -> needsMapping con headers+sample, cero inserciones", async () => {
+test("previewCsv+commitImport (router): cabeceras desconocidas sin perfil -> needsMapping con headers+sample, cero inserciones", async () => {
   const d = db();
   assert.equal(metaValue(d, "csv_profile"), ""); // valor por defecto de schema.sql: sin perfil guardado
   const res = await runImportRouter(d, GENERIC_2ROWS);
@@ -422,7 +376,7 @@ test("importCsv (router): cabeceras desconocidas sin perfil -> needsMapping con 
   assert.equal(txCount(d), 0);
 });
 
-test("importCsv (router): perfil guardado que NO matchea las cabeceras -> needsMapping", async () => {
+test("previewCsv+commitImport (router): perfil guardado que NO matchea las cabeceras -> needsMapping", async () => {
   const d = db();
   setMetaValue(d, "csv_profile", JSON.stringify({ ...PROFILE, headers: ["Otra", "Cosa"] }));
   const res = await runImportRouter(d, GENERIC_2ROWS);
@@ -431,7 +385,7 @@ test("importCsv (router): perfil guardado que NO matchea las cabeceras -> needsM
   assert.equal(txCount(d), 0);
 });
 
-test("importCsv (router): perfil que matchea -> crea y concilia por el pipeline compartido", async () => {
+test("previewCsv+commitImport (router): perfil que matchea -> crea y concilia por el pipeline compartido", async () => {
   const d = db();
   setMetaValue(d, "csv_profile", JSON.stringify(PROFILE));
   const T2 = "2026-08-19T10:00:00Z";
@@ -451,7 +405,7 @@ test("importCsv (router): perfil que matchea -> crea y concilia por el pipeline 
   assert.match(manual.external_id, /^[0-9a-f]{16}$/);
 });
 
-test("importCsv (router): reimportar el MISMO texto -> dedupe por external_id, todo skipped", async () => {
+test("previewCsv+commitImport (router): reimportar el MISMO texto -> dedupe por external_id, todo skipped", async () => {
   const d = db();
   setMetaValue(d, "csv_profile", JSON.stringify(PROFILE));
   const first = await runImportRouter(d, GENERIC_2ROWS);
@@ -462,7 +416,7 @@ test("importCsv (router): reimportar el MISMO texto -> dedupe por external_id, t
   assert.equal(n26Rows(d).length, 2);
 });
 
-test("importCsv (router): sin periodo abierto, ni un CSV basura llega al sniff — gana el mensaje de periodo", async () => {
+test("previewCsv+commitImport (router): sin periodo abierto, ni un CSV basura llega al sniff — gana el mensaje de periodo", async () => {
   const d = dbNoPeriod();
   await assert.rejects(
     () => runImportRouter(d, "esto,no,es,csv,de,ningun,banco\n1,2,3,4,5,6,7"),
@@ -470,7 +424,7 @@ test("importCsv (router): sin periodo abierto, ni un CSV basura llega al sniff �
   );
 });
 
-test("importCsv (router): filas con fecha/importe inválidos van a omitted, el resto se importa", async () => {
+test("previewCsv+commitImport (router): filas con fecha/importe inválidos van a omitted, el resto se importa", async () => {
   const d = db();
   setMetaValue(d, "csv_profile", JSON.stringify(PROFILE));
   const text = [GENERIC_HEADER, genericRow(), genericRow({ date: "no-es-fecha", concept: "Fila mala" }),

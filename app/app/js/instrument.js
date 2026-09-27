@@ -52,6 +52,8 @@ export function dispInkHtml(text, { tone = "ink" } = {}) {
  *  @param {string} [o.aside]          Texto plano 12/500 --disp-dim junto al label (p. ej. un rango
  *                                     de fechas, B-PeriodoNuevo). Se escapa. Ignorado si hay `led`
  *                                     (el LED ya ocupa ese hueco).
+ *  @param {string} [o.asideHtml]      Como `aside` pero HTML de confianza (gana a él): el «69 %» en
+ *                                     ámbar de B-Objetivo (dispInkHtml). Ignorado si hay `led`.
  *  @param {string} [o.slot]           HTML de confianza debajo de la cifra: gráfico, medidor…
  *  @param {string} [o.id]             id de la cifra, para que la pantalla la actualice.
  *  @param {string} [o.labelAfter]     HTML de confianza justo detrás de la etiqueta (un chevron que
@@ -59,7 +61,7 @@ export function dispInkHtml(text, { tone = "ink" } = {}) {
  *  @param {boolean} [o.labelStrong]   Etiqueta 15/600 en --disp-ink en vez de 13/500 dim: el
  *                                     comercio de B-Movimiento-Detalle y B-Borrar («Bar Pepe»).
  *  @returns {string} HTML */
-export function displayHtml({ label, value, size = "l", foot = "", footHtml = "", led = null, aside = "", slot = "", id = "", labelAfter = "", labelStrong = false }) {
+export function displayHtml({ label, value, size = "l", foot = "", footHtml = "", led = null, aside = "", asideHtml = "", slot = "", id = "", labelAfter = "", labelStrong = false }) {
   const px = typeof size === "number" ? size : null;
   if (px !== null && !(Number.isInteger(px) && px >= DISPLAY_PX_MIN && px <= DISPLAY_PX_MAX)) {
     throw new Error(`displayHtml: size ${size} no es un entero de ${DISPLAY_PX_MIN} a ${DISPLAY_PX_MAX} px (K9)`);
@@ -67,14 +69,14 @@ export function displayHtml({ label, value, size = "l", foot = "", footHtml = ""
   if (px === null && !DISPLAY_SIZES.includes(size)) throw new Error(`displayHtml: size «${size}» no es xl, l, m ni un número de px (K9)`);
   const sizeCls = px === null ? `disp-value-${size}` : "disp-value-free";
   const sizeStyle = px === null ? "" : ` style="--disp-fs:${px}px"`;
-  if (/\bdisp-value\b/.test(footHtml) || /\bdisp-value\b/.test(slot)) {
+  if (/\bdisp-value\b/.test(footHtml) || /\bdisp-value\b/.test(slot) || /\bdisp-value\b/.test(asideHtml)) {
     throw new Error("displayHtml: una sola cifra .disp-value por Display (K4); las secundarias van con dispInkHtml");
   }
   const pie = footHtml || (foot ? escHtml(foot) : "");
   return `<section class="disp">
     <div class="disp-head">
       <span class="disp-label${labelStrong ? " is-strong" : ""}">${escHtml(label)}${labelAfter}</span>
-      ${led ? ledHtml({ ...led, onDisplay: true }) : aside ? `<span class="num disp-aside">${escHtml(aside)}</span>` : ""}
+      ${led ? ledHtml({ ...led, onDisplay: true }) : asideHtml ? `<span class="disp-aside">${asideHtml}</span>` : aside ? `<span class="num disp-aside">${escHtml(aside)}</span>` : ""}
     </div>
     <span class="num disp-value ${sizeCls}"${sizeStyle}${id ? ` id="${escAttr(id)}"` : ""}>${escHtml(value)}</span>
     ${pie ? `<span class="disp-foot">${pie}</span>` : ""}

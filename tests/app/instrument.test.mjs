@@ -380,3 +380,11 @@ test("emptyStateHtml: arrowHeight alarga la flecha (B-Inicio-Vacio, 120) y por d
     assert.match(emptyStateHtml({ title: "x", arrow: true, arrowHeight: bad }), /height="72"/, String(bad));
   }
 });
+
+test("displayHtml: asideHtml va tal cual a la derecha de la etiqueta y gana a aside (B-Objetivo)", () => {
+  const html = displayHtml({ label: "Ahorrado", value: "1 €", aside: "texto", asideHtml: dispInkHtml("69 %", { tone: "amber" }) });
+  assert.match(html, /<span class="disp-aside"><span class="num disp-ink disp-amber">69 %<\/span><\/span>/);
+  assert.doesNotMatch(html, /texto/);
+  assert.throws(() => displayHtml({ label: "x", value: "1", asideHtml: '<span class="disp-value">2</span>' }), /K4/);
+  assert.doesNotMatch(displayHtml({ label: "x", value: "1", led: { state: "ok", text: "ok" }, asideHtml: "<b>no</b>" }), /<b>no/);
+});

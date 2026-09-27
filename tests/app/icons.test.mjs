@@ -134,3 +134,7 @@ test("icons: los tres de B-Movimientos (‹ de periodo, lupa y filtrar), verbati
 test("ICON_PATHS.archive: la caja de archivo de B-Categorias y B-Etiquetas", () => {
   assert.equal(ICON_PATHS.archive, '<path d="M4 5h16v4H4zM5.5 9v10h13V9M10 13h4"/>');
 });
+
+test("ICON_PATHS.duplicate: el de B-Movimiento-Detalle (B-5), verbatim", () => {
+  assert.equal(ICON_PATHS.duplicate, '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>');
+});

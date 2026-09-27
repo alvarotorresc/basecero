@@ -289,10 +289,10 @@ test("validate: id con caracteres no válidos se rechaza — en meta.key y en ca
 });
 test("validate: PK duplicada (dentro de la misma pestaña, meta usa key)", () => {
   const d = parse((x) => { x.meta.push({ key: "schema_version", value: "1" }); });
-  // el duplicado se reporta en la fila de la SEGUNDA aparición (fila 17: las 15 semillas —incluidas
-  // quick_register (Registro v2 §4.1), subscription_ignored/renewal_snoozed (Suscripciones) y
-  // account_style (PR-10)— + esta)
-  assert.match(validateImport(d).join("\n"), /pestaña «meta» fila 17: id duplicado \(«schema_version»\)/);
+  // el duplicado se reporta en la fila de la SEGUNDA aparición (fila 18: las 16 semillas —incluidas
+  // quick_register (Registro v2 §4.1), subscription_ignored/renewal_snoozed (Suscripciones),
+  // account_style (PR-10) y pay_day (B-1)— + esta)
+  assert.match(validateImport(d).join("\n"), /pestaña «meta» fila 18: id duplicado \(«schema_version»\)/);
 });
 test("validate: dos periodos open", () => {
   const d = parse((x) => { x.periods.push({ ...x.periods[0], id: "per-2", name: "Otro" }); });
@@ -1159,4 +1159,49 @@ test("import: una hoja SIN account_style no borra el account_style YA GUARDADO e
   const row = db2.prepare("SELECT value FROM meta WHERE key='account_style'").get();
   assert.deepEqual(JSON.parse(row.value), { "acc-n26": { fam: "oci" } },
     "el valor previo de la BD destino sobrevive: la hoja importada no lo tocó");
+});
+
+// ---- B-1: meta.pay_day (día de cobro) — mismo par que account_style: round-trip y hoja antigua. --
+
+test("round-trip: pay_day presente sobrevive export -> import -> replaceAllStmts", async () => {
+  const { normalizePayDay } = await import("../../app/app/js/pay-day.js");
+  const db = openDb(); seedMinimal(db);
+  db.prepare("UPDATE meta SET value=? WHERE key='pay_day'").run("28");
+
+  const original = dumpAll(db);
+  const wb = rowsToWorkbook(X, original);
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(validateImport(data), []);
+
+  const db2 = openDb();
+  for (const s of replaceAllStmts(data)) db2.prepare(s.sql).run(...(s.bind ?? []));
+  assert.deepEqual(dumpAll(db2), original);
+  const row = db2.prepare("SELECT value FROM meta WHERE key='pay_day'").get();
+  assert.equal(normalizePayDay(row.value), 28);
+});
+
+test("import: una hoja SIN pay_day (antigua) no se queja; en una BD nueva queda '0' = día 1", async () => {
+  const { normalizePayDay } = await import("../../app/app/js/pay-day.js");
+  const wb = wbFromSeed((d) => { d.meta = d.meta.filter((m) => m.key !== "pay_day"); });
+  const { data, errors } = workbookToRows(X, wb);
+  assert.deepEqual(errors, []);
+  assert.ok(!data.meta.some((m) => m.key === "pay_day"), "la hoja de origen no trae la clave");
+  assert.deepEqual(validateImport(data), [], "validateImport no exige pay_day");
+
+  const db2 = openDb();
+  for (const s of replaceAllStmts(data)) db2.prepare(s.sql).run(...(s.bind ?? []));
+  const row = db2.prepare("SELECT value FROM meta WHERE key='pay_day'").get();
+  assert.equal(row.value, "0");
+  assert.equal(normalizePayDay(row.value), 1);
+});
+
+test("import: un pay_day basura en la hoja no rompe nada: se lee como día 1", async () => {
+  const { normalizePayDay } = await import("../../app/app/js/pay-day.js");
+  const wb = wbFromSeed((d) => { d.meta.find((m) => m.key === "pay_day").value = "cuarenta"; });
+  const { data } = workbookToRows(X, wb);
+  assert.deepEqual(validateImport(data), []);
+  const db2 = openDb();
+  for (const s of replaceAllStmts(data)) db2.prepare(s.sql).run(...(s.bind ?? []));
+  assert.equal(normalizePayDay(db2.prepare("SELECT value FROM meta WHERE key='pay_day'").get().value), 1);
 });

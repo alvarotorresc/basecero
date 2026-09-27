@@ -1,11 +1,15 @@
 import {
   listPeriods, listAllByDay, countUncategorized, allCategoriesById, listAccounts,
-  getMetaAll, tagTotals, tagTotalsOfPeriod, spentOfPeriod, budgetsOfPeriod,
+  getMetaAll, tagTotals, tagTotalsOfPeriod, spentOfPeriod, budgetsOfPeriod, listGoals,
 } from "../repo.js";
+import { familyForAccount, parseAccountStyle } from "../account-colors.js";
+import { segmentedHtml, wireSegmented, fieldHtml } from "../controls.js";
 import { FAMILIES, familyForCategory, iconForCategory, rootOf } from "../category-colors.js";
 import { budgetMap } from "../category-spend.js";
-import { matchesFilter, isUncategorized, groupByDay, daySpentCents } from "../movimientos-filter.js";
-import { fmtMoney, moneyPartsHtml, hoyISO, prevDayIso, periodTitle } from "../format.js";
+import {
+  matchesFilter, isUncategorized, groupByDay, daySpentCents, amountBoundCents, isFilterActive, activeCategoryCount, initialFilter,
+} from "../movimientos-filter.js";
+import { fmtMoney, moneyPartsHtml, hoyISO, prevDayIso, periodTitle, currencySymbol, centsToRaw } from "../format.js";
 import { t } from "../i18n/index.js";
 import { rootHeaderHtml, buttonHtml, sharedNoteHtml } from "../ui.js";
 import { icon } from "../icons.js";
@@ -94,8 +98,9 @@ function movRowHtml(r, byId, accById, partnerName) {
  *  de filtros (B-Movimientos-Filtros) con la semántica de siempre (matchesFilter): una categoría
  *  raíz o «sin categoría», y una etiqueta. Tocar una fila abre el detalle (movimiento-detalle.js)
  *  en este mismo contenedor.
- *  `tagId` (Etiquetas, N11) llega de nav("movimientos", { tagId }) al entrar desde Etiquetas. */
-export async function renderMovimientos(container, { tagId = null } = {}) {
+ *  `tagId` (Etiquetas, N11) llega de nav("movimientos", { tagId }) al entrar desde Etiquetas, y
+ *  `accountId` de nav("movimientos", { accountId }) desde el «Ver todos» del detalle de cuenta (B-6). */
+export async function renderMovimientos(container, { tagId = null, accountId = null } = {}) {
   // Silueta gris mientras llega la primera consulta (mismo criterio que inicio.js). Solo en el
   // PRIMER pintado de esta pantalla — el testigo container.dataset.screen lo escriben SOLO Inicio y
   // Movimientos.
@@ -103,9 +108,9 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     container.dataset.screen = "movimientos";
     container.innerHTML = skeletonHtml([72, 96, 56, 320]);
   }
-  let periods, accountsAll, byId, meta;
+  let periods, accountsAll, byId, meta, goals;
   try {
-    [periods, accountsAll, byId, meta] = await Promise.all([listPeriods(), listAccounts(), allCategoriesById(), getMetaAll()]);
+    [periods, accountsAll, byId, meta, goals] = await Promise.all([listPeriods(), listAccounts(), allCategoriesById(), getMetaAll(), listGoals()]);
   } catch (e) {
     container.innerHTML = `<div class="banner-aviso is-error">${t("movimientos.error.load", { error: escHtml(userMessage(e)) })}</div>`;
     return;
@@ -117,6 +122,10 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
   }
   const accById = Object.fromEntries(accountsAll.map((a) => [a.id, a]));
   const partnerName = (meta.partner_name || "").trim();
+  // B-2: la familia de cada cuenta (muestra del Segmented «Cuenta» y de su chip). Con los objetivos,
+  // para que la hucha salga en su familia (D-impl-2).
+  const accountStyle = parseAccountStyle(meta.account_style);
+  const accFam = (id) => familyForAccount(accById[id], accountStyle, goals);
 
   const state = {
     periodId: periods.find((p) => p.status === "open")?.id ?? periods[0].id,
@@ -127,12 +136,14 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     budgetCents: 0,
     tagTotalsPeriod: [], // Task 12: n/spent_cents por etiqueta EN ESTE periodo (chips + línea de la tarjeta)
     tagTotalsAll: [], // Task 12: total de SIEMPRE por etiqueta (D7) — nombre, límite y barra de la tarjeta
-    // Task 4: filtro cliente sobre state.rows (buscador + categoría raíz + sin categoría + etiqueta).
-    // Las cuatro condiciones se combinan con AND en matchesFilter (movimientos-filter.js); la UI
-    // garantiza que rootCatId y uncat no estén activos a la vez (selección única). «Todos» = sin
-    // categoría ni «sin categoría». tagId: D13, NUNCA se autolimpia (a diferencia de rootCatId, ver
-    // loadPeriodData) y sobrevive a un cambio de periodo: una etiqueta es transversal por definición.
-    filter: { query: "", rootCatId: null, uncat: false, tagId },
+    // Filtro cliente sobre state.rows (matchesFilter, movimientos-filter.js). B-2 (filtros
+    // múltiples): varias categorías raíz en O (rootCatIds; «sin categoría» es una opción más de esa
+    // sección), y en Y con ellas la cuenta, el rango de importe, «solo compartidos», la etiqueta y
+    // la búsqueda. «Todos» = ninguna categoría elegida. Vive solo mientras dura esta pantalla: al
+    // salir de Movimientos se pierde (no se guarda en ningún sitio).
+    // tagId: D13, NUNCA se autolimpia (a diferencia de rootCatIds, ver loadPeriodData) y sobrevive a
+    // un cambio de periodo, igual que cuenta, importe y compartidos: no dependen del periodo.
+    filter: initialFilter({ tagId, accountId }),
     opening: false, // apertura de detalle en curso (ver openDetail)
   };
   let errorMsg = "";
@@ -151,9 +162,10 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     // sin esto, categorizar/borrar el último movimiento sin categorizar con el filtro activo
     // deja la lista vacía sin forma de volver: el chip desaparece (count=0) pero el filtro seguía activo.
     if (state.uncategorizedCount === 0) state.filter.uncat = false;
-    // mismo invariante para la categoría raíz activa: si el último movimiento de esa raíz se
+    // mismo invariante para las categorías raíz elegidas: si el último movimiento de una raíz se
     // recategoriza/borra, su chip desaparece de presentRootCats() pero el filtro seguía activo.
-    if (state.filter.rootCatId && !presentRootCats().includes(state.filter.rootCatId)) state.filter.rootCatId = null;
+    const present = presentRootCats();
+    state.filter.rootCatIds = state.filter.rootCatIds.filter((id) => present.includes(id));
     // D13: filter.tagId NUNCA se autolimpia aquí, a propósito (ver el comentario de state.filter).
   }
 
@@ -186,6 +198,28 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     label: t("movimientos.uncategorizedChip", { n: state.uncategorizedCount }), selected, data: { chipUncat: "1" },
   });
   const tagChipHtml = (tg, selected) => filterChipHtml({ tag: true, label: tg.name, selected, data: { chipTag: tg.id } });
+
+  /** Cuentas que ofrece la hoja (B-2): las que aparecen en los movimientos del periodo (como
+   *  origen o destino) más la elegida, en el orden de Patrimonio (listAccounts). */
+  function presentAccounts(activeId) {
+    const used = new Set();
+    for (const r of state.rows) {
+      if (r.account_id) used.add(r.account_id);
+      if (r.counter_account_id) used.add(r.counter_account_id);
+    }
+    return accountsAll.filter((a) => used.has(a.id) || a.id === activeId);
+  }
+
+  /** «Solo compartidos» solo tiene sentido si se comparte algo: con pareja configurada, con algún
+   *  compartido en el periodo o con el filtro ya puesto (para poder quitarlo). */
+  const sharingInUse = (on) => !!partnerName || on || state.rows.some((r) => r.is_shared);
+
+  /** Texto del chip de importe de la fila de arriba: «Desde 10,00 €», «Hasta 50,00 €» o ambos. */
+  function amountChipLabel(min, max) {
+    if (min !== null && max !== null) return t("movimientos.filter.chipRange", { min: fmtMoney(min), max: fmtMoney(max) });
+    if (min !== null) return t("movimientos.filter.chipFrom", { amount: fmtMoney(min) });
+    return t("movimientos.filter.chipTo", { amount: fmtMoney(max) });
+  }
 
   /** Tarjeta de la etiqueta activa (Task 12): nombre y nº de movimientos de SIEMPRE (tagTotalsAll,
    *  D7), total global con medidor SOLO si tiene límite, y la línea del periodo que se mira. Nada
@@ -271,7 +305,7 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
         ? t("movimientos.empty.noPeriod")
         : state.filter.query
           ? t("movimientos.empty.noResults")
-          : state.filter.uncat
+          : state.filter.uncat && !isFilterActive({ ...state.filter, uncat: false })
             ? t("movimientos.empty.noUncategorized")
             : t("movimientos.empty.noResults");
       return emptyStateHtml({ title: msg, rows: 2 });
@@ -309,21 +343,27 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     })}</div>`;
   }
 
-  /** Fila de chips (B-Movimientos): «Todos» neutro (relleno --accent al estar elegido), una por
-   *  categoría raíz presente con su muestra -b, «Sin categoría N» si hay, y la etiqueta activa
-   *  (si la hay) para poder quitarla de un toque. Selección única, como siempre. */
+  /** Fila de chips (B-Movimientos): «Todos» neutro (relleno --accent al estar elegido); detrás,
+   *  los filtros de la hoja que estén puestos (cuenta, importe, compartidos, etiqueta), elegidos, y
+   *  cada uno se quita de un toque; luego una chip por categoría raíz presente con su muestra -b y
+   *  «Sin categoría N» si hay. Las categorías se suman o se quitan de una en una (B-2: varias en O). */
   function chipsRowHtml() {
     const f = state.filter;
     const activeTag = f.tagId ? state.tagTotalsAll.find((tg) => tg.id === f.tagId) : null;
+    const activeAcc = f.accountId ? accById[f.accountId] : null;
     const others = [
-      ...presentRootCats().map((id) => rootChipHtml(id, f.rootCatId === id)),
-      state.uncategorizedCount > 0 ? uncatChipHtml(f.uncat) : "",
+      activeAcc ? filterChipHtml({ fam: accFam(activeAcc.id), label: activeAcc.name, selected: true, data: { chipAcc: activeAcc.id } }) : "",
+      f.minCents !== null || f.maxCents !== null
+        ? filterChipHtml({ label: amountChipLabel(f.minCents, f.maxCents), selected: true, data: { chipAmount: "1" } }) : "",
+      f.sharedOnly ? filterChipHtml({ label: t("movimientos.filter.chipShared"), selected: true, data: { chipShared: "1" } }) : "",
       activeTag ? tagChipHtml(activeTag, true) : "",
+      ...presentRootCats().map((id) => rootChipHtml(id, f.rootCatIds.includes(id))),
+      state.uncategorizedCount > 0 ? uncatChipHtml(f.uncat) : "",
     ].filter(Boolean);
     // Sin nada que elegir (periodo vacío), un «Todos» solo no dice nada: no se pinta la fila.
     if (others.length === 0) return "";
     const chips = [
-      filterChipHtml({ label: t("movimientos.chipAll"), selected: !f.rootCatId && !f.uncat, data: { chipAll: "1" } }),
+      filterChipHtml({ label: t("movimientos.chipAll"), selected: activeCategoryCount(f) === 0, data: { chipAll: "1" } }),
       ...others,
     ];
     return `<div class="mov-chips" role="group" aria-label="${escAttr(t("movimientos.filter.category"))}">${chips.join("")}</div>`;
@@ -343,7 +383,9 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     }
     // Índice de state.periodId en `periods` (ORDER BY start_date DESC): 0 es el más reciente.
     // ‹ (anterior) avanza el índice hacia atrás en el tiempo → +1; › (siguiente) → -1.
-    const nothingToFilter = presentRootCats().length === 0 && state.uncategorizedCount === 0 && visibleTags(state.filter.tagId).length === 0;
+    // B-2: con movimientos siempre hay algo que filtrar (cuenta, importe); sin ellos, el botón sigue
+    // vivo si hay un filtro puesto, para poder quitarlo.
+    const nothingToFilter = state.rows.length === 0 && !isFilterActive(state.filter) && visibleTags(state.filter.tagId).length === 0;
 
     container.innerHTML = `
       <div class="mov">
@@ -386,9 +428,10 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
 
   async function changePeriod(id, focus) {
     state.periodId = id;
-    // D13: tagId sobrevive a un cambio de periodo (una etiqueta es transversal, D7) — el resto
-    // del filtro sí es intrínseco al periodo que se deja atrás y se resetea como siempre.
-    state.filter = { query: "", rootCatId: null, uncat: false, tagId: state.filter.tagId };
+    // D13: tagId sobrevive a un cambio de periodo (una etiqueta es transversal, D7), y con él la
+    // cuenta, el importe y «solo compartidos» (B-2). Búsqueda y categorías sí son del periodo que
+    // se deja atrás (sus chips salen de sus filas) y se resetean como siempre.
+    state.filter = { ...state.filter, query: "", rootCatIds: [], uncat: false };
     try {
       await loadPeriodData();
     } catch (err) {
@@ -398,33 +441,80 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     renderList({ focus: [`${focus}:not(:disabled)`, ".mov-period-nav .icon-btn:not(:disabled)"] });
   }
 
-  /** Hoja de filtros (B-Movimientos-Filtros, sheet.js) con la semántica de siempre. Trabaja sobre
-   *  un BORRADOR: «Ver N movimientos» lo aplica; el velo, Escape o el atrás del sistema lo
-   *  descartan. N cuenta las filas que dejaría el borrador (búsqueda incluida). Solo se pintan las
-   *  secciones que la lógica actual sabe filtrar (B-2, filtros múltiples, queda fuera). */
+  /** Hoja de filtros (B-Movimientos-Filtros, sheet.js), B-2: Categorías (varias, en O; «sin
+   *  categoría» es una más), Cuenta (Segmented), Importe desde/hasta, «Solo compartidos» y
+   *  Etiqueta. Trabaja sobre un BORRADOR: «Ver N movimientos» lo aplica; el velo, Escape o el atrás
+   *  del sistema lo descartan. N cuenta las filas que dejaría el borrador (búsqueda incluida) y se
+   *  recalcula al teclear un importe SIN repintar la hoja (el campo conserva foco y cursor). */
   function openFilters() {
-    const draft = { rootCatId: state.filter.rootCatId, uncat: state.filter.uncat, tagId: state.filter.tagId };
+    const f = state.filter;
+    const rawOf = (c) => (c === null ? "" : c === 0 ? "0" : centsToRaw(c));
+    const draft = {
+      rootCatIds: [...f.rootCatIds], uncat: f.uncat, tagId: f.tagId, accountId: f.accountId, sharedOnly: f.sharedOnly,
+      minRaw: rawOf(f.minCents), maxRaw: rawOf(f.maxCents),
+    };
     let apply = false;
-    const count = () => state.rows.filter((r) => matchesFilter(r, { ...state.filter, ...draft }, byId)).length;
+    const draftFilter = () => ({
+      rootCatIds: draft.rootCatIds, uncat: draft.uncat, tagId: draft.tagId, accountId: draft.accountId,
+      sharedOnly: draft.sharedOnly, minCents: amountBoundCents(draft.minRaw), maxCents: amountBoundCents(draft.maxRaw),
+    });
+    const count = () => state.rows.filter((r) => matchesFilter(r, { ...state.filter, ...draftFilter() }, byId)).length;
+    const applyLabel = () => t("movimientos.filter.apply", { n: count() });
 
     const bodyHtml = () => {
       // En la hoja van en el orden de las familias (Casa, Alimentación, Restauración…; las que no
-      // tienen familia, al final), no en el de aparición, y la elegida lleva además su check
+      // tienen familia, al final), no en el de aparición, y las elegidas llevan además su check
       // detrás (B-Movimientos-Filtros). sort es estable: a igual familia, el orden de aparición.
       const order = (id) => { const i = FAMILIES.indexOf(familyForCategory(id, byId)); return i < 0 ? FAMILIES.length : i; };
       const cats = [...presentRootCats()].sort((a, b) => order(a) - order(b))
-        .map((id) => rootChipHtml(id, draft.rootCatId === id, true));
+        .map((id) => rootChipHtml(id, draft.rootCatIds.includes(id), true));
       if (state.uncategorizedCount > 0) cats.push(uncatChipHtml(draft.uncat));
       const tags = visibleTags(draft.tagId).map((tg) => tagChipHtml(tg, draft.tagId === tg.id));
-      const section = (id, title, chips, count = 0) => (chips.length ? `
+      const label = (id, title, n = 0) => `<h3 class="mov-flt-label" id="${id}">${escHtml(title)}${n ? ` <span class="num mov-flt-count">${n}</span>` : ""}</h3>`;
+      const section = (id, title, chips, n = 0) => (chips.length ? `
         <section class="mov-flt-sec" aria-labelledby="${id}">
-          <h3 class="mov-flt-label" id="${id}">${escHtml(title)}${count ? ` <span class="num mov-flt-count">${count}</span>` : ""}</h3>
+          ${label(id, title, n)}
           <div class="mov-flt-chips" role="group" aria-labelledby="${id}">${chips.join("")}</div>
         </section>` : "");
+
+      // Cuenta: «Todas» + las cuentas del periodo, cada una con la muestra de su familia. Con una
+      // sola cuenta no hay nada que elegir y la sección no se pinta.
+      const accs = presentAccounts(draft.accountId);
+      const accountSec = accs.length > 1 || draft.accountId ? `
+        <section class="mov-flt-sec" aria-labelledby="mov-flt-acc">
+          ${label("mov-flt-acc", t("movimientos.filter.account"))}
+          ${segmentedHtml({
+            id: "mov-flt-acc-seg", name: t("movimientos.filter.account"), labelledBy: "mov-flt-acc",
+            options: [{ value: "", label: t("movimientos.filter.allAccounts") }, ...accs.map((a) => ({ value: a.id, label: a.name, fam: accFam(a.id) }))],
+            value: draft.accountId ?? "",
+          })}
+        </section>` : "";
+
+      const amtLead = (key) => `<span class="mov-flt-amt-lead">${escHtml(t(key))}</span>`;
+      const amountSec = state.rows.length ? `
+        <section class="mov-flt-sec" aria-labelledby="mov-flt-amt">
+          ${label("mov-flt-amt", t("movimientos.filter.amount"))}
+          <div class="mov-flt-amt">
+            ${fieldHtml({ id: "mov-flt-min", label: t("movimientos.filter.fromLabel"), value: draft.minRaw, inputmode: "decimal", num: true, suffix: currencySymbol(), lead: amtLead("movimientos.filter.from"), pill: true, hideLabel: true })}
+            ${fieldHtml({ id: "mov-flt-max", label: t("movimientos.filter.toLabel"), value: draft.maxRaw, inputmode: "decimal", num: true, suffix: currencySymbol(), placeholder: t("movimientos.filter.noLimit"), lead: amtLead("movimientos.filter.to"), pill: true, hideLabel: true })}
+          </div>
+        </section>` : "";
+
+      const sharedLabel = partnerName ? t("movimientos.filter.sharedWith", { name: partnerName }) : t("movimientos.filter.shared");
+      const sharedSec = sharingInUse(draft.sharedOnly) ? `
+        <button type="button" class="mov-flt-shared" id="mov-flt-shared" role="switch" aria-checked="${draft.sharedOnly ? "true" : "false"}">
+          ${icon("people", { size: 20 })}
+          <span class="mov-flt-shared-label">${escHtml(sharedLabel)}</span>
+          <span class="ctl-switch is-accent" aria-checked="${draft.sharedOnly ? "true" : "false"}" aria-hidden="true"><span class="ctl-switch-knob"></span></span>
+        </button>` : "";
+
       return `
-        ${section("mov-flt-cat", t("movimientos.filter.categories"), cats, draft.rootCatId || draft.uncat ? 1 : 0)}
+        ${section("mov-flt-cat", t("movimientos.filter.categories"), cats, activeCategoryCount(draft))}
+        ${accountSec}
+        ${amountSec}
+        ${sharedSec}
         ${section("mov-flt-tag", t("movimientos.filter.tag"), tags)}
-        <div class="mov-flt-foot">${buttonHtml({ kind: "primary", id: "mov-flt-apply", label: t("movimientos.filter.apply", { n: count() }) })}</div>`;
+        <div class="mov-flt-foot">${buttonHtml({ kind: "primary", id: "mov-flt-apply", label: applyLabel() })}</div>`;
     };
 
     const dlg = showSheet({
@@ -437,24 +527,41 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     const body = dlg.querySelector(".sheet-body");
 
     const repaint = (focus) => {
+      const scroll = body.scrollTop;
       body.innerHTML = bodyHtml();
+      body.scrollTop = scroll;
       wireSheet();
       if (focus) dlg.querySelector(focus)?.focus();
+    };
+    // Solo la etiqueta del botón: repintar la hoja al teclear se llevaría el foco del importe.
+    const refreshApply = () => {
+      const btn = body.querySelector("#mov-flt-apply");
+      const lbl = btn?.querySelector("span");
+      if (lbl) lbl.textContent = applyLabel();
     };
     function wireSheet() {
       body.querySelectorAll("[data-chip-cat]").forEach((b) => {
         b.onclick = () => {
           const id = b.dataset.chipCat;
-          draft.rootCatId = draft.rootCatId === id ? null : id;
-          draft.uncat = false;
+          draft.rootCatIds = draft.rootCatIds.includes(id) ? draft.rootCatIds.filter((x) => x !== id) : [...draft.rootCatIds, id];
           repaint(`[data-chip-cat="${id}"]`);
         };
       });
       const uncat = body.querySelector("[data-chip-uncat]");
       if (uncat) uncat.onclick = () => {
         draft.uncat = !draft.uncat;
-        if (draft.uncat) draft.rootCatId = null;
         repaint("[data-chip-uncat]");
+      };
+      const seg = body.querySelector("#mov-flt-acc-seg");
+      if (seg) wireSegmented(seg, (v) => { draft.accountId = v || null; refreshApply(); });
+      for (const [id, key] of [["#mov-flt-min", "minRaw"], ["#mov-flt-max", "maxRaw"]]) {
+        const input = body.querySelector(id);
+        if (input) input.oninput = (e) => { draft[key] = e.target.value; refreshApply(); };
+      }
+      const shared = body.querySelector("#mov-flt-shared");
+      if (shared) shared.onclick = () => {
+        draft.sharedOnly = !draft.sharedOnly;
+        repaint("#mov-flt-shared");
       };
       body.querySelectorAll("[data-chip-tag]").forEach((b) => {
         b.onclick = () => {
@@ -466,9 +573,7 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
       body.querySelector("#mov-flt-apply").onclick = () => { apply = true; goBack(); };
     }
     dlg.querySelector("#mov-flt-clear").onclick = () => {
-      draft.rootCatId = null;
-      draft.uncat = false;
-      draft.tagId = null;
+      Object.assign(draft, { rootCatIds: [], uncat: false, tagId: null, accountId: null, sharedOnly: false, minRaw: "", maxRaw: "" });
       repaint("");
     };
     wireSheet();
@@ -476,7 +581,7 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     // sigue abierta el resto de la página es inerte, así que el repintado espera a este momento.
     dlg.addEventListener("close", () => {
       if (!apply) return;
-      Object.assign(state.filter, draft);
+      Object.assign(state.filter, draftFilter());
       renderList({ focus: "#mov-filter" });
     });
   }
@@ -503,7 +608,7 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
 
     const chipAll = container.querySelector("[data-chip-all]");
     if (chipAll) chipAll.onclick = () => {
-      state.filter.rootCatId = null;
+      state.filter.rootCatIds = [];
       state.filter.uncat = false;
       renderList({ focus: "[data-chip-all]" });
     };
@@ -511,9 +616,9 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     container.querySelectorAll(".mov-chips [data-chip-cat]").forEach((b) => {
       b.onclick = () => {
         const id = b.dataset.chipCat;
-        // tocar el chip ya activo vuelve a «Todos» (mismo toggle que «Sin categoría»).
-        state.filter.rootCatId = state.filter.rootCatId === id ? null : id;
-        state.filter.uncat = false;
+        // B-2: cada chip suma o quita su categoría (varias a la vez, en O); sin ninguna, «Todos».
+        const ids = state.filter.rootCatIds;
+        state.filter.rootCatIds = ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
         renderList({ focus: `.mov-chips [data-chip-cat="${id}"]` });
       };
     });
@@ -521,16 +626,21 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     const chipUncat = container.querySelector(".mov-chips [data-chip-uncat]");
     if (chipUncat) chipUncat.onclick = () => {
       state.filter.uncat = !state.filter.uncat;
-      if (state.filter.uncat) state.filter.rootCatId = null;
       renderList({ focus: ".mov-chips [data-chip-uncat]" });
     };
 
-    // Chip de la etiqueta activa: tocarlo quita el filtro de etiqueta (se elige en la hoja).
-    const chipTag = container.querySelector(".mov-chips [data-chip-tag]");
-    if (chipTag) chipTag.onclick = () => {
-      state.filter.tagId = null;
-      renderList({ focus: ["[data-chip-all]", "#mov-filter"] });
-    };
+    // Chips de los filtros de la hoja (etiqueta, cuenta, importe, compartidos): tocar uno lo quita
+    // (se eligen en la hoja).
+    const removers = [
+      ["[data-chip-tag]", () => { state.filter.tagId = null; }],
+      ["[data-chip-acc]", () => { state.filter.accountId = null; }],
+      ["[data-chip-amount]", () => { state.filter.minCents = null; state.filter.maxCents = null; }],
+      ["[data-chip-shared]", () => { state.filter.sharedOnly = false; }],
+    ];
+    for (const [sel, clear] of removers) {
+      const chip = container.querySelector(`.mov-chips ${sel}`);
+      if (chip) chip.onclick = () => { clear(); renderList({ focus: ["[data-chip-all]", "#mov-filter"] }); };
+    }
 
     wireListBody();
   }

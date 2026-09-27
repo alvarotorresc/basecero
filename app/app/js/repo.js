@@ -15,6 +15,9 @@ import { MEMORY_WINDOW, merchantMemory } from "./merchant-memory.js";
 import { IGNORED_MAX, parseIgnored, parseSnoozed } from "./subscriptions.js";
 import { DETECT_WINDOW_DAYS } from "./subscription-detect.js";
 import { previousPeriodOf, previousPeriodsOf } from "./informe-logic.js";
+import { transferError } from "./objetivo-logic.js";
+import { monthEndDates } from "./cuenta-logic.js";
+import { lateMoveCutoff } from "./pay-day.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -38,12 +41,12 @@ export const periodStartTooEarly = (open, startDate) => !!open && startDate <= o
  *  `type='transfer'`, `category_id=''`, `merchant` = nombre del objetivo (saneado), `is_shared=0`,
  *  `paid_by='me'`, `has_attachment=0` (un barrido nunca lleva foto). OJO TDZ: aquí NO puede
  *  declararse ningún `const t` local. */
-export function sweepTransferStmt({ periodId, date, amountCents, fromAccountId, toAccountId, goalName, now }) {
+export function sweepTransferStmt({ periodId, date, amountCents, fromAccountId, toAccountId, goalName, now, note }) {
   return {
     sql: SQL.insertTransaction,
     bind: [
       bcUlid(), date, periodId, "transfer", amountCents, fromAccountId, toAccountId,
-      "", bcSanitizeCell(goalName ?? ""), t("barrido.note"),
+      "", bcSanitizeCell(goalName ?? ""), note ?? t("barrido.note"),
       0, null, "me", 0, "", "", "", "", 0, "pending", now, now,
     ],
   };
@@ -54,15 +57,30 @@ export function sweepTransferStmt({ periodId, date, amountCents, fromAccountId, 
  *  execMany que cierra/abre/presupuesta: o queda el periodo abierto CON su barrido, o no queda
  *  nada (D8 de la spec: es lo que hace inmutable el informe del periodo recién cerrado). Sin
  *  `sweep`, cero cambios de comportamiento. */
-export async function openNextPeriod({ name, startDate, sharePct, budgets = [], sweep }) {
+export async function openNextPeriod({ name, startDate, sharePct, budgets = [], sweep, payDay }) {
   const current = await getOpenPeriod();
   if (periodStartTooEarly(current, startDate))
     throw new UserError(t("errors.repo.periodStartTooEarly"));
-  const now = nowIso();
   const newId = bcUlid();
+  await execMany(openNextPeriodStmts({ current, newId, now: nowIso(), name, startDate, sharePct, budgets, sweep, payDay }));
+  return newId;
+}
+
+/** Statements de openNextPeriod, PUROS (reciben periodo abierto, id y hora ya resueltos): así el
+ *  test ejecuta la lista real sobre SQLite. Orden: cerrar, abrir, [cierre tardío], límites,
+ *  barrido. Cierre tardío (decisión de Álvaro 2026-09-27): SOLO con día de cobro (`payDay` ≥ 2,
+ *  pay-day.js#lateMoveCutoff) y periodo que cerrar, los apuntes del que se cierra con fecha
+ *  ≥ startDate pasan al nuevo —con el reparto de los compartidos congelado antes—; sin día de
+ *  cobro la lista es EXACTAMENTE la de antes, aunque la fecha elegida sea anterior a hoy. */
+export function openNextPeriodStmts({ current, newId, now, name, startDate, sharePct, budgets = [], sweep, payDay }) {
   const stmts = [];
   if (current) stmts.push({ sql: SQL.closePeriod, bind: [prevDayIso(startDate), now, current.id] });
   stmts.push({ sql: SQL.insertPeriod, bind: [newId, name, startDate, sharePct, now, now] });
+  const cutoff = current ? lateMoveCutoff({ payDay, startIso: startDate }) : "";
+  if (cutoff) {
+    stmts.push({ sql: SQL.lateCloseFreezeShare, bind: [current.id, now, current.id, cutoff] });
+    stmts.push({ sql: SQL.lateCloseMoveTx, bind: [newId, now, current.id, cutoff] });
+  }
   for (const b of budgets) {
     stmts.push({ sql: SQL.insertBudget, bind: [bcUlid(), newId, b.categoryId, b.amountCents, now, now] });
   }
@@ -72,8 +90,7 @@ export async function openNextPeriod({ name, startDate, sharePct, budgets = [], 
       fromAccountId: sweep.fromAccountId, toAccountId: sweep.toAccountId, goalName: sweep.goalName, now,
     }));
   }
-  await execMany(stmts);
-  return newId;
+  return stmts;
 }
 
 /** Reparto por defecto del periodo (Ajustes). Valida ANTES de tocar la BD (guard puro, testeable
@@ -186,6 +203,15 @@ export async function defaultAccountId() {
 
 export const listPeriods = () => query(SQL.listPeriods);
 export const listAllByDay = (pid) => query(SQL.listAllByDay, [pid]);
+/** Cifras del periodo que se cierra SIN lo que el cierre tardío moverá (fecha ≥ `cutoff`,
+ *  pay-day.js#lateMoveCutoff): gastado, ingresos y nº de movimientos que quedan en él. */
+export async function closingFiguresBefore(pid, cutoff) {
+  const [s, i, c] = await Promise.all([
+    query(SQL.spentOfPeriodBefore, [pid, cutoff]), query(SQL.incomeOfPeriodBefore, [pid, cutoff]),
+    query(SQL.countOfPeriodBefore, [pid, cutoff]),
+  ]);
+  return { spentCents: s[0].spent_cents, incomeCents: i[0].income_cents, count: c[0].n };
+}
 export const getTransaction = async (id) => (await query(SQL.getTransaction, [id]))[0] ?? null;
 // ¿`id` tiene algún apunte de liquidación activo enlazado por ref_id (la devolución entrante o el
 // ajuste saliente)? La usa tanto Movimientos (bloquear importe/compartido en la UI) como
@@ -694,6 +720,23 @@ export async function netWorthSeries() {
   return points;
 }
 
+// ---- Detalle de cuenta (B-6, screens/cuenta.js) ------------------------------------------
+
+/** Saldo de una cuenta al cierre de cada uno de los últimos `n` meses (el último punto es hoy):
+ *  la línea del Display de B-Cuenta. Fechas de cuenta-logic.js#monthEndDates; un
+ *  accountBalanceCents por punto, en paralelo (mismo criterio que netWorthSeries). */
+export async function accountBalanceSeries(accountId, n = 6) {
+  const dates = monthEndDates(hoyISO(), n);
+  const cents = await Promise.all(dates.map((d) => accountBalanceCents(accountId, d)));
+  return dates.map((date, i) => ({ date, label: shortMonthLabel(date), cents: cents[i] }));
+}
+
+/** Movimientos del periodo que tocan la cuenta (entran o salen): «Entró» / «Salió». */
+export const accountTxOfPeriod = (accountId, periodId) => query(SQL.accountTxOfPeriod, [periodId, accountId, accountId]);
+
+/** Los últimos `limit` movimientos de la cuenta, de cualquier periodo, del más nuevo al más viejo. */
+export const accountRecentTx = (accountId, limit = 5) => query(SQL.accountRecentTx, [accountId, accountId, limit]);
+
 /** Gasto medio (spentOfPeriod) de los periodos CERRADOS — es el target del goal emergency_fund
  *  (target_months × este promedio). 0 si no hay ninguno cerrado todavía: goalProgress ya trata
  *  avgSpentCents=0 como "sin datos", pct 0 sin dividir por cero. */
@@ -1184,10 +1227,25 @@ export async function archiveCategory(id) {
   await execMany(stmts);
 }
 
-/** Desarchiva una categoría. A propósito NO desarchiva sus hijas (si se archivó en cascada, cada
- *  hija se reactiva a mano, una por una): evita reactivar en bloque subcategorías que el usuario
- *  quizá había archivado ella sola antes de archivar la raíz. */
-export const unarchiveCategory = (id) => exec(SQL.setCategoryArchived, [0, nowIso(), id]);
+/** Desarchiva una categoría. Una raíz cuyas hijas vivas estaban TODAS archivadas (se archivaron
+ *  en cascada con ella, archiveCategory) vuelve con ellas, en una sola sentencia
+ *  (restoreCategoryTree). Si alguna hija seguía activa, las archivadas lo fueron por separado y se
+ *  quedan archivadas: solo vuelve la raíz. Una hija (sin hijas propias) vuelve sola. El statement
+ *  es PURO (`children`: SQL.liveChildrenOf) para que el test lo ejecute sobre SQLite real. */
+export function unarchiveCategoryStmt(id, now, children = []) {
+  const cascade = children.length > 0 && children.every((c) => c.is_archived);
+  return cascade
+    ? { sql: SQL.restoreCategoryTree, bind: [now, id, id] }
+    : { sql: SQL.setCategoryArchived, bind: [0, now, id] };
+}
+export async function unarchiveCategory(id) {
+  const st = unarchiveCategoryStmt(id, nowIso(), await query(SQL.liveChildrenOf, [id]));
+  return exec(st.sql, st.bind);
+}
+
+/** B-8 (onboarding, paso Categorías): recupera una raíz y TODAS sus hijas vivas en una sola
+ *  sentencia, para deshacer un desmarcado del propio onboarding. */
+export const restoreCategoryTree = (id) => exec(SQL.restoreCategoryTree, [nowIso(), id, id]);
 
 /** i18n (PR i18n, Task 6, fix round 1): retraduce las categorías SEMILLA (SEED_NAMES, seeds.js)
  *  a `toLang`. IDEMPOTENTE y basada en el ESTADO de cada fila, no en si el idioma "cambió": cada
@@ -1346,3 +1404,74 @@ export async function updateTag(id, fields) {
 /** Archiva/desarchiva (D5: no hay deleteTag — solo archivar). Sin cascada: una etiqueta no tiene
  *  hijas. */
 export const setTagArchived = (id, archived) => exec(SQL.setTagArchived, [archived ? 1 : 0, nowIso(), id]);
+
+// ---- Detalle de objetivo (B-7) y «Pasar a la hucha» (B-4) --------------------
+// Bloque propio (retrocompatible): no toca goalsWithProgress ni avgSpentOfClosedPeriods. OJO TDZ:
+// ningún `const t` local en estas funciones.
+
+/** Todo lo que pinta el detalle de un objetivo, activo o pausado (getGoal no filtra is_active):
+ *  el objetivo, su progreso (goalProgress, el mismo de la tarjeta de Patrimonio), su hucha con el
+ *  saldo a hoy, los movimientos de la hucha y el gasto medio (el MISMO de goalProgress, para que
+ *  «cubre N meses» cuadre con el % del objetivo). null si
+ *  el objetivo ya no existe (borrado). El ctx de goalProgress se arma igual que en
+ *  goalsWithProgress, pero solo para este objetivo. */
+export async function goalDetail(id) {
+  const goal = await getGoal(id);
+  if (!goal) return null;
+  const today = hoyISO();
+  const [account, avgSpentCents, openPeriod, meta] = await Promise.all([
+    goal.account_id ? getAccount(goal.account_id) : Promise.resolve(null),
+    avgSpentOfClosedPeriods(), getOpenPeriod(), getMetaAll(),
+  ]);
+  const [balanceCents, movements] = account
+    ? await Promise.all([accountBalanceCents(account.id, today), query(SQL.goalAccountMovements, [account.id, account.id])])
+    : [0, []];
+  let spentByCategory = {}, savingsRatePct = 0;
+  if (openPeriod && (goal.type === "spending_cap" || goal.type === "savings_rate")) {
+    const [rootRows, spent, income] = await Promise.all([
+      spentByRootCategory(openPeriod.id), spentOfPeriod(openPeriod.id), incomeOfPeriod(openPeriod.id),
+    ]);
+    spentByCategory = Object.fromEntries(rootRows.map((r) => [r.root_id, r.spent_cents]));
+    savingsRatePct = income > 0 ? ((income - spent) / income) * 100 : 0;
+  }
+  const ctx = {
+    balanceByAccount: account ? { [account.id]: balanceCents } : {},
+    accountNameById: account ? { [account.id]: account.name } : {},
+    avgSpentCents, spentByCategory, savingsRatePct,
+  };
+  return {
+    goal,
+    progress: goalProgress(goal, ctx),
+    account: account ? { ...account, balance_cents: balanceCents } : null,
+    movements,
+    avgSpentCents,
+    todayIso: today,
+    // Día de cobro (meta.pay_day, crudo): con él las aportaciones van por periodo (objetivo-logic.js).
+    payDay: meta.pay_day,
+  };
+}
+
+/** Statement de «Pasar a la hucha» (B-4). PURO (mismo patrón que sweepTransferStmt, que es quien
+ *  arma la fila): valida y lanza UserError antes de construir nada. `fromAccount` es la fila de
+ *  getAccount (null si no existe o está borrada). Nota «A la hucha»; comercio, el objetivo. */
+export function goalTransferStmt({ goal, fromAccount, amountCents, periodId, date, now }) {
+  let err = transferError({ cents: amountCents, fromId: fromAccount?.id ?? "", toId: goal?.account_id ?? "" });
+  if (!err && (!fromAccount || fromAccount.deleted)) err = "account";
+  if (err) throw new UserError(t(`objetivo.transfer.error.${err}`));
+  return sweepTransferStmt({
+    periodId, date, amountCents, fromAccountId: fromAccount.id, toAccountId: goal.account_id,
+    goalName: goal.name, now, note: t("objetivo.transfer.note"),
+  });
+}
+
+/** «Pasar a la hucha» (B-4): transferencia de hoy, en el periodo abierto, desde `fromAccountId` a
+ *  la hucha del objetivo. La cuenta origen se relee aquí: si ya no existe, no se escribe nada. */
+export async function transferToGoal({ goal, fromAccountId, amountCents }) {
+  const [period, fromAccount] = await Promise.all([
+    getOpenPeriod(), fromAccountId ? getAccount(fromAccountId) : Promise.resolve(null),
+  ]);
+  if (!period) throw new UserError(t("errors.common.noOpenPeriod"));
+  const stmt = goalTransferStmt({ goal, fromAccount, amountCents, periodId: period.id, date: hoyISO(), now: nowIso() });
+  await exec(stmt.sql, stmt.bind);
+  return stmt.bind[0];
+}

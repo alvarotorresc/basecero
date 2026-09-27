@@ -255,6 +255,69 @@
 .cat-error svg { flex: none; }
 /* === fin: categorias === */
 
+/* === pantalla: cuenta === */
+/* B-6 · B-Cuenta: detalle de una cuenta desde Patrimonio. La familia de la cuenta llega como
+   .fam-<k> (account-colors.js, C8) y aquí solo se leen --ft/--fb/--fx. */
+.cta { display: flex; flex-direction: column; gap: var(--sp-12); }
+
+/* Display: delta del periodo en el pie, como Patrimonio (sube en --ok, baja en --disp-ink). */
+.cta-delta { font-weight: 500; }
+.cta-delta.is-up { color: var(--ok); }
+.cta-delta.is-down { color: var(--disp-ink); }
+
+/* Entró / Salió: filas 13/600 dim con la cifra mono 15/600; lo que entra en --pos. La barra del
+   original: 3 de separación. */
+.cta .sbar { gap: 3px; }
+.cta-flow { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
+.cta-flow-label { font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.cta-flow-fig { font-size: var(--fs-15); font-weight: 600; color: var(--text); white-space: nowrap; }
+.cta-flow-fig.is-in { color: var(--pos); }
+
+/* Deuda: la cuota bajo la barra, en el -x de la familia. */
+.cta-quota { margin: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--fx, var(--text-dim)); }
+
+/* Últimos movimientos (B-Cuenta): --surface con borde, relleno 12 16 8; título 15 en Unbounded y
+   «Ver todos» terciario; cabecera de día 12/600 dim. */
+.cta-recent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-12) var(--sp-16) var(--sp-8);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.cta-recent-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); min-height: 44px; }
+.cta-recent-title { margin: 0; font-family: var(--font-display); font-size: var(--fs-15); font-weight: 700; line-height: var(--lh-title); letter-spacing: -.01em; color: var(--text); }
+.cta-see-all {
+  flex: none;
+  height: 44px;
+  padding: 0 var(--sp-4);
+  border: 0;
+  background: none;
+  font-family: var(--font-body);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.cta-see-all:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+.cta-day { padding-top: var(--sp-4); font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.cta-day:first-of-type { padding-top: 0; }
+.cta-recent .ent-row { padding-left: 0; padding-right: 0; }
+
+/* Ajustes de la cuenta: bloque teñido con relleno 4 (sin familia, --surface con borde, C11) y
+   filete con la sangría de la baldosa (8 + 32 + 12). */
+.cta-group { display: flex; flex-direction: column; gap: var(--sp-8); }
+.cta-block { display: flex; flex-direction: column; padding: var(--sp-4); border-radius: var(--radius-lg); background: var(--ft); }
+.cta-block.no-fam { background: var(--surface); border: 1px solid var(--border); }
+.cta-sep { height: 1px; margin: 0 var(--sp-8) 0 calc(var(--sp-8) + 32px + var(--sp-12)); background: var(--border); }
+.cta-block .ctl-switch:disabled { cursor: default; }
+/* Tipo (B-Cuenta): cabecera de 30 con la baldosa y el segmentado a lo ancho debajo. */
+.cta-sub { display: flex; flex-direction: column; gap: var(--sp-8); padding: var(--sp-8) var(--sp-4) var(--sp-8) var(--sp-8); }
+.cta-sub .cta-sub-head { min-height: 30px; padding: 0; }
+/* === fin: cuenta === */
+
 /* === pantalla: etiquetas === */
 /* S10 · B-Etiquetas: una línea de ayuda, Abiertas como tarjetas neutras (C10: --raised con borde,
    sin color propio) con la barra por familia y su leyenda con nombre (C12), Archivadas en filas de
@@ -624,6 +687,126 @@
 }
 .imp-msg > svg { flex: none; margin-top: var(--sp-2); }
 .imp-msg p { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+/* --- Revisar (B-3): lista editable antes de escribir nada. Bloque --surface con cabeceras de día
+   y filas de 68 (nombre 15/600 + importe mono, y debajo la ficha de categoría + su origen), como
+   B-Importar; delante, la casilla que quita la fila. Las que ya estaban, aparte y atenuadas. --- */
+.imp-rev-list {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--sp-4) var(--sp-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.imp-rev-list .ent-day { padding: 10px var(--sp-8) var(--sp-2); }
+.imp-rev-row { display: flex; align-items: center; gap: var(--sp-4); padding-left: var(--sp-4); }
+.imp-rev-row > .ctl-checkbox { flex: none; }
+.imp-rev-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 68px;
+  box-sizing: border-box;
+  padding: var(--sp-8);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  text-align: left;
+  border: 0;
+  background: none;
+}
+button.imp-rev-body { cursor: pointer; }
+button.imp-rev-body:disabled { cursor: default; }
+.imp-rev-l1 { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-12); }
+.imp-rev-name {
+  min-width: 0;
+  font-size: var(--fs-15);
+  font-weight: 600;
+  line-height: var(--lh-title);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.imp-rev-amount { flex: none; font-size: var(--fs-15); font-weight: 500; }
+.imp-rev-amount.is-pos { color: var(--pos); font-weight: 600; }
+.imp-rev-l2 { display: flex; align-items: center; gap: var(--sp-8); min-width: 0; }
+/* Ruta larga («Ropa y cuidado personal › …»): la ficha encoge con elipsis en su etiqueta y el
+   origen («elegida por ti») se queda entero a su derecha, también a 390. */
+.imp-rev-l2 .ent-badge { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; }
+.imp-rev-l2 .ent-badge > svg { flex: none; }
+.imp-rev-l2 .ent-badge-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imp-rev-src { flex: none; white-space: nowrap; font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
+/* Sin categoría: píldora punteada «Elegir categoría» (B-Importar). */
+.imp-rev-pick {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  border: 1.5px dashed var(--text-dim);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.imp-rev-sep { height: 1px; margin: 0 var(--sp-8); background: var(--border); }
+/* Fila quitada: se queda en la lista (se puede volver a marcar), atenuada y sin abrir la hoja. */
+.imp-rev-row.is-off .imp-rev-body { opacity: .45; }
+.imp-rev-row.is-known { padding-left: 0; }
+.imp-rev-row.is-known .imp-rev-name,
+.imp-rev-row.is-known .imp-rev-amount { color: var(--text-dim); }
+.imp-rev-mark { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-12); font-weight: 600; color: var(--text-dim); }
+
+/* Pie fijo abajo (B-Importar): la nota de la bandeja ENCIMA del primario, sobre --surface con
+   filete. Fijo y no sticky: main#screen lleva overflow-y (sticky se pegaría a él, que no se
+   desplaza). Centrado en el ancho máximo del body (480); .imp-screen.has-foot le deja su hueco. */
+.imp-foot {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  z-index: 2;
+  width: min(100%, 480px);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding: var(--sp-12) var(--sp-16) calc(var(--sp-24) + env(safe-area-inset-bottom, 0px));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.imp-foot-note { margin: 0; text-align: center; font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+.imp-screen.has-foot { padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)); }
+
+/* Hoja de categoría: «Sin categorizar» arriba y las baldosas de familia de B-Gasto en filas de 3;
+   el panel de subcategorías cuelga de la fila de la desplegada (misma geometría que Registro). */
+.imp-sheet-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); margin-bottom: var(--sp-12); }
+.imp-grid-wrap { display: flex; flex-direction: column; gap: var(--sp-8); }
+.imp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-8); }
+.imp-subs {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  padding: var(--sp-8);
+  border-radius: var(--radius);
+  background: var(--ft);
+}
+.imp-subs-neutral { background: var(--well); }
+.imp-subs::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: calc(var(--col, 0) * ((100% - 2 * var(--sp-8)) / 3 + var(--sp-8)) + (100% - 2 * var(--sp-8)) / 6 - 6px);
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  border-radius: var(--radius-xs);
+  transform: rotate(45deg);
+}
+.imp-subs .ent-chip.ent-neutral { position: relative; }
+.imp-subs .ent-chip.ent-neutral[aria-pressed="false"] { background: var(--lift); box-shadow: inset 0 0 0 1px var(--border); font-weight: 600; }
+:root[data-theme="dark"] .imp-subs .ent-chip.ent-neutral[aria-pressed="false"] { box-shadow: inset 0 0 0 1px var(--border-strong); }
 /* === fin: importar === */
 
 /* === pantalla: informe === */
@@ -1172,11 +1355,15 @@
 .mdet-note-text { font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-body); color: var(--text); overflow-wrap: anywhere; }
 .mdet-note-field { flex: 1; min-width: 0; }
 
-/* Abajo del todo: vista, «Editar» primario a todo el ancho (B-Movimiento-Detalle) y, debajo,
-   «Borrar» (entrada destructiva, C5, D-1) solo en su fila: el mockup lo pone en una rejilla de dos
-   junto a «Duplicar», bloqueado (B-5). Edición, «Guardar cambios» y «Cancelar». */
+/* Abajo del todo: vista, «Editar» primario a todo el ancho (B-Movimiento-Detalle) y, debajo, una
+   rejilla de dos con «Duplicar» (secundario, B-5) y «Borrar» (entrada destructiva, C5, D-1),
+   exactamente como el mockup. Edición, «Guardar cambios» y «Cancelar». */
 .mdet-foot { display: flex; flex-direction: column; gap: var(--sp-8); margin-top: auto; }
 .mdet-actions { display: flex; flex-direction: column; gap: var(--sp-8); }
+/* .btn-secondary es inline-flex sin ancho propio: sin esto, dentro de la rejilla se queda al
+   ancho de su contenido en vez de ocupar su columna (.btn-danger ya es width:100%). */
+.mdet-actions-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.mdet-actions-row .btn-secondary { width: 100%; }
 .mdet-actions-edit { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-4); }
 .mdet-actions-edit .btn-tertiary { align-self: center; }
 .mdet-error {
@@ -1383,7 +1570,90 @@
 .mov-flt #mov-flt-clear { font-size: var(--fs-14); }
 .mov-flt-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); margin: calc(-1 * var(--sp-4)); padding: var(--sp-4); }
 .mov-flt-foot { position: sticky; bottom: 0; margin-top: auto; padding-top: var(--sp-8); background: var(--surface); }
+/* B-2 · Importe: dos pozos en píldora lado a lado, «Desde»/«Hasta» dentro a la izquierda, la cifra
+   a la derecha y el símbolo detrás (B-Movimientos-Filtros). */
+.mov-flt-amt { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.mov-flt-amt .ctl-field.has-lead { padding: 0 var(--sp-16); gap: var(--sp-8); }
+.mov-flt-amt .ctl-field-input { min-width: 0; text-align: right; }
+.mov-flt-amt .ctl-field-input:placeholder-shown { font-family: var(--font-body); }
+.mov-flt-amt .ctl-field-suffix { margin-left: 0; }
+.mov-flt-amt-lead { font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }
+/* B-2 · «Solo compartidos»: toda la fila es el interruptor (52 en píldora --raised con borde),
+   icono dim, texto 15/600 y la pista naranja al final. */
+.mov-flt-shared {
+  flex: none;
+  height: 52px;
+  padding: 0 var(--sp-12) 0 var(--sp-16);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  border-radius: var(--radius-pill);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: var(--fs-15);
+  font-weight: 600;
+  text-align: left;
+}
+.mov-flt-shared > svg { flex: none; color: var(--text-dim); }
+.mov-flt-shared-label { flex: 1; min-width: 0; }
+.mov-flt-shared:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
 /* === fin: movimientos === */
+
+/* === pantalla: objetivo === */
+/* B-7 (detalle de objetivo, B-Objetivo de bak-agente2) y la hoja de B-4 («Pasar a la hucha»). La
+   familia de la hucha llega como .fam-<k> y aquí solo se leen --ft/--fb/--fx. */
+.obj { display: flex; flex-direction: column; gap: var(--sp-12); }
+
+/* Display: el porcentaje a la derecha de la etiqueta, 15/600 en el ámbar de la cifra. */
+.obj .disp-aside { font-size: var(--fs-15); font-weight: 600; }
+.obj .disp-slot { display: flex; flex-direction: column; gap: var(--sp-4); margin-top: var(--sp-8); }
+.obj-disp-line { margin-top: var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--disp-dim); }
+/* Casillas de meses a cubrir: 28 de alto, 4 de separación, pista --disp-line y relleno ámbar. */
+.obj-segs { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: var(--sp-4); height: 28px; }
+.obj-seg { overflow: hidden; border-radius: var(--radius-xs); background: var(--disp-line); }
+.obj-seg-fill { display: block; height: 100%; }
+.obj-seg-axis { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: var(--sp-4); font-size: var(--fs-12); color: var(--disp-dim); text-align: right; }
+
+/* Faltan / Lo completas en: dos bentos de 124 de alto mínimo, la cifra abajo. */
+.obj-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-12); }
+.obj-bento { min-height: 124px; justify-content: space-between; }
+/* «Diciembre» va en el cuerpo, no en mono: es un nombre, no una cifra. */
+.obj-when .bento-figure { font-family: var(--font-body); }
+
+/* Aportaciones: 6 columnas de 90 con la cifra encima; el mes en curso sin aportar, discontinuo. */
+.obj-cols,
+.obj-cols-labels { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sp-8); }
+.obj-cols { height: 90px; align-items: end; }
+.obj-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: var(--sp-4); height: 100%; }
+.obj-col-amt { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
+.obj-col-amt.is-dim { color: var(--text-dim); }
+.obj-col-bar { width: 100%; border-radius: var(--radius-xs); background: var(--fb, var(--idle)); }
+.obj-col-bar.is-expected { box-sizing: border-box; background: none; border: 1.5px dashed var(--fb, var(--idle)); }
+.obj-cols-labels { text-align: center; font-size: var(--fs-12); font-weight: 600; color: var(--text-dim); }
+.obj-cols-labels .is-cur { color: var(--text); }
+.obj-before { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); padding-top: 10px; border-top: 1px solid var(--border); }
+.obj-before-label { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+.obj-before-fig { font-size: var(--fs-14); font-weight: 500; color: var(--text); white-space: nowrap; }
+
+/* Ajustes del objetivo: grupo teñido con relleno 4 (sin familia, --surface con borde, C11). */
+.obj-group { display: flex; flex-direction: column; gap: var(--sp-8); }
+.obj-block { display: flex; flex-direction: column; padding: var(--sp-4); border-radius: var(--radius-lg); background: var(--ft); }
+.obj-block.no-fam { background: var(--surface); border: 1px solid var(--border); }
+.obj-sep { height: 1px; margin: 0 var(--sp-8) 0 50px; background: var(--border); }
+.obj-tall > .ent-set { min-height: 64px; padding-right: var(--sp-4); }
+
+.obj-actions { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-12); }
+.obj-actions .btn-tertiary { align-self: center; }
+
+/* Hoja «Pasar a la hucha». */
+.obj-tr .sheet-body { display: flex; flex-direction: column; gap: var(--sp-16); }
+.obj-tr-sec { display: flex; flex-direction: column; gap: var(--sp-8); }
+.obj-tr-label { margin: 0; padding-left: var(--sp-4); font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.obj-tr-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+.obj-tr-error { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-body); color: var(--neg); }
+.obj-tr-error:empty { display: none; }
+/* === fin: objetivo === */
 
 /* === pantalla: onboarding === */
 /* S13 · B-Onb-Bienvenida, B-Onb-Cuentas, B-Onb-Ajustes (y sus BD-*), iguales al original (Álvaro
@@ -1560,6 +1830,50 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 .onb-imp-file .btn-secondary { flex: none; }
 .onb-imp-block { padding: var(--sp-16); display: flex; flex-direction: column; gap: var(--sp-12); }
 .onb-imp-summary { margin: 0; font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+/* --- Día de cobro (B-1, B-Onb-Ajustes): fila de 68 con la línea en el -x del grupo y el paso a
+   paso de teclas sueltas con borde, como el del reparto. --- */
+.onb-row-pay { min-height: 68px; }
+.onb-row-stack { display: flex; flex-direction: column; gap: var(--sp-2); }
+.onb-row-sub { font-size: var(--fs-12); font-weight: 500; color: var(--fx); }
+.onb-row-pay .ctl-stepper { padding: 0; gap: 0; background: none; box-shadow: none; }
+.onb-row-pay .ctl-stepper-btn { border: 1px solid var(--border); box-shadow: none; }
+.onb-row-pay .ctl-stepper-value { min-width: 40px; }
+
+/* --- Categorías (B-8, B-Onb-Categorias): recuento a la derecha del título, franja de colores y
+   rejilla de 2 de tarjetas-casilla. Marcada: tinte de su familia y la línea en su -x; desmarcada:
+   --surface con filete y todo en dim. --- */
+.onb-head-row { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: var(--sp-12); }
+.onb-head-text { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.onb-cats-count { flex: none; font-size: var(--fs-12); font-weight: 600; color: var(--text-dim); }
+.onb-cats-n { font-size: var(--fs-17); color: var(--text); }
+.onb-cats-strip { display: flex; gap: 3px; height: 10px; border-radius: var(--radius-pill); overflow: hidden; }
+.onb-cats-seg { flex: 1; background: var(--fb); }
+.onb-cats-seg.is-off { opacity: .35; }
+.onb-cats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.onb-cat {
+  min-height: 68px;
+  padding: 0 10px 0 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--ft);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  overflow: hidden;
+  font: inherit;
+  cursor: pointer;
+}
+.onb-cat[aria-checked="false"] { background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); }
+.onb-cat:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+.onb-cat-bar { flex: none; width: 6px; align-self: stretch; background: var(--fb); }
+.onb-cat-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.onb-cat-name { font-size: var(--fs-14); font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.onb-cat-sub { font-size: var(--fs-12); font-weight: 500; line-height: 1.2; color: var(--fx); }
+.onb-cat[aria-checked="false"] .onb-cat-name,
+.onb-cat[aria-checked="false"] .onb-cat-sub { color: var(--text-dim); }
+.onb-cat[aria-checked="true"] .ctl-checkbox-box { background: var(--text); box-shadow: none; }
 /* === fin: onboarding === */
 
 /* === pantalla: patrimonio === */
@@ -1877,6 +2191,12 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 /* --- Paneles de error y de cierre completado. --- */
 .pn-error-actions { display: flex; flex-direction: column; gap: var(--sp-8); margin-top: var(--sp-16); }
 .pn-closed-panel { display: flex; flex-direction: column; gap: var(--sp-16); padding-top: var(--sp-24); }
+/* Día de cobro (B-1, B-PeriodoNuevo): «Tu día de cobro» a la derecha del título, 12/600 dim con
+   el punto de 8 en --pos (el verde del original). */
+.pn-date-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-12); }
+.pn-date-head .ent-sec { flex: 1; min-width: 0; }
+.pn-payday-legend { flex: none; display: flex; align-items: center; gap: 6px; font-size: var(--fs-12); font-weight: 600; color: var(--text-dim); }
+.pn-payday-dot { width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--pos); }
 /* === fin: periodo-nuevo === */
 
 /* === pantalla: recurrentes === */
