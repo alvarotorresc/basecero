@@ -1217,14 +1217,18 @@ export async function archiveCategory(id) {
   await execMany(stmts);
 }
 
-/** Desarchiva una categoría. A propósito NO desarchiva sus hijas (si se archivó en cascada, cada
- *  hija se reactiva a mano, una por una): evita reactivar en bloque subcategorías que el usuario
- *  quizá había archivado ella sola antes de archivar la raíz. */
-export const unarchiveCategory = (id) => exec(SQL.setCategoryArchived, [0, nowIso(), id]);
+/** Desarchiva una categoría. Una raíz vuelve CON sus subcategorías (restoreCategoryTree, en una
+ *  sola sentencia): archiveCategory las archivó en cascada, así que desarchivar deshace lo mismo
+ *  (revisión global de la PR de lógica). Una hija no tiene hijas propias: vuelve solo ella. PURO
+ *  el statement (unarchiveCategoryStmt) para que el test lo ejecute sobre SQLite real. */
+export const unarchiveCategoryStmt = (id, now) => ({ sql: SQL.restoreCategoryTree, bind: [now, id, id] });
+export const unarchiveCategory = (id) => {
+  const st = unarchiveCategoryStmt(id, nowIso());
+  return exec(st.sql, st.bind);
+};
 
 /** B-8 (onboarding, paso Categorías): recupera una raíz y TODAS sus hijas vivas en una sola
- *  sentencia. Solo para deshacer un desmarcado del propio onboarding, donde el archivado lo hizo
- *  archiveCategory en cascada; Categorías sigue usando unarchiveCategory (sin cascada, a propósito). */
+ *  sentencia, para deshacer un desmarcado del propio onboarding (mismo SQL que unarchiveCategory). */
 export const restoreCategoryTree = (id) => exec(SQL.restoreCategoryTree, [nowIso(), id, id]);
 
 /** i18n (PR i18n, Task 6, fix round 1): retraduce las categorías SEMILLA (SEED_NAMES, seeds.js)

@@ -7,6 +7,7 @@ import { FAMILIES, isFamily, isCatIcon, parseStyle, initCategoryStyle, familyFor
 import { CAT_ICONS } from "../../app/app/js/icons.js";
 import { t } from "../../app/app/js/i18n/index.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
+import { unarchiveCategoryStmt } from "../../app/app/js/repo.js";
 
 const require = createRequire(import.meta.url);
 const pure = require("../../app/app/vendor/pure.js");
@@ -350,9 +351,10 @@ function archiveCategoryReproduced(db, id, now = T2) {
   execManyRaw(db, stmts);
 }
 
-/** Reproduce repo.unarchiveCategory: NO cascada. */
-function unarchiveCategoryReproduced(db, id, now = T2) {
-  db.prepare(SQL.setCategoryArchived).run(0, now, id);
+/** Ejecuta el statement REAL de repo.unarchiveCategory (unarchiveCategoryStmt). */
+function unarchiveCategoryReal(db, id, now = T2) {
+  const st = unarchiveCategoryStmt(id, now);
+  db.prepare(st.sql).run(...st.bind);
 }
 
 /** Reproduce repo.reorderCategories. */
@@ -563,15 +565,31 @@ test("archiveCategory (reproducido): una hija (sin hijas propias) archiva solo s
   assert.equal(getCategoryRow(db, "cat-casa").is_archived, 0, "la raíz no se ve afectada al archivar una hija");
 });
 
-test("unarchiveCategory (reproducido): desarchiva la raíz pero NO sus hijas (explícito, sin cascada)", () => {
+test("unarchiveCategory: desarchivar una raíz restaura también sus subcategorías", () => {
   const db = openDb();
   seedMinimal(db);
   archiveCategoryReproduced(db, "cat-casa"); // cascada: casa + alquiler archivadas
 
-  unarchiveCategoryReproduced(db, "cat-casa");
+  unarchiveCategoryReal(db, "cat-casa");
 
   assert.equal(getCategoryRow(db, "cat-casa").is_archived, 0, "la raíz vuelve a estar activa");
-  assert.equal(getCategoryRow(db, "cat-casa-alquiler").is_archived, 1, "la hija SIGUE archivada: desarchivar no cascada");
+  assert.equal(getCategoryRow(db, "cat-casa-alquiler").is_archived, 0, "la hija vuelve con ella");
+  assert.equal(getCategoryRow(db, "cat-nomina").is_archived, 0);
+});
+
+test("unarchiveCategory: desarchivar una hija solo la toca a ella, no a la raíz ni a sus hermanas", () => {
+  const db = openDb();
+  seedMinimal(db);
+  db.prepare(`INSERT INTO categories (id,name,parent_id,flow,need_type,display_order,is_archived,created_at,updated_at,deleted)
+    VALUES ('cat-casa-luz','Luz','cat-casa','expense','need',2,1,?,?,0)`).run(T2, T2);
+  archiveCategoryReproduced(db, "cat-casa-alquiler");
+  db.prepare("UPDATE categories SET is_archived=1 WHERE id='cat-casa'").run();
+
+  unarchiveCategoryReal(db, "cat-casa-alquiler");
+
+  assert.equal(getCategoryRow(db, "cat-casa-alquiler").is_archived, 0);
+  assert.equal(getCategoryRow(db, "cat-casa").is_archived, 1);
+  assert.equal(getCategoryRow(db, "cat-casa-luz").is_archived, 1);
 });
 
 test("reorderCategories (reproducido): persiste display_order 1..n según la posición en el array recibido", () => {
