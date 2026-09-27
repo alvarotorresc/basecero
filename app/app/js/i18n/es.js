@@ -347,6 +347,8 @@ export const ES = {
       photoClose: "Cerrar la foto",
       // S6 (B-Movimiento-Detalle): vista con «Editar», fecha de la fila y resumen del reparto.
       edit: "Editar",
+      // B-5: comparte fila con «Borrar» en el pie de la vista.
+      duplicate: "Duplicar",
       dateToday: "Hoy, {date}",
       dateYesterday: "Ayer, {date}",
       sharedMine: "Tu parte {amount}, el {pct} %",

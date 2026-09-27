@@ -21,13 +21,16 @@ import { showToast } from "../toast.js";
 import { showConfirm } from "../modal.js";
 import { showSheet } from "../sheet.js";
 import { escHtml, escAttr } from "../esc.js";
+import { buildDuplicatePrefill } from "../duplicate-prefill.js";
+import { renderRegistro } from "./registro.js";
 
 // Detalle de un movimiento (S6 del rediseño B: B-Movimiento-Detalle, B-Borrar y el visor de foto
 // de DESIGN.md §9). Dos estados en la misma pantalla:
 //  - VISTA (el mockup): Display de 48 con el comercio arriba y la cifra con signo, tarjeta de la
 //    categoría elegida, filas de ajuste (cuenta, fecha, compartido, etiqueta), la nota con la foto
-//    y, abajo, «Editar» (el primario de la vista, a todo el ancho) y debajo «Borrar» (entrada
-//    destructiva, C5), solo en su fila porque «Duplicar» está bloqueado (B-5).
+//    y, abajo, «Editar» (el primario de la vista, a todo el ancho) y debajo, en dos columnas,
+//    «Duplicar» (B-5: abre Crear gasto prellenado con la fila, fecha de hoy y sin foto — nada se
+//    escribe hasta que el usuario guarda ahí) y «Borrar» (entrada destructiva, C5).
 //  - EDICIÓN: la misma pantalla con los campos vivos (comercio e importe en el Display, categoría
 //    en una hoja, cuentas y etiquetas desplegadas bajo su fila, fecha nativa, reparto) y «Guardar
 //    cambios» como único primario. Tocar una fila o la tarjeta en la vista entra en edición con
@@ -454,7 +457,10 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
       : `${errorMsg ? `<div class="mdet-error" role="alert">${icon("warn", { size: 18 })}<span>${escHtml(errorMsg)}</span></div>` : ""}
         <div class="mdet-actions">
           ${buttonHtml({ kind: "primary", id: "mdet-edit", label: t("movimientos.detail.edit"), icon: "pencil" })}
-          ${buttonHtml({ kind: "danger-entry", id: "mdet-delete", label: t("movimientos.delete.button"), icon: "trash" })}
+          <div class="mdet-actions-row">
+            ${buttonHtml({ kind: "secondary", id: "mdet-duplicate", label: t("movimientos.detail.duplicate"), icon: "duplicate" })}
+            ${buttonHtml({ kind: "danger-entry", id: "mdet-delete", label: t("movimientos.delete.button"), icon: "trash" })}
+          </div>
         </div>`;
 
     container.innerHTML = `
@@ -592,6 +598,35 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
       window.addEventListener("popstate", onPopstate);
     } catch { /* sin entrada de historial: cerrar no toca el historial */ }
     dlg.querySelector("#mdet-viewer-close").focus();
+  }
+
+  // ---- Duplicar (B-5) -------------------------------------------------------------------------
+
+  /** Recarga los datos del periodo detrás (Movimientos) o Inicio/Semana (open-tx.js: no hace
+   *  nada). No pinta nada — es la MISMA función que `save()`/`confirmDelete()` pasan a
+   *  `writeThenRefresh`; aquí se llama a mano porque el guardado real ocurre dentro de Registro,
+   *  fuera de este cierre, y un fallo se avisa igual que allí (con un toast) sin cortar la
+   *  navegación. */
+  async function refreshBehind() {
+    try { await onChanged(); } catch (e) { showToast(t("movimientos.error.loadPeriod", { error: userMessage(e) })); }
+  }
+
+  /** «Duplicar» (B-5, decisiones.md 2026-09-27): abre Crear gasto (registro.js) prellenado con la
+   *  fila —tipo, importe, comercio, categoría, cuenta, etiqueta, reparto y nota—, fecha de hoy y
+   *  sin foto (buildDuplicatePrefill, duplicate-prefill.js). Nada se escribe hasta que el usuario
+   *  guarda AHÍ: esta pantalla no toca la BD. Se apunta una entrada de «atrás» que vuelve a ESTE
+   *  detalle (no se vuelve a llamar a renderMovimientoDetalle: repetiría onOpen y abriría una
+   *  segunda URL de la foto que nadie revocaría); cerrar Registro, guardar o el gesto del sistema
+   *  llaman todos a goBack(), que la deshace. */
+  function openDuplicate() {
+    const prefill = buildDuplicatePrefill(row, periods.find((p) => p.id === row.period_id)?.my_share_pct);
+    pushBack(() => render("#mdet-duplicate"));
+    renderRegistro(
+      container,
+      async () => { await refreshBehind(); goBack(); },
+      prefill,
+      async () => { await refreshBehind(); render("#mdet-duplicate"); },
+    );
   }
 
   // ---- Borrar --------------------------------------------------------------------------------
@@ -801,6 +836,8 @@ export async function renderMovimientoDetalle(container, txId, { onOpen = () => 
     const edit = $("#mdet-edit");
     // Con teclado (e.detail 0: Intro o Espacio) el foco va directo al comercio, el primer campo.
     if (edit) edit.onclick = (e) => enterEdit({}, e.detail === 0 ? "#mdet-merchant" : "#mdet-disp-edit");
+    const dup = $("#mdet-duplicate");
+    if (dup) dup.onclick = () => openDuplicate();
     const del = $("#mdet-delete");
     if (del) del.onclick = () => confirmDelete();
 

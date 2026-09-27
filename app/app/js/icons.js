@@ -74,6 +74,8 @@ export const ICON_PATHS = {
   filterLines:  '<path d="M4 6.5h16M7 12h10M10 17.5h4"/>',
   // (B-Categorias, B-Etiquetas) archivada: la caja de archivo del chip y de la fila discontinuos
   archive:      '<path d="M4 5h16v4H4zM5.5 9v10h13V9M10 13h4"/>',
+  // (B-Movimiento-Detalle, B-5) «Duplicar», junto a «Borrar» en el pie de la vista
+  duplicate:    '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
 };
 
 /** SVG listo para pegar. `size` en px (20 dentro de fila o botón, 24 en cabecera, 16 dentro de la
