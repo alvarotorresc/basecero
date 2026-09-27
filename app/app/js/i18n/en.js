@@ -300,6 +300,22 @@ export const EN = {
       categories: "Categories",
       tag: "Tag",
       apply: { one: "Show {n} transaction", other: "Show {n} transactions" },
+      // B-2 (multiple filters): account, amount range and shared-only, plus the chips that show
+      // them in the top row (tapping one removes it).
+      account: "Account",
+      allAccounts: "All",
+      amount: "Amount",
+      from: "From",
+      to: "To",
+      fromLabel: "Amount from",
+      toLabel: "Amount up to",
+      noLimit: "no limit",
+      shared: "Shared only",
+      sharedWith: "Only shared with {name}",
+      chipShared: "Shared",
+      chipFrom: "From {amount}",
+      chipTo: "Up to {amount}",
+      chipRange: "{min} to {max}",
     },
     // System B (S5, B-Movimientos): root header with the period on screen and a compact Display.
     header: {

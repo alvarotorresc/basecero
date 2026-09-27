@@ -316,6 +316,22 @@ export const ES = {
       categories: "Categorías",
       tag: "Etiqueta",
       apply: { one: "Ver {n} movimiento", other: "Ver {n} movimientos" },
+      // B-2 (filtros múltiples): cuenta, rango de importe y «solo compartidos», y las chips que
+      // los representan en la fila de arriba (tocarlas los quita).
+      account: "Cuenta",
+      allAccounts: "Todas",
+      amount: "Importe",
+      from: "Desde",
+      to: "Hasta",
+      fromLabel: "Importe desde",
+      toLabel: "Importe hasta",
+      noLimit: "sin tope",
+      shared: "Solo compartidos",
+      sharedWith: "Solo compartidos con {name}",
+      chipShared: "Compartidos",
+      chipFrom: "Desde {amount}",
+      chipTo: "Hasta {amount}",
+      chipRange: "De {min} a {max}",
     },
     // Sistema B (S5, B-Movimientos): cabecera de raíz con el periodo que se mira y Display compacto.
     header: {
