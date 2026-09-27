@@ -1,6 +1,6 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { initFormat, fmtMoney, fmtMoneyParts, moneyPartsHtml, currencySymbol, currencyCode, appLocale, fmtPct, fmtPct0, fmtDec1, parseCentsRaw, centsToRaw, fmtDiaCorto } from "../../app/app/js/format.js";
+import { initFormat, fmtMoney, fmtMoneyParts, moneyPartsHtml, currencySymbol, currencyCode, appLocale, fmtPct, fmtPct0, fmtDec1, parseCentsRaw, centsToRaw, fmtDiaCorto, periodTitle } from "../../app/app/js/format.js";
 
 // Intl mete espacios no separadores (U+00A0/U+202F): normalizar antes de comparar.
 const norm = (s) => s.replace(/\u00A0|\u202F/g, " ");
@@ -129,4 +129,16 @@ test("fmtDiaCorto: no toca el día ni el año, y no recorta un mes que ya viene 
   assert.equal(norm(fmtDiaCorto("2026-05-03")), "3 may");
   initFormat({ locale: "en-US" });
   assert.equal(norm(fmtDiaCorto("2026-09-12")), "Sep 12");
+});
+
+test("periodTitle: quita el año final solo si es el de hoy (B-Home, B-Movimientos: «Septiembre»)", () => {
+  assert.equal(periodTitle("Septiembre 2026", "2026-09-27"), "Septiembre");
+  assert.equal(periodTitle("September 2026", "2026-09-27"), "September", "en inglés igual");
+  assert.equal(periodTitle("Diciembre 2025", "2026-01-03"), "Diciembre 2025", "otro año: con año");
+  assert.equal(periodTitle("Vacaciones", "2026-09-27"), "Vacaciones", "sin año: tal cual");
+  assert.equal(periodTitle("2026 Septiembre", "2026-09-27"), "2026 Septiembre", "año delante: tal cual");
+  assert.equal(periodTitle("Plan 2026 de verano", "2026-09-27"), "Plan 2026 de verano", "año en medio: tal cual");
+  assert.equal(periodTitle("2026", "2026-09-27"), "2026", "solo el año: no se vacía");
+  assert.equal(periodTitle("Septiembre  2026 ", "2026-09-27"), "Septiembre  2026 ", "con espacio final no es año final");
+  assert.equal(periodTitle("", "2026-09-27"), "");
 });

@@ -1253,9 +1253,9 @@
 .mov { display: flex; flex-direction: column; gap: var(--sp-12); }
 .mov-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); }
 .mov-head .root-header { flex: 1; min-width: 0; margin-bottom: 0; padding: 0 0 0 var(--sp-4); }
-/* El nombre del periodo es texto libre («Septiembre 2026»): en una línea junto a las flechas, a 20
-   para que quepa a 390 (el 24 de la cabecera de raíz lo partía), y con elipsis si aun así no cabe. */
-.mov-head .root-header-title { font-size: var(--fs-20); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* El título es el de B-Movimientos, a 24 («Septiembre»: periodTitle quita el año en curso). Un
+   nombre largo o de otro año parte en dos líneas junto a las flechas; nunca se recorta. */
+.mov-head .root-header-title { overflow-wrap: break-word; }
 .mov-period-nav { flex: none; display: flex; gap: var(--sp-8); }
 /* En el extremo, la flecha que no lleva a ningún sitio no se desvanece: fondo --surface y el
    icono en el color del borde (B-Movimientos). */

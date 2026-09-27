@@ -5,7 +5,7 @@ import {
 import { FAMILIES, familyForCategory, iconForCategory, rootOf } from "../category-colors.js";
 import { budgetMap } from "../category-spend.js";
 import { matchesFilter, isUncategorized, groupByDay, daySpentCents } from "../movimientos-filter.js";
-import { fmtMoney, fmtMoneyParts, moneyPartsHtml, hoyISO, prevDayIso } from "../format.js";
+import { fmtMoney, fmtMoneyParts, moneyPartsHtml, hoyISO, prevDayIso, periodTitle } from "../format.js";
 import { t } from "../i18n/index.js";
 import { rootHeaderHtml, buttonHtml } from "../ui.js";
 import { icon } from "../icons.js";
@@ -357,7 +357,7 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     container.innerHTML = `
       <div class="mov">
         <div class="mov-head">
-          ${rootHeaderHtml({ title: current.name, subtitle })}
+          ${rootHeaderHtml({ title: periodTitle(current.name, hoyISO()), subtitle })}
           <div class="mov-period-nav">
             <button type="button" class="icon-btn" id="mov-period-prev" aria-label="${escAttr(t("movimientos.period.prev"))}" ${periodIdx >= periods.length - 1 ? "disabled" : ""}>${icon("chevronLeft")}</button>
             <button type="button" class="icon-btn" id="mov-period-next" aria-label="${escAttr(t("movimientos.period.next"))}" ${periodIdx <= 0 ? "disabled" : ""}>${icon("chevronRight")}</button>

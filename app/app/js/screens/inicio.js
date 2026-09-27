@@ -7,7 +7,7 @@ import {
 import { renewalNotice } from "../subscriptions.js";
 import { familyForCategory, iconForCategory, famClass } from "../category-colors.js";
 import { familyForAccount, parseAccountStyle } from "../account-colors.js";
-import { fmtMoney, fmtMoneyParts, moneyPartsHtml, fmtDiaCorto, fmtDiaIni, hoyISO, fmtPct0 } from "../format.js";
+import { fmtMoney, fmtMoneyParts, moneyPartsHtml, fmtDiaCorto, fmtDiaIni, hoyISO, fmtPct0, periodTitle } from "../format.js";
 import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
 import {
   nextAccountId, daysLeftOfPeriod, dailyAllowanceCents, daysSinceLastEntry, huchaMessage,
@@ -478,7 +478,7 @@ export async function renderInicio(container) {
   const remaining = budgetTotal ? remainingAfterRecurringCents(disponible, prevision.comprometidoCents) : null;
 
   const header = rootHeaderHtml({
-    title: period.name,
+    title: periodTitle(period.name, hoy),
     subtitle: t("inicio.b.sub", { day: today, total: days, n: Math.max(0, daysLeft) }),
     subtitleAction: { id: "inicio-periodo-header", label: t("periodo.header.title") },
   });
