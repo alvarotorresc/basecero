@@ -555,9 +555,8 @@ export function renderImportAssistant(container, a, { partnerName = "" } = {}) {
       a.saveBusy = true; a.saveError = null; render();
       try {
         await setMeta("csv_profile", JSON.stringify(profile));
-        // El resultado cuenta el IMPORT; que el perfil quede guardado para la próxima vez —lo que
-        // el usuario acaba de configurar, y que ya no vuelve a ver— lo dice este toast.
-        showToast(t("toast.profileSaved"));
+        // Que el perfil quede guardado para la próxima vez lo dice el LED de la ficha del fichero en
+        // Revisar («Perfil guardado para la próxima vez»): sin aviso, que taparía el primario.
         const preview = await previewWithProfile(a.text, profile);
         await enterReview(a, preview);
         a.saveBusy = false;
