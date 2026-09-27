@@ -1403,9 +1403,9 @@ export async function goalDetail(id) {
   const goal = await getGoal(id);
   if (!goal) return null;
   const today = hoyISO();
-  const [account, avgSpentCents, openPeriod] = await Promise.all([
+  const [account, avgSpentCents, openPeriod, meta] = await Promise.all([
     goal.account_id ? getAccount(goal.account_id) : Promise.resolve(null),
-    avgSpentOfClosedPeriods(), getOpenPeriod(),
+    avgSpentOfClosedPeriods(), getOpenPeriod(), getMetaAll(),
   ]);
   const [balanceCents, movements] = account
     ? await Promise.all([accountBalanceCents(account.id, today), query(SQL.goalAccountMovements, [account.id, account.id])])
@@ -1430,6 +1430,8 @@ export async function goalDetail(id) {
     movements,
     avgSpentCents,
     todayIso: today,
+    // Día de cobro (meta.pay_day, crudo): con él las aportaciones van por periodo (objetivo-logic.js).
+    payDay: meta.pay_day,
   };
 }
 
