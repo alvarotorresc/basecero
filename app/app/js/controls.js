@@ -84,9 +84,11 @@ export function wireSegmented(root, onChange) {
  *  es la «Fila de ajuste» que lo envuelve); `label` es su aria-label.
  *  `accent` (por defecto false): encendido en naranja (`--accent`, pomo `--raised`), como el
  *  interruptor de B-Movimientos-Filtros (F-04 retirada, Álvaro 2026-09-27: igual que el mockup).
- *  Apagado se ve igual con o sin `accent`. */
-export function switchHtml({ id, checked, label, accent = false }) {
-  return `<button type="button" class="ctl-switch${accent ? " is-accent" : ""}" id="${escAttr(id)}" role="switch" aria-checked="${checked ? "true" : "false"}" aria-label="${escAttr(label)}">
+ *  Apagado se ve igual con o sin `accent`.
+ *  `disabled` (por defecto false): el botón nativo deshabilitado (no se puede cambiar; B-6, la
+ *  cuenta por defecto encendida). Sin él, el marcado es el de siempre. */
+export function switchHtml({ id, checked, label, accent = false, disabled = false }) {
+  return `<button type="button" class="ctl-switch${accent ? " is-accent" : ""}" id="${escAttr(id)}" role="switch" aria-checked="${checked ? "true" : "false"}" aria-label="${escAttr(label)}"${disabled ? " disabled" : ""}>
     <span class="ctl-switch-knob"></span>
   </button>`;
 }
