@@ -7,7 +7,7 @@ import { segmentedHtml, wireSegmented, fieldHtml } from "../controls.js";
 import { FAMILIES, familyForCategory, iconForCategory, rootOf } from "../category-colors.js";
 import { budgetMap } from "../category-spend.js";
 import {
-  matchesFilter, isUncategorized, groupByDay, daySpentCents, amountBoundCents, isFilterActive, activeCategoryCount,
+  matchesFilter, isUncategorized, groupByDay, daySpentCents, amountBoundCents, isFilterActive, activeCategoryCount, initialFilter,
 } from "../movimientos-filter.js";
 import { fmtMoney, moneyPartsHtml, hoyISO, prevDayIso, periodTitle, currencySymbol, centsToRaw } from "../format.js";
 import { t } from "../i18n/index.js";
@@ -98,8 +98,9 @@ function movRowHtml(r, byId, accById, partnerName) {
  *  de filtros (B-Movimientos-Filtros) con la semántica de siempre (matchesFilter): una categoría
  *  raíz o «sin categoría», y una etiqueta. Tocar una fila abre el detalle (movimiento-detalle.js)
  *  en este mismo contenedor.
- *  `tagId` (Etiquetas, N11) llega de nav("movimientos", { tagId }) al entrar desde Etiquetas. */
-export async function renderMovimientos(container, { tagId = null } = {}) {
+ *  `tagId` (Etiquetas, N11) llega de nav("movimientos", { tagId }) al entrar desde Etiquetas, y
+ *  `accountId` de nav("movimientos", { accountId }) desde el «Ver todos» del detalle de cuenta (B-6). */
+export async function renderMovimientos(container, { tagId = null, accountId = null } = {}) {
   // Silueta gris mientras llega la primera consulta (mismo criterio que inicio.js). Solo en el
   // PRIMER pintado de esta pantalla — el testigo container.dataset.screen lo escriben SOLO Inicio y
   // Movimientos.
@@ -142,7 +143,7 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     // salir de Movimientos se pierde (no se guarda en ningún sitio).
     // tagId: D13, NUNCA se autolimpia (a diferencia de rootCatIds, ver loadPeriodData) y sobrevive a
     // un cambio de periodo, igual que cuenta, importe y compartidos: no dependen del periodo.
-    filter: { query: "", rootCatIds: [], uncat: false, tagId, accountId: null, minCents: null, maxCents: null, sharedOnly: false },
+    filter: initialFilter({ tagId, accountId }),
     opening: false, // apertura de detalle en curso (ver openDetail)
   };
   let errorMsg = "";
