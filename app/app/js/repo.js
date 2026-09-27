@@ -16,6 +16,7 @@ import { IGNORED_MAX, parseIgnored, parseSnoozed } from "./subscriptions.js";
 import { DETECT_WINDOW_DAYS } from "./subscription-detect.js";
 import { previousPeriodOf, previousPeriodsOf } from "./informe-logic.js";
 import { transferError } from "./objetivo-logic.js";
+import { monthEndDates } from "./cuenta-logic.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -694,6 +695,23 @@ export async function netWorthSeries() {
   ]);
   return points;
 }
+
+// ---- Detalle de cuenta (B-6, screens/cuenta.js) ------------------------------------------
+
+/** Saldo de una cuenta al cierre de cada uno de los últimos `n` meses (el último punto es hoy):
+ *  la línea del Display de B-Cuenta. Fechas de cuenta-logic.js#monthEndDates; un
+ *  accountBalanceCents por punto, en paralelo (mismo criterio que netWorthSeries). */
+export async function accountBalanceSeries(accountId, n = 6) {
+  const dates = monthEndDates(hoyISO(), n);
+  const cents = await Promise.all(dates.map((d) => accountBalanceCents(accountId, d)));
+  return dates.map((date, i) => ({ date, label: shortMonthLabel(date), cents: cents[i] }));
+}
+
+/** Movimientos del periodo que tocan la cuenta (entran o salen): «Entró» / «Salió». */
+export const accountTxOfPeriod = (accountId, periodId) => query(SQL.accountTxOfPeriod, [periodId, accountId, accountId]);
+
+/** Los últimos `limit` movimientos de la cuenta, de cualquier periodo, del más nuevo al más viejo. */
+export const accountRecentTx = (accountId, limit = 5) => query(SQL.accountRecentTx, [accountId, accountId, limit]);
 
 /** Gasto medio (spentOfPeriod) de los periodos CERRADOS — es el target del goal emergency_fund
  *  (target_months × este promedio). 0 si no hay ninguno cerrado todavía: goalProgress ya trata
