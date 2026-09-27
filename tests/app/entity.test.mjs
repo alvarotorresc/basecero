@@ -97,10 +97,25 @@ test("settingRowHtml: nunca emite fam- en el valor ni en la fila (I-61)", () => 
   const valor = html.match(/<span class="ent-set-value[^"]*">[^<]*<\/span>/)[0];
   assert.ok(!valor.includes("fam-"), valor);
   assert.match(html, /^<button type="button" class="ent-set">/, "la familia no va en la fila");
-  assert.match(html, /class="ent-tile ent-tile-32 fam-tra"/, "solo en la baldosa");
+  assert.match(html, /class="ent-tile ent-tile-30 fam-tra"/, "solo en la baldosa");
   const sinFam = settingRowHtml({ icon: "calendar", label: "El periodo empieza", value: "Día 28", valueNum: true });
   assert.ok(!sinFam.includes("fam-"));
-  assert.match(sinFam, /ent-tile ent-tile-32 ent-neutral/);
+  assert.match(sinFam, /ent-tile ent-tile-30 ent-neutral/);
+});
+
+test("settingRowHtml: baldosa de 30 con radio 8 y fila de 46 (la .sq de B-Ajustes); tileSize 32 para B-PeriodoNuevo", () => {
+  assert.match(settingRowHtml({ icon: "casa", fam: "casa", label: "Casa", tileFilled: true }), /class="ent-tile ent-tile-30 fam-casa ent-tile-filled"/);
+  assert.match(settingRowHtml({ icon: "casa", fam: "casa", label: "Casa", tileSize: 32 }), /class="ent-tile ent-tile-32 fam-casa"/);
+  assert.match(settingRowHtml({ icon: "casa", fam: "casa", label: "Casa", tileSize: 99 }), /ent-tile-30/, "otro tamaño cae al 30");
+  assert.equal(decl(".ent-tile-30", "width"), "30px");
+  assert.equal(decl(".ent-tile-30", "border-radius"), "var(--radius-tile)");
+  assert.equal(decl(".ent-set", "min-height"), "46px");
+});
+
+test("tileHtml: size 30 lleva icono 18 y la clase ent-tile-30", () => {
+  const html = tileHtml({ fam: "tra", icon: "casa", size: 30 });
+  assert.match(html, /^<span class="ent-tile ent-tile-30 fam-tra">/);
+  assert.match(html, /width="18"/);
 });
 
 test("settingRowHtml: valueFam pinta la muestra de la cuenta delante del valor, nunca en él (C8, I-61)", () => {
@@ -199,6 +214,7 @@ test("familySwatchesHtml: grupo con aria-label y una muestra aria-pressed por fa
   assert.doesNotMatch(html, /fam-rojo/);
   assert.match(html, /class="ent-fam-pick fam-casa" aria-pressed="false" aria-label="Arena" data-fam="casa"/);
   assert.match(html, /class="ent-fam-pick fam-tra" aria-pressed="true" aria-label="Cielo, la usa Cuenta" data-fam="tra"/);
+  assert.equal(decl('.ent-fam-pick[aria-pressed="true"]', "box-shadow"), "var(--ring-sel-out)", "anillo exterior con hueco (F-17 retirada)");
 });
 
 test("familySwatchesHtml: solo la elegida lleva el check; sin radios (aria-checked) y escapa el label", () => {

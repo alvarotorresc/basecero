@@ -143,7 +143,10 @@ export function rC7(rel, text) {
 // y el 16 (--fs-input) solo en inputs. La cifra del Display puede llevar además su tamaño libre
 // --disp-fs (el de su mockup, que la pantalla pone en línea), solo en selectores .disp-value (escala
 // de tres RETIRADA, Álvaro 2026-09-27: igual que el mockup).
-const TAM = /var\(--(fs-(12|13|14|15|17|20|24|30)|disp-(xl|l|m))\)/;
+// --fs-16 (cifra de cuenta del onboarding) y --fs-40 (marca de la Bienvenida): tamaños de los
+// mockups elegidos (Álvaro 2026-09-27: igual que el mockup). «El 16 solo en inputs» sigue valiendo para
+// --fs-input; el 16 de una cifra va por --fs-16.
+const TAM = /var\(--(fs-(12|13|14|15|16|17|20|24|30|40)|disp-(xl|l|m))\)/;
 const TAM_INPUT = /var\(--fs-input\)/;
 const TAM_DISP_LIBRE = /var\(--disp-fs\)/;
 const LITERAL = /(^|[\s/])\d*\.?\d+(px|rem|em|pt|%|vw|vh)\b/;
@@ -173,7 +176,9 @@ export function rFS(rel, text) {
 
 // R-RAD · DESIGN §8: radios solo de --radius*. Constantes de componente con nombre del inventario
 // (§9): la casilla, radio 7, y la muestra de 10 del chip de filtro, radio 3.
-const RAD_TOKEN = /^var\(--radius(-xs|-lg|-xl|-pill)?\)$/;
+// --radius-bar (5) y --radius-tile (8): los radios de los mockups elegidos (Álvaro 2026-09-27: igual
+// que el mockup).
+const RAD_TOKEN = /^var\(--radius(-xs|-bar|-tile|-lg|-xl|-pill)?\)$/;
 const RAD_NOMBRADO = [{ v: "7px", sel: /casilla|checkbox|check-box/ }, { v: "3px", sel: /muestra|swatch/ }];
 export function rRAD(rel, text) {
   if (!rel.endsWith(".css")) return [];
@@ -382,6 +387,9 @@ test("detectores: cazan lo que prohíben y dejan pasar lo permitido", () => {
   assert.equal(rFS("x.css", ".a{font-size:var(--fs-15)}").length, 0);
   assert.equal(rFS("x.css", ".a{font:700 var(--fs-17)/1.2 var(--font-body)}").length, 0);
   assert.equal(rFS("x.css", ".a{font-size:18px}").length, 1);
+  assert.equal(rFS("x.css", ".a{font-size:var(--fs-16)}").length, 0, "cifra de cuenta del onboarding");
+  assert.equal(rFS("x.css", ".a{font-size:var(--fs-40)}").length, 0, "marca de la Bienvenida");
+  assert.equal(rFS("x.css", ".a{font-size:var(--fs-18)}").length, 1, "un tamaño fuera de la escala");
   assert.equal(rFS("x.css", ".a{font:600 15px var(--font-body)}").length, 1);
   assert.equal(rFS("x.css", ".a{font-size:var(--fs-input)}").length, 1);
   assert.equal(rFS("x.css", ".campo input{font-size:var(--fs-input)}").length, 0);
@@ -394,6 +402,10 @@ test("detectores: cazan lo que prohíben y dejan pasar lo permitido", () => {
   assert.equal(rRAD("x.css", ".a{border-radius:var(--radius-lg)}").length, 0);
   assert.equal(rRAD("x.css", ".a{border-radius:var(--radius-xl) var(--radius-xl) 0 0}").length, 0);
   assert.equal(rRAD("x.css", ".a{border-radius:8px}").length, 1);
+  assert.equal(rRAD("x.css", ".a{border-radius:var(--radius-tile)}").length, 0, "8 del mockup, por token");
+  assert.equal(rRAD("x.css", ".a{border-radius:var(--radius-bar) var(--radius-bar) 0 0}").length, 0, "5 del mockup, por token");
+  assert.equal(rRAD("x.css", ".a{border-radius:5px}").length, 1, "el 5 literal sigue prohibido");
+  assert.equal(rRAD("x.css", ".a{border-radius:var(--radius-md)}").length, 1, "un token que no existe");
   assert.equal(rRAD("x.css", ".casilla{border-radius:7px}").length, 0);
   assert.equal(rRAD("x.css", ".chip{border-radius:7px}").length, 1);
   assert.equal(rRAD("x.css", ".muestra{border-top-left-radius:3px}").length, 0);

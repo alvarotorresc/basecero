@@ -34,9 +34,6 @@ export const ES = {
     // spec §1.4/§4, fila de liquidar.js#rowHtml.
     dateValue: "{date}",
     amountValue: "{amount}",
-    // myPartSuffix se queda en prosa (con su separador ya sin punto medio): lo siguen concatenando tal cual
-    // inicio.js y semana.js, que esta PR no toca (spec §9.1/§9.2).
-    myPartSuffix: ", tu parte {amount}",
     sharedWith: "Compartido con {name}",
     settlement: {
       theyOwe: "{name} te debe",
@@ -376,10 +373,10 @@ export const ES = {
       fallbackName: "la contraparte",
       fallbackLabel: "Contraparte",
     },
-    // partnerPaid: prosa que Inicio y Semana concatenan al comercio. paidBy y sharedOf: la nota
-    // bajo la cifra de una fila compartida de Movimientos (B-Movimientos), donde la cifra es mi
-    // parte; {amount} es el ticket entero, sin símbolo y ya envuelto en mono por movimientos.js.
-    row: { partnerPaid: ", pagó {name}, tu parte {amount}", paidBy: "pagó {name}", sharedOf: "con {name}, de {amount}" },
+    // paidBy y sharedOf: la nota bajo la cifra de una fila compartida de Movimientos, Inicio y Semana
+    // (B-Movimientos, ui.js#sharedNoteHtml), donde la cifra es mi parte; {amount} es el ticket
+    // entero, sin símbolo y ya envuelto en mono.
+    row: { paidBy: "pagó {name}", sharedOf: "con {name}, de {amount}" },
     delete: {
       button: "Borrar",
       title: "¿Borrar este movimiento?",

@@ -218,7 +218,8 @@
 .cat-parents { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
 
 /* Selector de icono: rejilla de 6, 44 de alto, --raised con borde e icono dim; el elegido, en el
-   tinte de la familia con el icono -x y --ring-sel (F-17). */
+   tinte de la familia con el icono -x, borde -b y el anillo EXTERIOR con hueco de B-Categorias-Nueva
+   (--ring-sel-out; F-17 retirada, Álvaro 2026-09-27: igual que el mockup). */
 .cat-icons { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sp-8); }
 .cat-icon-pick {
   min-width: 0;
@@ -233,7 +234,7 @@
   color: var(--text-dim);
   cursor: pointer;
 }
-.cat-icon-pick[aria-pressed="true"] { border-color: var(--fb); background: var(--ft); color: var(--fx); box-shadow: var(--ring-sel); }
+.cat-icon-pick[aria-pressed="true"] { border-color: var(--fb); background: var(--ft); color: var(--fx); box-shadow: var(--ring-sel-out); }
 .cat-icon-pick:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
 
 /* Error: neutro en --raised con el icono de aviso (C4: nada de rojo fuera de cifras). */
@@ -659,9 +660,9 @@
   background: var(--ft);
   box-shadow: inset 0 -6px 0 var(--fb);
 }
-.inf-split-seg:first-child { border-radius: var(--radius) 0 0 var(--radius); }
-.inf-split-seg:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
-.inf-split-seg:only-child { border-radius: var(--radius); }
+.inf-split-seg:first-child { border-radius: var(--radius-tile) 0 0 var(--radius-tile); }
+.inf-split-seg:last-child { border-radius: 0 var(--radius-tile) var(--radius-tile) 0; }
+.inf-split-seg:only-child { border-radius: var(--radius-tile); }
 .inf-split-name { font-size: var(--fs-12); font-weight: 600; line-height: 1.3; color: var(--fx); }
 .inf-split-amt { font-size: var(--fs-15); font-weight: 600; line-height: 1.3; color: var(--text); white-space: nowrap; }
 
@@ -808,6 +809,10 @@
 .inicio-week-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
 .inicio-label { margin: 0; font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
 .inicio-week-total { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+/* Columnas de B-Home: radio 5 en las cuatro esquinas (no solo arriba) y 7 entre columnas. */
+.inicio-week .col-bar { border-radius: var(--radius-bar); }
+.inicio-week .cols,
+.inicio-week .cols-labels { gap: 7px; }
 /* Semana sin gasto (B-Inicio-Vacio): columnas de 6 en pozo, hoy en tinta. */
 .inicio-week.is-zero .cols { height: 32px; }
 .inicio-week.is-zero .col-bar { min-height: 6px; background: var(--well); box-shadow: var(--sh-well); }
@@ -1249,9 +1254,9 @@
 .mov { display: flex; flex-direction: column; gap: var(--sp-12); }
 .mov-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); }
 .mov-head .root-header { flex: 1; min-width: 0; margin-bottom: 0; padding: 0 0 0 var(--sp-4); }
-/* El nombre del periodo es texto libre («Septiembre 2026»): en una línea junto a las flechas, a 20
-   para que quepa a 390 (el 24 de la cabecera de raíz lo partía), y con elipsis si aun así no cabe. */
-.mov-head .root-header-title { font-size: var(--fs-20); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* El título es el de B-Movimientos, a 24 («Septiembre»: periodTitle quita el año en curso). Un
+   nombre largo o de otro año parte en dos líneas junto a las flechas; nunca se recorta. */
+.mov-head .root-header-title { overflow-wrap: break-word; }
 .mov-period-nav { flex: none; display: flex; gap: var(--sp-8); }
 /* En el extremo, la flecha que no lleva a ningún sitio no se desvanece: fondo --surface y el
    icono en el color del borde (B-Movimientos). */
@@ -1423,15 +1428,23 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .onb-msg svg { flex: none; }
 
-/* --- Marca de Bienvenida (B-Onb-Bienvenida): el nombre en Unbounded, sin logo, y la línea de
-   producto. --- */
+/* --- Marca de Bienvenida (B-Onb-Bienvenida): el logo de la hucha (decisión de Álvaro 2026-09-27,
+   D-impl-5) delante del nombre en Unbounded 40 del original, y la línea de producto. --- */
 .onb-brand { padding: var(--sp-12) var(--sp-4) var(--sp-8); display: flex; flex-direction: column; gap: var(--sp-8); }
+.onb-brand-row { display: flex; align-items: center; gap: var(--sp-12); }
+.onb-logo { flex: none; display: block; }
+/* Logo en tokens (D-impl-5, §Desviaciones): el fondo es el naranja de marca y la tinta la que va
+   sobre él. Excepción registrada en design-rules.test (R-C1, .onb-logo-bg). */
+.onb-logo-bg { fill: var(--accent); }
+.onb-logo-ink { fill: var(--on-accent); }
+.onb-logo-line { fill: none; stroke: var(--on-accent); }
 .onb-wordmark {
   margin: 0;
+  min-width: 0;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: var(--disp-m);
-  line-height: var(--lh-title);
+  font-size: var(--fs-40);
+  line-height: 1.1;
   letter-spacing: -.03em;
 }
 .onb-tagline { font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
@@ -1480,7 +1493,7 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 .onb-acc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
 .onb-acc-name { font-size: var(--fs-15); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .onb-acc-line { font-size: var(--fs-12); font-weight: 500; color: var(--fx); }
-.onb-acc-amount { flex: none; font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+.onb-acc-amount { flex: none; font-size: var(--fs-16); font-weight: 600; color: var(--text); }
 .onb-acc-amount.is-neg { color: var(--neg); }
 /* Papelera: entrada destructiva en rojo (D-1, «rojo en todas partes»), sin fondo ni borde. */
 .onb-acc-del { background: none; border: 0; color: var(--neg); }
@@ -1666,6 +1679,8 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
    relleno 4 (sin familia, --surface con borde, C11) y filas de ajuste con baldosa rellena y filete
    con la sangría de la baldosa. Una línea de ayuda como mucho por sección (K14). */
 .pat-group { display: flex; flex-direction: column; gap: var(--sp-8); }
+/* El selector de color de la cuenta va sobre el fondo de pantalla: el hueco del anillo exterior, en --bg. */
+.pat-group .ent-fam-picker { --ring-gap: var(--bg); }
 .pat-block {
   display: flex;
   flex-direction: column;
@@ -1721,6 +1736,8 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
    seleccionable, fila de reparto compartido, importe hundido reutilizado en límite/ingresos
    previstos/barrido, y el resumen de "Presupuestado". */
 .pn-blocks { display: flex; flex-direction: column; gap: var(--sp-16); }
+/* Baldosa de 32 de las filas de límite con el radio 8 de B-PeriodoNuevo (.sq). */
+.pn-blocks .ent-tile-32 { border-radius: var(--radius-tile); }
 .pn-section { display: flex; flex-direction: column; gap: var(--sp-12); }
 .pn-section-head { display: flex; flex-direction: column; gap: var(--sp-4); }
 /* K14: una línea de ayuda como mucho por sección. */
@@ -1894,7 +1911,7 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 
 /* Barra del héroe: lo pagado en --disp-dim y lo pendiente en ámbar (.disp-amber-fill), 10 de alto
    con 3 de separación; lo pendiente nunca baja de 14 para que se vea. */
-.rec-hero-bar { display: flex; gap: 3px; height: 10px; margin-top: 10px; border-radius: var(--radius-xs); overflow: hidden; }
+.rec-hero-bar { display: flex; gap: 3px; height: 10px; margin-top: 10px; border-radius: var(--radius-bar); overflow: hidden; }
 .rec-hero-paid { flex-grow: 0; flex-shrink: 1; background: var(--disp-dim); }
 .rec-hero-pending { flex-grow: 0; flex-shrink: 0; min-width: 14px; }
 
@@ -2295,12 +2312,11 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   justify-content: flex-start;
   gap: var(--sp-16);
   padding: max(var(--sp-16), min(108px, 12.8vh)) var(--sp-16) var(--sp-16);
-  /* Velo y sombra de B-Recibo (.62 y 0 14 28 .4, más densos que --scrim y --sh-alert), sacados de
-     --disp (casi negro en los dos temas) para no añadir tokens. */
-  background: color-mix(in srgb, var(--disp) 62%, transparent);
+  /* Velo de B-Recibo (.62, más denso que --scrim). */
+  background: var(--scrim-recibo);
   animation: bc-recibo-veil 150ms ease-out;
 }
-.recibo-ticket { width: 310px; max-width: 100%; filter: drop-shadow(0 14px 28px color-mix(in srgb, var(--disp) 40%, transparent)); animation: bc-recibo-in 250ms ease-out; }
+.recibo-ticket { width: 310px; max-width: 100%; filter: drop-shadow(var(--sh-ticket)); animation: bc-recibo-in 250ms ease-out; }
 .recibo-edge { display: block; width: 100%; height: 10px; color: var(--raised); }
 .recibo-body { display: flex; flex-direction: column; gap: var(--sp-12); padding: 14px var(--sp-20) 18px; background: var(--raised); color: var(--text); }
 .recibo-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
@@ -2315,12 +2331,12 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   flex: none;
   padding: 3px;
   border: 2px solid currentColor;
-  border-radius: var(--radius);
+  border-radius: var(--radius-tile);
   color: var(--fx, var(--text));
   transform: rotate(-8deg);
   animation: bc-recibo-stamp 200ms ease-out 250ms backwards;
 }
-.recibo-stamp-in { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: var(--sp-4) var(--sp-12); border: 1px solid currentColor; border-radius: var(--radius-xs); }
+.recibo-stamp-in { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: var(--sp-4) var(--sp-12); border: 1px solid currentColor; border-radius: var(--radius-bar); }
 .recibo-stamp-label { font-family: var(--font-display); font-size: var(--fs-13); font-weight: 700; line-height: var(--lh-title); }
 /* La fecha va en el color del sello, como en B-Recibo (C7 retirada ahí: .is-fam-ink). */
 .recibo-stamp-date { font-size: var(--fs-12); font-weight: 600; }

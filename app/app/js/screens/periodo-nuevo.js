@@ -437,7 +437,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
   function budgetRowHtml(r) {
     const sub = mode === "next" ? t("periodo.budget.lastMonth", { name: closingPeriod.name, amount: fmtMoney(r.spent_cents) }) : "";
     return settingRowHtml({
-      icon: iconForCategory(r.root_id, byId), fam: familyForCategory(r.root_id, byId), tileFilled: true,
+      icon: iconForCategory(r.root_id, byId), fam: familyForCategory(r.root_id, byId), tileFilled: true, tileSize: 32,
       label: r.name, sub, controlHtml: budgetFieldHtml(r), id: `pn-budget-row-${r.root_id}`,
     });
   }
@@ -458,9 +458,9 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
         ${visibleRows.map((r, i) => `${i > 0 ? '<hr class="pn-row-sep">' : ""}${budgetRowHtml(r)}`).join("")}
         ${hiddenRows.length ? `
         ${visibleRows.length ? '<hr class="pn-row-sep">' : ""}
-        ${settingRowHtml({ icon: "plus", label: t("periodo.budget.addAnother"), chevron: false, id: "pn-add-limite" })}
+        ${settingRowHtml({ icon: "plus", label: t("periodo.budget.addAnother"), chevron: false, id: "pn-add-limite", tileSize: 32 })}
         ${state.addOpen ? `<div class="pn-add-list">${hiddenRows.map((r) => settingRowHtml({
-          icon: iconForCategory(r.root_id, byId), fam: familyForCategory(r.root_id, byId), tileFilled: true, label: r.name,
+          icon: iconForCategory(r.root_id, byId), fam: familyForCategory(r.root_id, byId), tileFilled: true, tileSize: 32, label: r.name,
           chevron: false, id: `pn-add-cat-${r.root_id}`, data: { addRoot: r.root_id },
         })).join("")}</div>` : ""}` : ""}
       </div>

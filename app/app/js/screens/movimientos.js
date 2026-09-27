@@ -5,9 +5,9 @@ import {
 import { FAMILIES, familyForCategory, iconForCategory, rootOf } from "../category-colors.js";
 import { budgetMap } from "../category-spend.js";
 import { matchesFilter, isUncategorized, groupByDay, daySpentCents } from "../movimientos-filter.js";
-import { fmtMoney, fmtMoneyParts, moneyPartsHtml, hoyISO, prevDayIso } from "../format.js";
+import { fmtMoney, moneyPartsHtml, hoyISO, prevDayIso, periodTitle } from "../format.js";
 import { t } from "../i18n/index.js";
-import { rootHeaderHtml, buttonHtml } from "../ui.js";
+import { rootHeaderHtml, buttonHtml, sharedNoteHtml } from "../ui.js";
 import { icon } from "../icons.js";
 import { displayHtml, dispInkHtml, meterHtml, emptyStateHtml } from "../instrument.js";
 import { filterChipHtml, txRowHtml, dayHeaderHtml } from "../entity.js";
@@ -37,10 +37,6 @@ function dayHeaderFor(date, hoy, totalCents) {
 
 /** «24,00» del «con Marta, de 24,00» (B-Movimientos): la cifra sin el símbolo de moneda cuando va
  *  detrás; si el locale lo pone delante, se queda (va dentro de `main`). */
-function bareAmount(cents) {
-  const { main, cents: c } = fmtMoneyParts(Math.abs(cents));
-  return `${main}${c}`.trim();
-}
 
 /** «Casa › Supermercado» (B-Movimientos, línea 2 de la fila): la raíz y la hoja, o solo la raíz. */
 function categoryPath(catId, byId) {
@@ -80,11 +76,6 @@ function movRowHtml(r, byId, accById, partnerName) {
   const isExpense = r.type === "expense";
   const fam = uncategorized || r.type === "income" ? null : familyForCategory(r.category_id, byId);
   const shared = !!r.is_shared;
-  const who = escHtml(partnerName || t("movimientos.shared.fallbackName"));
-  const shareNoteHtml = !shared ? ""
-    : r.paid_by === "partner"
-      ? t("movimientos.row.paidBy", { name: who })
-      : t("movimientos.row.sharedOf", { name: who, amount: `<span class="num">${escHtml(bareAmount(r.amount_cents))}</span>` });
   return txRowHtml({
     fam,
     icon: uncategorized ? "plus" : iconForCategory(r.category_id, byId),
@@ -93,7 +84,7 @@ function movRowHtml(r, byId, accById, partnerName) {
     amountHtml: moneyPartsHtml(Math.abs(shared ? r.my_amount_cents : r.amount_cents)),
     sign: isExpense ? "expense" : "income",
     amountWeight: 500,
-    amountNoteHtml: shareNoteHtml,
+    amountNoteHtml: sharedNoteHtml(r, partnerName),
     data,
   });
 }
@@ -357,7 +348,7 @@ export async function renderMovimientos(container, { tagId = null } = {}) {
     container.innerHTML = `
       <div class="mov">
         <div class="mov-head">
-          ${rootHeaderHtml({ title: current.name, subtitle })}
+          ${rootHeaderHtml({ title: periodTitle(current.name, hoyISO()), subtitle })}
           <div class="mov-period-nav">
             <button type="button" class="icon-btn" id="mov-period-prev" aria-label="${escAttr(t("movimientos.period.prev"))}" ${periodIdx >= periods.length - 1 ? "disabled" : ""}>${icon("chevronLeft")}</button>
             <button type="button" class="icon-btn" id="mov-period-next" aria-label="${escAttr(t("movimientos.period.next"))}" ${periodIdx <= 0 ? "disabled" : ""}>${icon("chevronRight")}</button>

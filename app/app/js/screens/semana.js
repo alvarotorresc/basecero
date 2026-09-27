@@ -8,7 +8,7 @@ import { fmtMoney, fmtMoneyParts, moneyPartsHtml, fmtDiaIni, hoyISO } from "../f
 import { t, monthLong } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 import { openTxDetail } from "../open-tx.js";
-import { subHeaderHtml } from "../ui.js";
+import { subHeaderHtml, sharedNoteHtml } from "../ui.js";
 import { displayHtml, dispInkHtml, columnsHtml, meterHtml, containerHtml, emptyStateHtml } from "../instrument.js";
 import { txRowHtml } from "../entity.js";
 
@@ -42,16 +42,12 @@ function movRowHtml(r, byId, partnerName) {
   // C9: los ingresos y «sin categoría» van sin familia (--well, icono en tinta). Una devolución
   // lleva la familia de su categoría de gasto, como en Movimientos e Inicio.
   const fam = (isExpense || r.type === "refund") && cat ? familyForCategory(r.category_id, byId) : null;
-  const shareNote = !r.is_shared ? ""
-    : r.paid_by === "partner"
-      ? t("movimientos.row.partnerPaid", { name: partnerName || t("movimientos.shared.fallbackName"), amount: fmtMoney(r.my_amount_cents) })
-      : t("common.myPartSuffix", { amount: fmtMoney(r.my_amount_cents) });
   return txRowHtml({
     fam, icon: cat ? iconForCategory(r.category_id, byId) : (isExpense ? "otr" : ""),
     title: r.merchant || cat?.name || t("semana.uncategorized"), line2: path,
-    amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)), sign: isExpense ? "expense" : "income",
-    // La nota va debajo de la cifra: sin el separador de prosa con el que se concatenaba al nombre.
-    amountNote: shareNote.replace(/^,\s*/, ""),
+    // Compartido: MI parte, con la nota de Movimientos debajo («con Marta, de 24,00» / «pagó Marta»).
+    amountHtml: moneyPartsHtml(Math.abs(r.is_shared ? r.my_amount_cents : r.amount_cents)), sign: isExpense ? "expense" : "income",
+    amountNoteHtml: sharedNoteHtml(r, partnerName),
     data: { tx: r.id },
     // B-Semana: cifra 500 (F-34 retirada, Álvaro 2026-09-27); el alto de 56 lo pone screens.css.
     amountWeight: 500,
