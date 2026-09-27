@@ -102,10 +102,24 @@ test("categoryArchiveDiff: archiva las desmarcadas y recupera las que se vuelven
   const roots = onbCategoryRoots(CATS);
   assert.deepEqual(categoryArchiveDiff(roots, new Set(["cat-casa", "cat-ocio"])), { archive: [], restore: [] });
   assert.deepEqual(categoryArchiveDiff(roots, new Set(["cat-casa"])), { archive: ["cat-ocio"], restore: [] });
-  // Solo se recupera lo que archivó ESTE paso: cat-regalos ya venía archivada de antes.
-  assert.deepEqual(categoryArchiveDiff(roots, new Set(["cat-casa", "cat-ocio", "cat-regalos"])), { archive: [], restore: [] });
-  assert.deepEqual(categoryArchiveDiff(roots, new Set(["cat-casa", "cat-ocio", "cat-regalos"]), new Set(["cat-regalos"])),
+  // Con 0 periodos solo el propio onboarding puede haber archivado: el estado sale de is_archived
+  // de la BD (no de memoria), así que volver a marcar una archivada la recupera aunque se haya
+  // recargado la pestaña entre medias.
+  assert.deepEqual(categoryArchiveDiff(roots, new Set(["cat-casa", "cat-ocio", "cat-regalos"])),
     { archive: [], restore: ["cat-regalos"] });
+});
+
+test("categoryArchiveDiff: tras recargar a mitad (roots releídas de la BD), volver a marcar recupera", () => {
+  const db = openDb();
+  seedMinimal(db);
+  db.prepare("UPDATE categories SET is_archived=1 WHERE id IN ('cat-casa','cat-casa-alquiler')").run();
+  // Recarga: las raíces se reconstruyen desde la BD, sin ningún estado en memoria.
+  const roots = onbCategoryRoots(db.prepare("SELECT * FROM categories").all());
+  assert.equal(roots.find((r) => r.id === "cat-casa").checked, false);
+  const { restore } = categoryArchiveDiff(roots, new Set(["cat-casa"]));
+  assert.deepEqual(restore, ["cat-casa"]);
+  for (const id of restore) db.prepare(SQL.restoreCategoryTree).run(T, id, id);
+  assert.deepEqual(db.prepare("SELECT is_archived FROM categories WHERE id IN ('cat-casa','cat-casa-alquiler')").all().map((r) => r.is_archived), [0, 0]);
 });
 
 // ---- SQL.restoreCategoryTree (B-8): volver a marcar en el onboarding recupera la raíz Y sus hijas

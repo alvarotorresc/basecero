@@ -96,8 +96,6 @@ export async function renderOnboarding(container, { onDone }) {
     // Paso Categorías (B-8): raíces de gasto tal como están en la BD y las marcadas en pantalla.
     cats: null,
     checked: new Set(),
-    // Raíces que archivó este paso (y solo esas se recuperan al volver a marcarlas).
-    archivedHere: new Set(),
     view: "steps", // "steps" | "import"
     imp: null,
     busy: false,
@@ -539,9 +537,9 @@ export async function renderOnboarding(container, { onDone }) {
       if (!canLeaveCategories(state.checked.size)) { state.errorMsg = t("onboardingCategories.needOne"); render(); return; }
       state.busy = true;
       try {
-        const { archive, restore } = categoryArchiveDiff(state.cats, state.checked, state.archivedHere);
-        for (const id of archive) { await archiveCategory(id); state.archivedHere.add(id); }
-        for (const id of restore) { await restoreCategoryTree(id); state.archivedHere.delete(id); }
+        const { archive, restore } = categoryArchiveDiff(state.cats, state.checked);
+        for (const id of archive) await archiveCategory(id);
+        for (const id of restore) await restoreCategoryTree(id);
         await loadCategories();
         state.step = ONB_STEP.period;
         state.errorMsg = "";

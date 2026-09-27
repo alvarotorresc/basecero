@@ -63,12 +63,13 @@ export function onbCategoryRoots(rows) {
 export const canLeaveCategories = (checkedCount) => checkedCount >= 1;
 
 /** Qué cambia al salir del paso: `archive`, las raíces marcadas en la BD que el usuario desmarcó;
- *  `restore`, las archivadas que volvió a marcar, pero SOLO si las archivó este mismo paso
- *  (`archivedHere`): una raíz que ya venía archivada no la recupera el onboarding. */
-export function categoryArchiveDiff(roots, checkedIds, archivedHere = new Set()) {
+ *  `restore`, las archivadas en la BD que volvió a marcar. `roots` sale de is_archived al cargar el
+ *  paso (onbCategoryRoots), no de un estado en memoria: con 0 periodos nada más que este paso puede
+ *  haber archivado, así que tras recargar la pestaña a mitad volver a marcar también recupera. */
+export function categoryArchiveDiff(roots, checkedIds) {
   return {
     archive: roots.filter((r) => r.checked && !checkedIds.has(r.id)).map((r) => r.id),
-    restore: roots.filter((r) => !r.checked && checkedIds.has(r.id) && archivedHere.has(r.id)).map((r) => r.id),
+    restore: roots.filter((r) => !r.checked && checkedIds.has(r.id)).map((r) => r.id),
   };
 }
 
