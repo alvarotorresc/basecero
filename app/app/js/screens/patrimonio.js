@@ -18,6 +18,7 @@ import { tileHtml, filterChipHtml, settingRowHtml, sectionHeaderHtml, familySwat
 import { displayHtml, ledHtml, stackedBarHtml, meterHtml, containerHtml, emptyStateHtml } from "../instrument.js";
 import { icon } from "../icons.js";
 import { escHtml, escAttr } from "../esc.js";
+import { renderObjetivo } from "./objetivo.js";
 
 // Pantalla Patrimonio en el sistema B (S3; B-Patrimonio y BD-Patrimonio). Todo el color va por
 // clase: la familia de cada cuenta (account-colors.js, C8) entra como .fam-<k> y el CSS de la
@@ -323,7 +324,7 @@ export async function renderPatrimonio(container) {
   const state = {
     view: "main",
     editingAccountId: null, accountForm: null,
-    editingGoalId: null, goalForm: null,
+    editingGoalId: null, goalForm: null, detailGoalId: null,
     opening: false, // apertura de formulario de cuenta en curso (ver openAccountEdit)
   };
   let errorMsg = "";
@@ -578,7 +579,8 @@ export async function renderPatrimonio(container) {
     render();
   }
 
-  function openGoalEdit(goal) {
+  // Desde el detalle (B-7), «atrás» y guardar/borrar vuelven al detalle, no a la lista.
+  function openGoalEdit(goal, onBack = backToMain) {
     state.editingGoalId = goal.id;
     state.goalForm = {
       name: goal.name, type: goal.type,
@@ -593,7 +595,7 @@ export async function renderPatrimonio(container) {
       goal,
     };
     errorMsg = "";
-    pushBack(backToMain);
+    pushBack(onBack);
     state.view = "goal-form";
     render();
   }
@@ -832,6 +834,26 @@ export async function renderPatrimonio(container) {
     };
   }
 
+  // ---- subvista: detalle de objetivo (B-7, screens/objetivo.js) -------------
+
+  /** Toque en la tarjeta: abre el detalle. Al volver se recargan los datos (el detalle puede haber
+   *  pasado dinero a la hucha, cambiado los meses, pausado o borrado el objetivo). */
+  function openGoalDetail(id) {
+    pushBack(async () => {
+      try { await loadData(); } catch (e) { errorMsg = t("patrimonio.error.load", { error: userMessage(e) }); }
+      backToMain();
+    });
+    showGoalDetail(id);
+  }
+
+  function showGoalDetail(id) {
+    state.view = "goal-detail";
+    state.detailGoalId = id;
+    state.editingGoalId = null; state.goalForm = null;
+    errorMsg = "";
+    renderObjetivo(container, { goalId: id, onEdit: (goal) => openGoalEdit(goal, () => showGoalDetail(id)) });
+  }
+
   // ---- vista principal ------------------------------------------------------
 
   function renderMain() {
@@ -861,7 +883,7 @@ export async function renderPatrimonio(container) {
     container.querySelectorAll("[data-goal]").forEach((b) => {
       b.onclick = () => {
         const g = goals.find((x) => x.goal.id === b.dataset.goal);
-        if (g) openGoalEdit(g.goal);
+        if (g) openGoalDetail(g.goal.id);
       };
     });
   }
@@ -869,6 +891,7 @@ export async function renderPatrimonio(container) {
   function render() {
     if (state.view === "account-form") renderAccountForm();
     else if (state.view === "goal-form") renderGoalForm();
+    else if (state.view === "goal-detail") showGoalDetail(state.detailGoalId);
     else renderMain();
   }
 

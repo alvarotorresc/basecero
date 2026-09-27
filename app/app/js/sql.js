@@ -498,5 +498,10 @@ export const SQL = {
     LEFT JOIN periods p ON p.id=t.period_id
     WHERE tg.deleted=0
     GROUP BY tg.id`,
+  // ---- Detalle de objetivo (B-7) ----
+  // Movimientos vivos que tocan la hucha de un objetivo, de todos los periodos: objetivo-logic.js
+  // los agrupa por mes con el mismo CASE que accountBalance. Bind: [accountId, accountId].
+  goalAccountMovements: `SELECT date, type, amount_cents, account_id, counter_account_id FROM transactions
+    WHERE deleted=0 AND (account_id=? OR counter_account_id=?) ORDER BY date`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets","tags"];

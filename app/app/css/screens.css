@@ -1413,6 +1413,61 @@
 .mov-flt-shared:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
 /* === fin: movimientos === */
 
+/* === pantalla: objetivo === */
+/* B-7 (detalle de objetivo, B-Objetivo de bak-agente2) y la hoja de B-4 («Pasar a la hucha»). La
+   familia de la hucha llega como .fam-<k> y aquí solo se leen --ft/--fb/--fx. */
+.obj { display: flex; flex-direction: column; gap: var(--sp-12); }
+
+/* Display: el porcentaje a la derecha de la etiqueta, 15/600 en el ámbar de la cifra. */
+.obj .disp-aside { font-size: var(--fs-15); font-weight: 600; }
+.obj .disp-slot { display: flex; flex-direction: column; gap: var(--sp-4); margin-top: var(--sp-8); }
+.obj-disp-line { margin-top: var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--disp-dim); }
+/* Casillas de meses a cubrir: 28 de alto, 4 de separación, pista --disp-line y relleno ámbar. */
+.obj-segs { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: var(--sp-4); height: 28px; }
+.obj-seg { overflow: hidden; border-radius: var(--radius-xs); background: var(--disp-line); }
+.obj-seg-fill { display: block; height: 100%; }
+.obj-seg-axis { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: var(--sp-4); font-size: var(--fs-12); color: var(--disp-dim); text-align: right; }
+
+/* Faltan / Lo completas en: dos bentos de 124 de alto mínimo, la cifra abajo. */
+.obj-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-12); }
+.obj-bento { min-height: 124px; justify-content: space-between; }
+/* «Diciembre» va en el cuerpo, no en mono: es un nombre, no una cifra. */
+.obj-when .bento-figure { font-family: var(--font-body); }
+
+/* Aportaciones: 6 columnas de 90 con la cifra encima; el mes en curso sin aportar, discontinuo. */
+.obj-cols,
+.obj-cols-labels { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sp-8); }
+.obj-cols { height: 90px; align-items: end; }
+.obj-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: var(--sp-4); height: 100%; }
+.obj-col-amt { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
+.obj-col-amt.is-dim { color: var(--text-dim); }
+.obj-col-bar { width: 100%; border-radius: var(--radius-xs); background: var(--fb, var(--idle)); }
+.obj-col-bar.is-expected { box-sizing: border-box; background: none; border: 1.5px dashed var(--fb, var(--idle)); }
+.obj-cols-labels { text-align: center; font-size: var(--fs-12); font-weight: 600; color: var(--text-dim); }
+.obj-cols-labels .is-cur { color: var(--text); }
+.obj-before { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); padding-top: 10px; border-top: 1px solid var(--border); }
+.obj-before-label { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+.obj-before-fig { font-size: var(--fs-14); font-weight: 500; color: var(--text); white-space: nowrap; }
+
+/* Ajustes del objetivo: grupo teñido con relleno 4 (sin familia, --surface con borde, C11). */
+.obj-group { display: flex; flex-direction: column; gap: var(--sp-8); }
+.obj-block { display: flex; flex-direction: column; padding: var(--sp-4); border-radius: var(--radius-lg); background: var(--ft); }
+.obj-block.no-fam { background: var(--surface); border: 1px solid var(--border); }
+.obj-sep { height: 1px; margin: 0 var(--sp-8) 0 50px; background: var(--border); }
+.obj-tall > .ent-set { min-height: 64px; padding-right: var(--sp-4); }
+
+.obj-actions { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-12); }
+.obj-actions .btn-tertiary { align-self: center; }
+
+/* Hoja «Pasar a la hucha». */
+.obj-tr .sheet-body { display: flex; flex-direction: column; gap: var(--sp-16); }
+.obj-tr-sec { display: flex; flex-direction: column; gap: var(--sp-8); }
+.obj-tr-label { margin: 0; padding-left: var(--sp-4); font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.obj-tr-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+.obj-tr-error { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-body); color: var(--neg); }
+.obj-tr-error:empty { display: none; }
+/* === fin: objetivo === */
+
 /* === pantalla: onboarding === */
 /* S13 · B-Onb-Bienvenida, B-Onb-Cuentas, B-Onb-Ajustes (y sus BD-*), iguales al original (Álvaro
    2026-09-27). Pantalla de columna con el CTA abajo (margin-top:auto); tarjetas --surface con
