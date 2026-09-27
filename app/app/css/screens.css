@@ -659,9 +659,9 @@
   background: var(--ft);
   box-shadow: inset 0 -6px 0 var(--fb);
 }
-.inf-split-seg:first-child { border-radius: var(--radius) 0 0 var(--radius); }
-.inf-split-seg:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
-.inf-split-seg:only-child { border-radius: var(--radius); }
+.inf-split-seg:first-child { border-radius: var(--radius-tile) 0 0 var(--radius-tile); }
+.inf-split-seg:last-child { border-radius: 0 var(--radius-tile) var(--radius-tile) 0; }
+.inf-split-seg:only-child { border-radius: var(--radius-tile); }
 .inf-split-name { font-size: var(--fs-12); font-weight: 600; line-height: 1.3; color: var(--fx); }
 .inf-split-amt { font-size: var(--fs-15); font-weight: 600; line-height: 1.3; color: var(--text); white-space: nowrap; }
 
@@ -808,6 +808,10 @@
 .inicio-week-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
 .inicio-label { margin: 0; font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
 .inicio-week-total { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+/* Columnas de B-Home: radio 5 en las cuatro esquinas (no solo arriba) y 7 entre columnas. */
+.inicio-week .col-bar { border-radius: var(--radius-bar); }
+.inicio-week .cols,
+.inicio-week .cols-labels { gap: 7px; }
 /* Semana sin gasto (B-Inicio-Vacio): columnas de 6 en pozo, hoy en tinta. */
 .inicio-week.is-zero .cols { height: 32px; }
 .inicio-week.is-zero .col-bar { min-height: 6px; background: var(--well); box-shadow: var(--sh-well); }
@@ -1721,6 +1725,8 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
    seleccionable, fila de reparto compartido, importe hundido reutilizado en límite/ingresos
    previstos/barrido, y el resumen de "Presupuestado". */
 .pn-blocks { display: flex; flex-direction: column; gap: var(--sp-16); }
+/* Baldosa de 32 de las filas de límite con el radio 8 de B-PeriodoNuevo (.sq). */
+.pn-blocks .ent-tile-32 { border-radius: var(--radius-tile); }
 .pn-section { display: flex; flex-direction: column; gap: var(--sp-12); }
 .pn-section-head { display: flex; flex-direction: column; gap: var(--sp-4); }
 /* K14: una línea de ayuda como mucho por sección. */
@@ -1894,7 +1900,7 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 
 /* Barra del héroe: lo pagado en --disp-dim y lo pendiente en ámbar (.disp-amber-fill), 10 de alto
    con 3 de separación; lo pendiente nunca baja de 14 para que se vea. */
-.rec-hero-bar { display: flex; gap: 3px; height: 10px; margin-top: 10px; border-radius: var(--radius-xs); overflow: hidden; }
+.rec-hero-bar { display: flex; gap: 3px; height: 10px; margin-top: 10px; border-radius: var(--radius-bar); overflow: hidden; }
 .rec-hero-paid { flex-grow: 0; flex-shrink: 1; background: var(--disp-dim); }
 .rec-hero-pending { flex-grow: 0; flex-shrink: 0; min-width: 14px; }
 
@@ -2315,12 +2321,12 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   flex: none;
   padding: 3px;
   border: 2px solid currentColor;
-  border-radius: var(--radius);
+  border-radius: var(--radius-tile);
   color: var(--fx, var(--text));
   transform: rotate(-8deg);
   animation: bc-recibo-stamp 200ms ease-out 250ms backwards;
 }
-.recibo-stamp-in { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: var(--sp-4) var(--sp-12); border: 1px solid currentColor; border-radius: var(--radius-xs); }
+.recibo-stamp-in { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: var(--sp-4) var(--sp-12); border: 1px solid currentColor; border-radius: var(--radius-bar); }
 .recibo-stamp-label { font-family: var(--font-display); font-size: var(--fs-13); font-weight: 700; line-height: var(--lh-title); }
 /* La fecha va en el color del sello, como en B-Recibo (C7 retirada ahí: .is-fam-ink). */
 .recibo-stamp-date { font-size: var(--fs-12); font-weight: 600; }

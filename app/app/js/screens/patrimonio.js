@@ -268,7 +268,7 @@ function formRowHtml({ fam, icon: key, label, forId = "", labelId = "", controlH
     ? `<label class="ent-set-label pat-frow-label" for="${escAttr(forId)}">${text}</label>`
     : `<span class="ent-set-label pat-frow-label"${labelId ? ` id="${escAttr(labelId)}"` : ""}>${text}</span>`;
   return `<div class="ent-set pat-frow${head ? " is-head" : ""}${tall ? " is-tall" : ""}">`
-    + `${tileHtml({ fam, icon: key, size: 32, filled: true })}${lab}${controlHtml}</div>`;
+    + `${tileHtml({ fam, icon: key, size: 30, filled: true })}${lab}${controlHtml}</div>`;
 }
 
 /** El valor de la fila ES el input (B-Cuenta: «Cuenta corriente», «1.480,15 €» en el -x de la

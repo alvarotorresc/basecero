@@ -50,7 +50,9 @@ const cls = (...parts) => parts.filter(Boolean).join(" ");
  *  @param {object} o
  *  @param {string|null} [o.fam]    Clave de familia (category-colors.js#familyForCategory).
  *  @param {string} [o.icon]        Clave de icono. Por defecto la de la familia, o "otr".
- *  @param {40|32} [o.size]         Por defecto 40.
+ *  @param {40|32|30} [o.size]      Por defecto 40. 30: la baldosa de las filas de ajuste de los
+ *                                  mockups elegidos (.sq de B-Ajustes/B-Cuenta/B-Objetivo), radio 8
+ *                                  (--radius-tile), icono 18 (Álvaro 2026-09-27: igual que el mockup).
  *  @param {boolean} [o.onTint]     Dentro de algo ya teñido (tarjeta elegida, bloque de categoría).
  *  @param {boolean} [o.filled]     Baldosa RELLENA del sólido de la familia (-b) con el icono en
  *                                  --on-fam (claro en claro, fondo en oscuro), como B-Ajustes,
@@ -59,9 +61,10 @@ const cls = (...parts) => parts.filter(Boolean).join(" ");
  *  @returns {string} HTML */
 export function tileHtml({ fam = null, icon: key = "", size = 40, onTint = false, filled = false } = {}) {
   const fc = famClass(fam);
-  const small = Number(size) === 32;
+  const px = Number(size);
+  const small = px === 32 || px === 30;
   const fill = filled && fc;
-  return `<span class="${cls("ent-tile", small && "ent-tile-32", fc, !fc && "ent-neutral", fill && "ent-tile-filled", onTint && !fill && "ent-on-tint")}">`
+  return `<span class="${cls("ent-tile", px === 32 && "ent-tile-32", px === 30 && "ent-tile-30", fc, !fc && "ent-neutral", fill && "ent-tile-filled", onTint && !fill && "ent-on-tint")}">`
     + `${entityIcon(key || (fc ? fam : "otr"), small ? 18 : 20)}</span>`;
 }
 
@@ -253,11 +256,13 @@ export function txRowHtml({ fam = null, icon: key = "", title, line2 = "", amoun
  *  @param {string} [o.trailHtml]   HTML decorativo ya hecho entre el valor y el chevron, sin
  *                                  convertir la fila en div (a diferencia de `controlHtml`): las
  *                                  muestras de color de «Categorías» en B-Ajustes. Tal cual.
+ *  @param {30|32} [o.tileSize]     Tamaño de la baldosa. Por defecto 30 (radio 8, como la .sq de los
+ *                                  mockups); 32 en B-PeriodoNuevo.
  *  @param {string} [o.valueIcon]   Clave de icons.js: icono de 16 en dim delante del valor, a 6 de
  *                                  él (la etiqueta de B-Movimiento-Detalle: «Oficina»). Sin valor,
  *                                  no se pinta.
  *  @returns {string} HTML */
-export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", value = "", valueNum = false, valueFam = null, chevron, controlHtml = "", expanded, controls = "", disabled = false, id = "", data = null, tileFilled = false, valueInFam = false, trailHtml = "", valueIcon = "" }) {
+export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", value = "", valueNum = false, valueFam = null, chevron, controlHtml = "", expanded, controls = "", disabled = false, id = "", data = null, tileFilled = false, valueInFam = false, trailHtml = "", valueIcon = "", tileSize = 30 }) {
   const tag = controlHtml ? "div" : "button";
   const showChev = !controlHtml && (chevron ?? true);
   const labelId = controlHtml && id ? ` id="${escAttr(id + "-label")}"` : "";
@@ -269,7 +274,7 @@ export function settingRowHtml({ icon: key = "", fam = null, label, sub = "", va
     if (disabled) btnAttrs += " disabled";
   }
   return `<${tag}${tag === "button" ? ' type="button"' : ""} class="${cls("ent-set", sub && "ent-set-2")}"${attrs({ id, data })}${btnAttrs}>`
-    + `${key ? tileHtml({ fam, icon: key, size: 32, filled: tileFilled }) : ""}`
+    + `${key ? tileHtml({ fam, icon: key, size: tileSize === 32 ? 32 : 30, filled: tileFilled }) : ""}`
     + `<span class="ent-set-body"><span class="ent-set-label"${labelId}>${escHtml(label)}</span>`
     + `${sub ? `<span class="ent-set-sub">${escHtml(sub)}</span>` : ""}</span>`
     + `${value !== "" && value != null && famClass(valueFam) ? `<span class="ent-swatch ${famClass(valueFam)}" aria-hidden="true"></span>` : ""}`

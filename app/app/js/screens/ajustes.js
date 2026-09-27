@@ -84,7 +84,7 @@ function groupHtml({ id, title, fam, rows, after = "" }) {
  *  select no puede ir dentro de un botón; usa sus mismas clases. */
 function selectRowHtml({ icon: key, fam, label, value, valueNum = false, id, optionsHtml, disabled = false }) {
   return `<div class="ent-set aj-select-row">
-    ${tileHtml({ fam, icon: key, size: 32, filled: true })}
+    ${tileHtml({ fam, icon: key, size: 30, filled: true })}
     <span class="ent-set-body"><span class="ent-set-label">${escHtml(label)}</span></span>
     <span class="ent-set-value${valueNum ? " num" : ""} ${famClass(fam)} is-fam-ink">${escHtml(value)}</span>
     <span class="ent-chev">${icon("chevronRight", { size: 16 })}</span>
