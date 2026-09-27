@@ -34,6 +34,13 @@ export const isUncategorized = (r) =>
  *     null/undefined = sin tope; 0 sí es un tope.
  *   - sharedOnly: solo movimientos compartidos (is_shared).
  *  Todos los grupos se combinan en Y entre sí y con query/tagId. */
+/** Filtro con el que se abre Movimientos: neutro, salvo lo que llegue de goToTab("movimientos",
+ *  opts) — `tagId` desde Etiquetas (N11) o `accountId` desde el detalle de cuenta (B-6, «Ver
+ *  todos»). Mismo shape que el state.filter de movimientos.js. */
+export function initialFilter({ tagId = null, accountId = null } = {}) {
+  return { query: "", rootCatIds: [], uncat: false, tagId: tagId || null, accountId: accountId || null, minCents: null, maxCents: null, sharedOnly: false };
+}
+
 export function matchesFilter(row, filter, byId) {
   if (!filter) return true;
   const query = String(filter.query ?? "").trim().toLowerCase();

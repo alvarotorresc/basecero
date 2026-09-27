@@ -354,3 +354,11 @@ test("fieldHtml: `pill` pone el pozo en píldora y `hideLabel` deja la etiqueta 
   assert.match(html, /<label class="ctl-field-wrap" for="q">/, "sigue siendo la etiqueta del input");
   assert.match(CSS_CTL, /\.ctl-field\.is-pill\s*\{\s*border-radius:\s*var\(--radius-pill\)/);
 });
+
+test("switchHtml: `disabled` añade el atributo nativo; sin él, el marcado no cambia", () => {
+  const off = switchHtml({ id: "sw-d", checked: true, label: "Cuenta por defecto" });
+  const dis = switchHtml({ id: "sw-d", checked: true, label: "Cuenta por defecto", disabled: true });
+  assert.doesNotMatch(off, /\bdisabled\b/);
+  assert.match(dis, /role="switch" aria-checked="true" aria-label="Cuenta por defecto" disabled>/);
+  assert.equal(dis.replace(" disabled", ""), off);
+});

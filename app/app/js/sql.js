@@ -367,6 +367,20 @@ export const SQL = {
   listClosedPeriods: `SELECT * FROM periods WHERE status='closed' AND deleted=0 ORDER BY start_date`,
   listGoals: `SELECT * FROM goals WHERE is_active=1 AND deleted=0 ORDER BY created_at`,
 
+  // Detalle de cuenta (B-6, screens/cuenta.js). Los movimientos que tocan una cuenta por cualquiera
+  // de sus lados (una transferencia entra por counter_account_id), con las columnas que piden
+  // cuenta-logic.js#signedForAccount y la fila de la lista. Todos los tipos, como accountBalance.
+  // accountTxOfPeriod — bind: [periodId, accountId, accountId]; accountRecentTx — bind:
+  // [accountId, accountId, limit].
+  accountTxOfPeriod: `SELECT t.id, t.date, t.type, t.amount_cents, t.account_id, t.counter_account_id, t.category_id
+    FROM transactions t
+    WHERE t.period_id=? AND t.deleted=0 AND (t.account_id=? OR t.counter_account_id=?)`,
+  accountRecentTx: `SELECT t.id, t.date, t.type, t.amount_cents, t.account_id, t.counter_account_id, t.category_id,
+      t.merchant, t.note
+    FROM transactions t
+    WHERE t.deleted=0 AND (t.account_id=? OR t.counter_account_id=?)
+    ORDER BY t.date DESC, t.created_at DESC LIMIT ?`,
+
   // Formularios de cuentas y objetivos (Task 14).
   // Selector de categoría de spending_cap: SOLO raíces de gasto (parent_id=''), nunca hijas —
   // ver handoff de goalProgress (repo.js): una hija ahí no hace match con spentByRootCategory

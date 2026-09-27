@@ -255,6 +255,69 @@
 .cat-error svg { flex: none; }
 /* === fin: categorias === */
 
+/* === pantalla: cuenta === */
+/* B-6 · B-Cuenta: detalle de una cuenta desde Patrimonio. La familia de la cuenta llega como
+   .fam-<k> (account-colors.js, C8) y aquí solo se leen --ft/--fb/--fx. */
+.cta { display: flex; flex-direction: column; gap: var(--sp-12); }
+
+/* Display: delta del periodo en el pie, como Patrimonio (sube en --ok, baja en --disp-ink). */
+.cta-delta { font-weight: 500; }
+.cta-delta.is-up { color: var(--ok); }
+.cta-delta.is-down { color: var(--disp-ink); }
+
+/* Entró / Salió: filas 13/600 dim con la cifra mono 15/600; lo que entra en --pos. La barra del
+   original: 3 de separación. */
+.cta .sbar { gap: 3px; }
+.cta-flow { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
+.cta-flow-label { font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.cta-flow-fig { font-size: var(--fs-15); font-weight: 600; color: var(--text); white-space: nowrap; }
+.cta-flow-fig.is-in { color: var(--pos); }
+
+/* Deuda: la cuota bajo la barra, en el -x de la familia. */
+.cta-quota { margin: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--fx, var(--text-dim)); }
+
+/* Últimos movimientos (B-Cuenta): --surface con borde, relleno 12 16 8; título 15 en Unbounded y
+   «Ver todos» terciario; cabecera de día 12/600 dim. */
+.cta-recent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-12) var(--sp-16) var(--sp-8);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.cta-recent-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); min-height: 44px; }
+.cta-recent-title { margin: 0; font-family: var(--font-display); font-size: var(--fs-15); font-weight: 700; line-height: var(--lh-title); letter-spacing: -.01em; color: var(--text); }
+.cta-see-all {
+  flex: none;
+  height: 44px;
+  padding: 0 var(--sp-4);
+  border: 0;
+  background: none;
+  font-family: var(--font-body);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.cta-see-all:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+.cta-day { padding-top: var(--sp-4); font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.cta-day:first-of-type { padding-top: 0; }
+.cta-recent .ent-row { padding-left: 0; padding-right: 0; }
+
+/* Ajustes de la cuenta: bloque teñido con relleno 4 (sin familia, --surface con borde, C11) y
+   filete con la sangría de la baldosa (8 + 32 + 12). */
+.cta-group { display: flex; flex-direction: column; gap: var(--sp-8); }
+.cta-block { display: flex; flex-direction: column; padding: var(--sp-4); border-radius: var(--radius-lg); background: var(--ft); }
+.cta-block.no-fam { background: var(--surface); border: 1px solid var(--border); }
+.cta-sep { height: 1px; margin: 0 var(--sp-8) 0 calc(var(--sp-8) + 32px + var(--sp-12)); background: var(--border); }
+.cta-block .ctl-switch:disabled { cursor: default; }
+/* Tipo (B-Cuenta): cabecera de 30 con la baldosa y el segmentado a lo ancho debajo. */
+.cta-sub { display: flex; flex-direction: column; gap: var(--sp-8); padding: var(--sp-8) var(--sp-4) var(--sp-8) var(--sp-8); }
+.cta-sub .cta-sub-head { min-height: 30px; padding: 0; }
+/* === fin: cuenta === */
+
 /* === pantalla: etiquetas === */
 /* S10 · B-Etiquetas: una línea de ayuda, Abiertas como tarjetas neutras (C10: --raised con borde,
    sin color propio) con la barra por familia y su leyenda con nombre (C12), Archivadas en filas de

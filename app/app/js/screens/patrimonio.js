@@ -2,7 +2,7 @@ import {
   balancesAt, netWorthOfBalances, netWorthSeries, goalsWithProgress,
   getAccount, createAccount, updateAccount, listExpenseRootCategories, allCategoriesById,
   createGoal, updateGoal, softDeleteGoal, getAccountLoans, setAccountLoan,
-  getAccountStyle, setAccountFamily,
+  getAccountStyle, setAccountFamily, defaultAccountId,
 } from "../repo.js";
 import { familyForCategory, famClass, FAMILIES } from "../category-colors.js";
 import { familyForAccount, defaultFamilyForAccount, goalFamily } from "../account-colors.js";
@@ -19,6 +19,8 @@ import { displayHtml, ledHtml, stackedBarHtml, meterHtml, containerHtml, emptySt
 import { icon } from "../icons.js";
 import { escHtml, escAttr } from "../esc.js";
 import { renderObjetivo } from "./objetivo.js";
+import { renderCuenta } from "./cuenta.js";
+import { showToast } from "../toast.js";
 
 // Pantalla Patrimonio en el sistema B (S3; B-Patrimonio y BD-Patrimonio). Todo el color va por
 // clase: la familia de cada cuenta (account-colors.js, C8) entra como .fam-<k> y el CSS de la
@@ -171,12 +173,14 @@ function accountCardHtml(a, { fam, wide, isDefault, linkedGoal, accountLoans }) 
 /** Rejilla de cuentas (B-Patrimonio): corrientes y deudas a lo ancho; las de ahorro, de dos en
  *  dos (si queda una suelta, va a lo ancho para no dejar un hueco). Orden: corriente, ahorro,
  *  deuda (el de la barra). La cuenta «por defecto» es la primera corriente, como hasta ahora. */
-function cuentasHtml(accounts, { famOf, linkedGoalOf, accountLoans }) {
+function cuentasHtml(accounts, { famOf, linkedGoalOf, accountLoans, defaultAccId }) {
   const header = sectionWithAddHtml({ title: t("patrimonio.accounts.title"), btnId: "btn-nueva-cuenta", btnLabel: t("patrimonio.accounts.new") });
   if (accounts.length === 0) {
     return `${header}${emptyStateHtml({ title: t("patrimonio.accounts.empty"), rows: 1 })}`;
   }
-  const defaultId = accounts.find((a) => a.type === "checking")?.id;
+  // meta.default_account_id resuelta (repo.defaultAccountId): la que se elige en el detalle de la
+  // cuenta (B-6); sin elegir, la primera corriente, como hasta ahora.
+  const defaultId = defaultAccId ?? accounts.find((a) => a.type === "checking")?.id;
   const sorted = [...accounts].sort((x, y) => (TYPE_ORDER[x.type] ?? 0) - (TYPE_ORDER[y.type] ?? 0));
   const savings = sorted.filter((a) => a.type === "savings");
   const loneSavingsId = savings.length % 2 === 1 ? savings[savings.length - 1].id : null;
@@ -293,11 +297,13 @@ const SEP = '<div class="pat-sep" aria-hidden="true"></div>';
 
 /** Pantalla «Patrimonio»: Display, composición, cuentas y objetivos, con subvistas de formulario
  *  para crear/editar cuentas y objetivos (view interno 'main' | 'account-form' | 'goal-form', sin
- *  onBack: Patrimonio es pestaña de nivel superior y la subvista vuelve a su propio 'main'). El
- *  detalle de cuenta (B-6) y de objetivo (B-7) es lógica nueva bloqueada: un toque sigue abriendo
- *  la edición. */
+ *  onBack: Patrimonio es pestaña de nivel superior y la subvista vuelve a su propio 'main').
+ *  Tocar una cuenta abre su detalle (B-6, screens/cuenta.js), con su propia entrada de historial;
+ *  el formulario de la cuenta se abre desde ahí y vuelve al detalle. Igual con un objetivo:
+ *  su detalle (B-7, screens/objetivo.js), y desde él su formulario. */
 export async function renderPatrimonio(container) {
   let series, accounts, goals, expenseRootCats, byId, accountLoans, accountStyle;
+  let defaultAccId = null;
 
   async function loadData() {
     // accountLoans y accountStyle (meta.account_loans / meta.account_style) solo los usa esta
@@ -306,6 +312,7 @@ export async function renderPatrimonio(container) {
       netWorthSeries(), balancesAt(hoyISO()), goalsWithProgress(), listExpenseRootCategories(), allCategoriesById(),
       getAccountLoans(), getAccountStyle(),
     ]);
+    defaultAccId = await defaultAccountId();
   }
 
   try {
@@ -365,7 +372,7 @@ export async function renderPatrimonio(container) {
     render();
   }
 
-  async function openAccountEdit(id) {
+  async function openAccountEdit(id, { fromDetail = false } = {}) {
     // Guard de apertura en curso: la vista principal sigue viva durante el await, y dos toques
     // seguidos apuntarían DOS entradas de historial para un solo formulario abierto.
     if (state.opening) return;
@@ -374,8 +381,10 @@ export async function renderPatrimonio(container) {
     try {
       row = await getAccount(id);
     } catch (e) {
-      errorMsg = t("patrimonio.error.openAccount", { error: userMessage(e) });
       state.opening = false;
+      // Desde el detalle, la pantalla que se ve es la de la cuenta: aviso sin repintar Patrimonio.
+      if (fromDetail) { showToast(t("patrimonio.error.openAccount", { error: userMessage(e) })); return; }
+      errorMsg = t("patrimonio.error.openAccount", { error: userMessage(e) });
       render();
       return;
     }
@@ -393,10 +402,47 @@ export async function renderPatrimonio(container) {
       hasOverride: Object.hasOwn(accountStyle, id),
     };
     errorMsg = "";
-    pushBack(backToMain);
+    pushBack(fromDetail ? () => backToAccountDetail(id) : backToMain);
     state.view = "account-form";
     state.opening = false;
     render();
+  }
+
+  // ---- subvista: detalle de cuenta (B-6, screens/cuenta.js) -----------------
+
+  /** Pinta el detalle SIN apuntar historial (lo apunta openAccountDetail; el volver del
+   *  formulario y el de un movimiento repintan sobre la misma entrada). Si la cuenta ya no
+   *  existe, vuelve. */
+  async function showAccountDetail(id) {
+    const shown = await renderCuenta(container, id, {
+      onBack: () => goBack(),
+      onEdit: () => openAccountEdit(id, { fromDetail: true }),
+    });
+    if (!shown) goBack();
+  }
+
+  /** Toque en una cuenta: el detalle, con su entrada de historial. Al volver se recargan los
+   *  datos: desde el detalle se pueden editar la cuenta y sus movimientos. */
+  async function openAccountDetail(id) {
+    if (state.opening) return;
+    state.opening = true;
+    pushBack(async () => {
+      try { await loadData(); } catch { /* se pinta lo que había */ }
+      backToMain();
+    });
+    try {
+      await showAccountDetail(id);
+    } finally {
+      state.opening = false;
+    }
+  }
+
+  /** Vuelta del formulario abierto desde el detalle: al detalle, recargado. */
+  function backToAccountDetail(id) {
+    state.view = "main";
+    state.editingAccountId = null; state.accountForm = null;
+    errorMsg = "";
+    showAccountDetail(id);
   }
 
   /** Quién usa ya cada familia (para «la usa X» / «la misma que X», C8): primero las otras
@@ -863,7 +909,7 @@ export async function renderPatrimonio(container) {
         ${errorHtml()}
         ${netWorthDisplayHtml(netWorthOfBalances(accounts), series)}
         ${compositionHtml(accounts, famOf)}
-        ${cuentasHtml(accounts, { famOf, linkedGoalOf, accountLoans })}
+        ${cuentasHtml(accounts, { famOf, linkedGoalOf, accountLoans, defaultAccId })}
         ${objetivosHtml(goals, goalFamOf)}
       </div>
     `;
@@ -878,7 +924,7 @@ export async function renderPatrimonio(container) {
     if (nuevoObjetivoBtn) nuevoObjetivoBtn.onclick = () => openGoalNew();
 
     container.querySelectorAll("[data-acc]").forEach((b) => {
-      b.onclick = () => openAccountEdit(b.dataset.acc);
+      b.onclick = () => openAccountDetail(b.dataset.acc);
     });
     container.querySelectorAll("[data-goal]").forEach((b) => {
       b.onclick = () => {
