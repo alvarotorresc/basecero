@@ -1301,8 +1301,9 @@ body.subscreen #toast, body.onboarding #toast { bottom: calc(var(--sp-16) + env(
 .ent-tile.acc-debt { background: var(--stripe-debt); color: var(--fx); }
 
 /* Selector de familia (entity.js#familySwatchesHtml, B-Categorias-Nueva): 6 columnas de muestras
-   de 48, tinte con la barra de 12 abajo. Elegida: --ring-sel y check en --fx; la barra se mete 2
-   para que el anillo se vea entero. */
+   de 48, tinte con la barra de 12 abajo. Elegida: anillo EXTERIOR con hueco (--ring-sel-out, F-17
+   retirada: Álvaro 2026-09-27, igual que el mockup) y check en --fx. El hueco toma --ring-gap del
+   contenedor (por defecto --surface). */
 .ent-fam-picker { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sp-8); }
 .ent-fam-pick {
   position: relative;
@@ -1320,8 +1321,7 @@ body.subscreen #toast, body.onboarding #toast { bottom: calc(var(--sp-16) + env(
   cursor: pointer;
 }
 .ent-fam-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 12px; background: var(--fb); }
-.ent-fam-pick[aria-pressed="true"] { box-shadow: var(--ring-sel); }
-.ent-fam-pick[aria-pressed="true"] .ent-fam-bar { left: 2px; right: 2px; bottom: 2px; }
+.ent-fam-pick[aria-pressed="true"] { box-shadow: var(--ring-sel-out); }
 
 /* ===== Piezas sueltas: metadatos, aviso de error y esqueleto (PR-99, antes en app.css) ===== */
 

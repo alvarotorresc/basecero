@@ -214,6 +214,7 @@ test("familySwatchesHtml: grupo con aria-label y una muestra aria-pressed por fa
   assert.doesNotMatch(html, /fam-rojo/);
   assert.match(html, /class="ent-fam-pick fam-casa" aria-pressed="false" aria-label="Arena" data-fam="casa"/);
   assert.match(html, /class="ent-fam-pick fam-tra" aria-pressed="true" aria-label="Cielo, la usa Cuenta" data-fam="tra"/);
+  assert.equal(decl('.ent-fam-pick[aria-pressed="true"]', "box-shadow"), "var(--ring-sel-out)", "anillo exterior con hueco (F-17 retirada)");
 });
 
 test("familySwatchesHtml: solo la elegida lleva el check; sin radios (aria-checked) y escapa el label", () => {

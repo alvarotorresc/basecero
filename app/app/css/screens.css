@@ -218,7 +218,8 @@
 .cat-parents { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
 
 /* Selector de icono: rejilla de 6, 44 de alto, --raised con borde e icono dim; el elegido, en el
-   tinte de la familia con el icono -x y --ring-sel (F-17). */
+   tinte de la familia con el icono -x, borde -b y el anillo EXTERIOR con hueco de B-Categorias-Nueva
+   (--ring-sel-out; F-17 retirada, Álvaro 2026-09-27: igual que el mockup). */
 .cat-icons { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sp-8); }
 .cat-icon-pick {
   min-width: 0;
@@ -233,7 +234,7 @@
   color: var(--text-dim);
   cursor: pointer;
 }
-.cat-icon-pick[aria-pressed="true"] { border-color: var(--fb); background: var(--ft); color: var(--fx); box-shadow: var(--ring-sel); }
+.cat-icon-pick[aria-pressed="true"] { border-color: var(--fb); background: var(--ft); color: var(--fx); box-shadow: var(--ring-sel-out); }
 .cat-icon-pick:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
 
 /* Error: neutro en --raised con el icono de aviso (C4: nada de rojo fuera de cifras). */
@@ -1678,6 +1679,8 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
    relleno 4 (sin familia, --surface con borde, C11) y filas de ajuste con baldosa rellena y filete
    con la sangría de la baldosa. Una línea de ayuda como mucho por sección (K14). */
 .pat-group { display: flex; flex-direction: column; gap: var(--sp-8); }
+/* El selector de color de la cuenta va sobre el fondo de pantalla: el hueco del anillo exterior, en --bg. */
+.pat-group .ent-fam-picker { --ring-gap: var(--bg); }
 .pat-block {
   display: flex;
   flex-direction: column;
