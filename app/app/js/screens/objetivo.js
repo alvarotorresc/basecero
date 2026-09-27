@@ -113,8 +113,8 @@ function projectionHtml(d, fam, contrib) {
   const { progress } = d;
   if (!(progress.targetCents > 0)) return "";
   const remaining = progress.targetCents - progress.currentCents;
-  const avg = avgMonthlyContribution({ byMonth: contrib.byMonth, firstKey: contrib.firstKey, todayIso: d.todayIso });
-  const p = projectCompletion({ remainingCents: remaining, avgCents: avg, todayIso: d.todayIso, currentMonthCents: contrib.months.at(-1).cents });
+  const avg = avgMonthlyContribution({ byMonth: contrib.byMonth, firstKey: contrib.firstKey, todayIso: d.todayIso, payDay: d.payDay });
+  const p = projectCompletion({ remainingCents: remaining, avgCents: avg, todayIso: d.todayIso, currentMonthCents: contrib.months.at(-1).cents, payDay: d.payDay });
   const left = bentoHtml({
     label: t("objetivo.remaining"),
     value: fmtMoney(Math.max(0, remaining)),
@@ -233,7 +233,7 @@ export async function renderObjetivo(container, { goalId, onEdit }) {
     const withHucha = hasHucha(goal) && !!d.account;
     let middle = "";
     if (withHucha) {
-      const contrib = contributionsByMonth({ txs: d.movements, accountId: d.account.id, openingCents: d.account.opening_balance_cents, todayIso: d.todayIso });
+      const contrib = contributionsByMonth({ txs: d.movements, accountId: d.account.id, openingCents: d.account.opening_balance_cents, todayIso: d.todayIso, payDay: d.payDay });
       const proj = projectionHtml(d, fam, contrib);
       middle = `${proj ? proj.html : ""}${contributionsHtml(contrib, fam, proj ? proj.avg : null)}`;
     }

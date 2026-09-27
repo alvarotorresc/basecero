@@ -28,6 +28,7 @@ import { normalizeMerchant, memoryPatch } from "../merchant-memory.js";
 import { parseNaturalExpense } from "../natural.js";
 import { speech } from "../speech.js";
 import { escHtml, escAttr } from "../esc.js";
+import { prefillSharing } from "../duplicate-prefill.js";
 
 // labelKey/SAVE_KEY en vez de texto resuelto: son consts de módulo, evaluadas al importar el
 // fichero (antes de que boot() llame a initI18n con el idioma real) — si guardaran el string ya
@@ -151,10 +152,10 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     accountId: prefill?.accountId ?? resolveAccountId(meta.default_account_id, accounts) ?? "",
     // B-5: la cuenta destino de una transferencia duplicada (si la fila original la tenía).
     counterAccountId: prefill?.counterAccountId ?? "",
-    isShared: partnerName ? (prefill?.isShared ?? false) : false,
-    // B-5: quién pagó y el % del reparto de la fila duplicada; sin prefill, como antes ("yo" y el
-    // % del periodo abierto).
-    paidBy: prefill?.paidBy ?? "me",
+    // B-5: compartido y quién pagó de la fila duplicada; sin contraparte configurada, ni reparto ni
+    // «lo pagó ella» (duplicate-prefill.js#prefillSharing). Sin prefill, como antes.
+    ...prefillSharing(prefill, partnerName),
+    // B-5: el % del reparto de la fila duplicada; sin prefill, el del periodo abierto.
     sharePct: normalizePct(prefill?.sharePct ?? period?.my_share_pct, 100),
     fecha: hoyISO(),
     merchant: prefill?.merchant ?? "",

@@ -1,6 +1,6 @@
 import {
   getOpenPeriod, spentOfPeriod, incomeOfPeriod, listAllByDay, spentByRootCategory, budgetsOfPeriod,
-  openNextPeriod, getMetaAll, goalsWithProgress, listAllAccounts, defaultAccountId, accountBalanceCents,
+  openNextPeriod, closingFiguresBefore, getMetaAll, goalsWithProgress, listAllAccounts, defaultAccountId, accountBalanceCents,
 } from "../repo.js";
 import { familyForCategory, iconForCategory } from "../category-colors.js";
 import { eurToCents } from "../contract.js";
@@ -10,7 +10,7 @@ import {
 } from "../format.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, stepPct, normalizePct } from "../share-pct.js";
-import { normalizePayDay, proposedPeriodStart, periodNameFor, isPayDate } from "../pay-day.js";
+import { normalizePayDay, proposedPeriodStart, periodNameFor, isPayDate, lateMoveCount, lateMoveCutoff } from "../pay-day.js";
 import { inheritedBudgetsRaw, budgetMap } from "../category-spend.js";
 import { remainderCents, sweepDestinations, sweepPlan } from "../barrido.js";
 import { renderInforme } from "./informe.js";
@@ -73,6 +73,11 @@ function renderAsistenteError(container, { mode, onDone, onBack, embed, initialS
  *  Ajustes, para que el paso a paso de aquí arranque en él y no en el 50 de siempre. */
 export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embed = false, initialSharePct }) {
   let closingPeriod = null, closingSpent = 0, closingIncome = 0, closingCount = 0, rootRows = [], meta = {};
+  // Filas vivas del periodo que se cierra: el cierre tardío cuenta con ellas cuántas pasan al nuevo.
+  let closingRows = [];
+  // Ingresos del periodo ENTERO (sin corte): la referencia de la barra de «Presupuestado» del
+  // periodo nuevo, que no cambia con el cierre tardío (lo que se mueve es precisamente suyo).
+  let closingFullIncome = 0;
   let closingBudgets = [];
   // Barrido (N4): goals con progreso, cuentas vivas y la cuenta de origen por defecto — solo hace
   // falta en modo 'next' (bloqueBarrido() más abajo).
@@ -97,12 +102,17 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
         listAllAccounts(),
         defaultAccountId(),
       ]);
-      closingSpent = spent; closingIncome = income; closingCount = all.length; rootRows = roots;
+      closingSpent = spent; closingIncome = income; closingCount = all.length; closingRows = all; rootRows = roots;
+      closingFullIncome = income;
       closingBudgets = budgetRows; meta = metaAll;
       goalsProgress = goals; allAccounts = accounts; sourceAccountId = defaultAccId || "";
       proposedStart = proposedPeriodStart({
         payDay: normalizePayDay(meta.pay_day), todayIso: hoyISO(), openStartIso: closingPeriod.start_date,
       });
+      // Cierre tardío: las cifras del cierre (y el remanente que sugiere el barrido) sin lo que
+      // pasará al periodo nuevo — mismo corte que la escritura (pay-day.js#lateMoveCutoff).
+      const cutoff = lateMoveCutoff({ payDay: meta.pay_day, startIso: proposedStart });
+      if (cutoff) ({ spentCents: closingSpent, incomeCents: closingIncome, count: closingCount } = await closingFiguresBefore(closingPeriod.id, cutoff));
       // El barrido lleva la fecha de inicio: el saldo de origen se lee a ESA fecha, no a hoy.
       if (sourceAccountId) sourceBalanceCents = await accountBalanceCents(sourceAccountId, proposedStart);
     } else {
@@ -137,9 +147,12 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
   // periodo" de Inicio) y los destinos elegibles a la cuenta de origen por defecto. No se pinta
   // si el remanente es 0, si no hay ningún destino elegible, o si el saldo de origen es ≤ 0 (D10).
   const closingBudgetTotalCents = Object.values(budgetMap(closingBudgets)).reduce((s, c) => s + c, 0);
-  const remainder = mode === "next"
+  const computeRemainder = () => (mode === "next"
     ? remainderCents({ budgetTotalCents: closingBudgetTotalCents, incomeCents: closingIncome, spentCents: closingSpent })
-    : { cents: 0, basis: "income" };
+    : { cents: 0, basis: "income" });
+  // `let`: con día de cobro, cambiar la fecha de inicio cambia lo que queda en el periodo que se
+  // cierra y, con ello, el remanente (refreshForDate).
+  let remainder = computeRemainder();
   // Funciones, no consts: el saldo de origen (state.sourceBalanceCents) cambia si el usuario mueve
   // la fecha de inicio, así que los destinos elegibles hay que recalcularlos en cada render(), no
   // fijarlos una vez con el saldo inicial.
@@ -186,6 +199,9 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     // parseCentsRaw, nunca `type="number"`: con coma decimal, un <input type="number"> rechaza el
     // valor en silencio y el campo se ve vacío.
     sweepAmountRaw: centsToRaw(remainder.cents),
+    // Si el usuario ya tecleó la cantidad, un cambio de fecha no se la pisa con el remanente nuevo.
+    sweepTouched: false,
+    sweepChoiceTouched: false,
     sourceAccountId,
     sourceBalanceCents,
     // D11: "Ingresos previstos" del primer periodo — efímero, solo en modo 'first'. Misma
@@ -213,7 +229,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
    *  closingIncome, ya conocido; en 'first' es el importe efímero que el usuario teclea —
    *  null mientras esté vacío o a 0, que es lo que hoy ya apaga la barra y la nota. */
   function currentIngresos() {
-    if (mode === "next") return closingIncome;
+    if (mode === "next") return closingFullIncome;
     const cents = parseCentsRaw(state.expectedIncomeRaw);
     return cents > 0 ? cents : null;
   }
@@ -415,7 +431,16 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
       ${showField
         ? buttonHtml({ kind: "tertiary", id: "pn-dias-cercanos", icon: "calendar", label: t("periodo.date.quickPick") })
         : buttonHtml({ kind: "tertiary", id: "pn-otra-fecha", icon: "calendar", label: t("periodo.date.other") })}
+      ${lateMoveLineHtml()}
     </section>`;
+  }
+  /** Cierre tardío (decisión 2026-09-27): con día de cobro, cuántos apuntes del periodo que se
+   *  cierra pasan al nuevo —los de fecha ≥ inicio—, en una línea antes de confirmar. Sin día de
+   *  cobro, o sin ninguno que mover, nada. */
+  function lateMoveLineHtml() {
+    if (mode !== "next") return "";
+    const n = lateMoveCount({ payDay, rows: closingRows, startIso: state.startDate });
+    return n > 0 ? `<p class="pn-hint" id="pn-late-move">${escHtml(t("payday.lateMove", { n, date: fmtDiaCorto(state.startDate) }))}</p>` : "";
   }
   function dateTitle() {
     return t("periodo.date.title", { name: state.name.trim() || nameFor(state.startDate) });
@@ -530,6 +555,27 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     </div>`;
   }
 
+  /** Tras cambiar la fecha de inicio: el saldo de origen del barrido a ESA fecha y, en un cierre
+   *  tardío, las cifras del periodo que se cierra sin lo que pasará al nuevo (mismo corte que
+   *  openNextPeriodStmts) y el remanente que sugiere el barrido. Sin día de cobro, las del periodo
+   *  entero de siempre. */
+  async function refreshForDate() {
+    if (state.sourceAccountId) {
+      try { state.sourceBalanceCents = await accountBalanceCents(state.sourceAccountId, state.startDate); }
+      catch { state.sourceBalanceCents = 0; }
+    }
+    if (mode !== "next") return;
+    const cutoff = lateMoveCutoff({ payDay, startIso: state.startDate });
+    if (!cutoff) return;
+    try {
+      ({ spentCents: closingSpent, incomeCents: closingIncome, count: closingCount } = await closingFiguresBefore(closingPeriod.id, cutoff));
+    } catch { return; }
+    remainder = computeRemainder();
+    if (!state.sweepTouched) state.sweepAmountRaw = centsToRaw(remainder.cents);
+    if (state.sweepChoice === "keep" && !state.sweepChoiceTouched) state.sweepChoice = currentDestinations()[0]?.goalId ?? "keep";
+    else if (state.sweepChoice !== "keep" && !currentDestinations().some((d) => d.goalId === state.sweepChoice)) state.sweepChoice = "keep";
+  }
+
   /** Cambia la fecha de inicio; el nombre la sigue mientras el usuario no lo haya tocado (B-1). */
   function setStartDate(iso) {
     state.startDate = iso;
@@ -561,10 +607,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
       btn.onclick = async () => {
         setStartDate(btn.dataset.day);
         state.showCustomDate = false;
-        if (state.sourceAccountId) {
-          try { state.sourceBalanceCents = await accountBalanceCents(state.sourceAccountId, state.startDate); }
-          catch { state.sourceBalanceCents = 0; }
-        }
+        await refreshForDate();
         render();
       };
     });
@@ -576,10 +619,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     if (diasCercanosBtn) diasCercanosBtn.onclick = async () => {
       state.showCustomDate = false;
       setStartDate(proposedStart);
-      if (state.sourceAccountId) {
-        try { state.sourceBalanceCents = await accountBalanceCents(state.sourceAccountId, state.startDate); }
-        catch { state.sourceBalanceCents = 0; }
-      }
+      await refreshForDate();
       render();
     };
     const fechaInput = container.querySelector("#pn-fecha");
@@ -587,10 +627,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
       setStartDate(e.target.value || proposedStart);
       // La transferencia del barrido lleva ESTA fecha (no "hoy"): al mover el inicio del periodo
       // nuevo hay que releer el saldo de la cuenta de origen a esa fecha exacta.
-      if (state.sourceAccountId) {
-        try { state.sourceBalanceCents = await accountBalanceCents(state.sourceAccountId, state.startDate); }
-        catch { state.sourceBalanceCents = 0; }
-      }
+      await refreshForDate();
       render();
     };
 
@@ -626,12 +663,13 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     };
 
     container.querySelectorAll(".pn-sweep-radio").forEach((r) => {
-      r.onchange = () => { state.sweepChoice = r.value; render(); };
+      r.onchange = () => { state.sweepChoice = r.value; state.sweepChoiceTouched = true; render(); };
     });
     const sweepAmountInput = container.querySelector("#pn-sweep-amount");
     if (sweepAmountInput) {
       sweepAmountInput.oninput = (e) => {
         state.sweepAmountRaw = e.target.value;
+        state.sweepTouched = true;
         const empty = state.sweepAmountRaw === "";
         sweepAmountInput.classList.toggle("is-empty", empty);
         sweepAmountInput.closest(".pn-amount-wrap")?.classList.toggle("has-value", !empty);
@@ -697,6 +735,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
           sharePct: partnerName ? Math.min(100, Math.max(0, state.sharePct)) : 100,
           budgets: budgetsPayload,
           sweep,
+          payDay,
         });
         // Bloque 6 del artboard: en modo 'next' hay un periodo recién cerrado del que enseñar el
         // informe; en 'first' (onboarding) no existe ese periodo, así que se sigue como hasta

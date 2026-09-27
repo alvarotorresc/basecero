@@ -1404,6 +1404,7 @@ export const EN = {
     onbLabel: "Pay day",
     onbSub: "Your month starts that day",
     legend: "Your pay day",
+    lateMove: { one: "{n} entry since {date} will move to the new period.", other: "{n} entries since {date} will move to the new period." },
     noticeToday: "Today is your pay day",
     noticePast: "Your pay day was {date}",
     noticeOpen: "{name} is still open.",

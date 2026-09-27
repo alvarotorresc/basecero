@@ -180,6 +180,18 @@ export const SQL = {
   hasSharedRule: `SELECT 1 FROM recurring_rules WHERE is_shared=1 AND deleted=0 LIMIT 1`,
 
   closePeriod: `UPDATE periods SET end_date=?, status='closed', updated_at=? WHERE id=?`,
+  // Cierre tardío con día de cobro (decisión de Álvaro 2026-09-27: «mover los apuntes»): al abrir
+  // el periodo nuevo con un inicio anterior a hoy, lo apuntado desde ese inicio pasa al periodo
+  // nuevo en el MISMO execMany (repo.openNextPeriodStmts). Primero se congela el reparto de los
+  // compartidos que se mueven y aún seguían al periodo (override NULL) en el % del periodo que se
+  // cierra —con el que se apuntaron—, así el cambio de periodo no mueve ningún importe ya
+  // calculado. Bind: [closingId, now, closingId, startDate].
+  lateCloseFreezeShare: `UPDATE transactions
+    SET share_pct_override=(SELECT my_share_pct FROM periods WHERE id=?), updated_at=?
+    WHERE period_id=? AND date>=? AND is_shared=1 AND share_pct_override IS NULL AND deleted=0`,
+  // Los borrados también se mueven: si se restauran, que caigan en el periodo de su fecha.
+  // Bind: [newId, now, closingId, startDate].
+  lateCloseMoveTx: `UPDATE transactions SET period_id=?, updated_at=? WHERE period_id=? AND date>=?`,
   // Cambia el reparto por defecto del periodo (Ajustes). Va SIEMPRE precedido, en el mismo
   // execMany, de freezePeriodShareOverrides: los gastos compartidos del periodo que aún seguían al
   // periodo (override NULL: filas de antes de que la UI guardara el % explícito, o importadas de
@@ -456,7 +468,10 @@ export const SQL = {
   // Hijas ACTIVAS de una categoría: archiveCategory las recorre para archivarlas en cascada (una
   // SQL.setCategoryArchived por cada una, en el MISMO execMany que la de la propia raíz).
   childrenOf: `SELECT id FROM categories WHERE parent_id=? AND deleted=0 AND is_archived=0`,
-  // B-8 (onboarding, paso Categorías): volver a marcar una raíz desmarcada la recupera CON sus hijas
+  // Todas las hijas vivas, archivadas incluidas: unarchiveCategory decide con ellas si la raíz se
+  // archivó en cascada (todas archivadas) o no.
+  liveChildrenOf: `SELECT id, is_archived FROM categories WHERE parent_id=? AND deleted=0`,
+  // B-8 (onboarding, paso Categorías) y Categorías (desarchivar, si todas estaban archivadas): una raíz vuelve CON sus hijas
   // —archiveCategory las archivó en cascada—, en una sola sentencia. Bind [updated_at, id, id].
   restoreCategoryTree: `UPDATE categories SET is_archived=0, updated_at=? WHERE (id=? OR parent_id=?) AND deleted=0`,
   // ¿Tiene `id` alguna hija ACTIVA? Ya NO la usa el guard de updateCategory (ver hasChildren) —
@@ -522,3 +537,10 @@ export const SQL = {
     WHERE deleted=0 AND (account_id=? OR counter_account_id=?) ORDER BY date`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets","tags"];
+
+// Cifras del periodo que se cierra SIN lo que el cierre tardío va a mover (date < corte, el mismo
+// de lateCloseMoveTx): Nuevo periodo enseña lo que de verdad queda en el cerrado. Mismas sentencias
+// que las de siempre + `date < ?`, sin copiar el cuerpo, para que nunca se desvíen. Bind: [periodId, corte].
+SQL.spentOfPeriodBefore = `${SQL.spentOfPeriod} AND t.date < ?`;
+SQL.incomeOfPeriodBefore = `${SQL.incomeOfPeriod} AND t.date < ?`;
+SQL.countOfPeriodBefore = `SELECT COUNT(*) AS n FROM transactions t WHERE t.period_id=? AND t.deleted=0 AND t.date < ?`;

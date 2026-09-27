@@ -118,3 +118,46 @@ test("hasHucha: solo los tipos con hucha y con cuenta enlazada", () => {
   assert.equal(hasHucha({ type: "savings_rate", account_id: "" }), false);
   assert.equal(hasHucha(null), false);
 });
+
+// ---- Revisión global, hallazgo 4: con día de cobro (≥ 2) las aportaciones van por PERIODO -------
+import { periodKeyOf } from "../../app/app/js/pay-day.js";
+
+const H2 = "acc-h";
+const inTx = (date, cents) => ({ date, type: "transfer", amount_cents: cents, account_id: "acc-c", counter_account_id: H2 });
+
+test("periodKeyOf: el periodo de una fecha lleva la clave del mes que le da nombre (periodNameFor)", () => {
+  assert.equal(periodKeyOf("2026-09-27", 28), "2026-09", "del 28 ago al 27 sep es «Septiembre»");
+  assert.equal(periodKeyOf("2026-09-29", 28), "2026-10", "desde el 28 sep es «Octubre»");
+  assert.equal(periodKeyOf("2026-10-03", 5), "2026-09", "del 5 sep al 4 oct es «Septiembre»");
+  assert.equal(periodKeyOf("2026-10-05", 5), "2026-10");
+  for (const pd of [undefined, 0, 1, "0"]) assert.equal(periodKeyOf("2026-09-29", pd), "2026-09", "sin día de cobro, mes natural");
+});
+
+test("contributionsByMonth con día de cobro 28: lo del 28 de septiembre es del periodo en curso (octubre)", () => {
+  const txs = [inTx("2026-09-20", 10000), inTx("2026-09-28", 5000)];
+  const r = contributionsByMonth({ txs, accountId: H2, todayIso: "2026-09-29", payDay: 28 });
+  assert.equal(r.months.at(-1).key, "2026-10");
+  assert.equal(r.months.at(-1).current, true);
+  assert.equal(r.months.at(-1).cents, 5000);
+  assert.equal(r.months.at(-2).key, "2026-09");
+  assert.equal(r.months.at(-2).cents, 10000);
+  assert.equal(r.totalCents, 15000);
+  // Sin día de cobro, igual que ahora: las dos en septiembre (mes natural).
+  const n = contributionsByMonth({ txs, accountId: H2, todayIso: "2026-09-29" });
+  assert.equal(n.months.at(-1).key, "2026-09");
+  assert.equal(n.months.at(-1).cents, 15000);
+});
+
+test("avgMonthlyContribution y projectCompletion con día de cobro 5: media de los 3 últimos PERIODOS cerrados", () => {
+  // Periodos (día 5): jul = 5 jul–4 ago, ago = 5 ago–4 sep, sep = 5 sep–4 oct (en curso el 3 oct).
+  const txs = [inTx("2026-07-06", 3000), inTx("2026-08-04", 3000), inTx("2026-08-05", 6000), inTx("2026-09-04", 3000)];
+  const { byMonth, firstKey } = contributionsByMonth({ txs, accountId: H2, todayIso: "2026-10-03", payDay: 5 });
+  assert.deepEqual(byMonth, { "2026-07": 6000, "2026-08": 9000 });
+  const avg = avgMonthlyContribution({ byMonth, firstKey, todayIso: "2026-10-03", payDay: 5 });
+  assert.equal(avg, 7500, "jul y ago cerrados (la hucha empieza en jul): (6000+9000)/2");
+  const p = projectCompletion({ remainingCents: 15000, avgCents: avg, todayIso: "2026-10-03", payDay: 5 });
+  assert.deepEqual(p, { status: "projected", count: 2, monthKey: "2026-10" }, "desde el periodo en curso (sep): sep y oct");
+  // Sin día de cobro: meses naturales (jul 3000, ago 9000, sep 3000 → media 5000).
+  const m = contributionsByMonth({ txs, accountId: H2, todayIso: "2026-10-03" });
+  assert.equal(avgMonthlyContribution({ byMonth: m.byMonth, firstKey: m.firstKey, todayIso: "2026-10-03" }), 5000);
+});

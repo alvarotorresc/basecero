@@ -3,7 +3,11 @@
 // (screens/objetivo.js) pinta lo que sale de aquí.
 //
 // Los meses van como claves "YYYY-MM" y se suman con aritmética entera: nada de Date, así un
-// cambio de hora o la zona del navegador no mueven un movimiento de mes.
+// cambio de hora o la zona del navegador no mueven un movimiento de mes. Con día de cobro (≥ 2,
+// `payDay`), cada clave es un PERIODO (pay-day.js#periodKeyOf: la del mes que le da nombre), no el
+// mes natural; sin él, el mes natural de siempre.
+
+import { periodKeyOf } from "./pay-day.js";
 
 /** "2026-09-27" → "2026-09". */
 export const monthKey = (iso) => String(iso).slice(0, 7);
@@ -34,14 +38,14 @@ export function accountFlowCents(tx, accountId) {
 
 /** Neto por mes de la cuenta {"YYYY-MM": cents} hasta `todayIso` (incluido), y el primer mes con
  *  movimiento (o null). Lo posterior a hoy no cuenta: el saldo de Patrimonio es a hoy. */
-export function flowsByMonth(txs, accountId, todayIso) {
+export function flowsByMonth(txs, accountId, todayIso, payDay) {
   const byMonth = {};
   let firstKey = null;
   for (const tx of txs ?? []) {
     if (!tx || tx.date > todayIso) continue;
     const c = accountFlowCents(tx, accountId);
     if (!c) continue;
-    const k = monthKey(tx.date);
+    const k = periodKeyOf(tx.date, payDay);
     byMonth[k] = (byMonth[k] ?? 0) + c;
     if (firstKey === null || k < firstKey) firstKey = k;
   }
@@ -52,9 +56,9 @@ export function flowsByMonth(txs, accountId, todayIso) {
  *  último, `current:true`), lo anterior junto en `beforeCents` (saldo inicial incluido: «Antes de
  *  abril») y `totalCents`, que es el saldo de la hucha a hoy. Una aportación es el NETO del mes:
  *  si se sacó dinero, resta. */
-export function contributionsByMonth({ txs, accountId, openingCents = 0, todayIso, months = 6 }) {
-  const { byMonth, firstKey } = flowsByMonth(txs, accountId, todayIso);
-  const cur = monthKey(todayIso);
+export function contributionsByMonth({ txs, accountId, openingCents = 0, todayIso, months = 6, payDay }) {
+  const { byMonth, firstKey } = flowsByMonth(txs, accountId, todayIso, payDay);
+  const cur = periodKeyOf(todayIso, payDay);
   const keys = Array.from({ length: months }, (_, i) => addMonths(cur, i - (months - 1)));
   const first = keys[0];
   const beforeCents = (Number(openingCents) || 0)
@@ -69,9 +73,9 @@ export function contributionsByMonth({ txs, accountId, openingCents = 0, todayIs
  *  solo por los meses que lleva, desde el de su primer movimiento; si ese primer movimiento es de
  *  este mes, la media es lo de este mes. Un mes sin aportar cuenta como 0. Sin media positiva
  *  (nada aportado, o se sacó más de lo que se metió) → null: no hay proyección honesta. */
-export function avgMonthlyContribution({ byMonth, firstKey, todayIso, n = 3 }) {
+export function avgMonthlyContribution({ byMonth, firstKey, todayIso, n = 3, payDay }) {
   if (!firstKey) return null;
-  const cur = monthKey(todayIso);
+  const cur = periodKeyOf(todayIso, payDay);
   let keys = Array.from({ length: n }, (_, i) => addMonths(cur, i - n)).filter((k) => k >= firstKey);
   if (!keys.length) keys = [cur];
   const avg = Math.round(keys.reduce((s, k) => s + (byMonth[k] ?? 0), 0) / keys.length);
@@ -82,12 +86,12 @@ export function avgMonthlyContribution({ byMonth, firstKey, todayIso, n = 3 }) {
  *  este mes todavía no se ha aportado, la primera cuenta en este mes (el mockup: 4 aportaciones
  *  desde septiembre → diciembre); si ya se aportó, empieza el que viene.
  *  → {status:"done"} | {status:"none"} | {status:"projected", count, monthKey}. */
-export function projectCompletion({ remainingCents, avgCents, todayIso, currentMonthCents = 0 }) {
+export function projectCompletion({ remainingCents, avgCents, todayIso, currentMonthCents = 0, payDay }) {
   if (!(remainingCents > 0)) return { status: "done" };
   if (!(avgCents > 0)) return { status: "none" };
   const count = Math.ceil(remainingCents / avgCents);
   const start = currentMonthCents > 0 ? 1 : 0;
-  return { status: "projected", count, monthKey: addMonths(monthKey(todayIso), start + count - 1) };
+  return { status: "projected", count, monthKey: addMonths(periodKeyOf(todayIso, payDay), start + count - 1) };
 }
 
 /** «Cubre N meses» = ahorrado / gasto medio mensual. Sin gasto medio (ningún periodo cerrado) →

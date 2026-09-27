@@ -93,8 +93,27 @@ export function monthNameOf(iso, locale) {
  *  (desde el día 16, el siguiente: empezar el 28 de septiembre es «Octubre»). Mismo formato que
  *  nombrePorDefecto: «Octubre 2026», con el año al final para que periodTitle lo quite. */
 export function periodNameFor(startIso, locale) {
+  const { y, m } = nameMonthOf(startIso);
+  return capitalizedMonth(y, m, locale);
+}
+
+/** El mes que da nombre al periodo que empieza en `startIso` ({y, m} con m 0-11, puede ser 12 =
+ *  enero del año siguiente: Date y payDateIn lo normalizan): desde el día 16, el siguiente. Una
+ *  sola regla para periodNameFor y periodKeyOf. */
+function nameMonthOf(startIso) {
   const { y, m, d } = parts(startIso);
-  return capitalizedMonth(y, d > 15 ? m + 1 : m, locale);
+  return { y, m: d > 15 ? m + 1 : m };
+}
+
+/** Clave "YYYY-MM" del periodo al que pertenece `iso` (detalle de objetivo, revisión global de la
+ *  PR de lógica): con día de cobro (≥ 2), el mes que da nombre al periodo que empezó en el último
+ *  día de cobro ≤ iso —la misma que periodNameFor—; sin ajuste, el mes natural de siempre. Los
+ *  periodos son mensuales, así que las claves se siguen sumando de una en una. */
+export function periodKeyOf(iso, payDay) {
+  if (normalizePayDay(payDay) <= PAY_DAY_MIN) return String(iso).slice(0, 7);
+  const { y, m } = nameMonthOf(lastPayDate(payDay, iso));
+  const yy = y + Math.floor(m / 12);
+  return `${yy}-${pad((m % 12) + 1)}`;
 }
 
 /** Propuesta completa de Nuevo periodo: fecha, nombre y si sale del día de cobro. Sin ajuste, hoy y
@@ -113,4 +132,19 @@ export function payDayDue({ payDay, openStartIso, todayIso }) {
   if (normalizePayDay(payDay) <= PAY_DAY_MIN || !openStartIso) return null;
   const due = nextPayDateAfter(payDay, addDays(openStartIso, MIN_PERIOD_DAYS - 1));
   return due <= todayIso ? due : null;
+}
+
+/** Cierre tardío (decisión 2026-09-27): con día de cobro (≥ 2), al abrir el periodo nuevo los
+ *  apuntes del que se cierra con fecha desde el nuevo inicio pasan a él. Cuántos son, para la línea
+ *  de Nuevo periodo antes de confirmar; `rows` son los VIVOS del periodo que se cierra
+ *  (listAllByDay). Sin día de cobro, 0: no se mueve nada (repo.openNextPeriodStmts). */
+export const movesLateRows = (payDay) => normalizePayDay(payDay) > PAY_DAY_MIN;
+/** El corte del cierre tardío: la fecha desde la que los apuntes pasan al periodo nuevo, o "" si no
+ *  se mueve nada (sin día de cobro). UNA sola fuente para la escritura (repo.openNextPeriodStmts)
+ *  y para lo que enseña Nuevo periodo (la línea y las cifras del cierre sin lo que se mueve). */
+export const lateMoveCutoff = ({ payDay, startIso }) => (movesLateRows(payDay) && startIso ? startIso : "");
+export function lateMoveCount({ payDay, rows, startIso }) {
+  const cutoff = lateMoveCutoff({ payDay, startIso });
+  if (!cutoff) return 0;
+  return (rows ?? []).filter((r) => r.date >= cutoff).length;
 }

@@ -39,3 +39,15 @@ export function buildDuplicatePrefill(row, defaultSharePct = 100) {
   if (row.tag_id) prefill.tagId = row.tag_id;
   return prefill;
 }
+
+/** Compartido y «quién pagó» con que arranca Crear gasto desde un prefill. Sin contraparte
+ *  configurada no hay reparto (como siempre) NI «lo pagó ella»: un duplicado de una fila pagada por
+ *  la contraparte vuelve a «yo» —si no, addTransaction lo rechazaría (paid_by='partner' exige
+ *  compartido) o el gasto se guardaría sin cuenta mía. Sin prefill, «yo» y no compartido. */
+export function prefillSharing(prefill, partnerName) {
+  const hasPartner = !!(partnerName && String(partnerName).trim());
+  return {
+    isShared: hasPartner ? (prefill?.isShared ?? false) : false,
+    paidBy: hasPartner ? (prefill?.paidBy ?? "me") : "me",
+  };
+}

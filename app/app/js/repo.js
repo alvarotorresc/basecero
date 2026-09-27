@@ -17,6 +17,7 @@ import { DETECT_WINDOW_DAYS } from "./subscription-detect.js";
 import { previousPeriodOf, previousPeriodsOf } from "./informe-logic.js";
 import { transferError } from "./objetivo-logic.js";
 import { monthEndDates } from "./cuenta-logic.js";
+import { lateMoveCutoff } from "./pay-day.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -56,15 +57,30 @@ export function sweepTransferStmt({ periodId, date, amountCents, fromAccountId, 
  *  execMany que cierra/abre/presupuesta: o queda el periodo abierto CON su barrido, o no queda
  *  nada (D8 de la spec: es lo que hace inmutable el informe del periodo recién cerrado). Sin
  *  `sweep`, cero cambios de comportamiento. */
-export async function openNextPeriod({ name, startDate, sharePct, budgets = [], sweep }) {
+export async function openNextPeriod({ name, startDate, sharePct, budgets = [], sweep, payDay }) {
   const current = await getOpenPeriod();
   if (periodStartTooEarly(current, startDate))
     throw new UserError(t("errors.repo.periodStartTooEarly"));
-  const now = nowIso();
   const newId = bcUlid();
+  await execMany(openNextPeriodStmts({ current, newId, now: nowIso(), name, startDate, sharePct, budgets, sweep, payDay }));
+  return newId;
+}
+
+/** Statements de openNextPeriod, PUROS (reciben periodo abierto, id y hora ya resueltos): así el
+ *  test ejecuta la lista real sobre SQLite. Orden: cerrar, abrir, [cierre tardío], límites,
+ *  barrido. Cierre tardío (decisión de Álvaro 2026-09-27): SOLO con día de cobro (`payDay` ≥ 2,
+ *  pay-day.js#lateMoveCutoff) y periodo que cerrar, los apuntes del que se cierra con fecha
+ *  ≥ startDate pasan al nuevo —con el reparto de los compartidos congelado antes—; sin día de
+ *  cobro la lista es EXACTAMENTE la de antes, aunque la fecha elegida sea anterior a hoy. */
+export function openNextPeriodStmts({ current, newId, now, name, startDate, sharePct, budgets = [], sweep, payDay }) {
   const stmts = [];
   if (current) stmts.push({ sql: SQL.closePeriod, bind: [prevDayIso(startDate), now, current.id] });
   stmts.push({ sql: SQL.insertPeriod, bind: [newId, name, startDate, sharePct, now, now] });
+  const cutoff = current ? lateMoveCutoff({ payDay, startIso: startDate }) : "";
+  if (cutoff) {
+    stmts.push({ sql: SQL.lateCloseFreezeShare, bind: [current.id, now, current.id, cutoff] });
+    stmts.push({ sql: SQL.lateCloseMoveTx, bind: [newId, now, current.id, cutoff] });
+  }
   for (const b of budgets) {
     stmts.push({ sql: SQL.insertBudget, bind: [bcUlid(), newId, b.categoryId, b.amountCents, now, now] });
   }
@@ -74,8 +90,7 @@ export async function openNextPeriod({ name, startDate, sharePct, budgets = [], 
       fromAccountId: sweep.fromAccountId, toAccountId: sweep.toAccountId, goalName: sweep.goalName, now,
     }));
   }
-  await execMany(stmts);
-  return newId;
+  return stmts;
 }
 
 /** Reparto por defecto del periodo (Ajustes). Valida ANTES de tocar la BD (guard puro, testeable
@@ -188,6 +203,15 @@ export async function defaultAccountId() {
 
 export const listPeriods = () => query(SQL.listPeriods);
 export const listAllByDay = (pid) => query(SQL.listAllByDay, [pid]);
+/** Cifras del periodo que se cierra SIN lo que el cierre tardío moverá (fecha ≥ `cutoff`,
+ *  pay-day.js#lateMoveCutoff): gastado, ingresos y nº de movimientos que quedan en él. */
+export async function closingFiguresBefore(pid, cutoff) {
+  const [s, i, c] = await Promise.all([
+    query(SQL.spentOfPeriodBefore, [pid, cutoff]), query(SQL.incomeOfPeriodBefore, [pid, cutoff]),
+    query(SQL.countOfPeriodBefore, [pid, cutoff]),
+  ]);
+  return { spentCents: s[0].spent_cents, incomeCents: i[0].income_cents, count: c[0].n };
+}
 export const getTransaction = async (id) => (await query(SQL.getTransaction, [id]))[0] ?? null;
 // ¿`id` tiene algún apunte de liquidación activo enlazado por ref_id (la devolución entrante o el
 // ajuste saliente)? La usa tanto Movimientos (bloquear importe/compartido en la UI) como
@@ -1203,14 +1227,24 @@ export async function archiveCategory(id) {
   await execMany(stmts);
 }
 
-/** Desarchiva una categoría. A propósito NO desarchiva sus hijas (si se archivó en cascada, cada
- *  hija se reactiva a mano, una por una): evita reactivar en bloque subcategorías que el usuario
- *  quizá había archivado ella sola antes de archivar la raíz. */
-export const unarchiveCategory = (id) => exec(SQL.setCategoryArchived, [0, nowIso(), id]);
+/** Desarchiva una categoría. Una raíz cuyas hijas vivas estaban TODAS archivadas (se archivaron
+ *  en cascada con ella, archiveCategory) vuelve con ellas, en una sola sentencia
+ *  (restoreCategoryTree). Si alguna hija seguía activa, las archivadas lo fueron por separado y se
+ *  quedan archivadas: solo vuelve la raíz. Una hija (sin hijas propias) vuelve sola. El statement
+ *  es PURO (`children`: SQL.liveChildrenOf) para que el test lo ejecute sobre SQLite real. */
+export function unarchiveCategoryStmt(id, now, children = []) {
+  const cascade = children.length > 0 && children.every((c) => c.is_archived);
+  return cascade
+    ? { sql: SQL.restoreCategoryTree, bind: [now, id, id] }
+    : { sql: SQL.setCategoryArchived, bind: [0, now, id] };
+}
+export async function unarchiveCategory(id) {
+  const st = unarchiveCategoryStmt(id, nowIso(), await query(SQL.liveChildrenOf, [id]));
+  return exec(st.sql, st.bind);
+}
 
 /** B-8 (onboarding, paso Categorías): recupera una raíz y TODAS sus hijas vivas en una sola
- *  sentencia. Solo para deshacer un desmarcado del propio onboarding, donde el archivado lo hizo
- *  archiveCategory en cascada; Categorías sigue usando unarchiveCategory (sin cascada, a propósito). */
+ *  sentencia, para deshacer un desmarcado del propio onboarding. */
 export const restoreCategoryTree = (id) => exec(SQL.restoreCategoryTree, [nowIso(), id, id]);
 
 /** i18n (PR i18n, Task 6, fix round 1): retraduce las categorías SEMILLA (SEED_NAMES, seeds.js)
@@ -1385,9 +1419,9 @@ export async function goalDetail(id) {
   const goal = await getGoal(id);
   if (!goal) return null;
   const today = hoyISO();
-  const [account, avgSpentCents, openPeriod] = await Promise.all([
+  const [account, avgSpentCents, openPeriod, meta] = await Promise.all([
     goal.account_id ? getAccount(goal.account_id) : Promise.resolve(null),
-    avgSpentOfClosedPeriods(), getOpenPeriod(),
+    avgSpentOfClosedPeriods(), getOpenPeriod(), getMetaAll(),
   ]);
   const [balanceCents, movements] = account
     ? await Promise.all([accountBalanceCents(account.id, today), query(SQL.goalAccountMovements, [account.id, account.id])])
@@ -1412,6 +1446,8 @@ export async function goalDetail(id) {
     movements,
     avgSpentCents,
     todayIso: today,
+    // Día de cobro (meta.pay_day, crudo): con él las aportaciones van por periodo (objetivo-logic.js).
+    payDay: meta.pay_day,
   };
 }
 
