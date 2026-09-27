@@ -1482,6 +1482,8 @@ export const ES = {
     onbLabel: "Día de cobro",
     onbSub: "Ese día empieza tu mes",
     legend: "Tu día de cobro",
+    // Cierre tardío: línea de Nuevo periodo antes de confirmar (los apuntes desde el inicio pasan).
+    lateMove: { one: "{n} apunte desde el {date} pasará al periodo nuevo.", other: "{n} apuntes desde el {date} pasarán al periodo nuevo." },
     noticeToday: "Hoy es tu día de cobro",
     noticePast: "Tu día de cobro fue el {date}",
     noticeOpen: "{name} sigue abierto.",

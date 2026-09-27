@@ -10,7 +10,7 @@ import {
 } from "../format.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, stepPct, normalizePct } from "../share-pct.js";
-import { normalizePayDay, proposedPeriodStart, periodNameFor, isPayDate } from "../pay-day.js";
+import { normalizePayDay, proposedPeriodStart, periodNameFor, isPayDate, lateMoveCount } from "../pay-day.js";
 import { inheritedBudgetsRaw, budgetMap } from "../category-spend.js";
 import { remainderCents, sweepDestinations, sweepPlan } from "../barrido.js";
 import { renderInforme } from "./informe.js";
@@ -73,6 +73,8 @@ function renderAsistenteError(container, { mode, onDone, onBack, embed, initialS
  *  Ajustes, para que el paso a paso de aquí arranque en él y no en el 50 de siempre. */
 export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embed = false, initialSharePct }) {
   let closingPeriod = null, closingSpent = 0, closingIncome = 0, closingCount = 0, rootRows = [], meta = {};
+  // Filas vivas del periodo que se cierra: el cierre tardío cuenta con ellas cuántas pasan al nuevo.
+  let closingRows = [];
   let closingBudgets = [];
   // Barrido (N4): goals con progreso, cuentas vivas y la cuenta de origen por defecto — solo hace
   // falta en modo 'next' (bloqueBarrido() más abajo).
@@ -97,7 +99,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
         listAllAccounts(),
         defaultAccountId(),
       ]);
-      closingSpent = spent; closingIncome = income; closingCount = all.length; rootRows = roots;
+      closingSpent = spent; closingIncome = income; closingCount = all.length; closingRows = all; rootRows = roots;
       closingBudgets = budgetRows; meta = metaAll;
       goalsProgress = goals; allAccounts = accounts; sourceAccountId = defaultAccId || "";
       proposedStart = proposedPeriodStart({
@@ -415,7 +417,16 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
       ${showField
         ? buttonHtml({ kind: "tertiary", id: "pn-dias-cercanos", icon: "calendar", label: t("periodo.date.quickPick") })
         : buttonHtml({ kind: "tertiary", id: "pn-otra-fecha", icon: "calendar", label: t("periodo.date.other") })}
+      ${lateMoveLineHtml()}
     </section>`;
+  }
+  /** Cierre tardío (decisión 2026-09-27): con día de cobro, cuántos apuntes del periodo que se
+   *  cierra pasan al nuevo —los de fecha ≥ inicio—, en una línea antes de confirmar. Sin día de
+   *  cobro, o sin ninguno que mover, nada. */
+  function lateMoveLineHtml() {
+    if (mode !== "next") return "";
+    const n = lateMoveCount({ payDay, rows: closingRows, startIso: state.startDate });
+    return n > 0 ? `<p class="pn-hint" id="pn-late-move">${escHtml(t("payday.lateMove", { n, date: fmtDiaCorto(state.startDate) }))}</p>` : "";
   }
   function dateTitle() {
     return t("periodo.date.title", { name: state.name.trim() || nameFor(state.startDate) });
@@ -697,6 +708,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
           sharePct: partnerName ? Math.min(100, Math.max(0, state.sharePct)) : 100,
           budgets: budgetsPayload,
           sweep,
+          payDay,
         });
         // Bloque 6 del artboard: en modo 'next' hay un periodo recién cerrado del que enseñar el
         // informe; en 'first' (onboarding) no existe ese periodo, así que se sigue como hasta
