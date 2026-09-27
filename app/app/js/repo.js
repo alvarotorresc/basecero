@@ -15,6 +15,7 @@ import { MEMORY_WINDOW, merchantMemory } from "./merchant-memory.js";
 import { IGNORED_MAX, parseIgnored, parseSnoozed } from "./subscriptions.js";
 import { DETECT_WINDOW_DAYS } from "./subscription-detect.js";
 import { previousPeriodOf, previousPeriodsOf } from "./informe-logic.js";
+import { avgOfLastClosed, transferError, goalTransferTx } from "./objetivo-logic.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -1346,3 +1347,65 @@ export async function updateTag(id, fields) {
 /** Archiva/desarchiva (D5: no hay deleteTag — solo archivar). Sin cascada: una etiqueta no tiene
  *  hijas. */
 export const setTagArchived = (id, archived) => exec(SQL.setTagArchived, [archived ? 1 : 0, nowIso(), id]);
+
+// ---- Detalle de objetivo (B-7) y «Pasar a la hucha» (B-4) --------------------
+// Bloque propio (retrocompatible): no toca goalsWithProgress ni avgSpentOfClosedPeriods. OJO TDZ:
+// ningún `const t` local en estas funciones.
+
+/** Gasto medio de los `n` últimos periodos CERRADOS («cubre N meses», B-7). 0 sin ninguno. */
+export async function avgSpentOfLastClosedPeriods(n = 3) {
+  const closed = await listClosedPeriods();
+  const spents = await Promise.all(closed.slice(-n).map((p) => spentOfPeriod(p.id)));
+  return avgOfLastClosed(spents, n);
+}
+
+/** Todo lo que pinta el detalle de un objetivo, activo o pausado (getGoal no filtra is_active):
+ *  el objetivo, su progreso (goalProgress, el mismo de la tarjeta de Patrimonio), su hucha con el
+ *  saldo a hoy, los movimientos de la hucha y el gasto medio de los 3 últimos cerrados. null si
+ *  el objetivo ya no existe (borrado). El ctx de goalProgress se arma igual que en
+ *  goalsWithProgress, pero solo para este objetivo. */
+export async function goalDetail(id) {
+  const goal = await getGoal(id);
+  if (!goal) return null;
+  const today = hoyISO();
+  const [account, avgSpentCents, avgSpent3Cents, openPeriod] = await Promise.all([
+    goal.account_id ? getAccount(goal.account_id) : Promise.resolve(null),
+    avgSpentOfClosedPeriods(), avgSpentOfLastClosedPeriods(3), getOpenPeriod(),
+  ]);
+  const [balanceCents, movements] = account
+    ? await Promise.all([accountBalanceCents(account.id, today), query(SQL.goalAccountMovements, [account.id, account.id])])
+    : [0, []];
+  let spentByCategory = {}, savingsRatePct = 0;
+  if (openPeriod && (goal.type === "spending_cap" || goal.type === "savings_rate")) {
+    const [rootRows, spent, income] = await Promise.all([
+      spentByRootCategory(openPeriod.id), spentOfPeriod(openPeriod.id), incomeOfPeriod(openPeriod.id),
+    ]);
+    spentByCategory = Object.fromEntries(rootRows.map((r) => [r.root_id, r.spent_cents]));
+    savingsRatePct = income > 0 ? ((income - spent) / income) * 100 : 0;
+  }
+  const ctx = {
+    balanceByAccount: account ? { [account.id]: balanceCents } : {},
+    accountNameById: account ? { [account.id]: account.name } : {},
+    avgSpentCents, spentByCategory, savingsRatePct,
+  };
+  return {
+    goal,
+    progress: goalProgress(goal, ctx),
+    account: account ? { ...account, balance_cents: balanceCents } : null,
+    movements,
+    avgSpent3Cents,
+    todayIso: today,
+  };
+}
+
+/** «Pasar a la hucha» (B-4): transferencia de hoy desde `fromAccountId` a la hucha del objetivo,
+ *  con addTransaction (la misma función que Registro; exige periodo abierto). Valida antes de
+ *  escribir con objetivo-logic.js#transferError. Devuelve el id del movimiento nuevo. */
+export async function transferToGoal({ goal, fromAccountId, amountCents }) {
+  const err = transferError({ cents: amountCents, fromId: fromAccountId, toId: goal?.account_id ?? "" });
+  if (err) throw new UserError(t(`objetivo.transfer.error.${err}`));
+  return addTransaction(goalTransferTx({
+    cents: amountCents, fromId: fromAccountId, toId: goal.account_id,
+    goalName: goal.name, note: t("objetivo.transfer.note"), todayIso: hoyISO(),
+  }));
+}
