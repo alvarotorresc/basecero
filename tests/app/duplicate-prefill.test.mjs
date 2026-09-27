@@ -96,3 +96,14 @@ test("buildDuplicatePrefill: paid_by desconocido o ausente cae a \"me\"", () => 
   assert.equal(buildDuplicatePrefill({ ...ROW, paid_by: null }, 100).paidBy, "me");
   assert.equal(buildDuplicatePrefill({ ...ROW, paid_by: "otracosa" }, 100).paidBy, "me");
 });
+
+// Revisión global, hallazgo 5: sin contraparte configurada no se puede heredar «lo pagó ella».
+import { prefillSharing } from "../../app/app/js/duplicate-prefill.js";
+
+test("prefillSharing: sin contraparte, un duplicado pagado por la contraparte vuelve a «yo» y no compartido", () => {
+  const prefill = { isShared: true, paidBy: "partner" };
+  assert.deepEqual(prefillSharing(prefill, ""), { isShared: false, paidBy: "me" });
+  assert.deepEqual(prefillSharing(prefill, "Marta"), { isShared: true, paidBy: "partner" });
+  assert.deepEqual(prefillSharing(undefined, "Marta"), { isShared: false, paidBy: "me" }, "sin prefill, como antes");
+  assert.deepEqual(prefillSharing(undefined, ""), { isShared: false, paidBy: "me" });
+});
