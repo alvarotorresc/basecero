@@ -136,6 +136,15 @@ test("meta: semillas incluyen quick_register a \"1\" (Registro rápido activado 
   assert.equal(db.prepare("SELECT value FROM meta WHERE key='quick_register'").get().value, "1");
 });
 
+// B-1: el día de cobro nace a "0" (= día 1) y re-ejecutar el esquema no pisa el elegido.
+test("meta: semilla pay_day a \"0\" (día 1) y el esquema no la pisa al re-ejecutarse", () => {
+  const db = freshDb();
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='pay_day'").get().value, "0");
+  db.prepare("UPDATE meta SET value='28' WHERE key='pay_day'").run();
+  db.exec(schema);
+  assert.equal(db.prepare("SELECT value FROM meta WHERE key='pay_day'").get().value, "28");
+});
+
 test("meta: las claves de cuenta entran vacías con INSERT OR IGNORE", () => {
   const db = freshDb();
   assert.equal(db.prepare("SELECT value FROM meta WHERE key='import_account_id'").get().value, "");
