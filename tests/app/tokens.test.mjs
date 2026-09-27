@@ -78,7 +78,7 @@ const sha256 = (buf) => createHash("sha256").update(buf).digest("hex");
 // K2 (DESIGN §13): tokens.css es la copia BYTE A BYTE de design/design-system/tokens-B.css. La
 // constante fija la copia en CI (design/ está ignorado en git); si tokens-B cambia, se vuelve a
 // copiar con `cp` y se actualiza aquí, nunca se edita tokens.css a mano.
-const TOKENS_B_SHA256 = "67c8c169844ed179bfd0547705fa4e47fe0d9418398dc54051b3807eebd02904";
+const TOKENS_B_SHA256 = "597c098affacb7b112c40093f3191b4fff69d5dc789ea3c81efaf225e78c1ab9";
 const TOKENS_B = fileURLToPath(new URL("../../design/design-system/tokens-B.css", import.meta.url));
 
 test("tokens.css (K2): su sha256 es el de la copia canónica de tokens-B.css", () => {
@@ -93,7 +93,7 @@ test("tokens.css (K2): en local, sigue siendo idéntico a design/design-system/t
 
 test("tokens.css: claro en :root y oscuro en :root[data-theme=dark], con --bg en los dos", () => {
   assert.match(tokens, /:root\s*\{[^}]*--bg:\s*#E3E1DC/i);
-  assert.match(tokens, /:root\[data-theme="dark"\]\s*\{[^}]*--bg:\s*#161719/i);
+  assert.match(tokens, /:root\[data-theme="dark"\]\s*\{[^}]*--bg:\s*#1D1E20/i);
 });
 
 test("tokens.css: solo tokens; ni @import de fuentes ni reglas de base", () => {

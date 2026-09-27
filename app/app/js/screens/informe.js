@@ -5,13 +5,14 @@ import { loadPdfPalette } from "../pdf-palette.js";
 import { loadPdfLib } from "../pdf-loader.js";
 import { download } from "../download.js";
 import { fmtMoney, fmtDiaCorto, fmtPct, fmtPct0 } from "../format.js";
-import { t } from "../i18n/index.js";
+import { t, monthLong, monthShort } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 import { subHeaderHtml, buttonHtml } from "../ui.js";
 import { segmentedHtml, wireSegmented } from "../controls.js";
 import { displayHtml, dispInkHtml, bentoHtml, meterHtml, emptyStateHtml, containerHtml } from "../instrument.js";
 import { settingRowHtml } from "../entity.js";
 import { icon } from "../icons.js";
+import { famClass } from "../category-colors.js";
 import { escHtml, escAttr } from "../esc.js";
 
 // Pantalla del Informe del periodo, sistema B (B-Informe / BD-Informe). Lo que se ve es el
@@ -28,6 +29,8 @@ const SEGMENTED_PERIODS = 3;
 const OLDER = "__older__";
 // Categorías con nombre antes de agrupar el resto en «Resto» (B-Informe: cinco más Resto).
 const TOP_CATEGORIES = 5;
+// Cifra del Display a 64, la de B-Informe.
+const DISPLAY_PX = 64;
 
 /** «Septiembre 2026» → «Septiembre» para la etiqueta corta del Segmented y de la comparativa,
  *  solo si quitar el año deja algo. El nombre lo escribe el usuario: cualquier otro formato se
@@ -36,6 +39,30 @@ function shortName(name) {
   const s = String(name ?? "").trim();
   const m = s.match(/^(.+?)\s+\d{4}$/);
   return m ? m[1] : s;
+}
+
+/** Índice 0-11 del mes si el nombre (ya sin año) es el de un mes del idioma activo; si no, -1. */
+function monthIndexOf(name) {
+  const s = String(name ?? "").trim().toLocaleLowerCase();
+  for (let i = 0; i < 12; i++) if (monthLong(i).toLocaleLowerCase() === s) return i;
+  return -1;
+}
+
+/** El nombre dentro de una frase (B-Informe: «Frente a agosto», «vs agosto», «En agosto, el 72 %»):
+ *  si es un mes, como lo escribe el idioma en mitad de frase (minúscula en español); cualquier otro
+ *  nombre que escriba el usuario se queda tal cual. */
+function inText(name) {
+  const i = monthIndexOf(name);
+  return i < 0 ? name : monthLong(i);
+}
+
+/** Rótulo corto de la comparativa (B-Informe «Sep» / «Ago»): la abreviatura del mes con mayúscula;
+ *  si no es un mes, el nombre (se recorta por CSS). */
+function barLabel(name) {
+  const i = monthIndexOf(name);
+  if (i < 0) return name;
+  const m = monthShort(i);
+  return m.charAt(0).toLocaleUpperCase() + m.slice(1);
 }
 
 /** Pantalla de error con recuperación: aviso + «Reintentar» + «Volver», nunca un callejón. */
@@ -92,27 +119,28 @@ function olderListHtml(periods, selectedId) {
   return `<div id="informe-older">${containerHtml({ title: t("informe.older.title"), kind: "list", body: rows })}</div>`;
 }
 
-/** Display l (F-12): la tasa de ahorro manda. Con gasto por encima del ingreso la tasa sería
+/** Display a 64 (B-Informe; F-12 retirada, Álvaro 2026-09-27): la tasa de ahorro manda. Con gasto por encima del ingreso la tasa sería
  *  negativa («−146 %» no dice nada): la etiqueta lo dice y la cifra es lo que falta. Sin ingresos
  *  no hay tasa: la cifra es lo ahorrado. El pie compara con el periodo anterior solo si su tasa
  *  existe, no es negativa y hay nombre — nunca «el null %». */
 function displayBlockHtml(report, prevName) {
   const s = report.summary;
   if (s.savedCents < 0) {
-    return displayHtml({ label: t("informe.display.overspent"), value: fmtMoney(s.savedCents) });
+    return displayHtml({ label: t("informe.display.overspent"), value: fmtMoney(s.savedCents), size: DISPLAY_PX });
   }
   if (s.savingsRatePct == null) {
-    return displayHtml({ label: t("informe.summary.saved"), value: fmtMoney(s.savedCents) });
+    return displayHtml({ label: t("informe.summary.saved"), value: fmtMoney(s.savedCents), size: DISPLAY_PX });
   }
   const footHtml = s.prevSavingsRatePct != null && s.prevSavingsRatePct >= 0 && prevName
-    ? t("informe.display.vsPrev", { name: escHtml(prevName), pct: dispInkHtml(fmtPct0(s.prevSavingsRatePct / 100)) })
+    ? t("informe.display.vsPrev", { name: escHtml(inText(prevName)), pct: dispInkHtml(fmtPct0(s.prevSavingsRatePct / 100)) })
     : "";
-  return displayHtml({ label: t("informe.display.rate"), value: fmtPct0(s.savingsRatePct / 100), footHtml });
+  return displayHtml({ label: t("informe.display.rate"), value: fmtPct0(s.savingsRatePct / 100), footHtml, size: DISPLAY_PX });
 }
 
-/** Ingresado arriba y, debajo, la barra de lo que pasó con ese ingreso (F-10): lo gastado en
- *  --idle y lo ahorrado en --text, cada tramo con su nombre y su cifra dentro (C12). Si el gasto
- *  supera al ingreso no hay tramo de ahorro: la barra es entera gasto. */
+/** Ingresado arriba y, debajo, la barra de lo que pasó con ese ingreso (B-Informe; F-10 retirada,
+ *  Álvaro 2026-09-27): lo gastado sobre el tinte de Otros y lo ahorrado sobre el de Alimentación,
+ *  cada tramo con el filete de su barra, su nombre en -x y su cifra en tinta dentro (C12). Si el
+ *  gasto supera al ingreso no hay tramo de ahorro: la barra es entera gasto. */
 function splitHtml(report) {
   const s = report.summary;
   const spent = Math.max(0, s.spentCents);
@@ -123,8 +151,8 @@ function splitHtml(report) {
   const aria = t("informe.split.aria", { income: fmtMoney(s.incomeCents), spent: fmtMoney(spent), saved: fmtMoney(saved) });
   const bar = total > 0
     ? `<div class="inf-split" role="img" aria-label="${escAttr(aria)}">${[
-      spent > 0 ? seg("is-spent", t("informe.summary.spent"), spent) : "",
-      saved > 0 ? seg("is-saved", t("informe.summary.saved"), saved) : "",
+      spent > 0 ? seg(`is-spent ${famClass("otr")}`, t("informe.summary.spent"), spent) : "",
+      saved > 0 ? seg(`is-saved ${famClass("ali")}`, t("informe.summary.saved"), saved) : "",
     ].join("")}</div>`
     : "";
   return `<section class="box box-chart">
@@ -147,7 +175,10 @@ function deltaHtml(direction, pct) {
 }
 
 /** «Frente a agosto» (C12): el gasto de este periodo y el del anterior, cada barra con el nombre
- *  del periodo al lado y a la misma escala. Sin periodo anterior no hay comparativa. */
+ *  corto del periodo al lado («Sep» / «Ago») y a la misma escala; la de este en tinta, la del
+ *  anterior en la barra de Otros (B-Informe; F-10 retirada). Con este periodo aún abierto, la nota
+ *  del original: «Agosto está cerrado; septiembre va por el día 13.». Sin periodo anterior no hay
+ *  comparativa. */
 function compareHtml(report, curName, prevName) {
   const c = report.categories;
   if (!c.hasPrev || !prevName) return "";
@@ -155,27 +186,29 @@ function compareHtml(report, curName, prevName) {
   const w = (v) => (max > 0 ? ((Math.max(0, v) / max) * 100).toFixed(2) : "0");
   const direction = c.totalDeltaPct == null ? "flat" : c.totalDeltaPct > 0 ? "up" : c.totalDeltaPct < 0 ? "down" : "flat";
   return `<section class="box box-chart inf-gap-16">
-    <h2 class="box-title">${escHtml(t("informe.compare.title", { name: prevName }))}</h2>
+    <h2 class="box-title">${escHtml(t("informe.compare.title", { name: inText(prevName) }))}</h2>
     <div class="inf-cmp">
       <div class="inf-line">
         <span class="inf-line-label">${t("informe.summary.spent")}</span>
         ${deltaHtml(direction, c.totalDeltaPct)}
       </div>
       <div class="inf-cmp-grid">
-        <span class="inf-cmp-name">${escHtml(curName)}</span>
+        <span class="inf-cmp-name">${escHtml(barLabel(curName))}</span>
         <div class="inf-cmp-track"><span class="inf-cmp-fill is-cur" style="width:${w(c.totalCents)}%"></span></div>
         <span class="num inf-cmp-amt">${escHtml(fmtMoney(c.totalCents))}</span>
-        <span class="inf-cmp-name is-prev">${escHtml(prevName)}</span>
-        <div class="inf-cmp-track"><span class="inf-cmp-fill is-prev" style="width:${w(c.prevTotalCents)}%"></span></div>
+        <span class="inf-cmp-name is-prev">${escHtml(barLabel(prevName))}</span>
+        <div class="inf-cmp-track"><span class="inf-cmp-fill is-prev ${famClass("otr")}" style="width:${w(c.prevTotalCents)}%"></span></div>
         <span class="num inf-cmp-amt is-prev">${escHtml(fmtMoney(c.prevTotalCents))}</span>
       </div>
     </div>
+    ${report.meta.isOpen ? `<p class="inf-cmp-note">${escHtml(t("informe.compare.note", { prev: prevName, cur: inText(curName), day: report.meta.dayIndex }))}</p>` : ""}
   </section>`;
 }
 
 /** «Por categoría»: las cinco raíces que más gastan, cada una con su medidor en la barra de su
- *  familia (-b, C6) y su variación frente al periodo anterior; el resto sumado en «Resto», en
- *  --idle (C11). El nombre va siempre junto a la barra (C12); la cifra, en tinta (C7). */
+ *  familia (-b, C6) y su variación frente al periodo anterior; el resto sumado en «Resto», con
+ *  texto dim y la barra de Otros (B-Informe; F-10 retirada). El nombre va siempre junto a la barra
+ *  (C12); la cifra, en tinta (C7). */
 function categoriesHtml(report, prevName) {
   const rows = report.categories.rows.filter((r) => r.spentCents > 0).sort((a, b) => b.spentCents - a.spentCents);
   if (!rows.length) return "";
@@ -189,12 +222,12 @@ function categoriesHtml(report, prevName) {
         <span class="num inf-cat-amt">${escHtml(fmtMoney(spentCents))}</span>
         <span class="inf-cat-delta">${isRest ? "" : deltaHtml(direction, deltaPct)}</span>
       </div>
-      <div class="inf-cat-meter">${meterHtml({ fam: isRest ? null : fam, value: spentCents, max })}</div>
+      <div class="inf-cat-meter">${meterHtml({ fam: isRest ? "otr" : fam, value: spentCents, max })}</div>
     </div>`;
   return `<section class="box box-chart inf-gap-16">
     <div class="box-head">
       <h2 class="box-title">${t("informe.categories.byCategory")}</h2>
-      ${report.categories.hasPrev && prevName ? `<span class="inf-vs">${escHtml(t("informe.categories.vsPrev", { name: prevName }))}</span>` : ""}
+      ${report.categories.hasPrev && prevName ? `<span class="inf-vs">${escHtml(t("informe.categories.vsPrev", { name: inText(prevName) }))}</span>` : ""}
     </div>
     <div class="inf-cats">
       ${top.map((r) => row(r)).join("")}
@@ -219,16 +252,19 @@ function bentosHtml(report) {
   return `<div class="inf-bento${shared ? "" : " is-single"}">${shared}${movements}</div>`;
 }
 
-/** El primario (uno por pantalla, C1) con UNA nota debajo (F-11). */
+/** El primario (uno por pantalla, C1) con UNA nota debajo (F-11), en la barra de pie --surface
+ *  fija abajo de B-Informe. */
 function downloadHtml(state, report) {
-  return `<div class="inf-download">
+  // El aviso de error va en el flujo, encima de la barra fija: dentro la haría crecer y taparía
+  // el final de la pantalla.
+  return `${state.downloadError ? `<div class="banner-aviso is-error">${escHtml(state.downloadError)}</div>` : ""}
+  <div class="inf-download">
     ${buttonHtml({
       kind: "primary", id: "informe-download", icon: state.downloading ? "" : "download",
       label: state.downloading ? t("informe.downloading") : t("informe.download"),
       note: report.movements.count ? t("informe.downloadNote", { n: report.movements.count }) : t("informe.downloadNoteEmpty"),
       disabled: state.downloading,
     })}
-    ${state.downloadError ? `<div class="banner-aviso is-error">${escHtml(state.downloadError)}</div>` : ""}
   </div>`;
 }
 

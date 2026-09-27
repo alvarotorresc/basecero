@@ -4,9 +4,10 @@
    comprueba colores, radios, tamaños de letra y naranja igual que en components.css. */
 
 /* === pantalla: ajustes === */
-/* S4 · B-Ajustes: grupos neutros (F-08, C11) con etiqueta 13/600 dim (sectionHeaderHtml "group")
-   y tarjeta --surface con borde; filas de ajuste de entity.js; paneles que se despliegan en su
-   sitio bajo su fila (sin hoja inferior todavía). Sin tinte de familia en nada. */
+/* S4 · B-Ajustes con la excepción aprobada (Álvaro 2026-09-27): tarjeta de grupo NEUTRA --surface
+   con borde; lo demás como el original: encabezado en Unbounded 13 con el -x de la familia del
+   grupo (sectionHeaderHtml `fam`), baldosas rellenas del sólido con icono claro y valores en -x
+   (settingRowHtml `tileFilled`/`valueInFam`). Paneles que se despliegan en su sitio bajo su fila. */
 .aj-screen { display: flex; flex-direction: column; gap: var(--sp-12); }
 .aj-group { display: flex; flex-direction: column; gap: var(--sp-8); }
 .aj-card {
@@ -18,8 +19,11 @@
 /* Filete con la sangría de la baldosa: relleno 8 + baldosa 32 + hueco 12. */
 .aj-sep { height: 1px; margin: 0 var(--sp-8) 0 calc(var(--sp-8) + 32px + var(--sp-12)); background: var(--border); }
 
-/* Fila Tema: el Segmented mide 52, así que la fila sube a 60 con menos relleno a la derecha. */
-#theme-row { min-height: 60px; padding-right: var(--sp-4); }
+/* Fila Tema (B-Ajustes): 64 de alto, con menos relleno a la derecha para el Segmented. */
+#theme-row { min-height: 64px; padding-right: var(--sp-4); }
+/* Muestras de «Categorías» (B-Ajustes): barritas de 8×14 del sólido de cada familia. */
+.aj-cat-swatches { flex: none; display: flex; gap: 3px; }
+.aj-cat-swatch { width: 8px; height: 14px; border-radius: 3px; background: var(--fb); }
 #theme-row .ctl-segmented { flex: none; }
 #aj-quick { cursor: pointer; }
 /* Fila que despliega: el chevron apunta abajo mientras su panel está abierto (sin animación). */
@@ -170,6 +174,41 @@
 /* Hoja «Nueva / Editar categoría»: pila de 16; etiquetas 13/600 dim y una nota por sección. El
    relleno de 4 deja ver el anillo de foco dentro del scroll de .sheet-body. */
 .cat-form { display: flex; flex-direction: column; gap: var(--sp-16); padding: 0 var(--sp-4) var(--sp-4); }
+
+/* Campo Nombre (B-Categorias-Nueva): la vista previa VIVE en el propio campo — pozo teñido de la
+   familia elegida (o --well sin familia, ingreso) con la baldosa rellena delante y «Nombre» sobre
+   el valor, ambos en -x. Único campo del sistema con la etiqueta DENTRO del pozo: el original lo
+   pinta así para que cambiar de familia se note en el propio campo, no solo en la baldosa. */
+.cat-name-field {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  height: 64px;
+  padding: 0 var(--sp-12) 0 var(--sp-8);
+  box-sizing: border-box;
+  border-radius: var(--radius-lg);
+  background: var(--ft);
+  border: 1.5px solid var(--fb);
+}
+.cat-name-field.is-plain { background: var(--well); border-color: var(--border); }
+.cat-name-tile { flex: none; display: flex; }
+.cat-name-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.cat-name-caption { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--fx); }
+.cat-name-field.is-plain .cat-name-caption { color: var(--text-dim); }
+.cat-name-input {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-17);
+  font-weight: 600;
+  line-height: var(--lh-title);
+}
+.cat-name-input::placeholder { color: var(--text-dim); font-weight: 500; }
+.cat-name-input:focus { outline: none; }
+.cat-name-input:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
 .cat-style { display: flex; flex-direction: column; gap: var(--sp-16); }
 .cat-style:empty { display: none; }
 .cat-sec { display: flex; flex-direction: column; gap: var(--sp-8); }
@@ -179,7 +218,8 @@
 .cat-parents { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
 
 /* Selector de icono: rejilla de 6, 44 de alto, --raised con borde e icono dim; el elegido, en el
-   tinte de la familia con el icono -x y --ring-sel (F-17). */
+   tinte de la familia con el icono -x, borde -b y el anillo EXTERIOR con hueco de B-Categorias-Nueva
+   (--ring-sel-out; F-17 retirada, Álvaro 2026-09-27: igual que el mockup). */
 .cat-icons { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sp-8); }
 .cat-icon-pick {
   min-width: 0;
@@ -194,7 +234,7 @@
   color: var(--text-dim);
   cursor: pointer;
 }
-.cat-icon-pick[aria-pressed="true"] { border-color: var(--ft); background: var(--ft); color: var(--fx); box-shadow: var(--ring-sel); }
+.cat-icon-pick[aria-pressed="true"] { border-color: var(--fb); background: var(--ft); color: var(--fx); box-shadow: var(--ring-sel-out); }
 .cat-icon-pick:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
 
 /* Error: neutro en --raised con el icono de aviso (C4: nada de rojo fuera de cifras). */
@@ -315,13 +355,19 @@
    nombre · bloque teñido al desplegar · línea «Sin gasto:». Pila de 12 (§8). */
 .gc { display: flex; flex-direction: column; gap: var(--sp-12); }
 .gc > .sub-header { margin-bottom: 0; }
+/* Display del original: relleno 18 20 16 y pila de 6. */
+.gc .disp { padding: 18px var(--sp-20) var(--sp-16); gap: 6px; }
 
 /* Medidor del Display: el relleno ámbar y la marca del día en --disp-ink los pone meterHtml; aquí
    solo la escala de debajo, con «día N» centrado en la marca (--at) y el % a la derecha. */
-.gc-gauge { display: flex; flex-direction: column; gap: var(--sp-4); margin-top: var(--sp-12); }
+.gc-gauge { display: flex; flex-direction: column; gap: 6px; margin-top: var(--sp-12); }
+/* La barra del Display mide 10 y su marca del día sobresale 4 (B-GastoCategoria). */
+.gc-gauge .meter { height: 10px; }
+.gc-gauge .meter-limit { top: -4px; bottom: -4px; }
 .gc-gauge-scale { position: relative; height: 16px; font-size: var(--fs-12); line-height: var(--lh-title); color: var(--disp-dim); }
 .gc-daymark { position: absolute; left: var(--at); transform: translateX(-50%); white-space: nowrap; }
 .gc-pct { position: absolute; right: 0; white-space: nowrap; }
+.gc-gauge.is-late .gc-pct { right: auto; left: 0; }
 
 /* Lista: --surface con borde, relleno 12. */
 .gc-list {
@@ -337,8 +383,7 @@
 .gc-item { display: flex; flex-direction: column; }
 .gc-item.is-idle .gc-head { opacity: .6; }
 
-/* Cabecera de raíz: 56 de alto como mínimo, baldosa 32 · nombre y cifra sobre su medidor · chevron.
-   Desplegar no es seleccionar (F-18): sin anillo ni naranja. */
+/* Cabecera de raíz: 56 de alto como mínimo, baldosa 32 · nombre y cifra sobre su medidor · chevron. */
 .gc-head {
   width: 100%;
   min-height: 56px;
@@ -354,8 +399,10 @@
   text-align: left;
   cursor: pointer;
 }
-.gc-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-8); }
+.gc-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .gc-main .meter { display: block; }
+/* Un gasto pequeño sigue viéndose: el relleno nunca baja de 4 (salvo el cero). */
+.gc .meter-fill:not([style="width:0%"]) { min-width: 4px; }
 .gc-line { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
 .gc-name { min-width: 0; font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gc-amt { flex: none; font-size: var(--fs-14); font-weight: 500; color: var(--text); }
@@ -365,39 +412,44 @@
 .gc-over { color: var(--neg); }
 .gc-chev { flex: none; display: flex; color: var(--text-dim); }
 
-/* Bloque desplegado: tinte de la familia (C6), sin borde; nombre 600 y cifra 17/600 (C3: ≤ 20). */
-.gc-block { gap: var(--sp-12); padding: var(--sp-4) var(--sp-4) var(--sp-16); border-radius: var(--radius-lg); background: var(--ft); }
+/* Bloque desplegado: tinte de la familia (C6) con el anillo naranja de 2 del original (F-18
+   retirada, Álvaro 2026-09-27); nombre 700 y cifra 17/600. */
+.gc-block {
+  gap: 10px;
+  padding: var(--sp-4) var(--sp-4) var(--sp-16);
+  border-radius: var(--radius-lg);
+  background: var(--ft);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
 .gc-block .gc-head { padding-bottom: 0; }
-.gc-block .gc-name { font-weight: 600; }
+.gc-block .gc-name { font-weight: 700; }
 .gc-block .gc-amt { font-size: var(--fs-17); font-weight: 600; }
 .gc-block .gc-chev { color: var(--fx); transform: rotate(180deg); }
-.gc-subs { margin: 0 var(--sp-24) 0 48px; display: flex; flex-direction: column; gap: var(--sp-12); }
-.gc-sub { display: flex; flex-direction: column; gap: var(--sp-4); }
+.gc-subs { margin: 0 32px 0 48px; display: flex; flex-direction: column; gap: 10px; }
+.gc-sub { display: flex; flex-direction: column; gap: 5px; }
+.gc-sub .meter { height: 6px; }
 .gc-sub-line { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
 .gc-sub-name { min-width: 0; font-size: var(--fs-14); font-weight: 500; line-height: var(--lh-title); color: var(--text); }
 .gc-sub-amt { flex: none; font-size: var(--fs-14); font-weight: 500; color: var(--text); }
-/* Pie del bloque con filete --border: comparativa (nombre en -x, cifra en tinta: C7) y el límite
-   en terciario. */
+/* Pie del bloque con filete en la barra de la familia: comparativa entera en -x, delta y el
+   secundario S del límite (B-GastoCategoria). */
 .gc-block-foot {
-  margin: 0 var(--sp-12) 0 52px;
-  padding-top: var(--sp-12);
-  border-top: 1px solid var(--border);
+  margin: 2px var(--sp-12) 0 52px;
+  padding-top: 10px;
+  border-top: 1px solid var(--fb);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-8);
 }
-/* Comparativa en dos líneas (nombre y cifra · delta) para que el límite quepa a su derecha. */
-.gc-cmp-group { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
-.gc-cmp { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--fx); }
-.gc-cmp .num { color: var(--text); }
-.gc-delta { display: flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }
+.gc-cmp { flex: 1; min-width: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--fx); }
+.gc-delta { flex: none; display: flex; align-items: center; gap: var(--sp-4); font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); white-space: nowrap; }
 .gc-delta.is-up { color: var(--neg); }
 .gc-delta.is-down { color: var(--pos); }
-.gc-block-foot .btn-tertiary { flex: none; margin-left: auto; padding: 0 var(--sp-8); }
+.gc-block-foot .btn-secondary { flex: none; }
 
 /* Editor del límite dentro del bloque: campo hundido, primario y la nota con «Quitar límite». */
-.gc-edit { margin: 0 var(--sp-12) 0 52px; padding-top: var(--sp-12); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--sp-12); }
+.gc-edit { margin: 2px var(--sp-12) 0 52px; padding-top: 10px; border-top: 1px solid var(--fb); display: flex; flex-direction: column; gap: var(--sp-12); }
 /* Con el campo vacío manda el placeholder («Sin límite») y la unidad se oculta. */
 .gc-edit .ctl-field-input:placeholder-shown + .ctl-field-suffix { display: none; }
 .gc-edit .ctl-field-input { -moz-appearance: textfield; }
@@ -416,7 +468,7 @@
   padding: 0 var(--sp-8);
   display: flex;
   align-items: center;
-  gap: var(--sp-8);
+  gap: 10px;
   border: 0;
   border-radius: var(--radius);
   background: none;
@@ -424,7 +476,7 @@
   text-align: left;
   cursor: pointer;
 }
-.gc-idle-swatches { flex: none; display: flex; gap: var(--sp-4); }
+.gc-idle-swatches { flex: none; display: flex; gap: 3px; }
 .gc-idle-swatch { width: 8px; height: 14px; border-radius: var(--radius-xs); background: var(--ft); box-shadow: inset 0 0 0 1px var(--fb); }
 .gc-idle-text { flex: 1; min-width: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 .gc-empty { margin: 0; padding: var(--sp-16); font-size: var(--fs-13); font-weight: 500; text-align: center; color: var(--text-dim); }
@@ -581,44 +633,48 @@
 .inf-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* Segmented de periodos: el nombre lo escribe el usuario, se recorta en vez de desbordar. */
 .inf .ctl-segmented [role="radio"] { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.inf-gap-16 { gap: var(--sp-16); }
+.inf-gap-16 { gap: 14px; }
+/* Display del original: relleno 18 20 20, pila de 6 y la cifra de 64 a interlineado 1. */
+.inf .disp { padding: 18px var(--sp-20) var(--sp-20); gap: 6px; }
+.inf .disp-value { line-height: 1; }
 
 .inf-line { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
 .inf-line-label { font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
 .inf-income { font-size: var(--fs-20); font-weight: 600; line-height: var(--lh-title); color: var(--pos); }
 
-/* Ingresado · Gastado · Ahorrado (F-10): pozo con el filete de abajo en --idle (gastado) o en
-   --text (ahorrado); el nombre y la cifra van dentro de cada tramo (C12). */
-.inf-split { display: flex; gap: var(--sp-2); height: 64px; }
+/* Ingresado · Gastado · Ahorrado (B-Informe; F-10 retirada): cada tramo sobre el tinte de su
+   familia (Otros / Alimentación) con el filete de abajo en su barra; nombre en -x y cifra en tinta
+   dentro (C12). */
+.inf .box-chart:has(.inf-split) { gap: 10px; }
+.inf-split { display: flex; gap: 3px; height: 64px; }
 .inf-split-seg {
   flex-grow: 0;
   flex-shrink: 1;
   min-width: 96px;
   box-sizing: border-box;
-  padding: var(--sp-8) var(--sp-12);
+  padding: var(--sp-8) 10px;
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
   overflow: hidden;
-  background: var(--well);
+  background: var(--ft);
+  box-shadow: inset 0 -6px 0 var(--fb);
 }
-.inf-split-seg:first-child { border-radius: var(--radius) 0 0 var(--radius); }
-.inf-split-seg:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
-.inf-split-seg:only-child { border-radius: var(--radius); }
-.inf-split-seg.is-spent { box-shadow: inset 0 -6px 0 var(--idle); }
-.inf-split-seg.is-saved { box-shadow: inset 0 -6px 0 var(--text); }
-.inf-split-name { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
-.inf-split-seg.is-saved .inf-split-name { color: var(--text); }
-.inf-split-amt { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
+.inf-split-seg:first-child { border-radius: var(--radius-tile) 0 0 var(--radius-tile); }
+.inf-split-seg:last-child { border-radius: 0 var(--radius-tile) var(--radius-tile) 0; }
+.inf-split-seg:only-child { border-radius: var(--radius-tile); }
+.inf-split-name { font-size: var(--fs-12); font-weight: 600; line-height: 1.3; color: var(--fx); }
+.inf-split-amt { font-size: var(--fs-15); font-weight: 600; line-height: 1.3; color: var(--text); white-space: nowrap; }
 
 /* Variación de gasto: subir avisa (--neg), bajar es buena (--pos). C4: señal en la cifra. */
 .inf-delta { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-13); font-weight: 600; white-space: nowrap; }
 .inf-delta.is-up { color: var(--neg); }
 .inf-delta.is-down { color: var(--pos); }
 
-/* Frente al periodo anterior: este en --text, el anterior en --idle, cada uno con su nombre (C11, C12). */
-.inf-cmp { display: flex; flex-direction: column; gap: var(--sp-8); }
-.inf-cmp-grid { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp-8); }
+/* Frente al periodo anterior: este en --text, el anterior en la barra de Otros, cada uno con su
+   rótulo corto (C12); barras de 12. */
+.inf-cmp { display: flex; flex-direction: column; gap: 6px; }
+.inf-cmp-grid { display: grid; grid-template-columns: minmax(36px, auto) minmax(0, 1fr) 88px; align-items: center; gap: var(--sp-8); }
 .inf-cmp-name {
   max-width: 96px;
   font-size: var(--fs-12);
@@ -630,17 +686,18 @@
   text-overflow: ellipsis;
 }
 .inf-cmp-name.is-prev { font-weight: 600; color: var(--text-dim); }
-.inf-cmp-track { height: 8px; border-radius: var(--radius-pill); background: var(--well); }
-.inf-cmp-fill { display: block; height: 100%; border-radius: var(--radius-pill); }
+.inf-cmp-track { height: 12px; border-radius: var(--radius-xs); background: var(--well); }
+.inf-cmp-fill { display: block; height: 100%; border-radius: var(--radius-xs); }
 .inf-cmp-fill.is-cur { background: var(--text); }
-.inf-cmp-fill.is-prev { background: var(--idle); }
-.inf-cmp-amt { font-size: var(--fs-14); font-weight: 600; text-align: right; color: var(--text); white-space: nowrap; }
+.inf-cmp-fill.is-prev { background: var(--fb); }
+.inf-cmp-note { margin: 0; font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
+.inf-cmp-amt { font-size: var(--fs-14); font-weight: 600; line-height: 1.3; text-align: right; color: var(--text); white-space: nowrap; }
 .inf-cmp-amt.is-prev { font-weight: 500; color: var(--text-dim); }
 
 /* Por categoría: nombre, cifra en tinta (C7), variación y medidor -b; «Resto» en dim e --idle (C11). */
 .inf-vs { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
-.inf-cats { display: flex; flex-direction: column; gap: var(--sp-16); }
-.inf-cat { display: flex; flex-direction: column; gap: var(--sp-4); }
+.inf-cats { display: flex; flex-direction: column; gap: 14px; }
+.inf-cat { display: flex; flex-direction: column; gap: 5px; }
 .inf-cat-line { display: flex; align-items: baseline; gap: var(--sp-8); }
 .inf-cat-name {
   flex: 1;
@@ -666,7 +723,26 @@
 /* «Anteriores»: la lista de periodos cerrados, desplegada bajo el Segmented. */
 .inf-older-none { margin: 0; padding: var(--sp-8) var(--sp-12) var(--sp-12); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 
-.inf-download { display: flex; flex-direction: column; gap: var(--sp-12); padding-top: var(--sp-12); }
+/* Barra de pie de B-Informe: --surface con filete arriba, fija abajo como la barra de pestañas
+   (mismo tope de 480). Mide 12 + 56 + 8 + 18 de nota + 24 (+ safe-area); .inf reserva ese alto
+   menos el hueco que ya deja main#screen en subpantalla (24 + safe-area), más 12 de aire. */
+.inf:has(> .inf-download) { padding-bottom: 106px; }
+.inf-download {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: var(--sp-12) var(--sp-16) calc(env(safe-area-inset-bottom, 0px) + var(--sp-24));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
 .inf-download .btn-note { text-align: center; }
 /* === fin: informe === */
 
@@ -674,6 +750,13 @@
 /* Inicio (S1; B-Home, BD-Home, B-Inicio-Vacio, BD-Inicio-Vacio). Pila de bloques a 12 (§8). */
 .inicio { display: flex; flex-direction: column; gap: var(--sp-12); }
 .inicio > .root-header { margin-bottom: 0; }
+/* Display de B-Home / B-Inicio-Vacio: relleno 18 20 14 y pila a 6. Con la línea del periodo que
+   baja (.inicio-burn) el gráfico va a sangre y pegado al borde de abajo. */
+.inicio .disp { padding: 18px var(--sp-20) 14px; gap: 6px; }
+.inicio-burn .disp { padding-bottom: 0; overflow: hidden; }
+.inicio-burn .disp-slot { margin: 0 calc(-1 * var(--sp-20)); }
+.inicio .disp-chart { margin-top: 6px; }
+.inicio-burn .disp-chart { margin-top: 0; }
 
 /* Bloque que navega entero: un <button> encima que lo cubre (un solo foco, nada anidado). Al
    pulsarlo se hunde el bloque, no el botón invisible (§10). */
@@ -709,7 +792,15 @@
 .inicio-duo .bento { min-height: 140px; }
 /* Saldo negativo: «−» que avisa (C4), como el is-negative de antes. */
 .inicio-account-neg .bento-figure { color: var(--neg); }
-.inicio-shared .btn-secondary { width: 100%; }
+/* «Liquidar» de B-Home/BD-Home (F-25 retirada): secundario de 44 en --surface con borde --border
+   en los dos temas, texto 15/600. */
+.inicio-shared .btn-secondary,
+:root[data-theme="dark"] .inicio-shared .btn-secondary {
+  width: 100%;
+  background: var(--surface);
+  border-color: var(--border);
+  font-size: var(--fs-15);
+}
 .inicio-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-12); }
 .inicio-trio > .inicio-week { grid-column: span 2; }
 .inicio-trio > :only-child { grid-column: 1 / -1; }
@@ -718,23 +809,31 @@
 .inicio-week-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
 .inicio-label { margin: 0; font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
 .inicio-week-total { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+/* Columnas de B-Home: radio 5 en las cuatro esquinas (no solo arriba) y 7 entre columnas. */
+.inicio-week .col-bar { border-radius: var(--radius-bar); }
+.inicio-week .cols,
+.inicio-week .cols-labels { gap: 7px; }
 /* Semana sin gasto (B-Inicio-Vacio): columnas de 6 en pozo, hoy en tinta. */
 .inicio-week.is-zero .cols { height: 32px; }
 .inicio-week.is-zero .col-bar { min-height: 6px; background: var(--well); box-shadow: var(--sh-well); }
 .inicio-week.is-zero .col.is-today .col-bar { background: var(--text); box-shadow: none; }
 
-/* Ahorras (F-09): lo ahorrado mono 13/600 en tinta («−» que avisa en --neg, C4) y «de» 12 dim. */
-.inicio-savings { gap: var(--sp-8); }
+/* Ahorras (B-Home; F-09 retirada): bento con tinte de Alimentación, relleno 16 14, cifra 30 en
+   ali-x (bentoHtml valueFam/valueSize); lo ahorrado mono 13/600 en tinta («−» que avisa en --neg,
+   C4) y «de» 12 dim. */
+.inicio-savings { gap: var(--sp-8); padding: var(--sp-16) 14px; }
 .inicio-savings-foot { display: flex; flex-direction: column; gap: var(--sp-2); }
 .inicio-savings-amt { font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
 .inicio-savings-amt.is-neg { color: var(--neg); }
 .inicio-savings-amt.is-long { font-size: var(--fs-12); }
 .inicio-savings .bento-figure { white-space: nowrap; }
-.inicio-savings.is-long .bento-figure { font-size: var(--fs-17); }
+.inicio-savings.is-long .bento-figure { font-size: var(--fs-20); }
 .inicio-savings-of { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--text-dim); }
 
-/* El aviso: tarjeta de entidad con el tinte de su familia (C6), o neutra en --surface con borde
-   cuando no habla de una categoría (C11). Cifras en tinta (C7). */
+/* El aviso (B-Home): tarjeta con el tinte de su familia (C6), o neutra en --surface con borde
+   cuando no habla de una categoría (C11). La cuota de la línea 2 va en -x como su línea; «te
+   quedarán» en tinta. Abajo, el pie a la izquierda y las acciones (secundario 44 · 15/600) a la
+   derecha, en una fila. */
 .inicio-notice {
   display: flex;
   flex-direction: column;
@@ -745,12 +844,31 @@
 }
 .inicio-notice.is-neutral { background: var(--surface); border: 1px solid var(--border); }
 .inicio-notice-top { display: flex; align-items: center; gap: var(--sp-12); }
+/* «Ahora no»: aspa dim de 44 en la esquina (el mockup no la pinta; ver noticeHtml). */
+.inicio-notice-close {
+  flex: none;
+  align-self: flex-start;
+  width: 44px;
+  height: 44px;
+  margin: calc(-1 * var(--sp-12)) calc(-1 * var(--sp-12)) 0 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
 .inicio-notice-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
 .inicio-notice-title { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); }
 .inicio-notice-line2 { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--fx, var(--text-dim)); }
+.inicio-notice-fee { font-weight: 600; }
 .inicio-notice-amt { font-weight: 600; color: var(--text); }
-.inicio-notice-left { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
-.inicio-notice-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-8); }
+.inicio-notice-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-12); }
+.inicio-notice-left { flex: 1; min-width: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+.inicio-notice .btn-secondary { flex: none; padding: 0 18px; font-size: var(--fs-15); }
 
 /* Una línea de ayuda en lugar de la lista o de la barra (§7: una por sección como mucho). */
 .inicio-help { margin: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
@@ -760,7 +878,17 @@
    día a la altura del texto de las filas (relleno 12 de .ent-row). */
 .inicio-movements .box-head .btn-tertiary,
 .inicio-pending .box-head .btn-tertiary { padding: 0 var(--sp-4); }
+/* Cabecera de día de B-Home (F-36 retirada): «Hoy», «Sáb 12» a 12/600 dim. */
 .inicio-movements .ent-day { padding: var(--sp-4) var(--sp-12) 0; }
+.inicio-movements .ent-day-label { font-size: var(--fs-12); font-weight: 600; color: var(--text-dim); }
+
+/* Gasto por categoría (B-Home): barra de 22 con 3 de separación y bloque a 14; muestra de 12 con
+   radio 4 a 10 del nombre. */
+.inicio-cats .box { gap: 14px; }
+.inicio-cats .sbar-wrap { gap: 14px; }
+.inicio-cats .sbar-24 { height: 22px; gap: 3px; }
+.inicio-cats .sbar-key { gap: 10px; }
+.inicio-cats .sbar-muestra { width: 12px; height: 12px; border-radius: var(--radius-xs); }
 .inicio-left-row {
   min-height: 48px;
   padding: 0 var(--sp-12);
@@ -773,15 +901,25 @@
 .inicio-left-amt { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
 .inicio-left-amt.is-neg { color: var(--neg); }
 
-/* Vacío (B-Inicio-Vacio): la flecha cuelga del bloque y baja hasta el botón de añadir; el margen
-   de abajo (con los 24 de main#screen) le guarda su sitio sobre la barra de pestañas. */
-.inicio-empty { position: relative; margin-bottom: calc(var(--sp-24) * 2); }
-.inicio-empty .empty-arrow { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); }
+/* Vacío (B-Inicio-Vacio): la flecha de 120 cuelga a 12 del bloque y baja hasta el botón de añadir;
+   el margen de abajo (con los 24 de main#screen) le guarda su sitio sobre la barra de pestañas. */
+.inicio-empty { position: relative; margin-bottom: calc(120px + var(--sp-12) - var(--sp-24)); }
+.inicio-empty .empty-arrow { position: absolute; top: calc(100% + var(--sp-12)); left: 50%; transform: translateX(-50%); }
 /* === fin: inicio === */
 
 /* === pantalla: liquidar === */
-/* B-Liquidar / BD-Liquidar. Pila de bloques a 12 (§8). */
-.liq { display: flex; flex-direction: column; gap: var(--sp-12); padding-bottom: var(--sp-24); }
+/* B-Liquidar / BD-Liquidar. Pila de bloques a 12 (§8), y el primario abajo del todo (margin-top
+   auto): la pila ocupa al menos el alto de la pantalla menos cabecera y márgenes de main#screen. */
+.sub-header:has(+ .liq) { margin-bottom: var(--sp-12); }
+.liq {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  min-height: calc(100dvh - 96px - env(safe-area-inset-bottom, 0px));
+}
+.liq > .btn-primary { margin-top: auto; }
+/* Display del original: relleno 18 20 16 y pila de 6. */
+.liq .disp { padding: 18px var(--sp-20) var(--sp-16); gap: 6px; }
 
 /* Pie del Display: A tu favor / En contra, con el filete --disp-line encima; cifras en --disp-ink (C2). */
 .liq-split {
@@ -798,11 +936,15 @@
   color: var(--disp-dim);
 }
 
-.liq-account { display: flex; flex-direction: column; gap: var(--sp-8); }
+.liq-account { display: flex; flex-direction: column; gap: 6px; }
 .liq-account-label { padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
-.liq .ctl-segmented [role="radio"] { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* Tres cuentas o más: chips con la muestra de la familia, que envuelven de línea. */
-.liq-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+.liq .ctl-segmented [role="radio"] { min-width: 0; gap: 6px; overflow: hidden; text-overflow: ellipsis; }
+/* Muchas cuentas o nombres largos: el Segmented envuelve de línea, cada cuenta a su ancho (y
+   repartiendo lo que sobra), en vez de recortar el nombre. En varias líneas (is-wrapped, wire())
+   el pozo deja la píldora por el radio grande. */
+.liq-accounts-wrap .ctl-segmented { flex-wrap: wrap; }
+.liq-accounts-wrap .ctl-segmented [role="radio"] { flex: 1 1 auto; }
+.liq-accounts-wrap .ctl-segmented.is-wrapped { border-radius: var(--radius-lg); }
 
 /* Un solo contenedor --surface con los dos grupos; filas de 60 con filete que empieza tras la baldosa. */
 .liq-list {
@@ -813,28 +955,41 @@
   background: var(--surface);
   border: 1px solid var(--border);
 }
-.liq-group { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); padding: 0 var(--sp-8) var(--sp-4); }
-.liq-row + .liq-group { margin-top: var(--sp-4); padding-top: var(--sp-12); border-top: 1px solid var(--border); }
-.liq-group-title { margin: 0; font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+/* Grupos «A tu favor» / «En contra»: título en Unbounded 13 y tinta, total mono 13/600 dim. */
+.liq-group { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); padding: 0 var(--sp-8) var(--sp-2); }
+.liq-row + .liq-group { margin-top: var(--sp-4); padding-top: 10px; border-top: 1px solid var(--border); }
+.liq-group-title { margin: 0; font-family: var(--font-display); font-size: var(--fs-13); font-weight: 700; letter-spacing: -0.01em; line-height: var(--lh-title); color: var(--text); }
 .liq-group-total { font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); white-space: nowrap; }
 .liq-row { display: flex; align-items: center; gap: var(--sp-8); min-height: 60px; }
+/* Baldosa de 36 con icono 18 sobre el tinte (B-Liquidar). */
+.liq-row .ent-tile { width: 36px; height: 36px; }
+.liq-row .ent-tile svg { width: 18px; height: 18px; }
 .liq-amount { flex: none; padding-right: var(--sp-4); font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
-/* 44 de casilla + 8 + 40 de baldosa + 8. */
-.liq-sep { height: 1px; margin-left: 100px; background: var(--border); }
+/* 44 de casilla + 8 + 36 de baldosa + 8. */
+.liq-sep { height: 1px; margin-left: 96px; background: var(--border); }
 
 /* === fin: liquidar === */
 
 /* === pantalla: movimiento-detalle === */
 /* Detalle de un movimiento (B-Movimiento-Detalle/BD-), aviso de Borrar (B-Borrar, la vista previa
    de modal.js) y visor de foto (§9, D-impl-4). Vista y edición comparten anatomía. */
-.mdet { display: flex; flex-direction: column; gap: var(--sp-12); }
+/* Llena el alto de la subpantalla (sin tab bar: 12 arriba y 24 abajo de main#screen) para que las
+   acciones queden abajo del todo, como en B-Movimiento-Detalle (.mdet-foot, margin-top:auto). */
+.mdet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  min-height: calc(100dvh - var(--sp-12) - var(--sp-24) - env(safe-area-inset-bottom, 0px));
+}
 
-/* Vista: el comercio es la etiqueta del Display, 15/600 en --disp-ink (I-65), y la cifra con signo. */
+/* Cabecera de 44 pegada a la pila de 12, como en B-Movimiento-Detalle (sin el alto de 48 ni el
+   margen de 16 de la cabecera de subpantalla genérica). */
+.mdet .sub-header { min-height: 44px; margin-bottom: 0; }
+
+/* Vista: el comercio es la etiqueta fuerte del Display (displayHtml `labelStrong`); un nombre largo
+   se recorta en una línea. */
 .mdet-disp-view .disp-label {
   display: block;
-  font-size: var(--fs-15);
-  font-weight: 600;
-  color: var(--disp-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -923,7 +1078,12 @@
 .mdet-linked-label { font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
 .mdet-linked-meta { font-size: var(--fs-15); font-weight: 600; color: var(--text); }
 
-/* Filas de ajuste en un contenedor --surface con borde; filetes sangrados 8 (B-Movimiento-Detalle). */
+/* La flecha de la tarjeta de categoría, en el -x de su familia (B-Movimiento-Detalle). */
+.mdet .ent-chosen-detail .ent-chev { color: var(--fx); }
+
+/* Filas de ajuste en un contenedor --surface con borde; filetes sangrados 8, fila con 12 a la
+   izquierda y 8 a la derecha, etiqueta en dim y el pomo apagado en --raised (B-Movimiento-Detalle;
+   F-21 y la etiqueta en tinta de F-35, retiradas, Álvaro 2026-09-27). */
 .mdet-group {
   display: flex;
   flex-direction: column;
@@ -933,6 +1093,9 @@
   border: 1px solid var(--border);
 }
 .mdet-div { height: 1px; margin: 0 var(--sp-8); background: var(--border); }
+.mdet-group .ent-set { padding: 0 var(--sp-8) 0 var(--sp-12); }
+.mdet-group .ent-set-label { color: var(--text-dim); }
+.mdet-group .ctl-switch[aria-checked="false"] .ctl-switch-knob { background: var(--raised); }
 /* Valor largo (nombre de cuenta o etiqueta): se recorta en vez de partir la fila. La muestra de la
    cuenta va a 8 del valor, como en el mockup (la fila separa a 12). */
 .mdet-group .ent-set-value { min-width: 0; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1009,10 +1172,10 @@
 .mdet-note-text { font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-body); color: var(--text); overflow-wrap: anywhere; }
 .mdet-note-field { flex: 1; min-width: 0; }
 
-/* Abajo: vista, «Editar» primario a todo el ancho (B-Movimiento-Detalle) y, debajo, «Borrar»
-   (entrada destructiva, C5) solo en su fila: el mockup lo pone junto a «Duplicar», bloqueado (B-5).
-   Edición, «Guardar cambios» y «Cancelar». */
-.mdet-foot { display: flex; flex-direction: column; gap: var(--sp-8); margin-top: var(--sp-12); }
+/* Abajo del todo: vista, «Editar» primario a todo el ancho (B-Movimiento-Detalle) y, debajo,
+   «Borrar» (entrada destructiva, C5, D-1) solo en su fila: el mockup lo pone en una rejilla de dos
+   junto a «Duplicar», bloqueado (B-5). Edición, «Guardar cambios» y «Cancelar». */
+.mdet-foot { display: flex; flex-direction: column; gap: var(--sp-8); margin-top: auto; }
 .mdet-actions { display: flex; flex-direction: column; gap: var(--sp-8); }
 .mdet-actions-edit { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-4); }
 .mdet-actions-edit .btn-tertiary { align-self: center; }
@@ -1091,25 +1254,32 @@
 .mov { display: flex; flex-direction: column; gap: var(--sp-12); }
 .mov-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); }
 .mov-head .root-header { flex: 1; min-width: 0; margin-bottom: 0; padding: 0 0 0 var(--sp-4); }
-/* El nombre del periodo es texto libre («Septiembre 2026»): en una línea junto a las flechas, a 20
-   para que quepa a 390 (el 24 de la cabecera de raíz lo partía), y con elipsis si aun así no cabe. */
-.mov-head .root-header-title { font-size: var(--fs-20); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* El título es el de B-Movimientos, a 24 («Septiembre»: periodTitle quita el año en curso). Un
+   nombre largo o de otro año parte en dos líneas junto a las flechas; nunca se recorta. */
+.mov-head .root-header-title { overflow-wrap: break-word; }
 .mov-period-nav { flex: none; display: flex; gap: var(--sp-8); }
+/* En el extremo, la flecha que no lleva a ningún sitio no se desvanece: fondo --surface y el
+   icono en el color del borde (B-Movimientos). */
+.mov-period-nav .icon-btn:disabled { opacity: 1; background: var(--surface); color: var(--border); }
 
-/* Display m: «de X» a la derecha de la cifra, abajo; el medidor de 8 debajo, a todo el ancho. */
+/* Display m (B-Movimientos): relleno 14 20 16; «de X» a la derecha de la cifra, abajo; el medidor
+   de 6 debajo, a 10 de la cifra y a todo el ancho (F-45 retirada, Álvaro 2026-09-27). */
 .mov-disp .disp {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   column-gap: var(--sp-12);
   row-gap: var(--sp-2);
+  padding: 14px var(--sp-20) var(--sp-16);
 }
 .mov-disp .disp-head,
 .mov-disp .disp-slot { grid-column: 1 / -1; }
-.mov-disp .disp-foot { align-self: end; padding-bottom: var(--sp-4); white-space: nowrap; }
+.mov-disp .disp-foot { align-self: end; padding-bottom: 6px; white-space: nowrap; }
 .mov-disp .disp-slot { margin-top: var(--sp-8); }
+.mov-disp .meter { height: 6px; }
 
-/* Buscador (F-29): campo hundido RECTANGULAR (radio 10, un campo nunca es píldora, §8) con la lupa
-   dentro; el foco se pinta en el pozo entero. Filtrar: botón icono de 48 a su lado. */
+/* Buscador: pozo en píldora con la lupa dentro, como en B-Movimientos (F-29 retirada, Álvaro
+   2026-09-27: igual que el mockup); el foco se pinta en el pozo entero. Filtrar: botón icono de 48
+   a su lado. */
 .mov-tools { display: flex; gap: var(--sp-8); }
 .mov-search {
   flex: 1;
@@ -1119,8 +1289,8 @@
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: var(--sp-8);
-  border-radius: var(--radius);
+  gap: 10px;
+  border-radius: var(--radius-pill);
   background: var(--well);
   box-shadow: var(--sh-well);
   color: var(--text-dim);
@@ -1155,11 +1325,16 @@
   scrollbar-width: none;
 }
 .mov-chips::-webkit-scrollbar { display: none; }
+/* «Todos» lleva 18 a cada lado (B-Movimientos), un poco más ancho que un chip neutro. */
+.mov-chips .ent-chip[data-chip-all] { padding: 0 18px; }
 
-/* Lista: un bloque por día (cabecera de 24 + tarjeta de filas de 60 con divisor a la altura del
-   texto, 12 + 40 + 12). */
+/* Lista: un bloque por día (cabecera de 24 con 6 a los lados, a 6 de su tarjeta de filas de 60;
+   la fila con 10 a los lados y el divisor a la altura del texto, 10 + 40 + 12), como en
+   B-Movimientos. */
 .mov-list { display: flex; flex-direction: column; gap: var(--sp-16); padding-top: var(--sp-4); }
-.mov-day { display: flex; flex-direction: column; gap: var(--sp-8); }
+.mov-day { display: flex; flex-direction: column; gap: 6px; }
+.mov-day .ent-day { padding: 0 6px; }
+.mov-card .ent-row { padding: var(--sp-8) 10px; }
 .mov-card {
   display: flex;
   flex-direction: column;
@@ -1168,7 +1343,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
 }
-.mov-hr { height: 1px; margin: 0 var(--sp-12) 0 calc(var(--sp-12) + 40px + var(--sp-12)); background: var(--border); }
+.mov-hr { height: 1px; margin: 0 10px 0 calc(10px + 40px + var(--sp-12)); background: var(--border); }
 
 /* Tarjeta de la etiqueta activa (entrando desde Etiquetas): neutra (C10), cifra en tinta a 20 (C3). */
 .mov-tag {
@@ -1203,13 +1378,17 @@
    movimientos» se queda abajo aunque el cuerpo haga scroll. */
 .mov-flt-sec { display: flex; flex-direction: column; gap: var(--sp-8); }
 .mov-flt-label { margin: 0; padding-left: var(--sp-4); font-size: var(--fs-13); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
+.mov-flt-count { color: var(--text); }
+/* «Quitar filtros» a 14 como en el mockup (el terciario del sistema es de 13, F-26). */
+.mov-flt #mov-flt-clear { font-size: var(--fs-14); }
 .mov-flt-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); margin: calc(-1 * var(--sp-4)); padding: var(--sp-4); }
 .mov-flt-foot { position: sticky; bottom: 0; margin-top: auto; padding-top: var(--sp-8); background: var(--surface); }
 /* === fin: movimientos === */
 
 /* === pantalla: onboarding === */
-/* S13 · B-Onb-Bienvenida, B-Onb-Cuentas, B-Onb-Ajustes (y sus BD-*). Pantalla de columna con el
-   CTA abajo (margin-top:auto); tarjetas --surface con borde, como los grupos de Ajustes. */
+/* S13 · B-Onb-Bienvenida, B-Onb-Cuentas, B-Onb-Ajustes (y sus BD-*), iguales al original (Álvaro
+   2026-09-27). Pantalla de columna con el CTA abajo (margin-top:auto); tarjetas --surface con
+   borde, salvo los grupos de Ajustes, teñidos de su familia como en el original. */
 /* Sin tab bar (body.onboarding la esconde): el hueco inferior de main#screen ya no la reserva. */
 body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--sp-24)); }
 .onb-screen {
@@ -1226,8 +1405,9 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   border: 1px solid var(--border);
 }
 .onb-foot { margin-top: auto; padding-top: var(--sp-12); display: flex; flex-direction: column; }
-.onb-foot-stack { gap: var(--sp-8); }
-.onb-foot-stack .btn-secondary { width: 100%; }
+.onb-foot-stack { gap: 10px; }
+/* Importar (B-Onb-Bienvenida): secundario de 52. */
+.onb-foot-stack .btn-secondary { width: 100%; min-height: 52px; }
 .onb-hint { text-align: center; font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
 .onb-help { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 .onb-help[hidden], .onb-share[hidden], .onb-row-extra[hidden] { display: none; }
@@ -1248,40 +1428,42 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .onb-msg svg { flex: none; }
 
-/* --- Marca de Bienvenida: logo (D-impl-5) + nombre en Unbounded y la línea de producto. --- */
+/* --- Marca de Bienvenida (B-Onb-Bienvenida): el logo de la hucha (decisión de Álvaro 2026-09-27,
+   D-impl-5) delante del nombre en Unbounded 40 del original, y la línea de producto. --- */
 .onb-brand { padding: var(--sp-12) var(--sp-4) var(--sp-8); display: flex; flex-direction: column; gap: var(--sp-8); }
 .onb-brand-row { display: flex; align-items: center; gap: var(--sp-12); }
 .onb-logo { flex: none; display: block; }
 /* Logo en tokens (D-impl-5, §Desviaciones): el fondo es el naranja de marca y la tinta la que va
-   sobre él. Excepción registrada en design-rules.test (R-C1, .onb-logo). */
+   sobre él. Excepción registrada en design-rules.test (R-C1, .onb-logo-bg). */
 .onb-logo-bg { fill: var(--accent); }
 .onb-logo-ink { fill: var(--on-accent); }
 .onb-logo-line { fill: none; stroke: var(--on-accent); }
 .onb-wordmark {
   margin: 0;
+  min-width: 0;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: var(--disp-m);
-  line-height: var(--lh-title);
+  font-size: var(--fs-40);
+  line-height: 1.1;
   letter-spacing: -.03em;
 }
 .onb-tagline { font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
-.onb-ruler { margin-top: var(--sp-8); }
+.onb-ruler { margin-top: var(--sp-8); overflow: hidden; }
 .onb-ruler-tick { stroke: var(--disp-dim); stroke-opacity: .6; }
 
-/* Promesas: tarjeta con filas de 56, baldosa hundida de 40 y filete con la sangría de la baldosa. */
+/* Promesas: tarjeta con filas de 56, baldosa hundida de 36 y filete con la sangría de la baldosa. */
 .onb-promises { list-style: none; padding: var(--sp-4) var(--sp-12); }
 .onb-promise { position: relative; min-height: 56px; display: flex; align-items: center; gap: var(--sp-12); font-size: var(--fs-15); font-weight: 600; }
 .onb-promise + .onb-promise::before {
   content: "";
   position: absolute;
   top: 0;
-  left: calc(40px + var(--sp-12));
+  left: calc(36px + var(--sp-12));
   right: 0;
   height: 1px;
   background: var(--border);
 }
-.onb-promise .ent-tile { box-shadow: var(--sh-well); }
+.onb-promise .ent-tile { width: 36px; height: 36px; box-shadow: var(--sh-well); }
 
 /* --- Barra de los pasos: atrás, progreso y «1 de 3». Cabecera del paso: título 24 + línea. --- */
 .onb-top { display: flex; align-items: center; gap: var(--sp-12); }
@@ -1298,7 +1480,7 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .onb-sub { font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 
-/* --- Cuentas: tarjeta teñida por familia (C8), baldosa sobre --chip, cifra en tinta (C7). --- */
+/* --- Cuentas: tarjeta teñida por familia (C8), baldosa sobre --chip, cifra en tinta. --- */
 .onb-accs { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-8); }
 .onb-acc {
   display: flex;
@@ -1311,26 +1493,39 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 .onb-acc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
 .onb-acc-name { font-size: var(--fs-15); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .onb-acc-line { font-size: var(--fs-12); font-weight: 500; color: var(--fx); }
-.onb-acc-amount { flex: none; font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+.onb-acc-amount { flex: none; font-size: var(--fs-16); font-weight: 600; color: var(--text); }
 .onb-acc-amount.is-neg { color: var(--neg); }
-/* Papelera en dim (F-23): sin fondo ni borde sobre el tinte; el rojo llega en la confirmación. */
-.onb-acc-del { background: none; border: 0; color: var(--text-dim); }
+/* Papelera: entrada destructiva en rojo (D-1, «rojo en todas partes»), sin fondo ni borde. */
+.onb-acc-del { background: none; border: 0; color: var(--neg); }
 .onb-form { padding: var(--sp-16); display: flex; flex-direction: column; gap: var(--sp-12); }
 .onb-kinds { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-8); }
-/* La deuda lleva la trama sobre su familia (C8, --stripe-debt), como en Patrimonio. */
-.onb-kinds .ent-pick[data-onb-kind="liability"] { background: var(--stripe-debt); }
+/* Baldosas de tipo de 64 (B-Onb-Cuentas). La deuda, con la trama clara del original: tinte y
+   --surface, con un filete del sólido de su familia. */
+.onb-kinds .ent-pick { min-height: 64px; }
+.onb-kinds .ent-pick[data-onb-kind="liability"] {
+  background: repeating-linear-gradient(135deg, var(--ft) 0 6px, var(--surface) 6px 9px);
+  border: 1px solid var(--fb);
+}
 .onb-form .btn-secondary { width: 100%; }
 
-/* --- Ajustes: grupos con etiqueta 13/600 dim; reparto con paso a paso y barra de dos partes. --- */
+/* --- Ajustes (B-Onb-Ajustes): grupos teñidos de su familia (Cielo y Suscripciones) con el
+   encabezado en su -x; reparto con teclas sueltas y barra de dos partes. --- */
 .onb-sec { display: flex; flex-direction: column; gap: var(--sp-8); }
+.onb-card.onb-tinted { background: var(--ft); border: 0; }
+.onb-shared .ctl-field-label { font-size: var(--fs-12); color: var(--fx); }
+.onb-shared .ctl-field { background: var(--raised); }
+.onb-share .ctl-stepper { padding: 0; gap: var(--sp-8); background: none; box-shadow: none; }
+.onb-share .ctl-stepper-btn { border: 1px solid var(--border); box-shadow: none; }
+.onb-share .ctl-stepper-value { min-width: 56px; }
 .onb-shared { padding: var(--sp-12); display: flex; flex-direction: column; gap: var(--sp-12); }
 .onb-share { display: flex; flex-direction: column; gap: var(--sp-8); }
 .onb-share-head { display: flex; align-items: center; gap: var(--sp-8); }
 .onb-share-label { flex: 1; min-width: 0; font-size: var(--fs-15); font-weight: 500; }
-.onb-share-bar { display: flex; gap: var(--sp-2); height: 8px; border-radius: var(--radius-pill); overflow: hidden; }
-.onb-share-mine { background: var(--text); }
-.onb-share-theirs { background: var(--idle); }
+.onb-share-bar { display: flex; gap: 3px; height: 10px; border-radius: var(--radius-pill); overflow: hidden; }
+.onb-share-mine { background: var(--fb); }
+.onb-share-theirs { background: var(--raised); }
 .onb-share-legend { display: flex; justify-content: space-between; gap: var(--sp-8); font-size: var(--fs-12); font-weight: 600; }
+.onb-share-you { color: var(--fx); }
 .onb-share-partner { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .onb-rows { padding: var(--sp-4); }
 .onb-row { min-height: 60px; padding: 0 var(--sp-4) 0 var(--sp-8); display: flex; align-items: center; gap: var(--sp-12); }
@@ -1370,7 +1565,8 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 /* === pantalla: patrimonio === */
 /* S3 (B-Patrimonio, BD-Patrimonio; formularios con la anatomía de B-Cuenta y B-Objetivo). La
    familia llega como .fam-<k> (cuentas: account-colors.js, C8) y aquí solo se leen --ft/--fb/--fx.
-   Las cifras, siempre en tinta (C7). */
+   Las cifras van en tinta salvo donde el original las pinta con su familia (la deuda, el anillo y
+   la línea del objetivo: famNumHtml / herencia de --fx; C7 retirada ahí, Álvaro 2026-09-27). */
 .pat,
 .pat-form { display: flex; flex-direction: column; gap: var(--sp-12); }
 .pat-form { gap: var(--sp-16); }
@@ -1381,12 +1577,15 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 .pat-delta.is-up { color: var(--ok); }
 .pat-delta.is-down { color: var(--disp-ink); }
 
-/* Composición: Tienes / Debes a los lados de la barra y el operativo tras el separador. */
+/* Composición: Tienes / Debes a los lados de la barra y el operativo tras el separador. La barra
+   del original: 3 de separación y la deuda un poco más apartada. */
+.pat .sbar { gap: 3px; }
+.pat .sbar-seg.is-debt { margin-left: 5px; }
 .pat-split { display: flex; justify-content: space-between; gap: var(--sp-12); }
 .pat-split-col { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
 .pat-split-col.is-end { align-items: flex-end; text-align: right; }
 .pat-split-label { font-size: var(--fs-12); font-weight: 600; line-height: var(--lh-title); color: var(--text-dim); }
-.pat-split-fig { font-size: var(--fs-17); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
+.pat-split-fig { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--fs-17); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
 .pat-oper {
   display: flex;
   align-items: center;
@@ -1422,10 +1621,15 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .pat-acc.no-fam { background: var(--raised); border: 1px solid var(--border); }
 .pat-acc.is-wide { grid-column: span 2; flex-direction: row; align-items: center; }
+/* Media (apilada, B-Patrimonio): baldosa, 14, y debajo nombre, línea y saldo seguidos (2 entre
+   ellos), arriba; si la vecina es más alta, el hueco queda abajo. */
+.pat-acc:not(.is-wide) { gap: 0; }
+.pat-acc:not(.is-wide) > .ent-tile { margin-bottom: 14px; }
+.pat-acc:not(.is-wide) .pat-acc-body { flex: none; }
+.pat-acc:not(.is-wide) .pat-acc-fig { margin-top: var(--sp-2); }
 .pat-acc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
 .pat-acc-name { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); overflow-wrap: anywhere; }
 .pat-acc-line { font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--fx, var(--text-dim)); }
-.pat-acc-line .num { color: var(--text-dim); }
 .pat-acc-fig { flex: none; font-size: var(--fs-17); font-weight: 600; line-height: var(--lh-title); color: var(--text); white-space: nowrap; }
 
 /* Tarjeta de objetivo: tinte de la familia de su cuenta, o --raised con borde sin cuenta (C11). */
@@ -1445,36 +1649,80 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   cursor: pointer;
 }
 .pat-goal.no-fam { background: var(--raised); border: 1px solid var(--border); }
-.pat-goal.is-wide { grid-column: span 2; }
+.pat-goal-body { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
 .pat-goal-name { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); overflow-wrap: anywhere; }
-.pat-goal-foot { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
 .pat-goal-line { min-width: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-title); color: var(--fx, var(--text-dim)); }
-.pat-goal-line .num { color: var(--text); }
-.pat-goal-pct { flex: none; font-size: var(--fs-13); font-weight: 600; color: var(--text); }
-.pat-goal-pct.is-over { color: var(--neg); }
+.pat-goal-line .num:first-child { font-weight: 600; }
+/* Anillo de 56 (B-Patrimonio): pista --raised sobre el tinte (--well sin familia), arco -b (sin
+   familia, --idle) que arranca arriba; el porcentaje 13/600 en el centro. */
+.pat-ring { position: relative; flex: none; width: 56px; height: 56px; }
+.pat-ring-svg { display: block; transform: rotate(-90deg); }
+.pat-ring-track { stroke: var(--raised); }
+.pat-goal.no-fam .pat-ring-track { stroke: var(--well); }
+.pat-ring-arc { stroke: var(--fb, var(--idle)); }
+.pat-ring-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--text);
+}
+.pat-ring-pct.is-over { color: var(--neg); }
 
-/* Formularios (anatomía de «Ajustes de la cuenta» / «Ajustes del objetivo»): encabezado de grupo
-   13/600 dim, bloque teñido con la familia (o --surface con borde sin ella, C11) y una línea de
-   ayuda como mucho por sección (K14). */
+/* Formularios (anatomía de «Ajustes de la cuenta» / «Ajustes del objetivo» de B-Cuenta y
+   B-Objetivo): encabezado de grupo en Unbounded 13 con el -x de la familia, bloque teñido con
+   relleno 4 (sin familia, --surface con borde, C11) y filas de ajuste con baldosa rellena y filete
+   con la sangría de la baldosa. Una línea de ayuda como mucho por sección (K14). */
 .pat-group { display: flex; flex-direction: column; gap: var(--sp-8); }
+/* El selector de color de la cuenta va sobre el fondo de pantalla: el hueco del anillo exterior, en --bg. */
+.pat-group .ent-fam-picker { --ring-gap: var(--bg); }
 .pat-block {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-16);
-  padding: var(--sp-16) var(--sp-12);
+  padding: var(--sp-4);
   border-radius: var(--radius-lg);
   background: var(--ft);
 }
 .pat-block.no-fam { background: var(--surface); border: 1px solid var(--border); }
-.pat-field { display: flex; flex-direction: column; gap: var(--sp-8); }
+.pat-sep { height: 1px; margin: 0 var(--sp-8) 0 calc(var(--sp-8) + 32px + var(--sp-12)); background: var(--border); }
+.pat-frow-label { flex: 1; min-width: 0; }
+.pat-frow.is-tall { min-height: 64px; padding-right: var(--sp-4); }
+/* Fila con el control debajo (Tipo, Categoría): cabecera de 30 y el control a lo ancho. */
+.pat-sub { display: flex; flex-direction: column; gap: var(--sp-8); padding: var(--sp-8) var(--sp-4) var(--sp-8) var(--sp-8); }
+.pat-frow.is-head { min-height: 32px; padding: 0; }
+/* El valor de la fila es el input: sin pozo, a la derecha, 16 (K9) y 600, en el -x de la familia
+   (en tinta sin ella). El anillo de foco sigue en :focus-visible. */
+.pat-input {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 60%;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-input);
+  font-weight: 600;
+  text-align: right;
+}
+.pat-input.is-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.pat-input.is-fam-ink { color: var(--fx); }
+.pat-input::placeholder { color: var(--text-dim); font-weight: 500; }
+.pat-input:focus { outline: none; }
+.pat-input:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+.pat-input-suffix { flex: none; margin-left: calc(var(--sp-8) * -1); font-size: var(--fs-15); font-weight: 600; color: var(--text); }
+.pat-input-suffix.is-fam-ink { color: var(--fx); }
 .pat-help { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 .pat-hint-strong { font-weight: 700; color: var(--fx, var(--text)); }
-.pat-amount-row { display: flex; align-items: flex-end; gap: var(--sp-8); }
-.pat-amount-row .ctl-field-wrap { flex: 1; min-width: 0; }
-.pat-sign { font-family: var(--font-mono); font-size: var(--fs-17); font-weight: 600; margin-bottom: var(--sp-2); }
+.pat-sign { flex: none; font-family: var(--font-mono); font-size: var(--fs-17); font-weight: 600; }
 .pat-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); min-height: 48px; padding: 0 var(--sp-4); }
 .pat-row-label { font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-title); color: var(--text); }
-.pat-row-value { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); color: var(--text); text-align: right; overflow-wrap: anywhere; }
 .pat-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
 .pat-progress-fig { font-size: var(--fs-20); font-weight: 600; color: var(--text); white-space: nowrap; }
 .pat-progress-pct { align-self: flex-end; font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }
@@ -1488,6 +1736,8 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
    seleccionable, fila de reparto compartido, importe hundido reutilizado en límite/ingresos
    previstos/barrido, y el resumen de "Presupuestado". */
 .pn-blocks { display: flex; flex-direction: column; gap: var(--sp-16); }
+/* Baldosa de 32 de las filas de límite con el radio 8 de B-PeriodoNuevo (.sq). */
+.pn-blocks .ent-tile-32 { border-radius: var(--radius-tile); }
 .pn-section { display: flex; flex-direction: column; gap: var(--sp-12); }
 .pn-section-head { display: flex; flex-direction: column; gap: var(--sp-4); }
 /* K14: una línea de ayuda como mucho por sección. */
@@ -1631,18 +1881,43 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 
 /* === pantalla: recurrentes === */
 
-.rec-body { display: flex; flex-direction: column; gap: var(--sp-24); }
-.rec-section { display: flex; flex-direction: column; gap: var(--sp-8); }
+/* B-Recurrentes: pila de 12 (§8) y cabecera a 12 del Display. */
+.sub-header:has(+ .rec-body) { margin-bottom: var(--sp-12); }
+.rec-body { display: flex; flex-direction: column; gap: var(--sp-12); }
+.rec-section { display: flex; flex-direction: column; gap: var(--sp-12); }
+.rec-section > .ent-sec { padding: var(--sp-4) var(--sp-4) 0; }
+/* Display del original: relleno 18 20 16 y pila de 6. */
+.rec-body .disp { padding: 18px var(--sp-20) var(--sp-16); gap: 6px; }
 
 /* Fila de regla + interruptor HERMANO (D7, nunca anidados): el botón comparte fila con el
-   interruptor; pausada se atenúa solo en el botón, nunca en el interruptor (§F-04). */
-.rec-row { display: flex; align-items: center; gap: var(--sp-8); }
-.rec-row .ent-row { flex: 1; min-width: 0; width: auto; }
+   interruptor (B-Recurrentes: relleno 0 8, todo a 12); pausada se atenúa solo en el botón, nunca
+   en el interruptor (§F-04). */
+.rec-row { display: flex; align-items: center; gap: var(--sp-12); padding-right: var(--sp-8); }
+.rec-row .ent-row { flex: 1; min-width: 0; width: auto; min-height: 60px; padding: 0 0 0 var(--sp-8); }
 .rec-row-paused .ent-row { opacity: .55; }
+.rec-body .box-list { gap: 0; }
+.rec-body .box-list .ent-divider { margin: 0 var(--sp-8) 0 60px; }
+/* «pagado» / «pendiente» bajo la cifra: 12/600. */
+.rec-row .ent-amount-note { font-weight: 600; }
 
-/* Pie del héroe (§9 Display): medidor + fila «Pagado X · Y al mes», en --disp-dim con las cifras
+/* «Pendiente»: cada regla en su tarjeta sobre el tinte de su familia (C6), fila de 64, baldosa en
+   --chip y «pendiente» en su -x. */
+.rec-pending { display: flex; flex-direction: column; gap: var(--sp-8); }
+.rec-pending-card { padding: var(--sp-4); border-radius: var(--radius-lg); background: var(--ft, var(--surface)); }
+.rec-pending-card:not(.is-fam-ink) { border: 1px solid var(--border); }
+.rec-pending-card .ent-row { min-height: 64px; }
+.rec-pending-card .ent-tile { background: var(--chip); }
+.rec-pending-card.is-fam-ink .ent-amount-note { color: var(--fx); }
+
+/* Barra del héroe: lo pagado en --disp-dim y lo pendiente en ámbar (.disp-amber-fill), 10 de alto
+   con 3 de separación; lo pendiente nunca baja de 14 para que se vea. */
+.rec-hero-bar { display: flex; gap: 3px; height: 10px; margin-top: 10px; border-radius: var(--radius-bar); overflow: hidden; }
+.rec-hero-paid { flex-grow: 0; flex-shrink: 1; background: var(--disp-dim); }
+.rec-hero-pending { flex-grow: 0; flex-shrink: 0; min-width: 14px; }
+
+/* Pie del héroe (§9 Display): barra + fila «Pagado X · Y al mes», en --disp-dim con las cifras
    en --disp-ink (dispInkHtml). */
-.rec-hero-slot { display: flex; flex-direction: column; gap: var(--sp-8); }
+.rec-hero-slot { display: flex; flex-direction: column; gap: 6px; }
 .rec-hero-row {
   display: flex;
   justify-content: space-between;
@@ -1666,8 +1941,11 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 .rec-toggles { display: flex; flex-direction: column; gap: var(--sp-12); }
 .rec-sub-annual { display: flex; align-items: baseline; gap: var(--sp-4); margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
 
+/* Enlace al radar (B-Recurrentes): 52 de alto, relleno 0 12, etiqueta 600. */
 .rec-radar-link { border-radius: var(--radius-lg); background: var(--raised); border: 1px solid var(--border); }
-.rec-foot-note { margin: 0; font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+.rec-radar-link .ent-set { min-height: 50px; padding: 0 var(--sp-12); border-radius: var(--radius-lg); }
+.rec-radar-link .ent-set-label { font-weight: 600; }
+.rec-foot-note { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 
 .rec-form-body { display: flex; flex-direction: column; gap: var(--sp-16); }
 
@@ -1695,13 +1973,19 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .reg-head .ctl-segmented [role="radio"] { flex: none; }
 
-/* Display xl de entrada (F-48): comercio arriba como etiqueta, importe, «o dicta…» en el pie. */
-.reg-disp { gap: var(--sp-8); }
+/* Display de entrada (B-Gasto): «Importe» arriba, la cifra a 48 (--disp-fs en línea) y en el pie
+   el comercio a la izquierda y «o dicta…» a la derecha. Relleno 14 16 14 20 y separación 6. */
+.reg-disp { gap: 6px; padding: 14px var(--sp-16) 14px var(--sp-20); }
 .reg-disp-main { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); }
 .reg-disp-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+/* Los dos campos del pie tienen área de toque de 44 (K10) sin engordar el pie: los márgenes
+   negativos devuelven el alto a la línea de 20. El texto escrito va a 16 (--fs-input: por debajo,
+   iOS amplía la página al enfocar); la pista en reposo, a su tamaño del mockup. */
 .reg-merchant-input {
   width: 100%;
   min-width: 0;
+  height: 44px;
+  margin: -12px 0;
   padding: 0;
   border: 0;
   background: none;
@@ -1709,12 +1993,9 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   font-family: var(--font-body);
   font-size: var(--fs-input);
   font-weight: 600;
-  line-height: var(--lh-title);
-  /* Área de toque de 44 (K10) sin engordar la etiqueta: los márgenes negativos devuelven el alto. */
-  height: 44px;
-  margin: calc(-1 * var(--sp-12)) 0 calc(-1 * var(--sp-8));
 }
-.reg-merchant-input::placeholder { color: var(--disp-dim); }
+.reg-merchant-input::placeholder { color: var(--disp-dim); font-size: var(--fs-14); font-weight: 500; }
+.reg-merchant-text { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-14); font-weight: 600; line-height: var(--lh-title); color: var(--disp-ink); }
 .reg-amount { display: flex; align-items: baseline; gap: var(--sp-12); min-width: 0; }
 .reg-amount-input {
   min-width: 44px;
@@ -1746,6 +2027,7 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   font-weight: 600;
   text-shadow: none;
 }
+/* El micro, en el ámbar del Display (lo pone la clase .disp-amber del marcado). */
 .reg-mic {
   flex: none;
   width: 48px;
@@ -1757,20 +2039,24 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   border: 0;
   border-radius: var(--radius-pill);
   background: var(--disp-line);
-  color: var(--disp-ink);
 }
 .reg-disp-foot {
   display: flex;
   align-items: center;
-  gap: var(--sp-8);
-  min-height: 44px;
-  padding-top: var(--sp-4);
+  justify-content: space-between;
+  gap: var(--sp-12);
+  min-height: 20px;
+  padding-top: var(--sp-8);
   border-top: 1px solid var(--disp-line);
 }
+.reg-foot-left { flex: 1 1 0; min-width: 0; display: flex; align-items: center; }
+.reg-foot-right { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-8); }
 .reg-nat-input {
   flex: 1;
+  width: 100%;
   min-width: 0;
   height: 44px;
+  margin: -12px 0;
   padding: 0;
   border: 0;
   background: none;
@@ -1778,20 +2064,22 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   font-family: var(--font-body);
   font-size: var(--fs-input);
   font-weight: 500;
+  text-align: right;
 }
-.reg-nat-input::placeholder { color: var(--disp-dim); }
+.reg-nat-input::placeholder { color: var(--disp-dim); font-size: var(--fs-12); font-weight: 500; }
 .reg-nat-status,
-.reg-nat-quote { flex: 1; min-width: 0; font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--disp-ink); }
+.reg-nat-quote { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-title); color: var(--disp-ink); }
 .reg-nat-status { color: var(--disp-dim); }
 .reg-nat-reset {
   flex: none;
   min-height: 44px;
+  margin: -12px 0;
   padding: 0 var(--sp-4);
   border: 0;
   background: none;
   color: var(--disp-dim);
   font-family: var(--font-body);
-  font-size: var(--fs-13);
+  font-size: var(--fs-12);
   font-weight: 600;
 }
 .reg-help { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
@@ -1823,7 +2111,7 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   transform: rotate(45deg);
 }
 .reg-subs .ent-chip.ent-neutral { position: relative; }
-.reg-subs .ent-chip.ent-neutral[aria-pressed="false"] { background: var(--lift); box-shadow: inset 0 0 0 1px var(--border); }
+.reg-subs .ent-chip.ent-neutral[aria-pressed="false"] { background: var(--lift); box-shadow: inset 0 0 0 1px var(--border); font-weight: 600; }
 :root[data-theme="dark"] .reg-subs .ent-chip.ent-neutral[aria-pressed="false"] { box-shadow: inset 0 0 0 1px var(--border-strong); }
 
 /* Aviso de límite (Registro v2 §6.2), igual que en Gasto por categoría (S7): texto con el icono de
@@ -1845,35 +2133,14 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 .reg-limit.is-over { color: var(--text); font-weight: 600; }
 .reg-limit-over { color: var(--neg); }
 
-/* Registro rápido plegado: «Ver las N categorías» y la fila «Más» (fila de 60 en --raised con
-   borde: «Más» 15/600, resumen 13/500 dim con el divisor de metaHtml, chevron). */
+/* Registro rápido plegado: «Ver las N categorías» y la fila «Más», con la misma receta que las
+   píldoras de cuenta y fecha de B-Gasto (48, --raised con borde, 14/600; resumen 13/500 dim en una
+   línea con el divisor de metaHtml; chevron 16 dim). */
 .reg-cats-more { align-self: flex-start; }
 .reg-more {
   width: 100%;
-  min-height: 60px;
-  padding: var(--sp-8) var(--sp-12) var(--sp-8) var(--sp-16);
-  display: flex;
-  align-items: center;
-  gap: var(--sp-12);
-  border-radius: var(--radius);
-  background: var(--raised);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-family: var(--font-body);
-  text-align: left;
-  cursor: pointer;
-}
-.reg-more-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
-.reg-more-label { font-size: var(--fs-15); font-weight: 600; line-height: var(--lh-title); }
-.reg-more-sum { font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
-
-/* Filas de cuenta y fecha, y «Con Marta 50 %» (F-20): píldoras de 48 en --raised con borde. */
-.reg-row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
-.reg-pill {
-  position: relative;
-  min-width: 0;
   height: 48px;
-  padding: 0 var(--sp-8) 0 var(--sp-12);
+  padding: 0 var(--sp-12) 0 14px;
   display: flex;
   align-items: center;
   gap: var(--sp-8);
@@ -1882,12 +2149,39 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   border: 1px solid var(--border);
   color: var(--text);
   font-family: var(--font-body);
-  font-size: var(--fs-15);
+  text-align: left;
+  cursor: pointer;
+}
+.reg-more-body { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--sp-12); }
+.reg-more-label { flex: none; font-size: var(--fs-14); font-weight: 600; line-height: var(--lh-title); }
+.reg-more-sum { flex: 1; min-width: 0; flex-wrap: nowrap; overflow: hidden; font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+.reg-more-sum > span { flex: none; white-space: nowrap; }
+
+/* Filas de cuenta y fecha, y «Con Marta 50 %» (F-20): píldoras de 48 en --raised con borde. */
+.reg-row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.reg-pill {
+  position: relative;
+  min-width: 0;
+  height: 48px;
+  padding: 0 var(--sp-12);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  border-radius: var(--radius-pill);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-14);
   font-weight: 600;
   text-align: left;
   cursor: pointer;
 }
 .reg-pill-wide { width: 100%; }
+/* Cuenta y fecha (B-Gasto): el chevron casi pegado al borde, para que «Cuenta corriente» quepa
+   entera en media fila como en el original. */
+.reg-row2 .reg-pill { padding-right: var(--sp-4); }
+.reg-row2 .reg-pill-chev { margin-left: calc(-1 * var(--sp-4)); }
 .reg-pill-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .reg-pill-pre { flex: none; font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
 .reg-pill-chev,
@@ -1906,8 +2200,14 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .reg-date:has(.reg-date-input:focus-visible) { outline: var(--focus); outline-offset: var(--focus-offset); }
 .reg-extras { display: flex; align-items: center; gap: var(--sp-8); }
-.reg-shared { flex: 1; padding: 0 var(--sp-8) 0 var(--sp-16); }
+.reg-shared { flex: 1; padding: 0 var(--sp-8) 0 14px; }
 .reg-shared-pct { font-weight: 500; color: var(--text-dim); }
+/* Interruptor de «Con Marta» (B-Gasto): 40×24 con pomo 18; apagado, pomo --raised en claro y --idle
+   en oscuro (BD-Gasto). El área de toque sigue siendo la píldora entera. */
+.reg-shared .ctl-switch { width: 40px; height: 24px; }
+.reg-shared .ctl-switch-knob { width: 18px; height: 18px; background: var(--raised); }
+:root[data-theme="dark"] .reg-shared .ctl-switch[aria-checked="false"] .ctl-switch-knob { background: var(--idle); }
+.reg-shared .ctl-switch[aria-checked="true"] .ctl-switch-knob { transform: translateX(16px); }
 .reg-round {
   flex: none;
   width: 48px;
@@ -2007,39 +2307,43 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* B-Recibo lo cuelga a 108 de arriba en 844 (el 12,8 %): proporcional, para que «Deshacer» siga a
+     la vista en pantallas más bajas. */
+  justify-content: flex-start;
   gap: var(--sp-16);
-  padding: var(--sp-16);
-  background: var(--scrim);
+  padding: max(var(--sp-16), min(108px, 12.8vh)) var(--sp-16) var(--sp-16);
+  /* Velo de B-Recibo (.62, más denso que --scrim). */
+  background: var(--scrim-recibo);
   animation: bc-recibo-veil 150ms ease-out;
 }
-.recibo-ticket { width: 310px; max-width: 100%; filter: drop-shadow(var(--sh-alert)); animation: bc-recibo-in 250ms ease-out; }
+.recibo-ticket { width: 310px; max-width: 100%; filter: drop-shadow(var(--sh-ticket)); animation: bc-recibo-in 250ms ease-out; }
 .recibo-edge { display: block; width: 100%; height: 10px; color: var(--raised); }
-.recibo-body { display: flex; flex-direction: column; gap: var(--sp-12); padding: var(--sp-16); background: var(--raised); color: var(--text); }
+.recibo-body { display: flex; flex-direction: column; gap: var(--sp-12); padding: 14px var(--sp-20) 18px; background: var(--raised); color: var(--text); }
 .recibo-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
 .recibo-brand { font-family: var(--font-display); font-size: var(--fs-13); font-weight: 700; line-height: var(--lh-title); letter-spacing: -.01em; }
 .recibo-time { font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
-.recibo-body .disp { padding: var(--sp-12) var(--sp-16); border-radius: var(--radius); }
+.recibo-body .disp { padding: var(--sp-12) var(--sp-16) 14px; border-radius: var(--radius); }
 .recibo-id { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); min-height: 60px; }
 .recibo-id-text { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
 .recibo-title { font-size: var(--fs-20); font-weight: 700; line-height: var(--lh-title); overflow-wrap: anywhere; }
 .recibo-sub { font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
 .recibo-stamp {
   flex: none;
-  padding: var(--sp-2);
+  padding: 3px;
   border: 2px solid currentColor;
-  border-radius: var(--radius);
+  border-radius: var(--radius-tile);
   color: var(--fx, var(--text));
   transform: rotate(-8deg);
   animation: bc-recibo-stamp 200ms ease-out 250ms backwards;
 }
-.recibo-stamp-in { display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); padding: var(--sp-4) var(--sp-12); border: 1px solid currentColor; border-radius: var(--radius-xs); }
+.recibo-stamp-in { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: var(--sp-4) var(--sp-12); border: 1px solid currentColor; border-radius: var(--radius-bar); }
 .recibo-stamp-label { font-family: var(--font-display); font-size: var(--fs-13); font-weight: 700; line-height: var(--lh-title); }
-/* C7: la fecha es una cifra y va en tinta, aunque el sello lleve el color de su familia. */
-.recibo-stamp-date { font-size: var(--fs-12); font-weight: 600; color: var(--text); }
+/* La fecha va en el color del sello, como en B-Recibo (C7 retirada ahí: .is-fam-ink). */
+.recibo-stamp-date { font-size: var(--fs-12); font-weight: 600; }
+.recibo-stamp-date.is-fam-ink { color: var(--fx, var(--text)); }
 .recibo-badge { display: flex; }
 .recibo-perf { border-top: 1px dashed var(--border); }
-.recibo-lines { display: flex; flex-direction: column; gap: var(--sp-12); }
+.recibo-lines { display: flex; flex-direction: column; gap: 10px; }
 .recibo-line { display: flex; align-items: baseline; gap: var(--sp-8); }
 .recibo-label { flex: none; font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
 .recibo-dots { flex: 1; min-width: 12px; border-bottom: 2px dotted var(--border); transform: translateY(-4px); }
@@ -2064,6 +2368,8 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
    Todo en pila de 12 (§8). */
 .sem { display: flex; flex-direction: column; gap: var(--sp-12); }
 .sem > .sub-header { margin-bottom: 0; }
+/* Display de B-Semana: relleno 18 20 16 y pila a 6. */
+.sem .disp { padding: 18px var(--sp-20) var(--sp-16); gap: 6px; }
 
 /* Pie del Display: la media al día, etiqueta dim y cifra secundaria en --disp-ink (C2). */
 .sem-avg {
@@ -2118,7 +2424,8 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 :root[data-theme="dark"] .sem-avg-line { opacity: .75; }
 
-/* Días pulsables: 48 de alto; el elegido, relleno --accent + --on-accent 700 SIN --sh-key (F-19). */
+/* Días pulsables: 48 de alto; el elegido, relleno --accent + --on-accent 700 con la sombra de tecla
+   (F-19 retirada, Álvaro 2026-09-27: igual que B-Semana). */
 .sem-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--sp-4); }
 .sem-daybtn {
   height: 48px;
@@ -2138,7 +2445,7 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   cursor: pointer;
 }
 .sem-daybtn .num { font-size: var(--fs-12); font-weight: 500; }
-.sem-daybtn[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+.sem-daybtn[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 700; box-shadow: var(--sh-key); }
 .sem-daybtn[aria-pressed="true"] .num { font-weight: 600; }
 
 /* Día elegido: --raised con borde y una muesca que apunta a su columna (--i, índice 0-6). La
@@ -2176,6 +2483,8 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 }
 .sem-day-total { font-size: var(--fs-17); font-weight: 600; color: var(--text); white-space: nowrap; }
 .sem-day-rows { display: flex; flex-direction: column; margin: 0 calc(-1 * var(--sp-12)); }
+/* Filas de 56 en B-Semana. */
+.sem-day-rows .ent-row { min-height: 56px; padding-top: var(--sp-4); padding-bottom: var(--sp-4); }
 .sem-day-div { height: 1px; margin-left: 64px; background: var(--border); }
 .sem-day-empty { margin: 0; padding: var(--sp-8) 0; font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
 
@@ -2185,16 +2494,28 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 .sem-where-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
 .sem-where-name { min-width: 0; font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-title); color: var(--text); }
 .sem-where-amt { flex: none; font-size: var(--fs-14); font-weight: 500; color: var(--text); }
+/* Medidor de B-Semana (F-45 retirada): 10 de alto, radio 4, pista en el tinte de su familia (la
+   clase de familia va en la fila); sin familia, --well. */
+.sem-where .meter { height: 10px; border-radius: var(--radius-xs); background: var(--ft, var(--well)); }
+.sem-where .meter-fill { border-radius: var(--radius-xs); }
 /* === fin: semana === */
 
 /* === pantalla: suscripciones === */
 
-.susc-body { display: flex; flex-direction: column; gap: var(--sp-24); }
-.susc-section { display: flex; flex-direction: column; gap: var(--sp-8); }
+/* B-Suscripciones: pila de 12 (§8) y cabecera a 12 del Display. */
+.sub-header:has(+ .susc-body) { margin-bottom: var(--sp-12); }
+.susc-body { display: flex; flex-direction: column; gap: var(--sp-12); }
+.susc-section { display: flex; flex-direction: column; gap: var(--sp-12); }
+/* Display del original: relleno 18 20 16 y pila de 6. */
+.susc-body .disp { padding: 18px var(--sp-20) var(--sp-16); gap: 6px; }
 
-/* Marcas de renovación del Display (§9 LED, B-Suscripciones · suscripciones.js#renewalTimelineHtml):
-   la más próxima usa .disp-today (ya existente, C2); el resto, apagadas, nunca en el ámbar que manda. */
+/* Línea de renovaciones del Display (suscripciones.js#renewalTimelineHtml): pista y marcas por
+   semana en --disp-line; la próxima usa .disp-today y su fecha .disp-amber (C2); el resto, en
+   --disp-dim con el anillo del Display. */
+.susc-timeline { margin-top: 10px; }
 .susc-mark { fill: var(--disp-dim); stroke: var(--disp); }
+.susc-tl-label { fill: var(--disp-dim); font-family: var(--font-mono); font-size: var(--fs-12); font-weight: 500; }
+.susc-tl-label.disp-amber { fill: var(--disp-text); font-weight: 600; }
 
 /* Tarjeta de aviso (F-1x): tintada con la familia de la única suscripción de la que toca preguntar
    esta semana (C6: una entidad sola, tinte permitido). Sin familia (defensivo): --well. */
@@ -2210,13 +2531,25 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 /* .ent-name/.ent-line2 (entity.js) truncan a una línea para la fila de 60 — aquí el título es un
    párrafo de dos líneas dentro de una tarjeta ancha (B-Suscripciones): se deja envolver. */
 .susc-notice-head .ent-name { white-space: normal; overflow: visible; text-overflow: clip; }
+.susc-notice-head .ent-name { line-height: 1.25; }
 .susc-notice-sub { font-size: var(--fs-13); white-space: normal; overflow: visible; text-overflow: clip; }
-.susc-notice-amount { font-weight: 600; color: var(--text); }
+/* La cifra del aviso en el -x de su familia, como el resto de la línea (B-Suscripciones). */
+.susc-notice-amount.is-fam-ink { font-weight: 600; color: var(--fx); }
 .susc-notice-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.susc-notice-actions .btn-secondary { font-size: var(--fs-15); }
 
-.susc-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
-.susc-section-title { margin: 0; font-size: var(--fs-15); line-height: var(--lh-title); }
+/* «Activas»: Unbounded 15 en el -x de Suscripciones, con la pista de orden a la derecha. */
+.susc-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); padding: var(--sp-4) var(--sp-4) 0; }
+.susc-section-title { margin: 0; font-family: var(--font-display); font-size: var(--fs-15); font-weight: 700; letter-spacing: -0.01em; line-height: var(--lh-title); color: var(--fx); }
 .susc-section-hint { font-size: var(--fs-12); font-weight: 600; color: var(--text-dim); }
+
+/* Lista de B-Suscripciones: --raised, filas de 60 pegadas (relleno 0 8) y filete desde la baldosa. */
+.susc-list .box-list { gap: 0; background: var(--raised); }
+.susc-list .ent-row { min-height: 60px; padding: 0 var(--sp-8); }
+.susc-list .ent-divider { margin: 0 var(--sp-8) 0 60px; }
+/* «468,00 €/año» en mono, como la cifra. */
+.susc-list .ent-amount-note { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.susc-foot-note { margin: 0; padding: 0 var(--sp-4); font-size: var(--fs-13); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
 
 .susc-candidates { display: flex; flex-direction: column; gap: var(--sp-12); }
 .susc-candidate {

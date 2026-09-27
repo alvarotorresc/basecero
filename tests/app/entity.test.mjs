@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   tileHtml, pickTileHtml, badgeHtml, chosenCategoryHtml, filterChipHtml,
-  txRowHtml, settingRowHtml, dayHeaderHtml, sectionHeaderHtml, familySwatchesHtml,
+  txRowHtml, settingRowHtml, dayHeaderHtml, sectionHeaderHtml, familySwatchesHtml, famNumHtml,
 } from "../../app/app/js/entity.js";
 
 const AMOUNT = '12,50<span class="money-cents"></span><span class="money-cur"> €</span>';
@@ -33,6 +33,19 @@ test("tileHtml: tinte por familia, 32 compacta, --chip sobre tinte y neutra sin 
   assert.match(neutra, /ent-neutral/);
   assert.ok(!neutra.includes("fam-"));
   assert.ok(!tileHtml({ fam: "inventada" }).includes("fam-"), "una clave desconocida no inventa clase");
+});
+
+test("badgeHtml: size 36 (B-Recibo) lleva el icono de 16 en su círculo; por defecto, la de 28", () => {
+  const def = badgeHtml({ fam: "res", label: "Bares" });
+  assert.doesNotMatch(def, /ent-badge-36|ent-badge-ico/);
+  assert.match(def, /width="14"/);
+  const big = badgeHtml({ fam: "res", icon: "res", label: "Restauración › Bares y cafés", size: 36 });
+  assert.match(big, /^<span class="ent-badge ent-badge-36 fam-res"><span class="ent-badge-ico"><svg[^>]*width="16"/);
+  assert.match(big, /ent-badge-label">Restauración › Bares y cafés</);
+  // C9: el ingreso sigue neutro también a 36.
+  assert.match(badgeHtml({ income: true, fam: "res", label: "Nómina", size: 36 }), /class="ent-badge ent-badge-36 ent-badge-income"/);
+  assert.equal(decl(".ent-badge-36", "min-height"), "36px");
+  assert.equal(decl(".ent-badge-ico", "background"), "var(--raised)");
 });
 
 test("badgeHtml: la ficha de ingreso (C9) no lleva clase fam- ni borde de etiqueta", () => {
@@ -84,10 +97,25 @@ test("settingRowHtml: nunca emite fam- en el valor ni en la fila (I-61)", () => 
   const valor = html.match(/<span class="ent-set-value[^"]*">[^<]*<\/span>/)[0];
   assert.ok(!valor.includes("fam-"), valor);
   assert.match(html, /^<button type="button" class="ent-set">/, "la familia no va en la fila");
-  assert.match(html, /class="ent-tile ent-tile-32 fam-tra"/, "solo en la baldosa");
+  assert.match(html, /class="ent-tile ent-tile-30 fam-tra"/, "solo en la baldosa");
   const sinFam = settingRowHtml({ icon: "calendar", label: "El periodo empieza", value: "Día 28", valueNum: true });
   assert.ok(!sinFam.includes("fam-"));
-  assert.match(sinFam, /ent-tile ent-tile-32 ent-neutral/);
+  assert.match(sinFam, /ent-tile ent-tile-30 ent-neutral/);
+});
+
+test("settingRowHtml: baldosa de 30 con radio 8 y fila de 46 (la .sq de B-Ajustes); tileSize 32 para B-PeriodoNuevo", () => {
+  assert.match(settingRowHtml({ icon: "casa", fam: "casa", label: "Casa", tileFilled: true }), /class="ent-tile ent-tile-30 fam-casa ent-tile-filled"/);
+  assert.match(settingRowHtml({ icon: "casa", fam: "casa", label: "Casa", tileSize: 32 }), /class="ent-tile ent-tile-32 fam-casa"/);
+  assert.match(settingRowHtml({ icon: "casa", fam: "casa", label: "Casa", tileSize: 99 }), /ent-tile-30/, "otro tamaño cae al 30");
+  assert.equal(decl(".ent-tile-30", "width"), "30px");
+  assert.equal(decl(".ent-tile-30", "border-radius"), "var(--radius-tile)");
+  assert.equal(decl(".ent-set", "min-height"), "46px");
+});
+
+test("tileHtml: size 30 lleva icono 18 y la clase ent-tile-30", () => {
+  const html = tileHtml({ fam: "tra", icon: "casa", size: 30 });
+  assert.match(html, /^<span class="ent-tile ent-tile-30 fam-tra">/);
+  assert.match(html, /width="18"/);
 });
 
 test("settingRowHtml: valueFam pinta la muestra de la cuenta delante del valor, nunca en él (C8, I-61)", () => {
@@ -186,6 +214,7 @@ test("familySwatchesHtml: grupo con aria-label y una muestra aria-pressed por fa
   assert.doesNotMatch(html, /fam-rojo/);
   assert.match(html, /class="ent-fam-pick fam-casa" aria-pressed="false" aria-label="Arena" data-fam="casa"/);
   assert.match(html, /class="ent-fam-pick fam-tra" aria-pressed="true" aria-label="Cielo, la usa Cuenta" data-fam="tra"/);
+  assert.equal(decl('.ent-fam-pick[aria-pressed="true"]', "box-shadow"), "var(--ring-sel-out)", "anillo exterior con hueco (F-17 retirada)");
 });
 
 test("familySwatchesHtml: solo la elegida lleva el check; sin radios (aria-checked) y escapa el label", () => {
@@ -201,4 +230,112 @@ test("pickTileHtml: expanded pone aria-expanded solo si es booleano (desplegar n
   assert.match(pickTileHtml({ fam: "res", label: "Restauración", expanded: false }), /aria-expanded="false"/);
   assert.doesNotMatch(pickTileHtml({ fam: "res", label: "Restauración" }), /aria-expanded/);
   assert.match(pickTileHtml({ fam: "res", label: "Restauración", expanded: true }), /aria-pressed="false"/);
+});
+
+// ---- Variantes de fidelidad al mockup (2026-09-27) ----------------------------------------
+
+test("tileHtml: filled rellena con el sólido -b y el icono en --on-fam; sin familia, neutra; por defecto, no", () => {
+  assert.doesNotMatch(tileHtml({ fam: "tra", icon: "casa" }), /ent-tile-filled/);
+  assert.match(tileHtml({ fam: "tra", icon: "casa", size: 32, filled: true }), /class="ent-tile ent-tile-32 fam-tra ent-tile-filled"/);
+  assert.match(tileHtml({ fam: "tra", filled: true, onTint: true }), /class="ent-tile fam-tra ent-tile-filled"/, "filled gana a onTint");
+  assert.match(tileHtml({ filled: true }), /class="ent-tile ent-neutral"/);
+  assert.equal(decl(".ent-tile.ent-tile-filled", "background"), "var(--fb)");
+  assert.equal(decl(".ent-tile.ent-tile-filled", "color"), "var(--on-fam)");
+});
+
+test("settingRowHtml: tileFilled y valueInFam (grupos del original de B-Ajustes); por defecto, nada", () => {
+  const base = settingRowHtml({ icon: "casa", fam: "tra", label: "Reparto", value: "50 %" });
+  assert.doesNotMatch(base, /ent-tile-filled|is-fam-ink/);
+  const html = settingRowHtml({ icon: "casa", fam: "tra", label: "Reparto", value: "50 %", valueNum: true, tileFilled: true, valueInFam: true });
+  assert.match(html, /ent-tile-filled/);
+  assert.match(html, /class="ent-set-value num fam-tra is-fam-ink">50 %/);
+  assert.doesNotMatch(settingRowHtml({ label: "x", value: "1", valueInFam: true }), /is-fam-ink/, "sin fam no hay -x");
+  assert.equal(decl(".ent-set-value.is-fam-ink", "color"), "var(--fx)");
+});
+
+test("chosenCategoryHtml: variant pick (B-Gasto) y detail (B-Movimiento-Detalle) con borde -b y su jerarquía", () => {
+  const base = chosenCategoryHtml({ fam: "res", name: "Bares", path: "Restauración" });
+  assert.doesNotMatch(base, /ent-chosen-/);
+  const pick = chosenCategoryHtml({ fam: "res", name: "Restauración › Bares y cafés", path: "La que usas en Bar Pepe", variant: "pick" });
+  assert.match(pick, /class="ent-chosen ent-chosen-pick fam-res"/);
+  assert.ok(pick.indexOf("ent-name") < pick.indexOf("ent-line2"), "pick: nombre arriba");
+  const det = chosenCategoryHtml({ fam: "res", name: "Bares y cafés", path: "Restauración", variant: "detail", id: "cat" });
+  assert.match(det, /class="ent-chosen ent-chosen-detail fam-res" id="cat"/);
+  assert.ok(det.indexOf("ent-line2") < det.indexOf("ent-name"), "detail: ruta arriba");
+  assert.doesNotMatch(chosenCategoryHtml({ fam: "res", name: "x", variant: "otra" }), /ent-chosen-/);
+  assert.equal(decl(".ent-chosen-pick", "border"), "1px solid var(--fb)");
+  assert.equal(decl(".ent-chosen-detail .ent-name", "font-size"), "var(--fs-17)");
+  assert.equal(decl(".ent-chosen-pick .ent-name", "font-weight"), "700");
+});
+
+test("chosenCategoryHtml: check (B-Gasto) pinta la marca de 22 al final, en -x; por defecto no", () => {
+  assert.doesNotMatch(chosenCategoryHtml({ fam: "res", name: "Bares" }), /ent-chosen-check/);
+  const html = chosenCategoryHtml({ fam: "res", name: "Restauración › Bares y cafés", variant: "pick", check: true });
+  assert.match(html, /<span class="ent-chosen-check"><svg[^>]*width="22"[^>]*aria-hidden="true"/);
+  assert.ok(html.indexOf("ent-chosen-check") > html.indexOf("ent-body"), "la marca va al final");
+  // Con chevron (tarjeta pulsable), gana el chevron: nunca las dos.
+  const both = chosenCategoryHtml({ fam: "res", name: "x", id: "c", check: true });
+  assert.match(both, /ent-chev/);
+  assert.doesNotMatch(both, /ent-chosen-check/);
+  assert.equal(decl(".ent-chosen-check", "color"), "var(--fx)");
+});
+
+test("txRowHtml: height 52 y amountWeight 500 (B-Home); por defecto, 60 y 600", () => {
+  const base = txRowHtml({ fam: "ali", title: "Mercadona", amountHtml: AMOUNT });
+  assert.doesNotMatch(base, /ent-row-52|ent-row-w500/);
+  assert.match(txRowHtml({ fam: "ali", title: "M", amountHtml: AMOUNT, height: 52, amountWeight: 500 }), /class="ent-row ent-row-52 ent-row-w500 fam-ali"/);
+  assert.equal(decl(".ent-row.ent-row-52", "min-height"), "52px");
+  assert.equal(decl(".ent-row.ent-row-w500 .ent-amount", "font-weight"), "500");
+});
+
+test("txRowHtml: amountNoteHtml va tal cual y gana a amountNote; sin él, amountNote se escapa como siempre", () => {
+  const html = txRowHtml({ fam: "res", title: "Casa Paco", amountHtml: AMOUNT, amountNote: "<i>x</i>", amountNoteHtml: 'con Marta, de <span class="num">24,00</span>' });
+  assert.match(html, /<span class="ent-amount-note">con Marta, de <span class="num">24,00<\/span><\/span>/);
+  assert.ok(!html.includes("&lt;i&gt;"), "amountNote no se pinta si llega amountNoteHtml");
+  const plano = txRowHtml({ fam: "res", title: "X", amountHtml: AMOUNT, amountNote: "<i>tu parte</i>" });
+  assert.match(plano, /<span class="ent-amount-note">&lt;i&gt;tu parte&lt;\/i&gt;<\/span>/);
+  assert.ok(!txRowHtml({ fam: "res", title: "X", amountHtml: AMOUNT }).includes("ent-amount-note"));
+});
+
+test("filterChipHtml: trailCheck pone el check de 16 detrás al estar elegido; sin él, nada cambia", () => {
+  const on = filterChipHtml({ fam: "ali", label: "Alimentación", selected: true, trailCheck: true });
+  assert.match(on, /<span class="ent-chip-label">Alimentación<\/span><span class="ent-chip-trail" aria-hidden="true"><svg[^>]*width="16"/);
+  assert.ok(!filterChipHtml({ fam: "ali", label: "A", selected: false, trailCheck: true }).includes("ent-chip-trail"), "sin elegir, sin check");
+  assert.ok(!filterChipHtml({ fam: "ali", label: "A", selected: true }).includes("ent-chip-trail"), "por defecto, sin check");
+  assert.ok(!filterChipHtml({ fam: "ali", label: "A", selected: true, check: true }).includes("ent-chip-trail"), "check (delantero) no lo activa");
+  assert.equal(decl(".ent-chip[aria-pressed=\"true\"] .ent-chip-trail", "color"), "var(--accent-text)");
+});
+
+test("settingRowHtml: valueIcon pinta el icono de 16 delante del valor; sin valor o por defecto, nada", () => {
+  const html = settingRowHtml({ label: "Etiqueta", value: "Oficina", valueIcon: "tag" });
+  assert.match(html, /<span class="ent-set-vicon"><svg[^>]*width="16"[\s\S]*?<\/svg><\/span><span class="ent-set-value">Oficina<\/span>/);
+  assert.ok(!settingRowHtml({ label: "Etiqueta", valueIcon: "tag" }).includes("ent-set-vicon"), "sin valor, sin icono");
+  assert.ok(!settingRowHtml({ label: "Etiqueta", value: "Oficina" }).includes("ent-set-vicon"), "por defecto, sin icono");
+  assert.equal(decl(".ent-set-vicon + .ent-set-value", "margin-left"), "-6px");
+});
+
+test("sectionHeaderHtml: fam (texto -x; en grupo, Unbounded), ttl y dim; por defecto, sin modificadores", () => {
+  assert.equal(sectionHeaderHtml({ title: "Activas" }).includes("is-"), false);
+  assert.match(sectionHeaderHtml({ title: "Activas", fam: "sus" }), /class="ent-sec ent-sec-title fam-sus is-fam"/);
+  assert.match(sectionHeaderHtml({ title: "Periodo", level: "group", fam: "tra" }), /class="ent-sec ent-sec-group fam-tra is-fam is-ttl"/);
+  assert.match(sectionHeaderHtml({ title: "A tu favor", level: "group", ttl: true }), /class="ent-sec ent-sec-group is-ttl"/);
+  assert.match(sectionHeaderHtml({ title: "Archivadas", dim: true }), /class="ent-sec ent-sec-title is-dim"/);
+  assert.doesNotMatch(sectionHeaderHtml({ title: "x", fam: "nada" }), /is-fam/);
+  assert.equal(decl(".ent-sec.is-fam .ent-sec-text", "color"), "var(--fx)");
+  assert.equal(decl(".ent-sec-group.is-ttl .ent-sec-text", "font-family"), "var(--font-display)");
+});
+
+test("famNumHtml: cifra mono en -x de su familia, escapada; familia desconocida, en tinta", () => {
+  assert.equal(famNumHtml("−4.300,00 €", "coc"), '<span class="num ent-fam-num fam-coc is-fam-ink">−4.300,00 €</span>');
+  assert.equal(famNumHtml("<b>", "nada"), '<span class="num ent-fam-num">&lt;b&gt;</span>');
+  assert.match(famNumHtml("1.250", "imp", { weight: 600 }), /is-w600/);
+  assert.equal(decl(".ent-fam-num.is-fam-ink", "color"), "var(--fx)");
+});
+
+test("settingRowHtml: trailHtml va entre el valor y el chevron y la fila sigue siendo botón; por defecto, nada", () => {
+  const trail = '<span class="aj-cat-swatches" aria-hidden="true"></span>';
+  const html = settingRowHtml({ icon: "grid", label: "Categorías", id: "btn-categorias", trailHtml: trail });
+  assert.match(html, /^<button type="button" class="ent-set" id="btn-categorias">/);
+  assert.ok(html.indexOf(trail) > html.indexOf("ent-set-label") && html.indexOf(trail) < html.indexOf("ent-chev"), "entre la etiqueta y el chevron");
+  assert.equal(settingRowHtml({ label: "Categorías" }), settingRowHtml({ label: "Categorías", trailHtml: "" }), "sin trailHtml, igual que antes");
 });

@@ -34,9 +34,6 @@ export const ES = {
     // spec §1.4/§4, fila de liquidar.js#rowHtml.
     dateValue: "{date}",
     amountValue: "{amount}",
-    // myPartSuffix se queda en prosa (con su separador ya sin punto medio): lo siguen concatenando tal cual
-    // inicio.js y semana.js, que esta PR no toca (spec §9.1/§9.2).
-    myPartSuffix: ", tu parte {amount}",
     sharedWith: "Compartido con {name}",
     settlement: {
       theyOwe: "{name} te debe",
@@ -199,7 +196,6 @@ export const ES = {
       lastMovements: "Últimos movimientos",
       emptyTitle: "Aún no hay movimientos",
       emptyText: "El primer gasto se apunta con el botón de abajo.",
-      yesterday: "Ayer",
       weekdayShort: { 0: "dom", 1: "lun", 2: "mar", 3: "mié", 4: "jue", 5: "vie", 6: "sáb" },
       renewalTitle: "{name} se renueva el {date}",
       renewalAsk: "¿Lo sigues usando?",
@@ -315,6 +311,9 @@ export const ES = {
       title: "Filtros",
       clear: "Quitar filtros",
       category: "Categoría",
+      // Título de la sección de la hoja (B-Movimientos-Filtros): «Categorías» y, con una elegida,
+      // su cuenta al lado.
+      categories: "Categorías",
       tag: "Etiqueta",
       apply: { one: "Ver {n} movimiento", other: "Ver {n} movimientos" },
     },
@@ -374,7 +373,10 @@ export const ES = {
       fallbackName: "la contraparte",
       fallbackLabel: "Contraparte",
     },
-    row: { partnerPaid: ", pagó {name}, tu parte {amount}" },
+    // paidBy y sharedOf: la nota bajo la cifra de una fila compartida de Movimientos, Inicio y Semana
+    // (B-Movimientos, ui.js#sharedNoteHtml), donde la cifra es mi parte; {amount} es el ticket
+    // entero, sin símbolo y ya envuelto en mono.
+    row: { paidBy: "pagó {name}", sharedOf: "con {name}, de {amount}" },
     delete: {
       button: "Borrar",
       title: "¿Borrar este movimiento?",
@@ -525,7 +527,6 @@ export const ES = {
       empty: "Todavía no tienes ninguna cuenta.",
     },
     account: {
-      title: { edit: "Editar cuenta" },
       settings: "Ajustes de la cuenta",
       openingBalance: "Saldo inicial",
       note: {
@@ -555,7 +556,6 @@ export const ES = {
       savings_rate: "Tasa de ahorro",
     },
     goal: {
-      title: { edit: "Editar objetivo" },
       settings: "Ajustes del objetivo",
       monthsLabel: "Meses a cubrir",
       monthLess: "Un mes menos",
@@ -585,11 +585,13 @@ export const ES = {
     title: "Recurrentes",
     empty: "Todavía no hay ninguna regla recurrente.",
     hero: {
-      pending: "Pendiente este periodo",
+      pending: "Queda por pagar este periodo",
       perMonth: "al mes",
       pendingCount: { one: "{n} pendiente", other: "{n} pendientes" },
       allSettled: "Todo pagado",
       remaining: "Te quedarán {amount}",
+      // Con algo pendiente (B-Recurrentes).
+      remainingAfter: "Tras pagarlo te quedarán {amount}",
       paidLabel: "Pagado",
       meterAria: "Pendiente {pending} de {total} este periodo",
     },
@@ -601,7 +603,7 @@ export const ES = {
     },
     newRule: "Nueva regla recurrente",
     toggle: { aria: "Activar {name}" },
-    footNote: "El interruptor pausa la regla sin borrarla.",
+    footNote: "Apagar una regla la pausa sin borrarla: no se genera el próximo cargo hasta que la vuelvas a encender.",
     type: { transfer: "Transfer." },
     freq: {
       weekly: "Semanal",
@@ -676,7 +678,7 @@ export const ES = {
       needSectionTitle: "¿Necesario o prescindible?",
       parentSectionTitle: "Dentro de",
       rootLockedNote: "Una categoría con subcategorías no puede colgarse de otra.",
-      inheritNote: "Una subcategoría hereda el color y el icono de su categoría.",
+      inheritNote: "Las subcategorías heredan color e icono de la suya.",
       famLabel: "Familia de color",
       famUsedBy: "{fam}, la usa {name}",
       famShared: ", la misma que {name}. El icono las distingue.",
@@ -689,7 +691,7 @@ export const ES = {
   },
   etiquetas: {
     title: "Etiquetas de proyecto",
-    hint: "Cruzan categorías: un viaje, una reforma, un cumple.",
+    hint: "Cruzan las categorías: juntan un viaje, una reforma o un cumple caiga donde caiga cada gasto.",
     empty: "Todavía no hay etiquetas.",
     open: "Abiertas",
     archived: "Archivadas",
@@ -727,7 +729,7 @@ export const ES = {
       open: "No se pudo abrir el periodo: {error}",
     },
     header: {
-      closing: "Cierras {name} y abres el siguiente",
+      closing: "Cierras {name} y abres {next}",
       first: "Primer periodo",
       title: "Nuevo periodo",
     },
@@ -883,7 +885,6 @@ export const ES = {
       partnerNone: "Nadie",
       partnerField: "Nombre de la otra persona",
       informeSub: "{name}, abierto el {date}",
-      quickRegisterSub: "Solo importe y categoría",
       enc: "Copia cifrada",
       sheet: "Hoja de cálculo",
       sheetNote: "Importar sustituye los datos actuales y también abre una copia cifrada (.bce).",
@@ -1074,6 +1075,8 @@ export const ES = {
       activeCount: { one: "{n} activa", other: "{n} activas" },
       chartLabel: "Renovaciones de los próximos 30 días",
     },
+    // Nota al pie de la lista (B-Suscripciones).
+    footNote: "Salen de tus recurrentes marcados como suscripción y de los cargos que se repiten con el mismo importe.",
     notice: {
       title: "{name} se renueva el {when}",
       question: "¿Lo sigues usando?",
@@ -1087,11 +1090,13 @@ export const ES = {
       cancelled: "Canceladas",
     },
     row: {
-      renewsOn: "renueva el {date}",
-      renewsInDays: { one: "renueva el {date}, en {n} día", other: "renueva el {date}, en {n} días" },
-      renewsWeekly: "renueva cada semana",
+      // Línea 2 de una activa (B-Suscripciones): «Renueva en 2 días» / «Renueva el 2 oct».
+      renewsOn: "Renueva el {date}",
+      renewsInDays: { one: "Renueva en {n} día", other: "Renueva en {n} días" },
+      renewsToday: "Renueva hoy",
+      renewsWeekly: "Renueva cada semana",
       perYear: "/año",
-      noDate: "sin fecha de renovación",
+      noDate: "Sin fecha de renovación",
     },
     candidate: {
       sameAmountOn: "mismo importe el {dates}",
@@ -1270,6 +1275,8 @@ export const ES = {
     },
     compare: {
       title: "Frente a {name}",
+      // Nota bajo la comparativa con este periodo abierto (B-Informe).
+      note: "{prev} está cerrado; {cur} va por el día {day}.",
       up: "Sube",
       down: "Baja",
     },

@@ -267,7 +267,12 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
   // el nombre del periodo que se cierra (periodo.header.closing); en 'first' no hay periodo que
   // cerrar (periodo.header.first).
   function bloqueHeader() {
-    const subtitle = mode === "next" ? t("periodo.header.closing", { name: closingPeriod.name }) : t("periodo.header.first");
+    // "Cierras {name} y abres {next}" (B-PeriodoNuevo): {next} es el mismo nombre que ya calcula
+    // dateTitle() más abajo (el campo Nombre si se tocó, si no el de nombrePorDefecto()) — nunca un
+    // "el siguiente" genérico. Sin lógica nueva: reutiliza el valor que la pantalla ya conoce.
+    const subtitle = mode === "next"
+      ? t("periodo.header.closing", { name: closingPeriod.name, next: state.name.trim() || nombrePorDefecto() })
+      : t("periodo.header.first");
     return subHeaderHtml({
       id: mode === "next" || onBack ? "pn-back" : null,
       title: t("periodo.header.title"),
@@ -293,7 +298,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     return displayHtml({
       label: t("periodo.closing.saved", { name: closingPeriod.name }),
       value: fmtMoney(ahorrado),
-      size: "l",
+      size: 48, // B-PeriodoNuevo (medido en el mockup): 48px, no el "l" de 44 de las demás subpantallas.
       aside: rangeLabel,
       footHtml: t("periodo.closing.savedPct", { pct: dispInkHtml(tasa) }),
       slot: `<div class="pn-closing-grid">${filas.map(([label, value]) => `<div class="pn-closing-item">
@@ -432,7 +437,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
   function budgetRowHtml(r) {
     const sub = mode === "next" ? t("periodo.budget.lastMonth", { name: closingPeriod.name, amount: fmtMoney(r.spent_cents) }) : "";
     return settingRowHtml({
-      icon: iconForCategory(r.root_id, byId), fam: familyForCategory(r.root_id, byId),
+      icon: iconForCategory(r.root_id, byId), fam: familyForCategory(r.root_id, byId), tileFilled: true, tileSize: 32,
       label: r.name, sub, controlHtml: budgetFieldHtml(r), id: `pn-budget-row-${r.root_id}`,
     });
   }
@@ -453,9 +458,9 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
         ${visibleRows.map((r, i) => `${i > 0 ? '<hr class="pn-row-sep">' : ""}${budgetRowHtml(r)}`).join("")}
         ${hiddenRows.length ? `
         ${visibleRows.length ? '<hr class="pn-row-sep">' : ""}
-        ${settingRowHtml({ icon: "plus", label: t("periodo.budget.addAnother"), chevron: false, id: "pn-add-limite" })}
+        ${settingRowHtml({ icon: "plus", label: t("periodo.budget.addAnother"), chevron: false, id: "pn-add-limite", tileSize: 32 })}
         ${state.addOpen ? `<div class="pn-add-list">${hiddenRows.map((r) => settingRowHtml({
-          icon: iconForCategory(r.root_id, byId), fam: familyForCategory(r.root_id, byId), label: r.name,
+          icon: iconForCategory(r.root_id, byId), fam: familyForCategory(r.root_id, byId), tileFilled: true, tileSize: 32, label: r.name,
           chevron: false, id: `pn-add-cat-${r.root_id}`, data: { addRoot: r.root_id },
         })).join("")}</div>` : ""}` : ""}
       </div>

@@ -159,6 +159,18 @@ export function prevDayIso(iso) {
   return d.toLocaleDateString("sv-SE");
 }
 
+/** Título de periodo en la cabecera de Inicio y Movimientos (B-Home, B-Movimientos: «Septiembre»).
+ *  El nombre es texto libre; solo se quita un año FINAL que sea el del día de hoy («Septiembre 2026»
+ *  en 2026 → «Septiembre»). Con otro año, sin año o con el año en medio, el nombre va tal cual.
+ *  @param {string} name     Nombre del periodo.
+ *  @param {string} todayIso Hoy, YYYY-MM-DD (hoyISO()).
+ *  @returns {string} */
+export function periodTitle(name, todayIso) {
+  const s = String(name ?? "");
+  const m = s.match(/^(.*\S)\s+(\d{4})$/);
+  return m && m[2] === String(todayIso ?? "").slice(0, 4) ? m[1] : s;
+}
+
 // "agosto de 2026" (Intl es-ES) -> "Agosto 2026" — nombre por defecto del periodo (onboarding y asistente).
 export function nombrePorDefecto() {
   const raw = new Date().toLocaleDateString(locale, { month: "long", year: "numeric" });

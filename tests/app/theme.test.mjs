@@ -16,7 +16,7 @@ function fakeStorage({ stored = null, throws = false } = {}) {
 }
 
 // --bg por tema, como lo devolvería getComputedStyle (con el espacio inicial que deja el parser).
-function fakeDoc({ bg = { light: " #E3E1DC", dark: " #161719" }, meta = true } = {}) {
+function fakeDoc({ bg = { light: " #E3E1DC", dark: " #1D1E20" }, meta = true } = {}) {
   const attrs = {};
   const root = {
     setAttribute(k, v) { attrs[k] = String(v); },
@@ -99,7 +99,7 @@ test("applyTheme: oscuro pone data-theme=dark y theme-color con el --bg oscuro",
   const doc = fakeDoc();
   assert.equal(applyTheme(doc, "dark", fakeMql(false)), "dark");
   assert.equal(doc.attrs["data-theme"], "dark");
-  assert.equal(doc.metaEl.content, "#161719");
+  assert.equal(doc.metaEl.content, "#1D1E20");
 });
 
 test("applyTheme: claro quita data-theme y theme-color vuelve al --bg claro", () => {
@@ -123,7 +123,7 @@ test("applyTheme: escucha change SOLO con sistema, y cambia en caliente", () => 
   assert.equal(mql.listeners.length, 1);
   mql.fire(true);
   assert.equal(doc.attrs["data-theme"], "dark");
-  assert.equal(doc.metaEl.content, "#161719");
+  assert.equal(doc.metaEl.content, "#1D1E20");
   mql.fire(false);
   assert.equal(doc.attrs["data-theme"], undefined);
   assert.equal(doc.metaEl.content, "#E3E1DC");

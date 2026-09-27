@@ -3,12 +3,12 @@ import {
   weekRange, daysWithCategories, maxDayPositive, dayPositiveCents, weekTotals, categoryTotals, movementsOfDay,
   rangeLabelParts,
 } from "../semana-logic.js";
-import { familyForCategory, iconForCategory } from "../category-colors.js";
+import { familyForCategory, iconForCategory, famClass } from "../category-colors.js";
 import { fmtMoney, fmtMoneyParts, moneyPartsHtml, fmtDiaIni, hoyISO } from "../format.js";
 import { t, monthLong } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 import { openTxDetail } from "../open-tx.js";
-import { subHeaderHtml } from "../ui.js";
+import { subHeaderHtml, sharedNoteHtml } from "../ui.js";
 import { displayHtml, dispInkHtml, columnsHtml, meterHtml, containerHtml, emptyStateHtml } from "../instrument.js";
 import { txRowHtml } from "../entity.js";
 
@@ -32,7 +32,7 @@ function movRowHtml(r, byId, partnerName) {
     return txRowHtml({
       fam: null, icon: "pencil", title: t("common.type.adjustment"), line2: r.merchant || r.note || "",
       amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)), sign: r.amount_cents < 0 ? "expense" : "income",
-      data: { tx: r.id },
+      data: { tx: r.id }, amountWeight: 500,
     });
   }
   const cat = r.category_id ? byId[r.category_id] : null;
@@ -42,17 +42,15 @@ function movRowHtml(r, byId, partnerName) {
   // C9: los ingresos y «sin categoría» van sin familia (--well, icono en tinta). Una devolución
   // lleva la familia de su categoría de gasto, como en Movimientos e Inicio.
   const fam = (isExpense || r.type === "refund") && cat ? familyForCategory(r.category_id, byId) : null;
-  const shareNote = !r.is_shared ? ""
-    : r.paid_by === "partner"
-      ? t("movimientos.row.partnerPaid", { name: partnerName || t("movimientos.shared.fallbackName"), amount: fmtMoney(r.my_amount_cents) })
-      : t("common.myPartSuffix", { amount: fmtMoney(r.my_amount_cents) });
   return txRowHtml({
     fam, icon: cat ? iconForCategory(r.category_id, byId) : (isExpense ? "otr" : ""),
     title: r.merchant || cat?.name || t("semana.uncategorized"), line2: path,
-    amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)), sign: isExpense ? "expense" : "income",
-    // La nota va debajo de la cifra: sin el separador de prosa con el que se concatenaba al nombre.
-    amountNote: shareNote.replace(/^,\s*/, ""),
+    // Compartido: MI parte, con la nota de Movimientos debajo («con Marta, de 24,00» / «pagó Marta»).
+    amountHtml: moneyPartsHtml(Math.abs(r.is_shared ? r.my_amount_cents : r.amount_cents)), sign: isExpense ? "expense" : "income",
+    amountNoteHtml: sharedNoteHtml(r, partnerName),
     data: { tx: r.id },
+    // B-Semana: cifra 500 (F-34 retirada, Álvaro 2026-09-27); el alto de 56 lo pone screens.css.
+    amountWeight: 500,
   });
 }
 
@@ -165,12 +163,14 @@ export async function renderSemana(container, onBack, { openDay } = {}) {
   }
 
   /** «Dónde se ha ido»: neto por raíz de la semana como medidores con nombre, relativos a la que
-   *  más se llevó. Es la leyenda de las columnas apiladas: mismo color de familia y su nombre. */
+   *  más se llevó. Es la leyenda de las columnas apiladas: mismo color de familia y su nombre. La
+   *  fila lleva la clase de su familia para que la pista del medidor vaya en su tinte (B-Semana;
+   *  F-45 retirada, Álvaro 2026-09-27). */
   function whereHtml() {
     if (!chips.length) return "";
     const top = chips[0].cents;
     const body = `<div class="sem-where">${chips.map((c) => `
-      <div class="sem-where-row">
+      <div class="sem-where-row${famClass(rootFam(c.rootId)) ? ` ${famClass(rootFam(c.rootId))}` : ""}">
         <div class="sem-where-head">
           <span class="sem-where-name">${escHtml(rootName(c.rootId))}</span>
           <span class="num sem-where-amt">${escHtml(fmtMoney(c.cents))}</span>

@@ -77,8 +77,14 @@ export function rC13(rel, text) {
 // Única desviación registrada fuera de primario y seleccionado: el logo del onboarding (D-impl-5,
 // DESIGN §Desviaciones «Logo de onboarding en tokens»): es marca, no sistema, y su fondo es el
 // naranja. Se retira cuando se decida P7 (marca/).
+// Interruptor encendido y casilla marcada en naranja (B-Movimientos-Filtros, B-Liquidar; F-04/F-05
+// RETIRADAS, Álvaro 2026-09-27: igual que el mockup): solo con la variante .is-accent de controls.js
+// (`accent:true`) y en su estado marcado. Un radio del Segmented ([aria-checked] a secas) sigue fuera.
+// Anillo de 2 del bloque desplegado de B-GastoCategoria (F-18 RETIRADA, Álvaro 2026-09-27): solo
+// el selector exacto `.gc-block`, que existe únicamente con la raíz desplegada.
 const C1_BLANCA = [/\.btn-primary\b/, /\.tab-add\b/, /\.tab\[aria-current/, /\[aria-selected="?true"?\]/,
-  /\[aria-pressed="?true"?\]/, /:checked\b/, /::selection\b/, /^\.onb-logo-bg$/];
+  /\[aria-pressed="?true"?\]/, /:checked\b/, /::selection\b/, /^\.onb-logo-bg$/,
+  /(switch|checkbox|casilla)[\w-]*\.is-accent\[aria-checked="?true"?\]/, /^\.gc-block$/];
 // §5 C1: el :checked que pinta naranja es de chip, día o baldosa.
 const C1_CHECKED = /chip|day|dia|tile|baldosa/i;
 export function rC1(rel, text) {
@@ -103,10 +109,12 @@ export function rC1(rel, text) {
   return errs;
 }
 
-// R-C2 · DESIGN §5 C2: ámbar solo en la cifra principal del Display, su línea y el «hoy». Más el
+// R-C2 · DESIGN §5 C2: ámbar solo dentro del Display: la cifra principal, su línea, el «hoy» y el
 // LED en espera (DESIGN §9 LED: «espera» solo en el Display; inventario-B LED/I-19 y el token
-// --led-glow-wait: su punto es ámbar). Es un punto de 8 dentro del Display, no una cifra.
-const C2_BLANCA = /\.disp-value\b|\.disp-chart-line\b|\.disp-today\b|\.led-wait\b/;
+// --led-glow-wait: su punto es ámbar). Más `.disp-amber` (instrument.js#dispInkHtml con
+// tone:"amber"): cifras secundarias, barras y rótulos del Display que el original pinta en ámbar
+// (F-13 RETIRADA, Álvaro 2026-09-27: igual que el mockup). Fuera del Display no se usa.
+const C2_BLANCA = /\.disp-value\b|\.disp-chart-line\b|\.disp-today\b|\.led-wait\b|\.disp-amber\b/;
 export function rC2(rel, text) {
   if (rel.endsWith(".js")) return text.includes("--disp-text") ? [`${rel}: --disp-text en JS`] : [];
   const errs = [];
@@ -117,18 +125,30 @@ export function rC2(rel, text) {
   return errs;
 }
 
-// R-C7 · DESIGN §5 C7: las cifras van en tinta, nunca en color de familia.
+// R-C7 · DESIGN §5 C7: las cifras van en tinta salvo que se pidan en familia a propósito. La
+// excepción es el modificador `.is-fam-ink` (color --fx), que usan las variantes de los componentes
+// donde el original pinta la cifra con su familia (deuda, «Ahorras 47 %», «39,00 €»…; C7 RETIRADA
+// ahí, Álvaro 2026-09-27: igual que el mockup). Una cifra que lea la familia sin él sigue fallando.
 const C7_FAM = /var\(--(f-[a-z]+-[xbt]|fx|fb|ft)\)/;
 export function rC7(rel, text) {
   if (!rel.endsWith(".css")) return [];
-  return reglasCss(text).flatMap(({ sel, decls }) =>
-    /num|amount|value/i.test(sel) && decls.some((d) => C7_FAM.test(d.value))
-      ? [`${rel}: «${sel}» pinta una cifra con color de familia`] : []);
+  return reglasCss(text).flatMap(({ sel, decls }) => {
+    if (!decls.some((d) => C7_FAM.test(d.value))) return [];
+    return selectores(sel).filter((s) => /num|amount|value/i.test(s) && !/\.is-fam-ink\b/.test(s))
+      .map((s) => `${rel}: «${s}» pinta una cifra con color de familia`);
+  });
 }
 
-// R-FS · DESIGN §7: escala de cuerpo --fs-*, Display --disp-xl/l/m y el 16 (--fs-input) solo en inputs.
-const TAM = /var\(--(fs-(12|13|14|15|17|20|24)|disp-(xl|l|m))\)/;
+// R-FS · DESIGN §7: escala de cuerpo --fs-* (con el 30 de la cifra de bloque), Display --disp-xl/l/m
+// y el 16 (--fs-input) solo en inputs. La cifra del Display puede llevar además su tamaño libre
+// --disp-fs (el de su mockup, que la pantalla pone en línea), solo en selectores .disp-value (escala
+// de tres RETIRADA, Álvaro 2026-09-27: igual que el mockup).
+// --fs-16 (cifra de cuenta del onboarding) y --fs-40 (marca de la Bienvenida): tamaños de los
+// mockups elegidos (Álvaro 2026-09-27: igual que el mockup). «El 16 solo en inputs» sigue valiendo para
+// --fs-input; el 16 de una cifra va por --fs-16.
+const TAM = /var\(--(fs-(12|13|14|15|16|17|20|24|30|40)|disp-(xl|l|m))\)/;
 const TAM_INPUT = /var\(--fs-input\)/;
+const TAM_DISP_LIBRE = /var\(--disp-fs\)/;
 const LITERAL = /(^|[\s/])\d*\.?\d+(px|rem|em|pt|%|vw|vh)\b/;
 export function rFS(rel, text) {
   if (!rel.endsWith(".css")) return [];
@@ -142,8 +162,13 @@ export function rFS(rel, text) {
         errs.push(`${rel}: «${sel}» usa --fs-input fuera de input/select/textarea`);
         continue;
       }
+      const libre = TAM_DISP_LIBRE.test(value);
+      if (libre && !selectores(sel).every((s) => /\.disp-value/.test(s))) {
+        errs.push(`${rel}: «${sel}» usa --disp-fs fuera de la cifra del Display`);
+        continue;
+      }
       const soloVar = value.replace(/var\([^)]*\)/g, "");
-      if ((!TAM.test(value) && !input) || LITERAL.test(soloVar)) errs.push(`${rel}: «${sel}» ${prop}: ${value}`);
+      if ((!TAM.test(value) && !input && !libre) || LITERAL.test(soloVar)) errs.push(`${rel}: «${sel}» ${prop}: ${value}`);
     }
   }
   return errs;
@@ -151,7 +176,9 @@ export function rFS(rel, text) {
 
 // R-RAD · DESIGN §8: radios solo de --radius*. Constantes de componente con nombre del inventario
 // (§9): la casilla, radio 7, y la muestra de 10 del chip de filtro, radio 3.
-const RAD_TOKEN = /^var\(--radius(-xs|-lg|-xl|-pill)?\)$/;
+// --radius-bar (5) y --radius-tile (8): los radios de los mockups elegidos (Álvaro 2026-09-27: igual
+// que el mockup).
+const RAD_TOKEN = /^var\(--radius(-xs|-bar|-tile|-lg|-xl|-pill)?\)$/;
 const RAD_NOMBRADO = [{ v: "7px", sel: /casilla|checkbox|check-box/ }, { v: "3px", sel: /muestra|swatch/ }];
 export function rRAD(rel, text) {
   if (!rel.endsWith(".css")) return [];
@@ -265,8 +292,8 @@ test("hay ficheros migrados que escanear, y los de las otras PRs de fundación e
 });
 test("R-C13: ningún hex ni rgb( fuera de tokens.css", () => assert.deepEqual(incumple("rC13"), []));
 test("R-C1: naranja solo en primario y seleccionado; nada de var(--accent en JS", () => assert.deepEqual(incumple("rC1"), []));
-test("R-C2: --disp-text solo en .disp-value, .disp-chart-line y .disp-today", () => assert.deepEqual(incumple("rC2"), []));
-test("R-C7: ninguna cifra (num|amount|value) en -x/-b/-t de familia", () => assert.deepEqual(incumple("rC7"), []));
+test("R-C2: --disp-text solo en .disp-value, .disp-chart-line, .disp-today, .led-wait y .disp-amber", () => assert.deepEqual(incumple("rC2"), []));
+test("R-C7: ninguna cifra (num|amount|value) en -x/-b/-t de familia salvo con .is-fam-ink", () => assert.deepEqual(incumple("rC7"), []));
 test("R-FS: font-size/font solo de la escala; --fs-input solo en inputs", () => assert.deepEqual(incumple("rFS"), []));
 test("R-RAD: border-radius solo de --radius* (casilla 7, muestra 3)", () => assert.deepEqual(incumple("rRAD"), []));
 test("R-FOCUS: ningún outline:none sin :focus-visible con var(--focus)", () => assert.deepEqual(incumple("rFOCUS"), []));
@@ -327,7 +354,11 @@ test("detectores: cazan lo que prohíben y dejan pasar lo permitido", () => {
   assert.equal(rC1("x.css", ".tab[aria-current=\"page\"]{color:var(--accent-text)}").length, 0);
   assert.equal(rC1("x.css", ".chip[aria-pressed=\"true\"]{background:var(--accent)}").length, 0);
   assert.equal(rC1("x.css", ".tile:checked{box-shadow:var(--ring-sel)}").length, 0);
-  assert.equal(rC1("x.css", ".switch:checked{background:var(--accent)}").length, 1, "el interruptor va en tinta (F-04)");
+  assert.equal(rC1("x.css", ".switch:checked{background:var(--accent)}").length, 1, "sin la variante .is-accent, el interruptor va en tinta");
+  assert.equal(rC1("x.css", ".ctl-switch.is-accent[aria-checked=\"true\"]{background:var(--accent)}").length, 0, "variante naranja (B-Movimientos-Filtros)");
+  assert.equal(rC1("x.css", ".ctl-checkbox.is-accent[aria-checked=\"true\"] .ctl-checkbox-box{background:var(--accent)}").length, 0, "casilla naranja (B-Liquidar)");
+  assert.equal(rC1("x.css", ".ctl-switch.is-accent{background:var(--accent)}").length, 1, "apagado, nunca naranja");
+  assert.equal(rC1("x.css", ".ctl-segmented [role=\"radio\"][aria-checked=\"true\"]{background:var(--accent)}").length, 1, "el Segmented sigue sin naranja");
   assert.equal(rC1("x.css", ".link{color:var(--accent)}").length, 1);
   assert.equal(rC1("x.css", "@media (x){.btn-primary,.h2{color:var(--accent)}}").length, 1);
   assert.equal(rC1("x.css", "button:focus-visible{outline:var(--focus)}").length, 0);
@@ -335,28 +366,46 @@ test("detectores: cazan lo que prohíben y dejan pasar lo permitido", () => {
   assert.equal(rC1("x.css", ".onb-logo-x{fill:var(--accent)}").length, 1, "solo el fondo del logo, nada más");
   assert.equal(rC1("x.css", ".onb-title{color:var(--accent)}").length, 1, "el resto del onboarding, no");
   assert.equal(rC1("x.css", ".a:hover{outline:var(--focus)}").length, 1);
+  assert.equal(rC1("x.css", ".gc-block{box-shadow:inset 0 0 0 2px var(--accent)}").length, 0, "bloque desplegado (B-GastoCategoria)");
+  assert.equal(rC1("x.css", ".gc-block .gc-name{color:var(--accent)}").length, 1, "solo el anillo del bloque, nada dentro");
+  assert.equal(rC1("x.css", ".gc-head{box-shadow:inset 0 0 0 2px var(--accent)}").length, 1, "la fila plegada, no");
 
   assert.equal(rC2("x.css", ".disp-value{color:var(--disp-text)}").length, 0);
   assert.equal(rC2("x.css", ".disp-foot{color:var(--disp-text)}").length, 1);
   assert.equal(rC2("x.css", ".led-wait .led-dot{background:var(--disp-text)}").length, 0);
   assert.equal(rC2("x.css", ".led-ok .led-dot{background:var(--disp-text)}").length, 1);
+  assert.equal(rC2("x.css", ".disp-ink.disp-amber{color:var(--disp-text)}").length, 0, "secundaria en ámbar (B-Home «558,29 €»)");
+  assert.equal(rC2("x.css", ".disp-ink{color:var(--disp-text)}").length, 1, "sin .disp-amber, la secundaria va en --disp-ink");
 
   assert.equal(rC7("x.css", ".row-amount{color:var(--fx)}").length, 1);
   assert.equal(rC7("x.css", ".row-sub{color:var(--fx)}").length, 0);
   assert.equal(rC7("x.css", ".num{color:var(--f-casa-x)}").length, 1);
+  assert.equal(rC7("x.css", ".bento-figure.is-fam-ink{color:var(--fx)}").length, 0, "cifra en familia a propósito");
+  assert.equal(rC7("x.css", ".is-fam-ink.num{color:var(--fx)}").length, 0);
+  assert.equal(rC7("x.css", ".bento-figure.is-fam-ink,.row-amount{color:var(--fx)}").length, 1, "cada selector de la lista cuenta");
 
   assert.equal(rFS("x.css", ".a{font-size:var(--fs-15)}").length, 0);
   assert.equal(rFS("x.css", ".a{font:700 var(--fs-17)/1.2 var(--font-body)}").length, 0);
   assert.equal(rFS("x.css", ".a{font-size:18px}").length, 1);
+  assert.equal(rFS("x.css", ".a{font-size:var(--fs-16)}").length, 0, "cifra de cuenta del onboarding");
+  assert.equal(rFS("x.css", ".a{font-size:var(--fs-40)}").length, 0, "marca de la Bienvenida");
+  assert.equal(rFS("x.css", ".a{font-size:var(--fs-18)}").length, 1, "un tamaño fuera de la escala");
   assert.equal(rFS("x.css", ".a{font:600 15px var(--font-body)}").length, 1);
   assert.equal(rFS("x.css", ".a{font-size:var(--fs-input)}").length, 1);
   assert.equal(rFS("x.css", ".campo input{font-size:var(--fs-input)}").length, 0);
   assert.equal(rFS("x.css", ".d{font-size:var(--disp-xl)}").length, 0);
+  assert.equal(rFS("x.css", ".bento-figure{font-size:var(--fs-30)}").length, 0);
+  assert.equal(rFS("x.css", ".disp-value-free{font-size:var(--disp-fs)}").length, 0, "tamaño libre del Display");
+  assert.equal(rFS("x.css", ".bento-figure{font-size:var(--disp-fs)}").length, 1, "--disp-fs solo en la cifra del Display");
   assert.equal(rFS("x.css", "button{font:inherit}").length, 0);
 
   assert.equal(rRAD("x.css", ".a{border-radius:var(--radius-lg)}").length, 0);
   assert.equal(rRAD("x.css", ".a{border-radius:var(--radius-xl) var(--radius-xl) 0 0}").length, 0);
   assert.equal(rRAD("x.css", ".a{border-radius:8px}").length, 1);
+  assert.equal(rRAD("x.css", ".a{border-radius:var(--radius-tile)}").length, 0, "8 del mockup, por token");
+  assert.equal(rRAD("x.css", ".a{border-radius:var(--radius-bar) var(--radius-bar) 0 0}").length, 0, "5 del mockup, por token");
+  assert.equal(rRAD("x.css", ".a{border-radius:5px}").length, 1, "el 5 literal sigue prohibido");
+  assert.equal(rRAD("x.css", ".a{border-radius:var(--radius-md)}").length, 1, "un token que no existe");
   assert.equal(rRAD("x.css", ".casilla{border-radius:7px}").length, 0);
   assert.equal(rRAD("x.css", ".chip{border-radius:7px}").length, 1);
   assert.equal(rRAD("x.css", ".muestra{border-top-left-radius:3px}").length, 0);

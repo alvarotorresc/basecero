@@ -21,19 +21,20 @@ import { tileHtml, txRowHtml, sectionHeaderHtml } from "../entity.js";
 import { displayHtml, dispInkHtml, containerHtml, emptyStateHtml } from "../instrument.js";
 import { escHtml } from "../esc.js";
 
-/** «renueva el X, en N días» (si faltan ≤7), «renueva cada semana» para las semanales (D5: sin
- *  ancla semanal, nunca aviso), o «sin fecha» para datos incompletos. Sin dueIso ni warn: el
- *  sistema B no colorea esta línea fuera del Display (C2) — el texto ya dice si es pronto. */
+/** «Renueva en N días» (si faltan ≤7; «Renueva hoy» si es hoy), «Renueva el 2 oct» si falta más
+ *  (B-Suscripciones), «Renueva cada semana» para las semanales (D5: sin ancla semanal, nunca
+ *  aviso), o «Sin fecha» para datos incompletos. La línea va en el -x de la familia de la fila. */
 function renewsInfo(rule, todayIso) {
   if (rule.frequency === "weekly") return t("suscripciones.row.renewsWeekly");
   const dueIso = nextRenewal(rule, todayIso);
   if (!dueIso) return t("suscripciones.row.noDate");
   const days = daysUntil(dueIso, todayIso);
+  if (days <= 0) return t("suscripciones.row.renewsToday");
   if (days <= RENEWAL_SOON_DAYS) {
     // n (no "days"): dispara el plural {one, other} de t() — "en 1 día" en vez de "en 1 días".
-    return t("suscripciones.row.renewsInDays", { date: fmtDiaLargo(dueIso), n: days });
+    return t("suscripciones.row.renewsInDays", { n: days });
   }
-  return t("suscripciones.row.renewsOn", { date: fmtDiaLargo(dueIso) });
+  return t("suscripciones.row.renewsOn", { date: fmtDiaCorto(dueIso) });
 }
 
 /** Un <div class="ent-divider"> entre cada elemento (nunca antes del primero), para las listas de
@@ -54,39 +55,54 @@ function sortActive(rules, todayIso) {
   });
 }
 
-// ---- marcas de renovación (Display, F-13) -----------------------------------------------------
+// ---- marcas de renovación (Display, B-Suscripciones) --------------------------------------------
 
 const TIMELINE_DAYS = 30;
-const TIMELINE_W = 318, TIMELINE_H = 28, TIMELINE_PAD = 6;
+const TIMELINE_W = 318, TIMELINE_H = 42, TIMELINE_Y = 14, TIMELINE_LABEL_Y = 38;
+// Ancho aproximado de un rótulo «15 sep» (mono 12): para no montar dos y para no salirse del borde.
+const LABEL_W = 46;
 
-/** Sparkline de «marcas de renovación» dentro del Display (B-Suscripciones): un punto por
- *  suscripción activa que renueva dentro de los próximos 30 días, proporcional a esos días. La más
- *  próxima se pinta grande con `.disp-today` (la clase ya existente del Display, C2: ámbar SOLO
- *  ahí); el resto, pequeñas y apagadas — nunca en el color que manda el Display, ninguna otra es
- *  «la que importa». Decorativa (aria-hidden): el detalle por nombre ya vive en cada fila de
- *  Activas de abajo, así que no se repite en un aria-label (mismo criterio que charts.js#sparklineSvg,
- *  cuyo <svg> interno también es aria-hidden). "" sin ninguna renovación en ventana. */
+/** Línea de renovaciones de los próximos 30 días dentro del Display (B-Suscripciones): la pista
+ *  con una marca por semana, un punto por suscripción activa que renueva en la ventana y, debajo
+ *  de cada punto, su fecha corta («2 oct»). La más próxima va grande con `.disp-today` y su fecha
+ *  en ámbar (`.disp-amber`, dentro del Display); el resto, en --disp-dim. Si dos fechas se
+ *  pisarían, la segunda no se rotula (el punto sí se pinta). Decorativa (aria-hidden): el detalle
+ *  por nombre ya vive en cada fila de Activas (mismo criterio que charts.js#sparklineSvg).
+ *  "" sin ninguna renovación en ventana. */
 function renewalTimelineHtml(actives, todayIso) {
-  const days = actives
+  const marks = actives
     .map((r) => {
       if (r.frequency === "weekly") return null;
       const dueIso = nextRenewal(r, todayIso);
       if (!dueIso) return null;
       const d = daysUntil(dueIso, todayIso);
-      return d >= 0 && d <= TIMELINE_DAYS ? d : null;
+      return d >= 0 && d <= TIMELINE_DAYS ? { d, dueIso } : null;
     })
-    .filter((d) => d !== null)
-    .sort((a, b) => a - b);
-  if (!days.length) return "";
-  const y = TIMELINE_H / 2;
-  const trackW = TIMELINE_W - TIMELINE_PAD * 2;
-  const x = (d) => Number((TIMELINE_PAD + (d / TIMELINE_DAYS) * trackW).toFixed(2));
-  const base = `<path class="disp-chart-base" d="M0,${y} L${TIMELINE_W},${y}" stroke-width="1"></path>`;
-  const marks = days.map((d, i) => (i === 0
-    ? `<circle class="disp-today" cx="${x(d)}" cy="${y}" r="6" stroke-width="3"></circle>`
-    : `<circle class="susc-mark" cx="${x(d)}" cy="${y}" r="4"></circle>`)).join("");
-  return `<div class="disp-chart"><svg class="disp-chart-svg" width="${TIMELINE_W}" height="${TIMELINE_H}" `
-    + `viewBox="0 0 ${TIMELINE_W} ${TIMELINE_H}" aria-hidden="true">${base}${marks}</svg></div>`;
+    .filter(Boolean)
+    .sort((a, b) => a.d - b.d);
+  if (!marks.length) return "";
+  const y = TIMELINE_Y;
+  const x = (d) => Number((Math.min(TIMELINE_W - 1, Math.max(1, (d / TIMELINE_DAYS) * TIMELINE_W))).toFixed(1));
+  const base = `<path class="disp-chart-base" d="M0,${y} L${TIMELINE_W},${y}" stroke-width="2" stroke-linecap="round"></path>`;
+  // Una marca por semana; la de hoy, algo más alta.
+  const ticks = [0, 7, 14, 21, 28].map((d) => (d === 0 ? `M${x(d)},${y - 5} L${x(d)},${y + 5}` : `M${x(d)},${y - 4} L${x(d)},${y + 4}`)).join(" ");
+  const tickPath = `<path class="disp-chart-base" d="${ticks}" stroke-width="1.5" stroke-linecap="round"></path>`;
+  // El punto grande (la próxima) se pinta el último, encima de los demás.
+  const dots = [...marks.slice(1).map((m) => `<circle class="susc-mark" cx="${x(m.d)}" cy="${y}" r="5" stroke-width="3"></circle>`),
+    `<circle class="disp-today" cx="${x(marks[0].d)}" cy="${y}" r="6" stroke-width="3"></circle>`].join("");
+  let lastRight = -Infinity;
+  const labels = marks.map((m, i) => {
+    const cx = x(m.d);
+    let left = cx - LABEL_W / 2;
+    let anchor = "middle", tx = cx;
+    // Cerca de un borde, el rótulo se alinea hacia dentro sin separarse más de 13 del punto.
+    if (left < 0) { anchor = "start"; tx = Math.max(0, cx - 13); left = tx; } else if (cx + LABEL_W / 2 > TIMELINE_W) { anchor = "end"; tx = Math.min(TIMELINE_W, cx + 13); left = tx - LABEL_W; }
+    if (left < lastRight + 4) return "";
+    lastRight = left + LABEL_W;
+    return `<text class="susc-tl-label${i === 0 ? " disp-amber" : ""}" x="${tx}" y="${TIMELINE_LABEL_Y}" text-anchor="${anchor}">${escHtml(fmtDiaCorto(m.dueIso))}</text>`;
+  }).join("");
+  return `<div class="disp-chart susc-timeline"><svg class="disp-chart-svg" width="${TIMELINE_W}" height="${TIMELINE_H}" `
+    + `viewBox="0 0 ${TIMELINE_W} ${TIMELINE_H}" aria-hidden="true">${base}${tickPath}${dots}${labels}</svg></div>`;
 }
 
 function heroHtml(rules, actives, todayIso) {
@@ -97,14 +113,15 @@ function heroHtml(rules, actives, todayIso) {
     value: fmtMoney(annual),
     size: "l",
     led: { state: actives.length > 0 ? "ok" : "idle", text: t("suscripciones.hero.activeCount", { n: actives.length }) },
-    footHtml: `${dispInkHtml(fmtMoney(monthly))} ${escHtml(t("suscripciones.hero.perMonth"))}`,
+    footHtml: `${dispInkHtml(fmtMoney(monthly), { tone: "amber" })} ${escHtml(t("suscripciones.hero.perMonth"))}`,
     slot: renewalTimelineHtml(actives, todayIso),
   });
 }
 
 /** Tarjeta de aviso (F-1x): la única suscripción de la que toca preguntar esta semana, tintada con
- *  la familia de su categoría (C6: una sola entidad, tinte permitido). «Lo sigo usando» /
- *  «Voy a cancelarlo» son un secundario S cada uno — sin naranja (C1): nada se preselecciona. */
+ *  la familia de su categoría (C6: una sola entidad, tinte permitido), con la fecha corta y la
+ *  cifra en el -x de la familia, como B-Suscripciones. «Lo sigo usando» / «Voy a cancelarlo» son
+ *  un secundario de 44 cada uno — sin naranja (C1): nada se preselecciona. */
 function noticeHtml(notice, rules, byId) {
   if (!notice) return "";
   const rule = rules.find((r) => r.id === notice.ruleId);
@@ -115,8 +132,8 @@ function noticeHtml(notice, rules, byId) {
     <div class="susc-notice-head">
       ${tileHtml({ fam, icon: iconKey, onTint: true })}
       <div class="ent-body">
-        <span class="ent-name">${t("suscripciones.notice.title", { name: escHtml(notice.name), when: escHtml(fmtDiaLargo(notice.dueIso)) })}</span>
-        <span class="ent-line2 susc-notice-sub"><span class="num susc-notice-amount">${escHtml(fmtMoney(notice.amountCents))}</span> ${escHtml(t("suscripciones.notice.question"))}</span>
+        <span class="ent-name">${t("suscripciones.notice.title", { name: escHtml(notice.name), when: escHtml(fmtDiaCorto(notice.dueIso)) })}</span>
+        <span class="ent-line2 susc-notice-sub"><span class="num susc-notice-amount is-fam-ink">${escHtml(fmtMoney(notice.amountCents))}</span> ${escHtml(t("suscripciones.notice.question"))}</span>
       </div>
     </div>
     <div class="susc-notice-actions">
@@ -222,11 +239,11 @@ export async function renderSuscripciones(container, onBack) {
       ` : `
       ${actives.length ? `
       <div class="susc-section">
-        <div class="susc-section-head">
+        <div class="susc-section-head ${famClass("sus")}">
           <h2 class="ttl susc-section-title">${escHtml(t("suscripciones.section.active"))}</h2>
           <span class="susc-section-hint">${escHtml(t("suscripciones.section.activeHint"))}</span>
         </div>
-        ${containerHtml({ kind: "list", body: withDividers(actives.map((r) => activeRowHtml(r, byId, today))) })}
+        <div class="susc-list">${containerHtml({ kind: "list", body: withDividers(actives.map((r) => activeRowHtml(r, byId, today))) })}</div>
       </div>
       ` : ""}
 
@@ -240,9 +257,11 @@ export async function renderSuscripciones(container, onBack) {
       ${inactives.length ? `
       <div class="susc-section">
         ${sectionHeaderHtml({ title: t("suscripciones.section.cancelled") })}
-        ${containerHtml({ kind: "list", body: withDividers(inactives.map((r) => cancelledRowHtml(r, today))) })}
+        <div class="susc-list">${containerHtml({ kind: "list", body: withDividers(inactives.map((r) => cancelledRowHtml(r, today))) })}</div>
       </div>
       ` : ""}
+
+      <p class="susc-foot-note">${escHtml(t("suscripciones.footNote"))}</p>
       `}
     </div>
   `;

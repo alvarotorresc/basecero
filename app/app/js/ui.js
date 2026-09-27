@@ -3,6 +3,7 @@
 import { icon } from "./icons.js";
 import { t } from "./i18n/index.js";
 import { escHtml, escAttr } from "./esc.js";
+import { fmtMoneyParts } from "./format.js";
 
 /** Cabecera de raíz (DESIGN.md §9, B-Home): `h1` de 24 en Unbounded y subtítulo opcional 13/500
  *  dim debajo. La llevan los 4 destinos de la barra de pestañas; es el único `h1` de la pantalla.
@@ -43,19 +44,25 @@ export function rootHeaderHtml({ title, subtitle = "", subtitleAction = null }) 
  *  @param {string|null} [o.id]           id del botón «atrás». null → sin botón «atrás».
  *  @param {string}      [o.subtitle]     Segunda línea. Se escapa aquí.
  *  @param {object|null} [o.action]       { id, icon, label } del botón derecho. null → nada.
+ *  @param {boolean}     [o.center]       Título de 15 CENTRADO entre el atrás y la acción (o un hueco
+ *                                        de 44 si no hay acción), como B-Movimiento-Detalle y
+ *                                        B-Borrar («Gasto»). Por defecto false (20 a la izquierda).
+ *                                        F-15 retirada ahí (Álvaro 2026-09-27: igual que el mockup).
+ *  @param {string}      [o.leadHtml]     HTML de confianza entre el atrás y el título: la baldosa de
+ *                                        32 de la familia de B-Cuenta (entity.js#tileHtml size:32).
  *  @returns {string} HTML
  *
  *  El «atrás» se llama siempre t("common.back") («Atrás», §11). NO cablea nada: devuelve HTML con
  *  los ids que le pasas y la pantalla los conecta en su wire(). Es lo que permite que sea puro. */
-export function subHeaderHtml({ title, id = "screen-back", subtitle = "", action = null }) {
+export function subHeaderHtml({ title, id = "screen-back", subtitle = "", action = null, center = false, leadHtml = "" }) {
   const back = id === null
     ? ""
     : `<button type="button" class="icon-btn" id="${escAttr(id)}" aria-label="${escAttr(t("common.back"))}">${icon("back")}</button>`;
   const right = action
     ? `<button type="button" class="icon-btn" id="${escAttr(action.id)}" aria-label="${escAttr(action.label)}">${icon(action.icon)}</button>`
-    : "";
-  return `<header class="sub-header">
-    ${back}
+    : center ? `<span class="sub-header-spacer" aria-hidden="true"></span>` : "";
+  return `<header class="sub-header${center ? " is-center" : ""}">
+    ${back}${leadHtml ? `<span class="sub-header-lead" aria-hidden="true">${leadHtml}</span>` : ""}
     <div class="sub-header-body">
       <h1 class="sub-header-title">${escHtml(title)}</h1>
       ${subtitle ? `<span class="sub-header-sub">${escHtml(subtitle)}</span>` : ""}
@@ -142,4 +149,19 @@ export function radioKeyIndex(key, index, count) {
     case "End": return count - 1;
     default: return -1;
   }
+}
+
+/** Nota bajo la cifra de una fila de gasto COMPARTIDO (B-Movimientos; la misma en Inicio y Semana
+ *  para que las tres listas coincidan con el mockup). La fila pinta MI parte (my_amount_cents) y
+ *  debajo «con Marta, de 24,00» (el ticket entero, en mono y sin símbolo) o, si pagó la contraparte,
+ *  «pagó Marta». Sin compartir, cadena vacía.
+ *  @param {{is_shared?:number|boolean, paid_by?:string, amount_cents:number}} r  Fila de movimiento.
+ *  @param {string} [partnerName]  Nombre de la contraparte. Vacío → movimientos.shared.fallbackName.
+ *  @returns {string} HTML (el nombre va escapado) para txRowHtml `amountNoteHtml`. */
+export function sharedNoteHtml(r, partnerName = "") {
+  if (!r?.is_shared) return "";
+  const who = escHtml(partnerName || t("movimientos.shared.fallbackName"));
+  if (r.paid_by === "partner") return t("movimientos.row.paidBy", { name: who });
+  const { main, cents } = fmtMoneyParts(Math.abs(r.amount_cents));
+  return t("movimientos.row.sharedOf", { name: who, amount: `<span class="num">${escHtml(`${main}${cents}`.trim())}</span>` });
 }

@@ -131,7 +131,7 @@ export async function renderOnboarding(container, { onDone }) {
       <span class="onb-tagline">${escHtml(t("onboarding.welcome.tagline"))}</span>
     </header>
     ${displayHtml({
-      label: t("onboarding.welcome.displayLabel"), value: fmtMoney(0), size: "xl",
+      label: t("onboarding.welcome.displayLabel"), value: fmtMoney(0), size: 56,
       led: { state: "ok", text: t("onboarding.welcome.ready") }, slot: RULER_SVG,
     })}
     <ul class="onb-card onb-promises">
@@ -222,15 +222,15 @@ export async function renderOnboarding(container, { onDone }) {
     return `
     ${headHtml("onboarding.prefs.title", "onboarding.prefs.subtitle")}
     <section class="onb-sec">
-      ${sectionHeaderHtml({ title: t("onboarding.prefs.sharedTitle"), level: "group" })}
-      <div class="onb-card onb-shared">
+      ${sectionHeaderHtml({ title: t("onboarding.prefs.sharedTitle"), level: "group", fam: "tra" })}
+      <div class="onb-card onb-tinted onb-shared fam-tra">
         ${fieldHtml({ id: "onb-partner", label: t("onboarding.prefs.partnerLabel"), value: p.partner, placeholder: t("onboarding.prefs.partnerPlaceholder") })}
         ${shareHtml()}
       </div>
     </section>
     <section class="onb-sec">
-      ${sectionHeaderHtml({ title: t("onboarding.prefs.prefsTitle"), level: "group" })}
-      <div class="onb-card onb-rows">
+      ${sectionHeaderHtml({ title: t("onboarding.prefs.prefsTitle"), level: "group", fam: "sus" })}
+      <div class="onb-card onb-tinted onb-rows fam-sus">
         ${prefRowHtml("onb-cur-label", "onboarding.prefs.currencyLabel", segmentedHtml({
           id: "onb-cur-seg", name: t("onboarding.prefs.currencyLabel"), labelledBy: "onb-cur-label", value: curValue,
           options: [...QUICK_CURRENCIES.map((c) => ({ value: c, label: c })), { value: OTHER_CURRENCY, label: t("onboarding.prefs.currencyOther") }],

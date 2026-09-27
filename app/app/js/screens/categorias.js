@@ -11,7 +11,7 @@ import { userMessage } from "../errors.js";
 import { showConfirm } from "../modal.js";
 import { showSheet } from "../sheet.js";
 import { subHeaderHtml, buttonHtml } from "../ui.js";
-import { segmentedHtml, wireSegmented, fieldHtml, neutralChipHtml } from "../controls.js";
+import { segmentedHtml, wireSegmented, neutralChipHtml } from "../controls.js";
 import { tileHtml, filterChipHtml, familySwatchesHtml } from "../entity.js";
 import { icon, catIcon } from "../icons.js";
 
@@ -140,7 +140,7 @@ export async function renderCategorias(container, onBack) {
     return `<section class="${cls}" data-root-row="${escAttr(root.id)}" aria-labelledby="${escAttr(nameId)}">
       <div class="cat-head">
         <button type="button" class="cat-name-btn" data-cat="${escAttr(root.id)}">
-          ${tileHtml({ fam, icon: iconForCategory(root.id, byId), size: 32, onTint: true })}
+          ${tileHtml({ fam, icon: iconForCategory(root.id, byId), size: 32, filled: true })}
           <span class="cat-nm">
             <span class="cat-name" id="${escAttr(nameId)}">${escHtml(root.name)}</span>
             <span class="cat-sub">${escHtml(rootSubtitle(root, kids))}</span>
@@ -440,12 +440,35 @@ export async function renderCategorias(container, onBack) {
   // Raíces elegibles para «Dentro de»: ACTIVAS, del tipo del formulario, excluida ella misma.
   const availableParents = () => roots.filter((r) => r.flow === form.flow && !r.is_archived && r.id !== form.id);
 
-  /** Baldosa de la vista previa: la familia/icono elegidos si es categoría de gasto; los heredados
-   *  de la elegida en «Dentro de» si es subcategoría; neutra con el icono de ingreso si es ingreso. */
+  /** Familia e icono efectivos del nombre en vista previa: null (ingreso, C9), los heredados de la
+   *  elegida en «Dentro de» (subcategoría, §6) o los propios (categoría de gasto). Un único punto de
+   *  cálculo para la baldosa Y el tinte del campo Nombre (B-Categorias-Nueva). */
+  function previewStyle() {
+    if (form.flow !== "expense") return { fam: null, icon: "income" };
+    if (form.parentId) return { fam: familyForCategory(form.parentId, byId), icon: iconForCategory(form.parentId, byId) };
+    return { fam: form.fam, icon: form.icon };
+  }
+
+  /** Baldosa de la vista previa (F-08 retirada, Álvaro 2026-09-27: rellena, como B-Categorias). */
   function previewTileHtml() {
-    if (form.flow !== "expense") return tileHtml({ fam: null, icon: "income", size: 32 });
-    if (form.parentId) return tileHtml({ fam: familyForCategory(form.parentId, byId), icon: iconForCategory(form.parentId, byId), size: 32 });
-    return tileHtml({ fam: form.fam, icon: form.icon, size: 32 });
+    const { fam, icon: key } = previewStyle();
+    return tileHtml({ fam, icon: key, size: 40, filled: true });
+  }
+
+  /** Campo Nombre (B-Categorias-Nueva): 64 de alto, tintado en la familia de la vista previa (o
+   *  --well sin familia, ingreso), con la baldosa rellena delante y «Nombre» encima del valor en el
+   *  -x de la familia. Markup propio (no fieldHtml): el original apila etiqueta+valor DENTRO del
+   *  pozo teñido, algo que ningún otro campo del sistema hace todavía. */
+  function nameFieldHtml() {
+    const { fam } = previewStyle();
+    const fc = famClass(fam);
+    return `<label class="cat-name-field${fc ? ` ${fc}` : " is-plain"}" for="cf-name" id="cf-name-wrap">
+      <span class="cat-name-tile" aria-hidden="true">${previewTileHtml()}</span>
+      <span class="cat-name-body">
+        <span class="cat-name-caption">${escHtml(t("common.name"))}</span>
+        <input class="cat-name-input" id="cf-name" type="text" value="${escAttr(form.name)}" placeholder="${escAttr(t("categorias.form.namePlaceholder"))}" autocomplete="off">
+      </span>
+    </label>`;
   }
 
   /** Primera categoría de gasto (que no sea la propia) que ya usa cada familia. Las activas van
@@ -512,7 +535,7 @@ export async function renderCategorias(container, onBack) {
   function formBodyHtml() {
     const editing = form.mode === "edit";
     return `<div class="cat-form">
-      ${fieldHtml({ id: "cf-name", label: t("common.name"), value: form.name, placeholder: t("categorias.form.namePlaceholder"), lead: previewTileHtml() })}
+      ${nameFieldHtml()}
       ${placeHtml()}
       <div id="cf-style" class="cat-style">${styleHtml()}</div>
       ${form.flow === "expense" ? `<div class="cat-sec">
@@ -540,8 +563,16 @@ export async function renderCategorias(container, onBack) {
   }
 
   function repaintStyle() {
-    const lead = dlg?.querySelector(".ctl-field-lead");
-    if (lead) lead.innerHTML = previewTileHtml();
+    // El nombre puede cambiar la familia sugerida mientras se teclea (wireForm#oninput): el campo
+    // entero se retinta (clase .fam-<k> del wrapper, que expone --ft/--fb/--fx a su CSS), no solo
+    // la baldosa.
+    const wrap = dlg?.querySelector("#cf-name-wrap");
+    if (wrap) {
+      const fc = famClass(previewStyle().fam);
+      wrap.className = `cat-name-field${fc ? ` ${fc}` : " is-plain"}`;
+      const tile = wrap.querySelector(".cat-name-tile");
+      if (tile) tile.innerHTML = previewTileHtml();
+    }
     const style = dlg?.querySelector("#cf-style");
     if (style) { style.innerHTML = styleHtml(); wireStyle(); }
   }

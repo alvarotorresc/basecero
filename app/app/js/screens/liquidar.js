@@ -1,21 +1,22 @@
 import { pendingSettlements, listAccounts, allCategoriesById, settleAllShared, getMetaAll, getAccountStyle, listGoals } from "../repo.js";
 import { familyForAccount } from "../account-colors.js";
 import { familyForCategory, iconForCategory } from "../category-colors.js";
-import { fmtMoney, fmtDiaCorto } from "../format.js";
+import { fmtMoney, fmtDiaCorto, hoyISO } from "../format.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { t } from "../i18n/index.js";
 import { userMessage } from "../errors.js";
 import { subHeaderHtml, buttonHtml } from "../ui.js";
 import { segmentedHtml, wireSegmented, checkboxHtml } from "../controls.js";
-import { tileHtml, filterChipHtml } from "../entity.js";
+import { tileHtml } from "../entity.js";
 import { displayHtml, dispInkHtml, emptyStateHtml } from "../instrument.js";
 import { netOfSelected } from "../share-pct.js";
 import { escHtml } from "../esc.js";
 
-// Pantalla «Liquidar», sistema B (B-Liquidar / BD-Liquidar): Display l con el neto de lo
+// Pantalla «Liquidar», sistema B (B-Liquidar / BD-Liquidar): Display a 48 con el neto de lo
 // seleccionado y su pie «A tu favor / En contra», Segmented «Entra en» con las cuentas, las filas
-// pendientes con su casilla en tinta (F-05) en un solo contenedor, y el primario al pie. Todo el
-// color y la forma viven en la sección «liquidar» de css/screens.css.
+// pendientes con su casilla naranja (F-05 retirada, Álvaro 2026-09-27: igual que el mockup) en un
+// solo contenedor, y el primario al pie. Todo el color y la forma viven en la sección «liquidar»
+// de css/screens.css.
 
 const MINUS = "−"; // «−» tipográfico, el mismo ancho que «+» en la mono tabular.
 
@@ -35,13 +36,15 @@ function commonTheirPct(rows) {
   return rows.every((r) => theirPct(r) === first) ? first : null;
 }
 
-/** Fila pendiente (B-Liquidar): casilla de 44 (§9) · baldosa 40 de la familia de la categoría ·
- *  nombre 15/600 y línea 2 12/500 dim · lo que se liquida, mono 15/600 en tinta, con «−» si le
- *  debo yo. La fila no es un botón: solo lo es la casilla, que decide si entra en el neto. */
+/** Fila pendiente (B-Liquidar): casilla de 44 (§9) · baldosa 36 sobre el tinte de la familia de
+ *  la categoría · nombre 15/600 y línea 2 12/500 dim con el importe del gasto en mono · lo que se
+ *  liquida, mono 15/600 en tinta, con «−» si le debo yo. La fila no es un botón: solo lo es la
+ *  casilla, que decide si entra en el neto. */
 function rowHtml(r, { byId, selected, partner, common }) {
   const catName = byId[r.category_id]?.name ?? "";
   const title = r.merchant || catName || t("common.type.expense");
-  const date = fmtDiaCorto(r.date);
+  // «Hoy» en vez de la fecha, como B-Liquidar («Hoy, de 9,90 €»).
+  const date = r.date === hoyISO() ? t("common.today") : fmtDiaCorto(r.date);
   let line2 = r.direction === "i_owe"
     ? t("liquidar.row.paidBy", { date, name: partner, amount: fmtMoney(r.amount_cents) })
     : t("liquidar.row.of", { date, amount: fmtMoney(r.amount_cents) });
@@ -49,10 +52,13 @@ function rowHtml(r, { byId, selected, partner, common }) {
     line2 += `, ${t(r.direction === "i_owe" ? "liquidar.row.myPct" : "liquidar.row.theirPct", { pct: rowPct(r) })}`;
   }
   const checked = selected.has(r.id);
+  // El importe del gasto va en mono dentro de la línea 2 (B-Liquidar «12 sep, de 62,60 €»).
+  const amount = escHtml(fmtMoney(r.amount_cents));
+  const line2Html = escHtml(line2).replace(amount, `<span class="num">${amount}</span>`);
   return `<div class="liq-row">
-    ${checkboxHtml({ id: `liq-sel-${r.id}`, checked, label: t("liquidar.select.aria", { merchant: title }) })}
+    ${checkboxHtml({ id: `liq-sel-${r.id}`, checked, label: t("liquidar.select.aria", { merchant: title }), accent: true })}
     ${tileHtml({ fam: familyForCategory(r.category_id, byId), icon: iconForCategory(r.category_id, byId) })}
-    <span class="ent-body"><span class="ent-name">${escHtml(title)}</span><span class="ent-line2">${escHtml(line2)}</span></span>
+    <span class="ent-body"><span class="ent-name">${escHtml(title)}</span><span class="ent-line2">${line2Html}</span></span>
     <span class="num liq-amount">${r.direction === "i_owe" ? MINUS : ""}${escHtml(fmtMoney(r.settle_cents))}</span>
   </div>`;
 }
@@ -89,16 +95,13 @@ export async function renderLiquidar(container, onBack) {
   };
   let errorMsg = "";
 
-  /** «Entra en» / «Sale de»: con una o dos cuentas, el Segmented de B-Liquidar; a partir de tres
-   *  los segmentos se quedaban en «Cuen…» ilegibles, así que pasan a chips de filtro con la muestra
-   *  de la familia de cada cuenta (C8), que envuelven de línea. Selección única en los dos casos:
-   *  radiogroup en el Segmented, grupo de botones con aria-pressed (uno solo a true) en los chips. */
+  /** «Entra en» / «Sale de»: el Segmented de B-Liquidar, con la muestra de la familia de cada
+   *  cuenta (C8). Con muchas cuentas o nombres largos, los segmentos se quedaban en «Cuen…»
+   *  ilegibles: el Segmented de esta pantalla envuelve de línea (cada cuenta a su ancho, CSS
+   *  `.liq-accounts-wrap`) en vez de recortar, y el wire() le pone `is-wrapped` para que el pozo
+   *  deje de ser píldora cuando ocupa más de una línea. Selección única: radiogroup. */
   function accountPickerHtml(net) {
     const fam = (a) => familyForAccount(a, accountStyle, goals);
-    if (accounts.length >= 3) {
-      return `<div class="liq-chips" id="liq-accounts" role="group" aria-labelledby="liq-account-label">${accounts
-        .map((a) => filterChipHtml({ label: a.name, fam: fam(a), selected: a.id === state.accountId, data: { acc: a.id } })).join("")}</div>`;
-    }
     return segmentedHtml({
       id: "liq-accounts", name: t(net < 0 ? "liquidar.account.out" : "liquidar.account.in"), labelledBy: "liq-account-label",
       options: accounts.map((a) => ({ value: a.id, label: a.name, fam: fam(a) })), value: state.accountId,
@@ -164,10 +167,10 @@ export async function renderLiquidar(container, onBack) {
     container.innerHTML = `
       ${subHeaderHtml({ id: "liq-back", title, subtitle })}
       <div class="liq">
-        ${displayHtml({ label: netLabel, value: fmtMoney(Math.abs(net)), slot: split })}
+        ${displayHtml({ label: netLabel, value: fmtMoney(Math.abs(net)), size: 48, slot: split })}
 
         ${accounts.length ? `
-        <div class="liq-account">
+        <div class="liq-account liq-accounts-wrap">
           <span class="liq-account-label" id="liq-account-label">${escHtml(t(net < 0 ? "liquidar.account.out" : "liquidar.account.in"))}</span>
           ${accountPickerHtml(net)}
         </div>` : ""}
@@ -187,6 +190,10 @@ export async function renderLiquidar(container, onBack) {
   function wire() {
     container.querySelector("#liq-back").onclick = () => onBack();
 
+    // Pozo en varias líneas: el radio píldora de una línea se vería como una cápsula deformada.
+    const picker = container.querySelector("#liq-accounts");
+    if (picker && picker.getBoundingClientRect().height > 60) picker.classList.add("is-wrapped");
+
     // Sin cuenta elegida (o si la elegida ya no existe), el Segmented marca la primera: se alinea
     // el estado con lo que se ve, como hacían los chips con resolveAccountId.
     const seg = container.querySelector("#liq-accounts.ctl-segmented");
@@ -195,15 +202,6 @@ export async function renderLiquidar(container, onBack) {
       if (shown && shown !== state.accountId) state.accountId = shown;
       wireSegmented(seg, (value) => chooseAccount(value,
         () => container.querySelector('#liq-accounts [aria-checked="true"]')?.focus()));
-    }
-    // Chips (tres cuentas o más): un solo aria-pressed a true, el de la cuenta elegida.
-    const chips = [...container.querySelectorAll("#liq-accounts.liq-chips [data-acc]")];
-    for (const chip of chips) {
-      chip.onclick = () => {
-        for (const c of chips) c.setAttribute("aria-pressed", String(c === chip));
-        chooseAccount(chip.dataset.acc,
-          () => container.querySelector(`#liq-accounts [data-acc="${CSS.escape(chip.dataset.acc)}"]`)?.focus());
-      };
     }
 
     // Casilla por fila (§9): cambiar la selección invalida la confirmación en curso, igual que

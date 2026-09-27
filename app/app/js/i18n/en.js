@@ -34,9 +34,6 @@ export const EN = {
     // §1.4/§4, liquidar.js#rowHtml.
     dateValue: "{date}",
     amountValue: "{amount}",
-    // myPartSuffix stays prose (dot-free separator): inicio.js/semana.js keep concatenating it
-    // as-is (§9.1/§9.2 don't touch it).
-    myPartSuffix: ", your share {amount}",
     sharedWith: "Shared with {name}",
     settlement: {
       theyOwe: "{name} owes you",
@@ -192,7 +189,6 @@ export const EN = {
       lastMovements: "Latest transactions",
       emptyTitle: "No transactions yet",
       emptyText: "Log your first expense with the button below.",
-      yesterday: "Yesterday",
       weekdayShort: { 0: "Sun", 1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat" },
       renewalTitle: "{name} renews on {date}",
       renewalAsk: "Still using it?",
@@ -300,6 +296,8 @@ export const EN = {
       title: "Filters",
       clear: "Clear filters",
       category: "Category",
+      // Sheet section title (B-Movimientos-Filtros): «Categories» and, with one picked, its count.
+      categories: "Categories",
       tag: "Tag",
       apply: { one: "Show {n} transaction", other: "Show {n} transactions" },
     },
@@ -358,7 +356,10 @@ export const EN = {
       fallbackName: "the other party",
       fallbackLabel: "Other party",
     },
-    row: { partnerPaid: ", {name} paid, your share {amount}" },
+    // paidBy and sharedOf: the note under a shared row's figure in Movimientos, Inicio and Semana
+    // (B-Movimientos, ui.js#sharedNoteHtml), where the figure is my share; {amount} is the whole
+    // receipt, without symbol and already wrapped in mono.
+    row: { paidBy: "{name} paid", sharedOf: "with {name}, of {amount}" },
     delete: {
       button: "Delete",
       title: "Delete this transaction?",
@@ -498,7 +499,6 @@ export const EN = {
       empty: "You don’t have any accounts yet.",
     },
     account: {
-      title: { edit: "Edit account" },
       settings: "Account settings",
       openingBalance: "Opening balance",
       note: {
@@ -527,7 +527,6 @@ export const EN = {
       savings_rate: "Savings rate",
     },
     goal: {
-      title: { edit: "Edit goal" },
       settings: "Goal settings",
       monthsLabel: "Months to cover",
       monthLess: "One month less",
@@ -557,11 +556,12 @@ export const EN = {
     title: "Recurring",
     empty: "You don’t have any recurring rules yet.",
     hero: {
-      pending: "Pending this period",
+      pending: "Still to pay this period",
       perMonth: "per month",
       pendingCount: { one: "{n} pending", other: "{n} pending" },
       allSettled: "All paid",
       remaining: "You'll have {amount} left",
+      remainingAfter: "After paying it you'll have {amount} left",
       paidLabel: "Paid",
       meterAria: "Pending {pending} of {total} this period",
     },
@@ -573,7 +573,7 @@ export const EN = {
     },
     newRule: "New recurring rule",
     toggle: { aria: "Enable {name}" },
-    footNote: "The switch pauses the rule without deleting it.",
+    footNote: "Turning a rule off pauses it without deleting it: the next charge isn't generated until you turn it back on.",
     type: { transfer: "Transfer" },
     freq: {
       weekly: "Weekly",
@@ -648,7 +648,7 @@ export const EN = {
       needSectionTitle: "Essential or discretionary?",
       parentSectionTitle: "Inside",
       rootLockedNote: "A category with subcategories can’t be nested under another one.",
-      inheritNote: "A subcategory inherits its category’s color and icon.",
+      inheritNote: "Subcategories inherit their category’s color and icon.",
       famLabel: "Color family",
       famUsedBy: "{fam}, used by {name}",
       famShared: ", the same as {name}. The icon tells them apart.",
@@ -661,7 +661,7 @@ export const EN = {
   },
   etiquetas: {
     title: "Project tags",
-    hint: "They cross categories: a trip, a renovation, a birthday.",
+    hint: "They cross categories: they group a trip, a renovation or a birthday no matter which category each expense falls under.",
     empty: "No tags yet.",
     open: "Open",
     archived: "Archived",
@@ -699,7 +699,7 @@ export const EN = {
       open: "Couldn’t open the period: {error}",
     },
     header: {
-      closing: "Closing {name} and opening the next one",
+      closing: "Closing {name} and opening {next}",
       first: "First period",
       title: "New period",
     },
@@ -840,7 +840,6 @@ export const EN = {
       partnerNone: "No one",
       partnerField: "The other person’s name",
       informeSub: "{name}, opened {date}",
-      quickRegisterSub: "Just amount and category",
       enc: "Encrypted backup",
       sheet: "Spreadsheet",
       sheetNote: "Importing replaces your current data and also opens an encrypted backup (.bce).",
@@ -1014,6 +1013,7 @@ export const EN = {
       activeCount: { one: "{n} active", other: "{n} active" },
       chartLabel: "Renewals in the next 30 days",
     },
+    footNote: "They come from your recurring rules marked as a subscription and from charges that repeat with the same amount.",
     notice: {
       title: "{name} renews on {when}",
       question: "Still using it?",
@@ -1027,11 +1027,12 @@ export const EN = {
       cancelled: "Cancelled",
     },
     row: {
-      renewsOn: "renews on {date}",
-      renewsInDays: { one: "renews on {date}, in {n} day", other: "renews on {date}, in {n} days" },
-      renewsWeekly: "renews every week",
+      renewsOn: "Renews on {date}",
+      renewsInDays: { one: "Renews in {n} day", other: "Renews in {n} days" },
+      renewsToday: "Renews today",
+      renewsWeekly: "Renews every week",
       perYear: "/year",
-      noDate: "no renewal date",
+      noDate: "No renewal date",
     },
     candidate: {
       sameAmountOn: "same amount on {dates}",
@@ -1199,6 +1200,7 @@ export const EN = {
     },
     compare: {
       title: "Compared with {name}",
+      note: "{prev} is closed; {cur} is on day {day}.",
       up: "Up",
       down: "Down",
     },

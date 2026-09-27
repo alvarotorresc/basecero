@@ -7,7 +7,7 @@ import {
 import { renewalNotice } from "../subscriptions.js";
 import { familyForCategory, iconForCategory, famClass } from "../category-colors.js";
 import { familyForAccount, parseAccountStyle } from "../account-colors.js";
-import { fmtMoney, fmtMoneyParts, moneyPartsHtml, fmtDiaCorto, fmtDiaIni, hoyISO, fmtPct0, prevDayIso } from "../format.js";
+import { fmtMoney, fmtMoneyParts, moneyPartsHtml, fmtDiaCorto, fmtDiaIni, hoyISO, fmtPct0, periodTitle } from "../format.js";
 import { dayIndexOfPeriod, expectedPeriodDays } from "../prevision.js";
 import {
   nextAccountId, daysLeftOfPeriod, dailyAllowanceCents, daysSinceLastEntry, huchaMessage,
@@ -19,7 +19,7 @@ import { resolveAccountId } from "../account-defaults.js";
 import { icon } from "../icons.js";
 import { t } from "../i18n/index.js";
 import { budgetMap, pctOf } from "../category-spend.js";
-import { rootHeaderHtml, buttonHtml } from "../ui.js";
+import { rootHeaderHtml, buttonHtml, sharedNoteHtml } from "../ui.js";
 import { fieldHtml } from "../controls.js";
 import { tileHtml, txRowHtml, dayHeaderHtml } from "../entity.js";
 import {
@@ -94,31 +94,32 @@ function partnerBannerHtml() {
 }
 
 /** Display «Hoy puedes gastar» (B-Home, C2): la cifra que manda en ámbar, el pie «Quedan X de Y»
- *  con X en --disp-ink (F-13), el LED «Periodo abierto» y la línea del periodo con el punto de hoy.
+ *  con X también en ámbar (F-13 retirada, Álvaro 2026-09-27: igual que el mockup), el LED «Periodo abierto» y la línea del periodo con el punto de hoy.
  *  Sin margen (lo comprometido se come lo que queda) la cifra es 0,00 €, como antes. */
 function allowanceDisplayHtml({ budgetTotal, disponible, allowance, series, days, today }) {
   const budget = escHtml(fmtMoney(budgetTotal));
   const footHtml = disponible >= 0
-    ? t("inicio.b.left", { amount: dispInkHtml(fmtMoney(disponible)), budget })
-    : t("inicio.b.over", { amount: dispInkHtml(fmtMoney(-disponible)), budget });
-  return displayHtml({
+    ? t("inicio.b.left", { amount: dispInkHtml(fmtMoney(disponible), { tone: "amber" }), budget })
+    : t("inicio.b.over", { amount: dispInkHtml(fmtMoney(-disponible), { tone: "amber" }), budget });
+  // La línea del periodo va a sangre, pegada al borde de abajo, como en B-Home (358 de ancho).
+  return `<div class="inicio-burn">${displayHtml({
     label: t("inicio.available.today"),
     value: fmtMoney(Math.max(0, allowance)),
     size: "xl",
     footHtml,
     led: { state: "ok", text: t("inicio.b.led") },
     slot: periodChartSvg({
-      days, today, values: series, max: budgetTotal,
+      days, today, values: series, max: budgetTotal, width: 358,
       todayLabel: t("inicio.b.todayMark"), endLabel: t("inicio.b.endMark", { n: days }),
     }),
-  });
+  })}</div>`;
 }
 
 /** Bloque de la cuenta (PR-10, C8): la cuenta con el tinte de SU familia (familyForAccount). Con
  *  varias cuentas, el bloque entero es un botón que pasa a la siguiente (decisiones 1-3 de la spec
  *  de Inicio v2), con el chevron como pista. Dos formas:
  *   - "bento" (junto a «Hoy puedes gastar», B-Home): bento teñido, cifra 20/600 en tinta (C7);
- *   - "display" (vacío y sin límites, B-Inicio-Vacio): el saldo es la cifra del Display. */
+ *   - "display" (vacío y sin límites, B-Inicio-Vacio): el saldo es la cifra del Display, a 48. */
 function accountBlockHtml(acc, { form, cuentas, styleMap, goals, empty, days, today }) {
   const many = cuentas.length > 1;
   const overlay = many
@@ -142,7 +143,7 @@ function accountBlockHtml(acc, { form, cuentas, styleMap, goals, empty, days, to
       label: acc.name,
       labelAfter,
       value: fmtMoney(acc.balance_cents),
-      size: "xl",
+      size: 48,
       foot: t(empty ? "inicio.b.balanceStart" : "inicio.b.balanceToday"),
       led: { state: "ok", text: t("inicio.b.led") },
       slot: periodChartSvg({ days, today, todayLabel: t("inicio.b.todayMark"), endLabel: t("inicio.b.endMark", { n: days }) }),
@@ -164,7 +165,7 @@ function sharedBlockHtml(sharedRows, netCents, partnerName) {
   });
 }
 
-/** «Esta semana» (B-Home): columnas en --idle y hoy en tinta con su cifra encima (columnsHtml).
+/** «Esta semana» (B-Home): columnas en la barra de Otros (F-10 retirada) y hoy en tinta con su cifra encima (columnsHtml).
  *  Los 7 días que terminan hoy (semana-logic.js, la misma ventana que la pantalla Semana). Sin
  *  gasto en toda la semana, las columnas son filas de pozo (B-Inicio-Vacio). El bloque entero
  *  abre Semana. */
@@ -178,15 +179,16 @@ function weekBlockHtml(days, total, hoy) {
       today,
       amount: today && d.totalCents > 0 ? plainAmount(d.totalCents) : "",
     };
-  }), { label: t("inicio.week.title") });
+  }), { label: t("inicio.week.title"), restFam: "otr" });
   const body = `<div class="inicio-week-head"><h2 class="inicio-label">${escHtml(t("inicio.week.title"))}</h2>`
     + `<span class="num inicio-week-total">${escHtml(fmtMoney(total.totalCents))}</span></div>${cols}`;
   const zero = days.every((d) => d.totalCents <= 0);
   return `<div class="inicio-week inicio-tap${zero ? " is-zero" : ""}">${containerHtml({ body })}${overlayHtml("inicio-semana", t("inicio.week.viewAll"))}</div>`;
 }
 
-/** «Ahorras 47 %» (B-Home, F-09, C11): bento neutro, la tasa en mono 20/600 en tinta y debajo lo
- *  ahorrado «de» lo ingresado. Sin ingresos o gastando de más no hay tasa que dar (savingsSentence):
+/** «Ahorras 47 %» (B-Home; F-09 retirada, Álvaro 2026-09-27): bento con el tinte de Alimentación
+ *  (verde, la familia del ahorro), la tasa en mono 30/600 en su -x y debajo lo ahorrado «de» lo
+ *  ingresado. Sin ingresos o gastando de más no hay tasa que dar (savingsSentence):
  *  la cifra es «—» y lo ahorrado sale con su «−» en --neg (C4). El bloque entero abre el Informe. */
 function savingsBlockHtml(income, spent, periodName) {
   const s = savingsSentence(income, spent);
@@ -199,7 +201,10 @@ function savingsBlockHtml(income, spent, periodName) {
   const bento = bentoHtml({
     label: t("inicio.b.savings"),
     value,
-    // En la columna de 1/3 caben ~77 px: una cifra larga baja a 17 en vez de partirse.
+    fam: "ali",
+    valueFam: true,
+    valueSize: "l",
+    // En la columna de 1/3 caben ~80 px: una cifra larga baja a 20 en vez de partirse.
     cls: `inicio-savings${value.length > 5 ? " is-long" : ""}`,
     slot,
   });
@@ -208,8 +213,11 @@ function savingsBlockHtml(income, spent, periodName) {
 
 /** El aviso (antes «la hucha», B-Home: «Gimnasio se renueva…»): una tarjeta de entidad con el tinte
  *  de la familia de su categoría cuando habla de una (renovación, límite) y neutra cuando no
- *  (días sin apuntar, fin de periodo; C11). huchaMessage (inicio-logic.js) sigue decidiendo cuál;
- *  las acciones son las de siempre: la suya (secundario S) y «Ahora no» (terciario). */
+ *  (días sin apuntar, fin de periodo; C11). huchaMessage (inicio-logic.js) sigue decidiendo cuál.
+ *  Abajo, en una fila como en B-Home, «Tras pagarlo te quedarán…» a la izquierda y su acción
+ *  (secundario, «Revisar») a la derecha. El mockup no pinta «Ahora no», pero descartar el aviso es
+ *  comportamiento que ya funciona y no se pierde: queda como un aspa de 44 en la esquina, con
+ *  «Ahora no» como nombre accesible, para no romper la fila del pie. */
 function noticeHtml(msg, { byId, rules, leftAfterRenewal }) {
   if (!msg) return "";
   let fam = null, iconKey = "otr", title, line2 = "", foot = "", actionLabel;
@@ -218,7 +226,9 @@ function noticeHtml(msg, { byId, rules, leftAfterRenewal }) {
     fam = rule ? familyForCategory(rule.category_id, byId) : null;
     iconKey = rule ? iconForCategory(rule.category_id, byId) : "sus";
     title = t("inicio.b.renewalTitle", { name: msg.params.name, date: fmtDiaCorto(msg.params.date) });
-    line2 = `<span class="num inicio-notice-amt">${escHtml(fmtMoney(msg.params.amount))}</span> ${escHtml(t("inicio.b.renewalAsk"))}`;
+    // La cuota va en el -x de la familia, como el resto de la línea (C7 retirada aquí, Álvaro
+    // 2026-09-27: «39,00 €» del Gimnasio en sal-d, igual que el mockup).
+    line2 = `<span class="num inicio-notice-fee">${escHtml(fmtMoney(msg.params.amount))}</span> ${escHtml(t("inicio.b.renewalAsk"))}`;
     if (leftAfterRenewal != null) {
       foot = `<span class="inicio-notice-left">${t("inicio.b.afterPay", { amount: `<span class="num inicio-notice-amt">${escHtml(fmtMoney(leftAfterRenewal))}</span>` })}</span>`;
     }
@@ -245,10 +255,10 @@ function noticeHtml(msg, { byId, rules, leftAfterRenewal }) {
     <div class="inicio-notice-top">${tile}<div class="inicio-notice-body">
       <span class="inicio-notice-title">${escHtml(title)}</span>
       ${line2 ? `<span class="inicio-notice-line2">${line2}</span>` : ""}
-    </div></div>
-    ${foot}
-    <div class="inicio-notice-actions">
-      ${buttonHtml({ kind: "tertiary", id: "inicio-hucha-dismiss", label: t("inicio.hucha.dismiss") })}
+    </div>
+    <button type="button" class="inicio-notice-close" id="inicio-hucha-dismiss" aria-label="${escAttr(t("inicio.hucha.dismiss"))}">${icon("close", { size: 18 })}</button></div>
+    <div class="inicio-notice-foot">
+      ${foot}
       ${buttonHtml({ kind: "secondary", size: "s", id: "inicio-hucha-action", label: actionLabel })}
     </div>
   </section>`;
@@ -265,13 +275,13 @@ function categoriesBlockHtml(rootRows, byId) {
     const segs = top.map((r) => ({
       fam: familyForCategory(r.root_id, byId), value: r.spent_cents, name: r.name, amount: fmtMoney(r.spent_cents),
     }));
-    if (restCents > 0) segs.push({ idle: true, value: restCents, name: t("inicio.b.rest"), amount: fmtMoney(restCents) });
+    if (restCents > 0) segs.push({ idle: true, fam: "otr", value: restCents, name: t("inicio.b.rest"), amount: fmtMoney(restCents) });
     body = stackedBarHtml(segs, { label: title });
   } else {
     body = `<p class="inicio-help">${escHtml(t("inicio.categorySpend.empty"))}</p>`;
   }
   const box = containerHtml({ title, total: totalCents > 0 ? fmtMoney(totalCents) : "", body });
-  return `<div class="inicio-tap">${box}${overlayHtml("inicio-categoria", title)}</div>`;
+  return `<div class="inicio-tap inicio-cats">${box}${overlayHtml("inicio-categoria", title)}</div>`;
 }
 
 /** Fila de movimiento (B-Movimientos, §9): entity.js#txRowHtml con la familia de la categoría, la
@@ -284,39 +294,38 @@ function movementRowHtml(r, byId, partnerName) {
     return txRowHtml({
       fam: null, icon: "pencil", title: t("common.type.adjustment"), line2: r.merchant || r.note || "",
       amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)), sign: isNeg ? "expense" : "income", data: { tx: r.id },
+      height: 52, amountWeight: 500,
     });
   }
   const cat = byId[r.category_id];
   const parent = cat?.parent_id ? byId[cat.parent_id] : null;
   const path = cat ? (parent ? `${parent.name} › ${cat.name}` : cat.name) : "";
-  const shareNote = !r.is_shared ? ""
-    : r.paid_by === "partner"
-      ? t("movimientos.row.partnerPaid", { name: partnerName || t("movimientos.shared.fallbackName"), amount: fmtMoney(r.my_amount_cents) })
-      : t("common.myPartSuffix", { amount: fmtMoney(r.my_amount_cents) });
   return txRowHtml({
     fam: familyForCategory(r.category_id, byId),
     icon: iconForCategory(r.category_id, byId),
     // Sin comercio ni categoría, el mismo «Sin categorizar» que Movimientos: la fila nunca sin nombre.
     title: r.merchant || cat?.name || t("movimientos.uncategorized"),
     line2: path,
-    amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)),
+    // Compartido: MI parte, con la nota de Movimientos debajo («con Marta, de 24,00» / «pagó Marta»).
+    amountHtml: moneyPartsHtml(Math.abs(r.is_shared ? r.my_amount_cents : r.amount_cents)),
     sign: r.type === "expense" ? "expense" : "income",
-    // La nota de compartido va debajo de la cifra, como en Movimientos y Semana.
-    amountNote: shareNote.replace(/^,\s*/, ""),
+    amountNoteHtml: sharedNoteHtml(r, partnerName),
     data: { tx: r.id },
+    height: 52,
+    amountWeight: 500,
   });
 }
 
-/** Cabecera de día canónica (B-Home): «Hoy dom 13», «Ayer sáb 12»; más atrás, «vie 11». */
+/** Cabecera de día de B-Home (F-36 retirada, Álvaro 2026-09-27): «Hoy» y, los demás días, el día
+ *  corto con mayúscula, «Sáb 12». 12/600 dim (sección «inicio» de screens.css). */
 function dayHeaderFor(date, hoy) {
-  const short = `${weekdayShort(date)} ${dayNumber(date)}`;
-  if (date === hoy) return dayHeaderHtml({ label: t("common.today"), date: short });
-  if (date === prevDayIso(hoy)) return dayHeaderHtml({ label: t("inicio.b.yesterday"), date: short });
-  return dayHeaderHtml({ label: short });
+  if (date === hoy) return dayHeaderHtml({ label: t("common.today") });
+  const wd = weekdayShort(date);
+  return dayHeaderHtml({ label: `${wd.charAt(0).toLocaleUpperCase()}${wd.slice(1)} ${dayNumber(date)}` });
 }
 
 /** «Últimos movimientos» (B-Home): los de hoy y, si son menos de 3, los siguientes más recientes,
- *  por día y con filas de 60. «Ver todos» lleva a la pestaña Movimientos. Un periodo nuevo sin
+ *  por día y con filas de 52 y cifra 500 (F-34 retirada, Álvaro 2026-09-27). «Ver todos» lleva a la pestaña Movimientos. Un periodo nuevo sin
  *  movimientos (pero con historia) lo dice en una línea. */
 function movementsBlockHtml(rows, hoy, byId, partnerName) {
   const aside = buttonHtml({ kind: "tertiary", id: "inicio-movimientos-ver", label: t("inicio.movements.viewAll") });
@@ -330,7 +339,7 @@ function movementsBlockHtml(rows, hoy, byId, partnerName) {
 /** «Últimos movimientos» sin ningún movimiento todavía (B-Inicio-Vacio): filas fantasma en pozo,
  *  el título, una línea y la flecha discontinua que baja hacia el botón de añadir. */
 function emptyMovementsHtml() {
-  const body = emptyStateHtml({ title: t("inicio.b.emptyTitle"), text: t("inicio.b.emptyText"), rows: 2, arrow: true });
+  const body = emptyStateHtml({ title: t("inicio.b.emptyTitle"), text: t("inicio.b.emptyText"), rows: 2, arrow: true, arrowHeight: 120 });
   return `<div class="inicio-empty">${containerHtml({ title: t("inicio.b.lastMovements"), body })}</div>`;
 }
 
@@ -349,6 +358,8 @@ function pendingHtml(prevision, remaining, byId) {
     line2: byId[it.rule.category_id]?.name ?? "",
     amountHtml: moneyPartsHtml(it.myCents),
     data: { previsionRule: it.rule.id },
+    height: 52,
+    amountWeight: 500,
   })).join("");
   const left = remaining == null ? "" : `<div class="inicio-left-row">
       <span class="inicio-left-label">${escHtml(t("inicio.pending.left"))}</span>
@@ -463,7 +474,7 @@ export async function renderInicio(container) {
   const remaining = budgetTotal ? remainingAfterRecurringCents(disponible, prevision.comprometidoCents) : null;
 
   const header = rootHeaderHtml({
-    title: period.name,
+    title: periodTitle(period.name, hoy),
     subtitle: t("inicio.b.sub", { day: today, total: days, n: Math.max(0, daysLeft) }),
     subtitleAction: { id: "inicio-periodo-header", label: t("periodo.header.title") },
   });
