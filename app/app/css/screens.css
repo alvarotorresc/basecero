@@ -650,7 +650,11 @@
   justify-content: center;
   gap: 6px;
   text-align: left;
+  border: 0;
+  background: none;
 }
+button.imp-rev-body { cursor: pointer; }
+button.imp-rev-body:disabled { cursor: default; }
 .imp-rev-l1 { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-12); }
 .imp-rev-name {
   min-width: 0;
@@ -688,16 +692,25 @@
 .imp-rev-row.is-known .imp-rev-amount { color: var(--text-dim); }
 .imp-rev-mark { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-12); font-weight: 600; color: var(--text-dim); }
 
-/* Pie fijo abajo (B-Importar): la nota de la bandeja y el primario, sobre --surface con filete. */
+/* Pie fijo abajo (B-Importar): la nota de la bandeja ENCIMA del primario, sobre --surface con
+   filete. Fijo y no sticky: main#screen lleva overflow-y (sticky se pegaría a él, que no se
+   desplaza). Centrado en el ancho máximo del body (480); .imp-screen.has-foot le deja su hueco. */
 .imp-foot {
-  position: sticky;
+  position: fixed;
+  left: 50%;
   bottom: 0;
-  z-index: 1;
-  margin: 0 calc(-1 * var(--sp-16));
+  z-index: 2;
+  width: min(100%, 480px);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
   padding: var(--sp-12) var(--sp-16) calc(var(--sp-24) + env(safe-area-inset-bottom, 0px));
   background: var(--surface);
   border-top: 1px solid var(--border);
 }
+.imp-foot-note { margin: 0; text-align: center; font-size: var(--fs-12); font-weight: 500; line-height: var(--lh-body); color: var(--text-dim); }
+.imp-screen.has-foot { padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)); }
 
 /* Hoja de categoría: «Sin categorizar» arriba y las baldosas de familia de B-Gasto en filas de 3;
    el panel de subcategorías cuelga de la fila de la desplegada (misma geometría que Registro). */

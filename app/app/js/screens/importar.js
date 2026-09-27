@@ -412,7 +412,8 @@ export function renderImportAssistant(container, a, { partnerName = "" } = {}) {
       </section>` : ""}
       ${a.commitError ? `<div class="imp-msg" role="alert">${icon("warn", { size: 18 })}<p>${escHtml(a.commitError)}</p></div>` : ""}
       <div class="imp-foot">
-        ${buttonHtml({ kind: "primary", id: "imp-commit", label, note, disabled })}
+        <p class="imp-foot-note">${escHtml(note)}</p>
+        ${buttonHtml({ kind: "primary", id: "imp-commit", label, disabled })}
       </div>`;
   }
 
@@ -499,7 +500,7 @@ export function renderImportAssistant(container, a, { partnerName = "" } = {}) {
     // Un repintado sustituye el DOM: se conserva el scroll para que marcar una casilla o cambiar la
     // categoría de una fila de la mitad de una lista larga no devuelva al principio.
     const y = typeof window !== "undefined" ? window.scrollY : 0;
-    container.innerHTML = `<div class="imp-screen">
+    container.innerHTML = `<div class="imp-screen${a.step === "review" ? " has-foot" : ""}">
       ${subHeaderHtml({ id: "assist-close", title: t("importar.title") })}
       ${stepsHtml({ total: 3, current: stepNo, ariaLabel: t("importar.steps.aria"), labels: [t("importar.steps.file"), t("importar.steps.columns"), t("importar.steps.review")] })}
       ${fileCardHtml()}
@@ -591,7 +592,8 @@ export function renderImportAssistant(container, a, { partnerName = "" } = {}) {
   }
 
   function wireReview() {
-    wireSegmented(container.querySelector("#imp-tab"), (tab) => {
+    const tabs = container.querySelector("#imp-tab");
+    if (tabs) wireSegmented(tabs, (tab) => {
       if (tab === a.tab) return;
       a.tab = tab;
       refocus = (root) => root.querySelector('#imp-tab [aria-checked="true"]');
