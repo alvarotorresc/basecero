@@ -68,6 +68,12 @@
   --xh-x: max(12px, calc(50% - 570px - 57px));
 }
 
+/* Reset: tokens.css YA NO trae `* { box-sizing: border-box; margin: 0 }` (se movió a app.css con
+   los tokens B, PR 33fe4c5) y la landing no carga app.css (nota de arriba), así que sin esto todo
+   `.bc-wrap`/`.bc-frame` con padding + width:100% en content-box se sale del contenedor — 32px de
+   scroll horizontal en móvil y tablet en las dos landings y en las páginas legales. */
+*, *::before, *::after { box-sizing: border-box; }
+
 html {
   scroll-padding-top: 84px;
 }
@@ -76,6 +82,7 @@ html {
 }
 
 body {
+  margin: 0;
   /* tokens.css pone font-family: var(--font-sans) directamente (no vía --font-ui), así que
      redeclarar --font-ui arriba no le llega solo: hay que pisarlo aquí para que el body no
      herede la v2 (Schibsted Grotesk). */
