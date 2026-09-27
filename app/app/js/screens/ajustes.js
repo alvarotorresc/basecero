@@ -2,6 +2,7 @@ import { dumpAllTables, replaceAll, exportAllJson, getOpenPeriod, getMetaAll, se
 import { familyForCategory, famClass } from "../category-colors.js";
 import { PCT_STEP, normalizePct, stepPct } from "../share-pct.js";
 import { quickRegisterEnabled } from "../registro-mode.js";
+import { normalizePayDay, payDayToMeta, stepPayDay } from "../pay-day.js";
 import { rowsToWorkbook, workbookToRows, validateImport } from "../xlsx.js";
 import { hoyISO, fmtDiaCorto } from "../format.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
@@ -116,8 +117,8 @@ export async function renderAjustes(container) {
 
   const state = {
     errors: null, pending: null, busy: false, n26Error: null,
-    encImport: null, periodError: "", prefsError: "",
-    // Panel desplegado: "partner" | "share" | "enc" | "sheet" | null. Vive en el estado, no en el
+    encImport: null, periodError: "", prefsError: "", payDayError: "",
+    // Panel desplegado: "partner" | "share" | "payday" | "enc" | "sheet" | null. Vive en el estado, no en el
     // DOM: cada cambio de `busy` repinta, y el panel no debe plegarse a mitad de una exportación.
     open: null,
     view: "main", assistant: null, // subvista del importador (asistente o resultado), importar.js
@@ -204,7 +205,23 @@ export async function renderAjustes(container) {
       </div>
       ${state.periodError ? `<div class="aj-panel">${msgHtml(escHtml(state.periodError), { error: true })}</div>` : ""}` : ""));
     }
-    // «El periodo empieza · Día de cobro» (B-Ajustes) se omite: no existe como dato (B-1, P1).
+    // «El periodo empieza» (B-Ajustes, B-1): «Día 1» o «Día de cobro, N». Despliega su paso a paso,
+    // que guarda al instante como el reparto. Con o sin periodo abierto: es una preferencia.
+    const payDay = normalizePayDay(metaCfg.pay_day);
+    const payOpen = state.open === "payday" || Boolean(state.payDayError);
+    rows.push(row({
+      icon: "calendar", label: t("payday.label"), id: "aj-payday",
+      value: payDay > 1 ? t("payday.valuePayDay", { n: payDay }) : t("payday.valueDay1"),
+      expanded: payOpen, controls: "aj-payday-panel",
+    }) + (payOpen ? `
+      <div class="aj-panel aj-panel-row" id="aj-payday-panel">
+        <p class="aj-help">${escHtml(t("payday.help"))}</p>
+        ${stepperHtml({
+          value: String(payDay), decId: "aj-payday-down", incId: "aj-payday-up",
+          decLabel: t("payday.decAria"), incLabel: t("payday.incAria"),
+        })}
+      </div>
+      ${state.payDayError ? `<div class="aj-panel">${msgHtml(escHtml(state.payDayError), { error: true })}</div>` : ""}` : ""));
     if (openPeriod) {
       rows.push(row({
         icon: "chart", label: t("informe.entry.fromSettings"), id: "btn-informe",
@@ -426,6 +443,28 @@ export async function renderAjustes(container) {
       savePrefs({ partner_name: partner });
     });
     on("#aj-share", () => { state.periodError = ""; toggle("share"); });
+
+    // Día de cobro (B-1): optimista y al instante, como el reparto; si falla, vuelve al guardado.
+    on("#aj-payday", () => { state.payDayError = ""; toggle("payday"); });
+    const stepPay = async (delta) => {
+      const cur = normalizePayDay(metaCfg.pay_day);
+      const next = stepPayDay(cur, delta);
+      if (next === cur) return;
+      metaCfg = { ...metaCfg, pay_day: payDayToMeta(next) };
+      try {
+        await setMeta("pay_day", payDayToMeta(next));
+        state.payDayError = "";
+        showToast(t("toast.saved"));
+      } catch (e) {
+        metaCfg = { ...metaCfg, pay_day: payDayToMeta(cur) };
+        state.payDayError = t("common.saveFailed", { error: userMessage(e) });
+      }
+      state.open = "payday";
+      render();
+      container.querySelector(delta < 0 ? "#aj-payday-down" : "#aj-payday-up")?.focus();
+    };
+    on("#aj-payday-down", () => stepPay(-1));
+    on("#aj-payday-up", () => stepPay(1));
 
     on("#btn-informe", () => {
       // Sin body.onboarding (a diferencia de #btn-cerrar-periodo): esto NO es un asistente que

@@ -1391,4 +1391,31 @@ export const EN = {
       billete: "Banknote", bebe: "Baby", portatil: "Laptop", mando: "Game controller", paquete: "Package", birrete: "Graduation cap",
     },
   },
+  // B-1 · Pay day (meta.pay_day).
+  payday: {
+    label: "Period starts",
+    valueDay1: "Day 1",
+    valuePayDay: "Pay day, {n}",
+    help: "With day 1, each period is a calendar month. With another day, it starts the day you get paid (on shorter months, the last day). Closing it is still up to you.",
+    decAria: "Previous day",
+    incAria: "Next day",
+    onbLabel: "Pay day",
+    onbSub: "Your month starts that day",
+    legend: "Your pay day",
+    noticeToday: "Today is your pay day",
+    noticePast: "Your pay day was {date}",
+    noticeOpen: "{name} is still open.",
+    noticeAction: "Close period",
+  },
+  // B-8 · Onboarding «Categories» step: unchecking archives.
+  onboardingCategories: {
+    title: "Categories",
+    subtitle: "Each one keeps its colour across the app.",
+    count: "{n} of {total}",
+    subs: { one: "{n} subcategory", other: "{n} subcategories" },
+    noSubs: "No subcategories",
+    unchecked: "Unchecked",
+    note: "Subcategories and names, later in Settings. Unchecked ones come back from Categories.",
+    needOne: "Keep at least one category checked.",
+  },
 };

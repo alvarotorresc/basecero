@@ -10,6 +10,7 @@ import {
 } from "../format.js";
 import { t } from "../i18n/index.js";
 import { PCT_STEP, stepPct, normalizePct } from "../share-pct.js";
+import { normalizePayDay, proposedPeriodStart, periodNameFor, isPayDate } from "../pay-day.js";
 import { inheritedBudgetsRaw, budgetMap } from "../category-spend.js";
 import { remainderCents, sweepDestinations, sweepPlan } from "../barrido.js";
 import { renderInforme } from "./informe.js";
@@ -20,8 +21,8 @@ import { settingRowHtml, sectionHeaderHtml } from "../entity.js";
 import { displayHtml, dispInkHtml, stackedBarHtml, meterHtml } from "../instrument.js";
 import { escHtml, escAttr } from "../esc.js";
 
-// Ventana de días seleccionables del picker de fecha (±2 alrededor de hoy, P1 abierto: la
-// sugerencia es siempre hoy, nunca un «día de cobro» fijo — ver Omite del brief S11).
+// Ventana de días seleccionables del picker de fecha: ±2 alrededor de la fecha propuesta (B-1: el
+// día de cobro de meta.pay_day, o hoy si no toca — pay-day.js#proposedPeriodStart).
 const DAY_WINDOW = 2;
 
 function addDaysIso(iso, n) {
@@ -29,9 +30,8 @@ function addDaysIso(iso, n) {
   d.setDate(d.getDate() + n);
   return d.toLocaleDateString("sv-SE");
 }
-function dayCandidates() {
-  const today = hoyISO();
-  return Array.from({ length: DAY_WINDOW * 2 + 1 }, (_, i) => addDaysIso(today, i - DAY_WINDOW));
+function dayCandidates(centerIso) {
+  return Array.from({ length: DAY_WINDOW * 2 + 1 }, (_, i) => addDaysIso(centerIso, i - DAY_WINDOW));
 }
 
 /** Día seleccionable (B-PeriodoNuevo): botón con el patrón de selección «sobre neutro» del sistema
@@ -77,6 +77,8 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
   // Barrido (N4): goals con progreso, cuentas vivas y la cuenta de origen por defecto — solo hace
   // falta en modo 'next' (bloqueBarrido() más abajo).
   let goalsProgress = [], allAccounts = [], sourceAccountId = "", sourceBalanceCents = 0;
+  // B-1: la fecha que se propone (el día de cobro que ya llegó, o hoy) y el nombre que le toca.
+  let proposedStart = hoyISO();
   try {
     if (mode === "next") {
       closingPeriod = await getOpenPeriod();
@@ -98,15 +100,26 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
       closingSpent = spent; closingIncome = income; closingCount = all.length; rootRows = roots;
       closingBudgets = budgetRows; meta = metaAll;
       goalsProgress = goals; allAccounts = accounts; sourceAccountId = defaultAccId || "";
-      if (sourceAccountId) sourceBalanceCents = await accountBalanceCents(sourceAccountId, hoyISO());
+      proposedStart = proposedPeriodStart({
+        payDay: normalizePayDay(meta.pay_day), todayIso: hoyISO(), openStartIso: closingPeriod.start_date,
+      });
+      // El barrido lleva la fecha de inicio: el saldo de origen se lee a ESA fecha, no a hoy.
+      if (sourceAccountId) sourceBalanceCents = await accountBalanceCents(sourceAccountId, proposedStart);
     } else {
       [rootRows, meta] = await Promise.all([spentByRootCategory(""), getMetaAll()]);
+      proposedStart = proposedPeriodStart({ payDay: normalizePayDay(meta.pay_day), todayIso: hoyISO() });
     }
   } catch (e) {
     renderAsistenteError(container, { mode, onDone, onBack, embed, initialSharePct }, t("periodo.error.load", { error: userMessage(e) }));
     return;
   }
   const partnerName = (meta.partner_name || "").trim();
+  const payDay = normalizePayDay(meta.pay_day);
+  // Nombre por defecto del periodo que empieza en `iso` (B-1): el mes que ocupa casi todo, con el
+  // locale de formato (el mismo que usa nombrePorDefecto).
+  const nameFor = (iso) => {
+    try { return periodNameFor(iso, meta.locale || "es-ES"); } catch { return nombrePorDefecto(); }
+  };
   const accountsById = Object.fromEntries(allAccounts.map((a) => [a.id, a]));
 
   // byId "de mentira" solo con lo que familyForCategory/iconForCategory necesitan (rootOf sube
@@ -143,8 +156,10 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     : [];
 
   const state = {
-    startDate: hoyISO(),
-    name: nombrePorDefecto(),
+    startDate: proposedStart,
+    name: nameFor(proposedStart),
+    // El nombre sigue a la fecha hasta que el usuario lo toca (#pn-nombre).
+    nameTouched: false,
     sharePct: mode === "next" ? closingPeriod.my_share_pct : normalizePct(initialSharePct, 50),
     budgets: { ...inherited }, // rootId -> string en euros tal cual lo escribe el usuario ("" = sin límite)
     // Una raíz con límite heredado TIENE que estar visible: totalPresupuestadoCents suma todo lo
@@ -268,10 +283,10 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
   // cerrar (periodo.header.first).
   function bloqueHeader() {
     // "Cierras {name} y abres {next}" (B-PeriodoNuevo): {next} es el mismo nombre que ya calcula
-    // dateTitle() más abajo (el campo Nombre si se tocó, si no el de nombrePorDefecto()) — nunca un
+    // dateTitle() más abajo (el campo Nombre si se tocó, si no el de nameFor(), B-1) — nunca un
     // "el siguiente" genérico. Sin lógica nueva: reutiliza el valor que la pantalla ya conoce.
     const subtitle = mode === "next"
-      ? t("periodo.header.closing", { name: closingPeriod.name, next: state.name.trim() || nombrePorDefecto() })
+      ? t("periodo.header.closing", { name: closingPeriod.name, next: state.name.trim() || nameFor(state.startDate) })
       : t("periodo.header.first");
     return subHeaderHtml({
       id: mode === "next" || onBack ? "pn-back" : null,
@@ -379,17 +394,19 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     return fieldHtml({ id: "pn-nombre", label: t("common.name"), value: state.name });
   }
 
-  /** Fecha de inicio (B-PeriodoNuevo): 5 días alrededor de hoy como baldosas seleccionables (P1
-   *  abierto: la sugerencia siempre es hoy, nunca un día de cobro fijo), más «Otra fecha» para
-   *  cualquier fecha fuera de esa ventana vía el campo hundido nativo. El botón hace de ida y
-   *  vuelta (#pn-otra-fecha/#pn-dias-cercanos en wire()): sin él, una vez abierto el campo no
-   *  habría manera de volver a las baldosas. */
+  /** Fecha de inicio (B-PeriodoNuevo): 5 días alrededor de la fecha propuesta (B-1: el día de
+   *  cobro, o hoy) como baldosas seleccionables, más «Otra fecha» para cualquier fecha fuera de esa
+   *  ventana vía el campo hundido nativo. El botón hace de ida y vuelta (#pn-otra-fecha/
+   *  #pn-dias-cercanos en wire()): sin él, una vez abierto el campo no habría manera de volver a
+   *  las baldosas. Con día de cobro (≥ 2) y la fecha elegida en él, la leyenda «Tu día de cobro». */
   function bloqueFecha() {
-    const candidates = dayCandidates();
+    const candidates = dayCandidates(proposedStart);
     const showField = state.showCustomDate || !candidates.includes(state.startDate);
+    const legend = payDay > 1 && isPayDate(payDay, state.startDate)
+      ? `<span class="pn-payday-legend"><span class="pn-payday-dot" aria-hidden="true"></span>${escHtml(t("payday.legend"))}</span>` : "";
     return `
     <section class="pn-section">
-      ${sectionHeaderHtml({ title: dateTitle(), id: "pn-date-title" })}
+      <div class="pn-date-head">${sectionHeaderHtml({ title: dateTitle(), id: "pn-date-title" })}${legend}</div>
       ${showField
         ? fieldHtml({ id: "pn-fecha", label: t("periodo.date.customLabel"), type: "date", value: state.startDate })
         : `<div class="pn-day-grid" role="group" aria-label="${escAttr(t("periodo.date.groupAria"))}">${candidates.map((iso) => dayTileHtml(iso, iso === state.startDate)).join("")}</div>`}
@@ -399,7 +416,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     </section>`;
   }
   function dateTitle() {
-    return t("periodo.date.title", { name: state.name.trim() || nombrePorDefecto() });
+    return t("periodo.date.title", { name: state.name.trim() || nameFor(state.startDate) });
   }
 
   // Paso a paso (§9, controls.js#stepperHtml): el reparto con la contraparte, dentro de un bloque
@@ -511,6 +528,12 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     </div>`;
   }
 
+  /** Cambia la fecha de inicio; el nombre la sigue mientras el usuario no lo haya tocado (B-1). */
+  function setStartDate(iso) {
+    state.startDate = iso;
+    if (!state.nameTouched) state.name = nameFor(iso);
+  }
+
   function render() {
     container.innerHTML = `
       ${embed ? "" : bloqueHeader()}
@@ -534,7 +557,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
 
     container.querySelectorAll("[data-day]").forEach((btn) => {
       btn.onclick = async () => {
-        state.startDate = btn.dataset.day;
+        setStartDate(btn.dataset.day);
         state.showCustomDate = false;
         if (state.sourceAccountId) {
           try { state.sourceBalanceCents = await accountBalanceCents(state.sourceAccountId, state.startDate); }
@@ -546,11 +569,11 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     const otraFechaBtn = container.querySelector("#pn-otra-fecha");
     if (otraFechaBtn) otraFechaBtn.onclick = () => { state.showCustomDate = true; render(); };
     // Ida y vuelta del campo nativo a las baldosas: sin esto, tras "Otra fecha" no habría forma de
-    // volver — el día vuelve a ser el de hoy (P1: la sugerencia siempre es hoy).
+    // volver — el día vuelve a ser el propuesto (B-1: el día de cobro, o hoy).
     const diasCercanosBtn = container.querySelector("#pn-dias-cercanos");
     if (diasCercanosBtn) diasCercanosBtn.onclick = async () => {
       state.showCustomDate = false;
-      state.startDate = hoyISO();
+      setStartDate(proposedStart);
       if (state.sourceAccountId) {
         try { state.sourceBalanceCents = await accountBalanceCents(state.sourceAccountId, state.startDate); }
         catch { state.sourceBalanceCents = 0; }
@@ -559,7 +582,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
     };
     const fechaInput = container.querySelector("#pn-fecha");
     if (fechaInput) fechaInput.onchange = async (e) => {
-      state.startDate = e.target.value || hoyISO();
+      setStartDate(e.target.value || proposedStart);
       // La transferencia del barrido lleva ESTA fecha (no "hoy"): al mover el inicio del periodo
       // nuevo hay que releer el saldo de la cuenta de origen a esa fecha exacta.
       if (state.sourceAccountId) {
@@ -571,6 +594,7 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
 
     container.querySelector("#pn-nombre").oninput = (e) => {
       state.name = e.target.value;
+      state.nameTouched = true;
       // "{name} empieza el" (bloqueFecha) se queda con el nombre de cuando se pintó por última
       // vez: un render() completo aquí perdería el foco del campo, así que se parchea solo el
       // título (mismo criterio que patchTotal/patchSweepPreview).
@@ -666,8 +690,8 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
           }
         }
         await openNextPeriod({
-          name: state.name.trim() || nombrePorDefecto(),
-          startDate: state.startDate || hoyISO(),
+          name: state.name.trim() || nameFor(state.startDate || proposedStart),
+          startDate: state.startDate || proposedStart,
           sharePct: partnerName ? Math.min(100, Math.max(0, state.sharePct)) : 100,
           budgets: budgetsPayload,
           sweep,

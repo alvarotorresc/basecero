@@ -134,6 +134,27 @@ test("huchaMessage: periodo pasado de largo dispara la variante «hoy»", () => 
   assert.equal(m.params.n, 0);
 });
 
+// B-1 · día de cobro: con el periodo abierto sin cerrar, el aviso del día de cobro gana a todo (es
+// lo único con fecha que no espera); «Ahora no» lo aparta por la sesión, y mientras siga pendiente
+// el de fin de periodo NO sale en su lugar (sería el mismo aviso con otras palabras).
+test("huchaMessage: el día de cobro pendiente gana a todo lo demás", () => {
+  const m = huchaMessage({ ...CTX, payDayDueIso: "2026-09-08" });
+  assert.deepEqual(m, { kind: "payday", key: "payday", params: { date: "2026-09-08" } });
+});
+
+test("huchaMessage: sin día de cobro pendiente (null o ausente), todo como antes", () => {
+  assert.equal(huchaMessage({ ...CTX, payDayDueIso: null }).kind, "renewal");
+  assert.equal(huchaMessage(CTX).kind, "renewal");
+});
+
+test("huchaMessage: «Ahora no» al día de cobro sigue con el resto, pero no saca el fin de periodo", () => {
+  const dismissed = new Set(["payday"]);
+  assert.equal(huchaMessage({ ...CTX, payDayDueIso: "2026-09-08", dismissed }).kind, "renewal");
+  const bare = { ...CTX, renewals: [], categories: [], daysSinceLastEntry: 0, daysLeftOfPeriod: -1 };
+  assert.equal(huchaMessage({ ...bare, payDayDueIso: "2026-09-08", dismissed }), null);
+  assert.equal(huchaMessage({ ...bare, dismissed }).kind, "periodEnd", "sin día de cobro pendiente, el fin de periodo sigue");
+});
+
 test("groupByDay: bloques en el orden de llegada", () => {
   const g = groupByDay([row("2026-09-09","1"),row("2026-09-09","2"),row("2026-09-08","3")]);
   assert.equal(g.length, 2);
