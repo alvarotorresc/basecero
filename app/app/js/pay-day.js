@@ -139,7 +139,12 @@ export function payDayDue({ payDay, openStartIso, todayIso }) {
  *  de Nuevo periodo antes de confirmar; `rows` son los VIVOS del periodo que se cierra
  *  (listAllByDay). Sin día de cobro, 0: no se mueve nada (repo.openNextPeriodStmts). */
 export const movesLateRows = (payDay) => normalizePayDay(payDay) > PAY_DAY_MIN;
+/** El corte del cierre tardío: la fecha desde la que los apuntes pasan al periodo nuevo, o "" si no
+ *  se mueve nada (sin día de cobro). UNA sola fuente para la escritura (repo.openNextPeriodStmts)
+ *  y para lo que enseña Nuevo periodo (la línea y las cifras del cierre sin lo que se mueve). */
+export const lateMoveCutoff = ({ payDay, startIso }) => (movesLateRows(payDay) && startIso ? startIso : "");
 export function lateMoveCount({ payDay, rows, startIso }) {
-  if (!movesLateRows(payDay) || !startIso) return 0;
-  return (rows ?? []).filter((r) => r.date >= startIso).length;
+  const cutoff = lateMoveCutoff({ payDay, startIso });
+  if (!cutoff) return 0;
+  return (rows ?? []).filter((r) => r.date >= cutoff).length;
 }

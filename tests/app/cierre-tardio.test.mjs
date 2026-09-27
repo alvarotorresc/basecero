@@ -6,7 +6,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { openNextPeriodStmts } from "../../app/app/js/repo.js";
-import { lateMoveCount } from "../../app/app/js/pay-day.js";
+import { lateMoveCount, lateMoveCutoff } from "../../app/app/js/pay-day.js";
+import { remainderCents } from "../../app/app/js/barrido.js";
 import { SQL } from "../../app/app/js/sql.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
@@ -141,4 +142,43 @@ test("lateMoveCount: lo que dice la pantalla es lo que mueve el SQL (vivos con f
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM transactions WHERE period_id='per-2' AND deleted=0").get().n, n);
   assert.equal(lateMoveCount({ payDay: 1, rows: live, startIso: "2026-09-05" }), 0, "sin día de cobro no se mueve nada");
   assert.equal(lateMoveCount({ payDay: 5, rows: live, startIso: "2026-09-28" }), 0);
+});
+
+// ---- Ronda 2: las cifras del cierre y la sugerencia del barrido EXCLUYEN lo que se va a mover ----
+const figuresBefore = (db, pid, cutoff) => ({
+  spent: db.prepare(SQL.spentOfPeriodBefore).get(pid, cutoff).spent_cents,
+  income: db.prepare(SQL.incomeOfPeriodBefore).get(pid, cutoff).income_cents,
+  count: db.prepare(SQL.countOfPeriodBefore).get(pid, cutoff).n,
+});
+const figuresFull = (db, pid) => ({
+  spent: db.prepare(SQL.spentOfPeriod).get(pid).spent_cents,
+  income: db.prepare(SQL.incomeOfPeriod).get(pid).income_cents,
+  count: db.prepare(SQL.listAllByDay).all(pid).length,
+});
+
+test("lateMoveCutoff: el mismo corte para pantalla y escritura; sin día de cobro, ninguno", () => {
+  assert.equal(lateMoveCutoff({ payDay: 5, startIso: "2026-09-05" }), "2026-09-05");
+  for (const payDay of [undefined, 0, 1, "0"]) assert.equal(lateMoveCutoff({ payDay, startIso: "2026-09-05" }), "");
+});
+
+test("cierre tardío pay_day 5: cifras y sugerencia sin los apuntes del 5 en adelante (= lo que queda tras escribir)", () => {
+  const { db, current } = setup();
+  const cutoff = lateMoveCutoff({ payDay: 5, startIso: "2026-09-05" });
+  const shown = figuresBefore(db, "per-1", cutoff);
+  // Lo que queda: 10 ago (1000) y 4 sep compartido al 60 % (600); la nómina del 5 se va.
+  assert.deepEqual(shown, { spent: 1600, income: 0, count: 2 });
+  const full = figuresFull(db, "per-1");
+  assert.equal(full.income, 250000, "antes de excluir, la nómina del 5 contaba");
+  const sug = remainderCents({ budgetTotalCents: 0, incomeCents: shown.income, spentCents: shown.spent });
+  assert.equal(sug.cents, 0, "sin la nómina del periodo nuevo no hay remanente que sugerir");
+  execMany(db, openNextPeriodStmts({ ...base, current, payDay: 5 }));
+  assert.deepEqual(figuresFull(db, "per-1"), shown, "la pantalla dice lo que queda en el periodo cerrado");
+});
+
+test("sin pay_day: sin corte, las cifras son las de siempre (y coinciden con el periodo tras cerrar)", () => {
+  const { db, current } = setup();
+  assert.equal(lateMoveCutoff({ payDay: undefined, startIso: "2026-09-05" }), "");
+  const full = figuresFull(db, "per-1");
+  execMany(db, openNextPeriodStmts({ ...base, current }));
+  assert.deepEqual(figuresFull(db, "per-1"), full);
 });

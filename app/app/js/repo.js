@@ -17,7 +17,7 @@ import { DETECT_WINDOW_DAYS } from "./subscription-detect.js";
 import { previousPeriodOf, previousPeriodsOf } from "./informe-logic.js";
 import { transferError } from "./objetivo-logic.js";
 import { monthEndDates } from "./cuenta-logic.js";
-import { movesLateRows } from "./pay-day.js";
+import { lateMoveCutoff } from "./pay-day.js";
 
 export async function getOpenPeriod() { return (await query(SQL.getOpenPeriod))[0] ?? null; }
 
@@ -69,16 +69,17 @@ export async function openNextPeriod({ name, startDate, sharePct, budgets = [], 
 /** Statements de openNextPeriod, PUROS (reciben periodo abierto, id y hora ya resueltos): así el
  *  test ejecuta la lista real sobre SQLite. Orden: cerrar, abrir, [cierre tardío], límites,
  *  barrido. Cierre tardío (decisión de Álvaro 2026-09-27): SOLO con día de cobro (`payDay` ≥ 2,
- *  pay-day.js#movesLateRows) y periodo que cerrar, los apuntes del que se cierra con fecha
+ *  pay-day.js#lateMoveCutoff) y periodo que cerrar, los apuntes del que se cierra con fecha
  *  ≥ startDate pasan al nuevo —con el reparto de los compartidos congelado antes—; sin día de
  *  cobro la lista es EXACTAMENTE la de antes, aunque la fecha elegida sea anterior a hoy. */
 export function openNextPeriodStmts({ current, newId, now, name, startDate, sharePct, budgets = [], sweep, payDay }) {
   const stmts = [];
   if (current) stmts.push({ sql: SQL.closePeriod, bind: [prevDayIso(startDate), now, current.id] });
   stmts.push({ sql: SQL.insertPeriod, bind: [newId, name, startDate, sharePct, now, now] });
-  if (current && movesLateRows(payDay)) {
-    stmts.push({ sql: SQL.lateCloseFreezeShare, bind: [current.id, now, current.id, startDate] });
-    stmts.push({ sql: SQL.lateCloseMoveTx, bind: [newId, now, current.id, startDate] });
+  const cutoff = current ? lateMoveCutoff({ payDay, startIso: startDate }) : "";
+  if (cutoff) {
+    stmts.push({ sql: SQL.lateCloseFreezeShare, bind: [current.id, now, current.id, cutoff] });
+    stmts.push({ sql: SQL.lateCloseMoveTx, bind: [newId, now, current.id, cutoff] });
   }
   for (const b of budgets) {
     stmts.push({ sql: SQL.insertBudget, bind: [bcUlid(), newId, b.categoryId, b.amountCents, now, now] });
@@ -202,6 +203,15 @@ export async function defaultAccountId() {
 
 export const listPeriods = () => query(SQL.listPeriods);
 export const listAllByDay = (pid) => query(SQL.listAllByDay, [pid]);
+/** Cifras del periodo que se cierra SIN lo que el cierre tardío moverá (fecha ≥ `cutoff`,
+ *  pay-day.js#lateMoveCutoff): gastado, ingresos y nº de movimientos que quedan en él. */
+export async function closingFiguresBefore(pid, cutoff) {
+  const [s, i, c] = await Promise.all([
+    query(SQL.spentOfPeriodBefore, [pid, cutoff]), query(SQL.incomeOfPeriodBefore, [pid, cutoff]),
+    query(SQL.countOfPeriodBefore, [pid, cutoff]),
+  ]);
+  return { spentCents: s[0].spent_cents, incomeCents: i[0].income_cents, count: c[0].n };
+}
 export const getTransaction = async (id) => (await query(SQL.getTransaction, [id]))[0] ?? null;
 // ¿`id` tiene algún apunte de liquidación activo enlazado por ref_id (la devolución entrante o el
 // ajuste saliente)? La usa tanto Movimientos (bloquear importe/compartido en la UI) como

@@ -534,3 +534,10 @@ export const SQL = {
     WHERE deleted=0 AND (account_id=? OR counter_account_id=?) ORDER BY date`,
 };
 export const TABLES = ["meta","accounts","categories","periods","transactions","recurring_rules","goals","budgets","tags"];
+
+// Cifras del periodo que se cierra SIN lo que el cierre tardío va a mover (date < corte, el mismo
+// de lateCloseMoveTx): Nuevo periodo enseña lo que de verdad queda en el cerrado. Mismas sentencias
+// que las de siempre + `date < ?`, sin copiar el cuerpo, para que nunca se desvíen. Bind: [periodId, corte].
+SQL.spentOfPeriodBefore = `${SQL.spentOfPeriod} AND t.date < ?`;
+SQL.incomeOfPeriodBefore = `${SQL.incomeOfPeriod} AND t.date < ?`;
+SQL.countOfPeriodBefore = `SELECT COUNT(*) AS n FROM transactions t WHERE t.period_id=? AND t.deleted=0 AND t.date < ?`;
