@@ -76,7 +76,10 @@ export async function renderCuenta(container, accountId, { onBack, onEdit }) {
   try {
     if (!(await load())) return false;
   } catch (e) {
-    container.innerHTML = `<div class="banner-aviso is-error">${escHtml(t("cuenta.error.load", { error: userMessage(e) }))}</div>`;
+    // Con cabecera y atrás (mismo patrón que objetivo.js): sin ella, el error dejaba la subpantalla
+    // sin salida visible. El nombre de la cuenta si llegó a leerse; si no, «Cuentas».
+    container.innerHTML = `${subHeaderHtml({ id: "cta-back", title: acc?.name || t("patrimonio.accounts.title") })}<div class="banner-aviso is-error">${escHtml(t("cuenta.error.load", { error: userMessage(e) }))}</div>`;
+    container.querySelector("#cta-back").onclick = () => onBack();
     return true;
   }
 
