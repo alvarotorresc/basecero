@@ -15,7 +15,7 @@ import { setMeta, allCategoriesById, listExpenseLeafCategories, listIncomeCatego
 import { fmtMoney } from "../format.js";
 import { goBack, pushBack } from "../back.js";
 import { previewWithProfile, commitImport } from "../n26.js";
-import { reviewCounts, reviewDays, effectiveCategory, isIncluded } from "../import-review.js";
+import { reviewCounts, reviewDays, effectiveCategory, isIncluded, exitStepsAfterCommit } from "../import-review.js";
 import { familyForCategory, iconForCategory, rootOf, famClass } from "../category-colors.js";
 import { showSheet } from "../sheet.js";
 import { buildProfile, applyProfile, detectDateFormat, detectDecimal, parseDateIso, parseAmountCents, summarizeReasons } from "../csv-generic.js";
@@ -124,7 +124,7 @@ function noteHtml(note) {
   return `<p class="imp-note${note.ok ? " is-ok" : ""}">${icon(note.ok ? "check" : "warn", { size: 16 })}<span>${escHtml(note.text)}</span></p>`;
 }
 
-/** Estado inicial para un CSV que importCsv() no supo leer solo: paso «Columnas». */
+/** Estado inicial para un CSV que previewCsv() no supo leer solo: paso «Columnas». */
 export function newAssistantState(fileName, text, needsMapping) {
   return {
     step: "columns", fileName, text, headers: needsMapping.headers, sample: needsMapping.sample,
@@ -216,7 +216,7 @@ export function renderImportAssistant(container, a, { partnerName = "" } = {}) {
     if (profileValid) {
       // Sobre el CSV COMPLETO (a.text), no solo la muestra de 5 filas: el contador "N de M" y la
       // cifra del primario tienen que coincidir con lo que de verdad se manda a importar (mismo
-      // cálculo que hará importWithProfile; el dedupe puede saltar luego alguna ya importada).
+      // cálculo que hará previewWithProfile; el dedupe puede saltar luego alguna ya importada).
       const { rows, errors } = applyProfile(a.text, profile, bcParseCsvLine);
       readableCount = rows.length;
       const total = rows.length + errors.length;
@@ -398,7 +398,7 @@ export function renderImportAssistant(container, a, { partnerName = "" } = {}) {
 
     return `
       <section class="imp-tiles" aria-label="${escAttr(t("importar.summaryAria"))}">
-        ${tile(c.fresh, "importar.tiles.created")}
+        ${tile(c.selected, "importar.tiles.created")}
         ${tile(c.reconciled, "importar.tiles.reconciled")}
         ${tile(c.skipped, "importar.tiles.skipped", true)}
       </section>
@@ -582,12 +582,16 @@ export function renderImportAssistant(container, a, { partnerName = "" } = {}) {
     };
   }
 
-  /** Salida tras escribir: a Ajustes. Desde el asistente hay DOS entradas de «atrás» (la de
-   *  Ajustes y la de Revisar→Columnas); un salto de dos deja que back.js ejecute solo la de más
+  /** Salida a Ajustes, mirando dónde está el usuario AHORA (import-review.js#exitStepsAfterCommit):
+   *  si hizo el gesto «atrás» mientras se escribía, el importador ya no está montado (o volvió a
+   *  Columnas) y retroceder a ciegas le sacaría una pantalla de más. Desde el asistente hay DOS
+   *  entradas (Ajustes y Revisar→Columnas); un salto de dos deja que back.js ejecute solo la de más
    *  abajo (la de Ajustes), sin pasar por Columnas. */
+  const mounted = () => Boolean(container.querySelector(".imp-screen"));
   function exitImporter() {
-    if (a.fromAssistant) window.history.go(-2);
-    else goBack();
+    const steps = exitStepsAfterCommit({ mounted: mounted(), step: a.step, fromAssistant: a.fromAssistant });
+    if (steps === 2) window.history.go(-2);
+    else if (steps === 1) goBack();
   }
 
   function wireReview() {
@@ -629,7 +633,10 @@ export function renderImportAssistant(container, a, { partnerName = "" } = {}) {
       } catch (err) {
         a.commitBusy = false;
         a.commitError = userMessage(err);
-        render();
+        // Si ya salió de Revisar durante la escritura, no se repinta el importador encima de otra
+        // pantalla: el error va en un aviso.
+        if (mounted() && a.step === "review") render();
+        else showToast(a.commitError);
       }
     };
   }

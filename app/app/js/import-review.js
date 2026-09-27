@@ -49,3 +49,15 @@ export function reviewDays(plan, { actions = ["create"], onlyUncategorized = fal
   }
   return [...byDate.keys()].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0)).map((date) => ({ date, items: byDate.get(date) }));
 }
+
+/** Cuántas entradas de «atrás» deshacer tras escribir el import para volver a Ajustes, según dónde
+ *  esté el usuario CUANDO TERMINA la escritura (puede haber hecho el gesto «atrás» mientras tanto):
+ *   - importador desmontado (ya volvió a Ajustes u otra pantalla): 0, solo el aviso;
+ *   - sigue en Revisar: 2 si llegó desde el asistente (Revisar→Columnas + Ajustes), 1 si no;
+ *   - volvió a Columnas (asistente) durante la escritura: 1, la entrada de Ajustes.
+ *  @returns {0|1|2} */
+export function exitStepsAfterCommit({ mounted, step, fromAssistant }) {
+  if (!mounted) return 0;
+  if (step === "review") return fromAssistant ? 2 : 1;
+  return 1;
+}

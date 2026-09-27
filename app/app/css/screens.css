@@ -668,9 +668,12 @@ button.imp-rev-body:disabled { cursor: default; }
 .imp-rev-amount { flex: none; font-size: var(--fs-15); font-weight: 500; }
 .imp-rev-amount.is-pos { color: var(--pos); font-weight: 600; }
 .imp-rev-l2 { display: flex; align-items: center; gap: var(--sp-8); min-width: 0; }
-.imp-rev-l2 .ent-badge { min-width: 0; max-width: 100%; }
-.imp-rev-l2 .ent-badge-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.imp-rev-src { flex: none; font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
+/* Ruta larga («Ropa y cuidado personal › …»): la ficha encoge con elipsis en su etiqueta y el
+   origen («elegida por ti») se queda entero a su derecha, también a 390. */
+.imp-rev-l2 .ent-badge { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; }
+.imp-rev-l2 .ent-badge > svg { flex: none; }
+.imp-rev-l2 .ent-badge-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imp-rev-src { flex: none; white-space: nowrap; font-size: var(--fs-12); font-weight: 500; color: var(--text-dim); }
 /* Sin categoría: píldora punteada «Elegir categoría» (B-Importar). */
 .imp-rev-pick {
   display: inline-flex;

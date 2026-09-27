@@ -11,10 +11,10 @@ import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 import { SQL } from "../../app/app/js/sql.js";
 import { seedStatements } from "../../app/app/js/seeds.js";
-import { planImportRows, importStatements, signedAmountCents } from "../../app/app/js/n26.js";
+import { planImportRows, importStatements, signedAmountCents, externalIdFor, categoryForImportedRow } from "../../app/app/js/n26.js";
 import { applyProfile } from "../../app/app/js/csv-generic.js";
 import { merchantMemory } from "../../app/app/js/merchant-memory.js";
-import { reviewCounts, reviewDays } from "../../app/app/js/import-review.js";
+import { reviewCounts, reviewDays, exitStepsAfterCommit } from "../../app/app/js/import-review.js";
 
 const require = createRequire(import.meta.url);
 const pure = require("../../app/app/vendor/pure.js");
@@ -324,4 +324,84 @@ test("reviewDays: agrupa por fecha de más reciente a más antigua; filtra por a
   assert.deepEqual(unc.map((g) => [g.date, g.items.map((i) => i.index)]), [["2026-08-21", [5]]]);
   const known = reviewDays(fakePlan, { actions: ["reconcile", "skip"] });
   assert.deepEqual(known.map((g) => g.items.map((i) => i.index)), [[2], [3]]);
+});
+
+// ---------------------------------------- paridad fila a fila con el pipeline ANTERIOR a B-3
+
+/** Copia congelada del bucle de runImportPipeline tal como era antes de B-3 (hasta ce20f82): el
+ *  mismo dedupe/conciliación/categoría escrito de corrido, con escritura inmediata en la lista de
+ *  sentencias. Solo existe para comparar: el ensayo + la escritura nuevos deben dejar la base
+ *  EXACTAMENTE igual (salvo los ids generados). */
+async function legacyPipeline(d, rows) {
+  const ctx = ctxFrom(d);
+  const existing = ctx.existing;
+  const res = { created: 0, reconciled: 0, skipped: 0, omitted: 0, categorized: 0 };
+  const stmts = [];
+  let n = 0;
+  for (const r of rows) {
+    if (r.amountCents === 0 || !Number.isFinite(r.amountCents)) { res.omitted++; continue; }
+    r.externalId = await externalIdFor(r, hashFn);
+    const decision = pure.bcDecideImportAction(r, existing);
+    if (decision.action === "skip") res.skipped++;
+    else if (decision.action === "reconcile") {
+      const match = existing.find((t) => t.id === decision.matchId);
+      stmts.push({ sql: SQL.reconcileTx, bind: [r.externalId, NOW, match.id] });
+      match.externalId = r.externalId;
+      res.reconciled++;
+    } else {
+      const id = `legacy${++n}`;
+      const type = r.amountCents < 0 ? "expense" : "income";
+      const categoryId = categoryForImportedRow(r, ctx.memory, type === "expense" ? ctx.expenseCatIds : ctx.incomeCatIds);
+      if (categoryId) res.categorized++;
+      stmts.push({ sql: SQL.insertTransaction, bind: [id, r.bookingDate, "p1", type, Math.abs(r.amountCents), "acc-n26", "",
+        categoryId, pure.bcSanitizeCell(r.partnerName), pure.bcSanitizeCell(r.paymentReference),
+        0, null, "me", 0, "", "", "", r.externalId, 0, "reconciled", NOW, NOW] });
+      existing.push({ id, dateIso: r.bookingDate, type, amountCents: r.amountCents, externalId: r.externalId, status: "reconciled" });
+      res.created++;
+    }
+  }
+  d.exec("BEGIN");
+  for (const s of stmts) d.prepare(s.sql).run(...s.bind);
+  d.exec("COMMIT");
+  return res;
+}
+
+function seedMixed(d) {
+  // pending que concilia, historial que da categoría por memoria, transferencia pendiente (A2)
+  d.prepare(SQL.insertTransaction).run("manual1", "2026-08-19", "p1", "expense", 4520, "acc-n26", "",
+    "cat-alimentacion-supermercado", "Compra en tienda", "", 0, null, "me", 0, "", "", "", "", 0, "pending", T, T);
+  d.prepare(SQL.insertTransaction).run("hist1", "2026-07-01", "p1", "expense", 3000, "acc-n26", "",
+    "cat-restauracion-bares", "BAR LUNA", "", 0, null, "me", 0, "", "", "", "hist-ext-1", 0, "reconciled", T, T);
+  d.prepare(SQL.insertTransaction).run("transfer1", "2026-08-19", "p1", "transfer", 50000, "acc-n26", "acc-ahorro",
+    "", "", "Traspaso", 0, null, "me", 0, "", "", "", "", 0, "pending", T, T);
+}
+const MIXED = [CSV_HEADER, csvRow(),
+  csvRow({ date: "2026-08-21", partner: "BAR LUNA", ref: "Cafe", amount: "-2.40" }),
+  csvRow({ date: "2026-08-21", partner: "BAR LUNA", ref: "Cafe", amount: "-2.40" }),
+  csvRow({ date: "2026-08-20", partner: "EMPRESA SA", ref: "Nomina", amount: "500.00" }),
+  csvRow({ date: "2026-08-22", partner: "N26", ref: "Comprobación", amount: "0.00" }),
+  csvRow({ date: "2026-08-22", partner: "=HYPERLINK(1)", ref: "+cmd", amount: "-9.99" })].join("\n");
+
+const snapshot = (d) => d.prepare(`SELECT * FROM transactions ORDER BY date, merchant, amount_cents, id`).all()
+  .map(({ id, ...rest }) => ({ ...rest, id: /^(legacy|tx)\d+$/.test(id) ? "<nuevo>" : id }));
+
+test("paridad fila a fila: ensayo + escritura dejan la base igual que el pipeline anterior a B-3", async () => {
+  const oldDb = db(); seedMixed(oldDb);
+  const newDb = db(); seedMixed(newDb);
+  const oldRes = await legacyPipeline(oldDb, pure.bcParseN26Csv(MIXED));
+  const newRes = await importRows(newDb, pure.bcParseN26Csv(MIXED));
+  assert.deepEqual(newRes, oldRes);
+  assert.deepEqual(oldRes, { created: 3, reconciled: 1, skipped: 1, omitted: 1, categorized: 1 });
+  assert.deepEqual(snapshot(newDb), snapshot(oldDb));
+  // y un segundo import sobre cada base sigue coincidiendo (todo skip)
+  assert.deepEqual(await importRows(newDb, pure.bcParseN26Csv(MIXED)), await legacyPipeline(oldDb, pure.bcParseN26Csv(MIXED)));
+  assert.deepEqual(snapshot(newDb), snapshot(oldDb));
+});
+
+test("exitStepsAfterCommit: no navega si el importador ya no está; 2 desde el asistente, 1 si no", () => {
+  assert.equal(exitStepsAfterCommit({ mounted: false, step: "review", fromAssistant: true }), 0);
+  assert.equal(exitStepsAfterCommit({ mounted: false, step: "review", fromAssistant: false }), 0);
+  assert.equal(exitStepsAfterCommit({ mounted: true, step: "review", fromAssistant: false }), 1);
+  assert.equal(exitStepsAfterCommit({ mounted: true, step: "review", fromAssistant: true }), 2);
+  assert.equal(exitStepsAfterCommit({ mounted: true, step: "columns", fromAssistant: true }), 1);
 });
