@@ -1,0 +1,49 @@
+<!doctype html>
+<!-- Promo 1920×1080 (tarjeta de proyecto en alvarotc.com, 640 px de ancho): aluminio del sistema B,
+     logotipo, titular y dos móviles con capturas reales (Inicio en claro delante, Movimientos en
+     oscuro detrás). Textos de media/labels.json; ?lang=es|en. Ningún texto por debajo de 40 px:
+     la tarjeta lo reduce a un tercio. -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Promo</title>
+<link rel="stylesheet" href="/app/vendor/fonts/fonts.css">
+<link rel="stylesheet" href="/app/css/tokens.css">
+<link rel="stylesheet" href="/media/templates/frame.css">
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); color: var(--text); }
+  body { position: relative; font-family: var(--font-body); }
+  /* Rejilla del lienzo: margen de 128 (≥ zona de respeto del logotipo, ¼ del icono). */
+  .copy { position: absolute; left: 128px; top: 128px; bottom: 128px; width: 820px; display: flex; flex-direction: column; }
+  .logo { height: 96px; width: auto; align-self: flex-start; }
+  h1 { font-family: var(--font-display); font-weight: 700; font-size: 92px; line-height: 1.08; letter-spacing: -0.03em; margin: auto 0 0; white-space: pre-line; text-wrap: balance; }
+  .sub { font-size: 40px; line-height: 1.3; color: var(--text-dim); margin: 36px 0 0; font-weight: 500; text-wrap: balance; }
+  .phones { position: absolute; top: 0; left: 1080px; width: 760px; height: 1080px; }
+  .phones .phone { --w: 380px; }
+  .phones .phone.back { position: absolute; left: 330px; top: 64px; }
+  .phones .phone.front { position: absolute; left: 0; top: 165px; }
+</style>
+</head>
+<body>
+  <div class="copy">
+    <img class="logo" id="logo" alt="">
+    <h1 id="headline"></h1>
+    <p class="sub" id="sub"></p>
+  </div>
+  <div class="phones">
+    <div class="phone back dark"><img id="shot-back" alt=""></div>
+    <div class="phone front"><img id="shot-front" alt=""></div>
+  </div>
+<script>
+  const lang = new URLSearchParams(location.search).get("lang") || "es";
+  document.documentElement.lang = lang;
+  document.getElementById("logo").src = "/media/brand/basecero-logotipo.svg";
+  document.getElementById("shot-front").src = `/media/out/shots/${lang}/01-inicio.png`;
+  document.getElementById("shot-back").src = `/media/out/shots/${lang}/03-movimientos.png`;
+  window.ready = fetch("/media/labels.json").then((r) => r.json()).then((L) => {
+    document.getElementById("headline").textContent = L.promo[lang].headline;
+    document.getElementById("sub").textContent = L.promo[lang].sub;
+  });
+</script>
+</body>
+</html>

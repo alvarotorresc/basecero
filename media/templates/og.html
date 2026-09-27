@@ -1,0 +1,40 @@
+<!doctype html>
+<!-- Social preview 1200×630 (og:image de la landing): aluminio, logotipo, titular y el Inicio real
+     en un móvil que sale por abajo. Las redes lo muestran a ~500 px: texto de 30 px como mínimo.
+     Textos de media/labels.json; ?lang=es|en. -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>OG</title>
+<link rel="stylesheet" href="/app/vendor/fonts/fonts.css">
+<link rel="stylesheet" href="/app/css/tokens.css">
+<link rel="stylesheet" href="/media/templates/frame.css">
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: var(--bg); color: var(--text); }
+  body { position: relative; font-family: var(--font-body); }
+  .copy { position: absolute; left: 80px; top: 80px; bottom: 80px; width: 640px; display: flex; flex-direction: column; }
+  .logo { height: 64px; width: auto; align-self: flex-start; }
+  h1 { font-family: var(--font-display); font-weight: 700; font-size: 58px; line-height: 1.1; letter-spacing: -0.03em; margin: auto 0 0; white-space: pre-line; }
+  .sub { font-size: 30px; line-height: 1.3; color: var(--text-dim); margin: 22px 0 0; font-weight: 500; text-wrap: balance; }
+  .phone { --w: 330px; position: absolute; left: 790px; top: 72px; }
+</style>
+</head>
+<body>
+  <div class="copy">
+    <img class="logo" id="logo" alt="">
+    <h1 id="headline"></h1>
+    <p class="sub" id="sub"></p>
+  </div>
+  <div class="phone"><img id="shot" alt=""></div>
+<script>
+  const lang = new URLSearchParams(location.search).get("lang") || "es";
+  document.documentElement.lang = lang;
+  document.getElementById("logo").src = "/media/brand/basecero-logotipo.svg";
+  document.getElementById("shot").src = `/media/out/shots/${lang}/01-inicio.png`;
+  window.ready = fetch("/media/labels.json").then((r) => r.json()).then((L) => {
+    document.getElementById("headline").textContent = L.og[lang].headline;
+    document.getElementById("sub").textContent = L.og[lang].sub;
+  });
+</script>
+</body>
+</html>
