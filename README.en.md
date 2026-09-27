@@ -11,7 +11,7 @@ For anyone who tracks their spending by hand and wants to stay the owner of thei
 
 [Español](README.md) · **English**
 
-<a href="https://basecero.alvarotc.com/app/"><img src="https://img.shields.io/badge/Open%20the%20app-basecero.alvarotc.com-4FD99A?style=for-the-badge&labelColor=121214" alt="Open the app"></a>
+<a href="https://basecero.alvarotc.com/app/"><img src="https://img.shields.io/badge/Open%20the%20app-basecero.alvarotc.com-FF5419?style=for-the-badge&labelColor=161719" alt="Open the app"></a>
 
 [Project website](https://basecero.alvarotc.com/en/) · [Install](#installation)
 
@@ -21,11 +21,11 @@ For anyone who tracks their spending by hand and wants to stay the owner of thei
 
 </div>
 
-![The home, transactions and net worth screens of BaseCero](.github/readme/hero.png)
+![BaseCero in the browser and on a phone, in the light theme: the Home screen with what is left in the period](app/img/cover-en.webp)
 
 ## What it is
 
-BaseCero orders your money into payday-to-payday periods and tells you, at any moment, what is
+BaseCero orders your money into periods, payday to payday, and tells you at any moment what is
 actually left. It is for anyone who tracks their spending by hand, wants to see where the month
 went, and would rather their accounts didn't live on somebody else's server. It opens in your
 browser, installs like an app, and works offline.
@@ -34,34 +34,50 @@ browser, installs like an app, and works offline.
 
 ## What it does
 
-- **Your month starts the day you get paid.** Payday-to-payday periods, not the 1st to the 30th.
-  Close one and you see what you spent, what you saved, and your savings rate for the stretch.
-- **Logging, fast.** One screen, with the phone keypad for the amount. Five kinds of entry:
+- **Your month starts the day you get paid.** A period runs from one payday to the next, or from
+  the 1st if you prefer. You close it yourself, and Home reminds you on the day. When you close
+  it you see what you spent, what you saved, and your savings rate for the stretch.
+- **Logging, fast.** One screen: the amount on the phone keypad and the category from a grid of
+  tiles, each in its own colour. You can also type or dictate "12.50 at the bar with Marta" and
+  the app pulls the amount, the category and the split out of the sentence. Five kinds of entry:
   expense, income, transfer, refund and adjustment.
-- **Spending by category.** One screen with all your categories, sorted by what you have spent so
-  far, each one expanding into its breakdown by subcategory. You set a limit only where it helps,
-  and change or remove it right there. The home screen tells you whether you are above or below the
-  pace of the plan.
+- **Spending by category.** All your categories, sorted by what you have spent so far, each with
+  its bar and its percentage. Each one expands into its subcategories. You set a limit only
+  where it helps, and change or remove it right there. Home tells you whether you are above or
+  below the pace of the plan.
 - **Categories that are yours.** You start with 41 across two levels and change the name,
   colour, icon and order. The ones you don't need get archived without touching your history.
 - **Shared expenses, both ways.** You log who paid and which share is yours. If the other person
-  paid, the expense counts as yours but doesn’t touch your accounts until you settle up;
-  “Settle up” shows both debts, the net figure, and closes them in one go. Expenses are the ones
-  that get split: income belongs to whoever earns it.
+  paid, the expense counts as yours but doesn't touch your accounts until you settle up.
+  "Settle up" shows both debts and the net figure, and closes them in one go. Expenses get
+  split; income belongs to whoever earns it.
 - **Recurring entries and forecasting.** Rules for the rent, subscriptions or your salary. With
-  them the home screen works out what is still committed and what is really available.
-- **Net worth.** Your net worth today and how it moved, current and savings accounts, debts with
-  their instalment and how many are left, and savings goals.
+  them, Home works out what is still committed and what is really available.
+- **Net worth.** Your net worth today and how it has moved, current and savings accounts, debts
+  with their instalment and how many are left, and savings goals with their own pot.
+- **Period report.** What came in, what went out and what you saved, against the previous period
+  and by category. You download it as a PDF, and the PDF is generated on your phone.
 - **Import your bank statement.** N26 CSVs are recognised on their own; for any other bank an
-  assistant asks once what each column is. It reconciles what you already logged and skips
-  duplicates.
+  assistant asks once what each column is. Before anything is saved you go over the list: drop
+  rows and change categories. It reconciles what you already logged and skips duplicates.
 - **In Spanish and in English,** with the currency and the number and date formats you pick.
+
+And the small things: a configurable payday, combined filters in Transactions, duplicating a
+transaction, moving money into a goal's pot, and a page of its own for every account and goal.
 
 ## What it looks like
 
-| Home | Transactions | Net worth | Spending by category |
-| :--: | :----------: | :-------: | :----: |
-| <img src=".github/readme/en/app-inicio.webp" alt="Home screen showing what's available in the period" width="190"> | <img src=".github/readme/en/app-movimientos.webp" alt="Transactions grouped by day" width="190"> | <img src=".github/readme/en/app-patrimonio.webp" alt="Net worth, accounts and goals" width="190"> | <img src=".github/readme/en/app-categorias.webp" alt="Spending by category, with a row and a percentage per category, and Groceries expanded with its subcategories" width="190"> |
+The background is aluminium grey in the light theme and graphite in the dark one; you pick
+either, or follow your system. Colour comes from the category: each one has its family (Sage,
+Mustard, Sky… twelve in all) and carries it everywhere, in the tint of its tile, in its bar and in
+its figure. Orange is kept for the main action, and the figure that matters shows in amber on a
+dark panel, like a calculator's.
+
+| Home | Log transaction | Transactions |
+| :--: | :-------------: | :----------: |
+| <img src="app/img/shots/en/01-inicio.webp" alt="Home in the light theme: what is left in the period on the dark panel and the latest transactions, each in its category's colour" width="220"> | <img src="app/img/shots/en/02-registro.webp" alt="Log transaction in the light theme: the amount, the transaction type and the category grid with each family's tint" width="220"> | <img src="app/img/shots/en/03-movimientos.webp" alt="Transactions in the dark theme: the period's entries grouped by day" width="220"> |
+| **Spending by category** | **Net worth** | **Report** |
+| <img src="app/img/shots/en/04-gasto-categoria.webp" alt="Spending by category in the light theme: categories sorted by spending, with their bar and percentage" width="220"> | <img src="app/img/shots/en/05-patrimonio.webp" alt="Net worth in the dark theme: the net total, the accounts and the savings goals" width="220"> | <img src="app/img/shots/en/06-informe.webp" alt="Period report in the light theme: income, spending and savings, and spending by category against the previous period" width="220"> |
 
 ## Installation
 
@@ -84,8 +100,9 @@ Once installed it works offline, and to uninstall it you just delete the icon.
 - **No telemetry, no analytics, no cookies.** The app measures nothing and reports to nobody, so
   there is no banner to consent to either.
 - **No third-party requests.** Everything it needs travels inside the repository: it works with
-  the network unplugged. The only way out is the link to the feedback form, which opens outside
-  the app and carries only what you type into it.
+  the network unplugged. There are two ways out, and you open both: the link to the feedback
+  form, which opens outside the app and carries only what you type into it, and dictation in Log
+  transaction (more on that below).
 - **Your data never leaves the device.** It lives in a local database in the browser and only
   moves if you export it.
 - **And if you leave, you take it with you.** You export an `.xlsx` spreadsheet you can open in
@@ -96,34 +113,42 @@ the browser's private storage and is protected by the device itself, so whoever 
 unlocked phone holds your accounts. And since you keep the keys, there is no "forgot my
 password": make backups.
 
+Another caveat: dictation is not local. If you tap the mic in Log transaction, speech
+recognition is done by the browser, and the browser sends your voice to its vendor's server. The
+app says so under the text box. If you'd rather it didn't, type the sentence instead of saying
+it: typed text is parsed on your device.
+
 <details>
 <summary><b>Technical details</b></summary>
 
 ### How it's built
 
-Vanilla JS. No framework, no bundler and no `node_modules`: the code you read is the code that
-runs in the browser.
+Vanilla JS. The app has no framework, no bundler and no `node_modules`: the code you read is the
+code that runs in the browser.
 
-- **Data** — SQLite compiled to WebAssembly, in a Web Worker over OPFS (the origin's private
+- **Data.** SQLite compiled to WebAssembly, in a Web Worker over OPFS (the origin's private
   storage). If the browser doesn't support it, the app says so and starts in memory.
-- **Offline** — a service worker with an explicit precache of the whole shell, including
-  SQLite's `.wasm` and the typeface.
+- **Offline.** A service worker with an explicit precache of the whole shell, including
+  SQLite's `.wasm` and the typefaces.
+- **Themes.** Colours come from CSS tokens defined in pairs, light and dark. The twelve category
+  families are stored as data (one key per category, not a loose colour) and the CSS paints them
+  in each theme.
 
 ### Export and import
 
-- **`.xlsx`** — the full data contract: accounts, categories, periods, transactions, recurring
+- **`.xlsx`.** The full data contract: accounts, categories, periods, transactions, recurring
   rules, goals and budgets. It can be re-imported to replace the data, and a round-trip test
   checks that exporting and re-importing leaves it intact, relationships included.
-- **`.bce`** — a backup encrypted with AES-256-GCM and a key derived with PBKDF2-HMAC-SHA256 at
+- **`.bce`.** A backup encrypted with AES-256-GCM and a key derived with PBKDF2-HMAC-SHA256 at
   600,000 iterations, with a 10-character minimum password. It is stored nowhere: if you forget
   it, the backup is unrecoverable.
-- **`.json`** — a quick emergency dump from Settings.
+- **`.json`.** A quick emergency dump from Settings.
 
 ### Tests and development
 
-More than 450 tests with Node's native runner, no dependencies. The pure logic — forecasting,
-charts, formatting, CSV parsing, backup crypto, the `.xlsx` contract — lives apart from the
-database and the DOM precisely so it can be tested that way.
+More than 1500 tests with Node's native runner, no dependencies. The pure logic (forecasting,
+charts, formatting, CSV and sentence parsing, backup crypto, the `.xlsx` contract) lives apart
+from the database and the DOM precisely so it can be tested that way.
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs them on every push to `main` and
 every PR.
 
@@ -136,16 +161,17 @@ node --test tests/app/*.test.mjs        # the tests
 
 ### Layout
 
-- [`app/`](app/) — the published root of the site: ES/EN landing, legal pages and static files.
-- [`app/app/`](app/app/) — the whole PWA, with `js/screens/` (one screen per file), `js/i18n/`
+- [`app/`](app/): the published root of the site: ES/EN landing, legal pages and static files.
+- [`app/app/`](app/app/): the whole PWA, with `js/screens/` (one screen per file), `js/i18n/`
   (es/en) and `vendor/`.
-- [`tests/app/`](tests/app/) — the suite, one file per logic module.
+- [`tests/app/`](tests/app/): the suite, one file per logic module.
 
 ### Known limitations
 
 - **A transfer imported from a CSV can end up duplicated.** The statement carries the transfer’s
-  charge as one more line, so it comes in as an uncategorised expense on top of the transfer entry
-  you already had. It is not reconciled automatically: delete the duplicate by hand.
+  charge as one more line, so it shows up as an uncategorised expense on top of the transfer entry
+  you already had. It is not reconciled automatically: drop it in the review step before
+  importing, or delete the duplicate afterwards.
 - **Income is not split with the other person.** The period’s percentage applies to shared
   expenses; income belongs, in full, to whoever earns it.
 
@@ -153,22 +179,27 @@ node --test tests/app/*.test.mjs        # the tests
 
 BaseCero started life as a Google Sheets spreadsheet with a Python generator and an Apps Script
 script. The app replaced all three, and neither program is in the repository any more: all that
-survives from those days is the data contract — the same one the `.xlsx` exports and imports today
-— and the pure import logic in [`app/app/vendor/pure.js`](app/app/vendor/pure.js), still written in
+survives from those days is the data contract (the same one the `.xlsx` exports and imports
+today) and the pure import logic in [`app/app/vendor/pure.js`](app/app/vendor/pure.js), still written in
 the Apps Script dialect it was born in.
 
 </details>
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE). It bundles third-party software in
+MIT, see [`LICENSE`](LICENSE). It bundles third-party software in
 [`app/app/vendor/`](app/app/vendor/); the full notices are in
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md):
 
-- [SheetJS](https://sheetjs.com/) (`xlsx.full.min.js`) — Apache-2.0.
-- [SQLite WASM](https://sqlite.org/wasm) — SQLite is public domain; the Emscripten glue code is
+- [SheetJS](https://sheetjs.com/) (`xlsx.full.min.js`): Apache-2.0.
+- [pdf-lib](https://pdf-lib.js.org/) (`pdf-lib.min.js`), for the Report PDF: MIT. Its bundle
+  includes `tslib`, under Apache-2.0.
+- [SQLite WASM](https://sqlite.org/wasm): SQLite is public domain; the Emscripten glue code is
   MIT / University of Illinois-NCSA.
-- [Outfit](https://fonts.google.com/specimen/Outfit) — SIL Open Font License 1.1.
+- [Unbounded](https://github.com/googlefonts/unbounded),
+  [Instrument Sans](https://github.com/Instrument/instrument-sans) and
+  [IBM Plex Mono](https://github.com/IBM/plex): SIL Open Font License 1.1.
+- Six icons from [Lucide](https://lucide.dev): ISC.
 
 ## Author
 
