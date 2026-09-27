@@ -8,9 +8,11 @@
   --font-body:'Instrument Sans',sans-serif;
   --font-mono:'IBM Plex Mono',monospace;
 
-  /* Escala de cuerpo (el 16 solo en <input>, para que iOS no haga zoom) */
-  --fs-12:12px;--fs-13:13px;--fs-14:14px;--fs-15:15px;--fs-input:16px;--fs-17:17px;--fs-20:20px;--fs-24:24px;
+  /* Escala de cuerpo. --fs-input (16) en <input>, para que iOS no haga zoom; --fs-16 la cifra de una
+     cuenta del onboarding (B-Onb-Cuentas) */
+  --fs-12:12px;--fs-13:13px;--fs-14:14px;--fs-15:15px;--fs-input:16px;--fs-16:16px;--fs-17:17px;--fs-20:20px;--fs-24:24px;
   --fs-30:30px; /* cifra grande de un bloque con familia (B-Home «Ahorras 47 %») */
+  --fs-40:40px; /* nombre de la marca en la Bienvenida (B-Onb-Bienvenida) */
   --lh-title:1.2;--lh-body:1.5;
 
   /* Cifra del Display: hero · subpantalla · compacta. Son los tamaños por defecto: cada pantalla puede
@@ -20,8 +22,11 @@
   /* Espaciado: rejilla 2/4/8/12/16/24; el 20 solo dentro del Display */
   --sp-2:2px;--sp-4:4px;--sp-8:8px;--sp-12:12px;--sp-16:16px;--sp-20:20px;--sp-24:24px;
 
-  /* Radios: xs barras y columnas · base controles y filas · lg bloques y Display · xl hoja y aviso */
-  --radius-xs:4px;--radius:10px;--radius-lg:18px;--radius-xl:24px;--radius-pill:999px;
+  /* Radios: xs barras y columnas · base controles y filas · lg bloques y Display · xl hoja y aviso.
+     Los dos de los mockups elegidos (Álvaro 2026-09-27: igual que el mockup): bar 5 (columnas de la
+     semana, barras de 10, marco interior del sello) y sm 8 (baldosa de 30 de las filas de ajuste,
+     barra apilada de 22-24, extremos de la barra del Informe, sello del Recibo). Valen en los dos temas. */
+  --radius-xs:4px;--radius-bar:5px;--radius-tile:8px;--radius:10px;--radius-lg:18px;--radius-xl:24px;--radius-pill:999px;
 
   /* Base Instrumento: fondos por elevación tonal, bordes y tinta */
   --bg:#E3E1DC;--surface:#EEEDE9;--raised:#F8F7F4;--well:#D9D7D1;
@@ -39,8 +44,9 @@
   /* Señal de dinero (+/−) y destructivo (D-1: rojo en entrada y confirmación) */
   --pos:#17693A;--neg:#B3261E;--on-neg:#FFFFFF;
 
-  /* Velo de hoja y aviso */
+  /* Velo de hoja y aviso; el del Recibo, más denso (B-Recibo) */
   --scrim:rgba(29,30,32,.55);
+  --scrim-recibo:rgba(29,30,32,.62);
 
   /* Sombras y anillos */
   --sh-display:inset 0 2px 6px rgba(0,0,0,.35);
@@ -50,10 +56,14 @@
   --sh-key:0 2px 0 rgba(0,0,0,.18);
   --sh-sheet:0 -2px 12px rgba(0,0,0,.18);
   --sh-alert:0 4px 16px rgba(0,0,0,.25);
+  --sh-ticket:0 14px 28px rgba(0,0,0,.4); /* sombra del papel del Recibo (drop-shadow, sin spread) */
   --disp-glow:0 0 12px rgba(255,194,102,.2);
   --led-glow:0 0 6px rgba(43,212,107,.6);
   --led-glow-wait:0 0 6px rgba(255,194,102,.6);
   --ring-sel:inset 0 0 0 2px var(--accent);
+  /* Anillo EXTERIOR con hueco (B-Categorias-Nueva: muestra de familia e icono elegidos). El hueco es
+     del color del fondo que hay detrás: --ring-gap, que el contenedor puede fijar (por defecto --surface). */
+  --ring-sel-out:0 0 0 2px var(--ring-gap,var(--surface)),0 0 0 4px var(--accent);
   --focus:2px solid var(--accent);--focus-offset:2px;
 
   /* Familias (paleta-familias.md): -t tinte (qué es) · -b barra (cuánto) · -x texto e icono (de qué).
@@ -98,8 +108,9 @@
   /* Señal y destructivo */
   --pos:#5BD08A;--neg:#F2766B;--on-neg:#161719;
 
-  /* Velo */
+  /* Velo; el del Recibo, más denso (misma subida que en claro) */
   --scrim:rgba(0,0,0,.6);
+  --scrim-recibo:rgba(0,0,0,.68);
 
   /* Sombras y anillos (en oscuro los hundidos llevan anillo de borde; el del pozo, --border-strong) */
   --sh-display:inset 0 2px 6px rgba(0,0,0,.6),inset 0 0 0 1px var(--disp-line);
@@ -109,6 +120,7 @@
   --sh-key:0 2px 0 rgba(0,0,0,.4);
   --sh-sheet:0 -2px 12px rgba(0,0,0,.5);
   --sh-alert:0 4px 16px rgba(0,0,0,.5);
+  --sh-ticket:0 14px 28px rgba(0,0,0,.6);
   --disp-glow:0 0 12px rgba(255,194,102,.25);
 
   /* Familias, oscuro: tintes con L +0,085 y croma ×1,7 y textos con croma ×1,5 sobre su tono (V3);
@@ -145,7 +157,9 @@
 
    Valores en crudo → token:
      #17693A (cifra de ingreso, LED fuera del Display)   → var(--pos)   (sin brillo)
-     rgba(29,30,32,.55|.62|.34)                          → var(--scrim)
+     rgba(29,30,32,.55|.34)                              → var(--scrim)
+     rgba(29,30,32,.62) (velo del Recibo)                → var(--scrim-recibo)
+     0 14px 28px rgba(0,0,0,.4) (papel del Recibo)       → var(--sh-ticket)
      #F8F7F4 usado como fondo de icono sobre tinte        → var(--chip)
      #F8F7F4 usado como control secundario sobre tinte    → var(--lift)
      inset 0 2px 6px rgba(0,0,0,.35|.6)[, inset 0 0 0 1px var(--disp-line)] → var(--sh-display)
@@ -160,7 +174,8 @@
      0 0 6px rgba(43,212,107,.6)                         → var(--led-glow)
      0 0 6px rgba(255,194,102,.6)                        → var(--led-glow-wait)
      inset 0 0 0 2px var(--accent)                       → var(--ring-sel)
-     0 0 0 2px var(--surface), 0 0 0 4px var(--accent)   → var(--ring-sel)   (anillo exterior eliminado)
+     0 0 0 2px var(--surface), 0 0 0 4px var(--accent)   → var(--ring-sel-out) (anillo exterior con hueco;
+       la simplificación a --ring-sel, F-17, RETIRADA: Álvaro 2026-09-27, igual que el mockup)
      outline 2px var(--accent) / anillo 0 0 0 2px var(--text) de foco → outline:var(--focus);outline-offset:var(--focus-offset)
      inset 0 0 0 1px var(--<fam>-s) (borde de tarjeta elegida) → RETIRADO (Álvaro 2026-09-27: igual que
        el mockup): la tarjeta lleva borde 1px --f-<fam>-b donde el original lo pinta
@@ -171,7 +186,10 @@
    Radios y cifras:
      border-radius 24px                                  → var(--radius-xl)
      border-radius 2-6px en barras, columnas, segmentos  → var(--radius-xs)
-     border-radius 8px y 14px                            → var(--radius)
+     border-radius 5px (columnas, barras de 10, sello)   → var(--radius-bar)  (antes --radius-xs: RETIRADO,
+       Álvaro 2026-09-27: igual que el mockup)
+     border-radius 8px                                   → var(--radius-tile) (antes --radius: RETIRADO, ídem)
+     border-radius 14px                                  → var(--radius)
      cifra del Display 52|56|64 (hero) / 44|48 / 34      → RETIRADO (Álvaro 2026-09-27): el tamaño de su
        mockup (--disp-fs); xl/l/m quedan como atajos de 52/44/34
      line-height de la cifra del Display 1|1.1           → var(--lh-disp)
