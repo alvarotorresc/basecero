@@ -219,69 +219,21 @@ async function runImportPipeline(rows, choices = {}) {
   return res;
 }
 
-/** Importa un CSV de N26. Conservada como export propio (no solo camino interno del router):
- *  la sigue llamando directamente Ajustes (Task 15, previa a esta PR) y es lo que reproduce el
- *  test de paridad de este fichero — cambiar su firma o retirarla habría obligado a tocar la UI
- *  fuera del alcance de esta tarea (Task 6). El router (importCsv) también la usa cuando detecta
- *  cabeceras N26. */
-export async function importN26Csv(text) {
-  return runImportPipeline(bcParseN26Csv(text));
-}
-
-/** Aplica un perfil de CSV genérico (csv-generic.js) y mete las filas válidas por el MISMO
- *  pipeline de dedupe/conciliación que N26. Las filas con error de applyProfile (fecha/importe
- *  inválidos) NO entran al pipeline: se cuentan aparte como `omitted` y no bloquean el resto.
- *  `res.omitted` ya trae su propio conteo (M4: filas de 0,00 o no numéricas descartadas DENTRO
- *  del pipeline) — se SUMA a errors.length, nunca se pisa. */
-export async function importWithProfile(text, profile) {
-  const { rows, errors } = applyProfile(text, profile, bcParseCsvLine);
-  const res = await runImportPipeline(rows);
-  return { ...res, omitted: res.omitted + errors.length };
-}
-
-/** Router de import (Task 5, PR E): detecta el formato del CSV y elige camino sin que la UI
- *  tenga que saber nada de N26 ni de perfiles. Orden de detección: (1) cabeceras N26 exactas →
- *  camino de siempre; (2) si no, perfil guardado en meta.csv_profile cuyas cabeceras casen
- *  exactamente → import genérico; (3) si no hay match, `needsMapping` con cabecera+muestra para
- *  que la UI (Task 6) abra el asistente — SIN tocar la base de datos más allá de la lectura de
- *  meta necesaria para decidir. */
-export async function importCsv(text) {
-  // Guard temprano (ruling de la review de Task 5): sin periodo abierto, CUALQUIER CSV — incluso
-  // basura irreconocible que de otro modo caería en needsMapping — debe fallar con este mensaje
-  // accionable ANTES de llegar al sniff, para que gane siempre sobre "cabecera no reconocida"
-  // (runImportPipeline ya repetía esta misma comprobación, pero solo se alcanza en los caminos
-  // N26/perfil; needsMapping no pasaba nunca por ahí).
-  if (!(await getOpenPeriod())) throw new UserError(t("errors.common.noOpenPeriod"));
+/** Router PURO del import (Task 5 PR E; B-3): detecta el formato del CSV y devuelve sus filas
+ *  parseadas sin tocar la base. Orden de detección: (1) cabeceras N26 exactas → bcParseN26Csv;
+ *  (2) si no, el perfil guardado (`savedProfileRaw` = meta.csv_profile tal cual) si sus cabeceras
+ *  casan exactamente → applyProfile; (3) si no, `needsMapping` con cabecera + muestra para el
+ *  asistente. `parseErrors`: filas que applyProfile no pudo leer (fecha/importe), que no entran al
+ *  pipeline y se suman a `omitted`. */
+export function routeCsv(text, savedProfileRaw) {
   const { headers, sample } = sniffCsv(text, bcParseCsvLine);
-  if (isN26Headers(headers)) {
-    const res = await importN26Csv(text);
-    return { ...res, via: "n26" };
-  }
-
-  const meta = await getMetaAll();
-  const profile = parseCsvProfile(meta.csv_profile);
+  if (isN26Headers(headers)) return { via: "n26", rows: bcParseN26Csv(text), parseErrors: 0 };
+  const profile = parseCsvProfile(savedProfileRaw);
   if (profile && profileMatches(profile, headers)) {
-    const res = await importWithProfile(text, profile);
-    return { ...res, via: "profile" };
+    const { rows, errors } = applyProfile(text, profile, bcParseCsvLine);
+    return { via: "profile", rows, parseErrors: errors.length };
   }
-
   return { needsMapping: { headers, sample } };
-}
-
-/** Filas parseadas de un CSV ya reconocido (N26 o perfil) + nº de filas que el parseo no pudo
- *  leer (solo el perfil genérico descarta filas aquí; N26 lanza si la cabecera no casa). */
-function parsedRows(text, via, profile) {
-  if (via === "n26") return { rows: bcParseN26Csv(text), parseErrors: 0 };
-  const { rows, errors } = applyProfile(text, profile, bcParseCsvLine);
-  return { rows, parseErrors: errors.length };
-}
-
-/** Ensayo de un CSV con el perfil indicado (el que acaba de configurar el asistente): nada se
- *  escribe. `plan.counts.omitted` ya suma las filas que applyProfile no pudo leer, igual que
- *  importWithProfile. */
-export async function previewWithProfile(text, profile) {
-  const { rows, parseErrors } = parsedRows(text, "profile", profile);
-  return previewRows(rows, parseErrors, "profile");
 }
 
 async function previewRows(rows, parseErrors, via) {
@@ -291,24 +243,25 @@ async function previewRows(rows, parseErrors, via) {
   return { via, rows, parseErrors, plan };
 }
 
-/** Router del paso de revisión (B-3): igual que importCsv —mismo guard temprano de periodo y
- *  mismo orden de detección (N26, perfil guardado, needsMapping)— pero SIN escribir nada:
- *  devuelve { via, rows, parseErrors, plan } para que la pantalla enseñe la lista, o
- *  { needsMapping } para abrir el asistente. La escritura la hace commitImport. */
+/** Ensayo de un CSV con el perfil indicado (el que acaba de configurar el asistente): nada se
+ *  escribe. `plan.counts.omitted` ya suma las filas que applyProfile no pudo leer. */
+export async function previewWithProfile(text, profile) {
+  const { rows, errors } = applyProfile(text, profile, bcParseCsvLine);
+  return previewRows(rows, errors.length, "profile");
+}
+
+/** Router del paso de revisión (B-3) SIN escribir nada: devuelve { via, rows, parseErrors, plan }
+ *  para que la pantalla enseñe la lista, o { needsMapping } para abrir el asistente. La escritura
+ *  la hace commitImport. */
 export async function previewCsv(text) {
+  // Guard temprano (ruling de la review de Task 5): sin periodo abierto, CUALQUIER CSV — incluso
+  // basura irreconocible que de otro modo caería en needsMapping — falla con este mensaje
+  // accionable ANTES de llegar al sniff.
   if (!(await getOpenPeriod())) throw new UserError(t("errors.common.noOpenPeriod"));
-  const { headers, sample } = sniffCsv(text, bcParseCsvLine);
-  if (isN26Headers(headers)) {
-    const { rows, parseErrors } = parsedRows(text, "n26");
-    return previewRows(rows, parseErrors, "n26");
-  }
   const meta = await getMetaAll();
-  const profile = parseCsvProfile(meta.csv_profile);
-  if (profile && profileMatches(profile, headers)) {
-    const { rows, parseErrors } = parsedRows(text, "profile", profile);
-    return previewRows(rows, parseErrors, "profile");
-  }
-  return { needsMapping: { headers, sample } };
+  const routed = routeCsv(text, meta.csv_profile);
+  if (routed.needsMapping) return routed;
+  return previewRows(routed.rows, routed.parseErrors, routed.via);
 }
 
 /** Escribe un import revisado: `rows`/`parseErrors` son los de previewCsv/previewWithProfile y
