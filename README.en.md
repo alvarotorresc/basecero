@@ -21,7 +21,7 @@ For anyone who tracks their spending by hand and wants to stay the owner of thei
 
 </div>
 
-![BaseCero in the browser and on a phone, in the light theme: the Home screen with what is left in the period](app/img/cover-en.webp)
+![BaseCero in a browser window: Home with what you can spend today and the September period line.](app/img/cover-en.webp)
 
 ## What it is
 
@@ -75,9 +75,9 @@ dark panel, like a calculator's.
 
 | Home | Log transaction | Transactions |
 | :--: | :-------------: | :----------: |
-| <img src="app/img/shots/en/01-inicio.webp" alt="Home in the light theme: what is left in the period on the dark panel and the latest transactions, each in its category's colour" width="220"> | <img src="app/img/shots/en/02-registro.webp" alt="Log transaction in the light theme: the amount, the transaction type and the category grid with each family's tint" width="220"> | <img src="app/img/shots/en/03-movimientos.webp" alt="Transactions in the dark theme: the period's entries grouped by day" width="220"> |
+| <img src="app/img/shots/en/01-inicio.webp" alt="BaseCero Home screen in light theme: you can spend €40.78 today, €530.17 left of €2,000.00 in the September period, current account balance, what Marta owes you, this week's spending and a 30% savings rate." width="220"> | <img src="app/img/shots/en/02-registro.webp" alt="Logging a €3.40 expense under Eating out › Bars &amp; cafés, with the colour-coded category grid and a note of what is left of the Eating out limit." width="220"> | <img src="app/img/shots/en/03-movimientos.webp" alt="September transactions in dark theme: €1,469.83 spent of €2,000.00, search, category filters and the list grouped by day." width="220"> |
 | **Spending by category** | **Net worth** | **Report** |
-| <img src="app/img/shots/en/04-gasto-categoria.webp" alt="Spending by category in the light theme: categories sorted by spending, with their bar and percentage" width="220"> | <img src="app/img/shots/en/05-patrimonio.webp" alt="Net worth in the dark theme: the net total, the accounts and the savings goals" width="220"> | <img src="app/img/shots/en/06-informe.webp" alt="Period report in the light theme: income, spending and savings, and spending by category against the previous period" width="220"> |
+| <img src="app/img/shots/en/04-gasto-categoria.webp" alt="September spending by category: each category with its colour, bar and limit; Home and Car flag that they have used over 95% of their limit." width="220"> | <img src="app/img/shots/en/05-patrimonio.webp" alt="Net worth in dark theme: €3,906.36 in total, €606.17 up this period, what you have against what you owe, and the current, savings and holiday jar accounts." width="220"> | <img src="app/img/shots/en/06-informe.webp" alt="Period report: you save 30% of what you earn, €2,100.00 earned against €1,469.83 spent, the comparison with August and the button to download the PDF." width="220"> |
 
 ## Installation
 

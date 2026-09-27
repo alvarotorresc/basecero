@@ -21,7 +21,7 @@ Para quien lleva sus gastos a mano y quiere seguir siendo dueño de sus datos.
 
 </div>
 
-![BaseCero en el navegador y en el móvil, en tema claro: la pantalla de Inicio con el disponible del periodo](app/img/cover-es.webp)
+![BaseCero en una ventana de navegador: Inicio con lo que puedes gastar hoy y la línea del periodo de septiembre.](app/img/cover-es.webp)
 
 ## Qué es
 
@@ -74,9 +74,9 @@ oscuro como el de una calculadora.
 
 | Inicio | Registrar | Movimientos |
 | :----: | :-------: | :---------: |
-| <img src="app/img/shots/es/01-inicio.webp" alt="Inicio en tema claro: el disponible del periodo en el panel oscuro y los últimos movimientos, cada uno con el color de su categoría" width="220"> | <img src="app/img/shots/es/02-registro.webp" alt="Registrar en tema claro: el importe, el tipo de movimiento y la rejilla de categorías con el tinte de cada familia" width="220"> | <img src="app/img/shots/es/03-movimientos.webp" alt="Movimientos en tema oscuro: los apuntes del periodo agrupados por día" width="220"> |
+| <img src="app/img/shots/es/01-inicio.webp" alt="Pantalla de Inicio de BaseCero en tema claro: hoy puedes gastar 40,78 €, quedan 530,17 € de 2.000,00 € en el periodo de septiembre, saldo de la cuenta corriente, lo que Marta te debe, el gasto de la semana y un 30 % de ahorro." width="220"> | <img src="app/img/shots/es/02-registro.webp" alt="Registro de un gasto de 3,40 € en Restauración › Bares y cafés, con la rejilla de categorías por colores y el aviso de lo que queda del límite de Restauración." width="220"> | <img src="app/img/shots/es/03-movimientos.webp" alt="Movimientos de septiembre en tema oscuro: 1.469,83 € gastados de 2.000,00 €, buscador, filtros por categoría y la lista agrupada por día." width="220"> |
 | **Gasto por categoría** | **Patrimonio** | **Informe** |
-| <img src="app/img/shots/es/04-gasto-categoria.webp" alt="Gasto por categoría en tema claro: las categorías ordenadas por gasto, con su barra y su porcentaje" width="220"> | <img src="app/img/shots/es/05-patrimonio.webp" alt="Patrimonio en tema oscuro: el patrimonio neto, las cuentas y los objetivos de ahorro" width="220"> | <img src="app/img/shots/es/06-informe.webp" alt="Informe del periodo en tema claro: ingresado, gastado y ahorrado, y el gasto por categoría frente al periodo anterior" width="220"> |
+| <img src="app/img/shots/es/04-gasto-categoria.webp" alt="Gasto por categoría de septiembre: cada categoría con su color, su barra y su límite; Casa y Coche avisan de que llevan más del 95 % del límite." width="220"> | <img src="app/img/shots/es/05-patrimonio.webp" alt="Patrimonio en tema oscuro: 3.906,36 € netos, 606,17 € más este periodo, lo que tienes frente a lo que debes y las cuentas corriente, de ahorro y la hucha de vacaciones." width="220"> | <img src="app/img/shots/es/06-informe.webp" alt="Informe del periodo: ahorras el 30 % de lo que ingresas, 2.100,00 € ingresados frente a 1.469,83 € gastados, la comparación con agosto y el botón para descargar el PDF." width="220"> |
 
 ## Instalación
 
