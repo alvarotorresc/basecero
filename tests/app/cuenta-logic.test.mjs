@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SQL } from "../../app/app/js/sql.js";
 import {
-  monthEndDates, signedForAccount, accountFlows, debtProgress,
+  monthEndDates, signedForAccount, accountFlows, debtProgress, accountTypeChange,
 } from "../../app/app/js/cuenta-logic.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
@@ -109,7 +109,7 @@ test("SQL.accountRecentTx: los últimos de la cuenta, de cualquier periodo, del 
   ins(db, { id: "x4", date: "2026-08-20", account: "acc-revolut" });
   const rows = db.prepare(SQL.accountRecentTx).all("acc-n26", "acc-n26", 2);
   assert.deepEqual(rows.map((r) => r.id), ["x2", "x3"]);
-  assert.ok("counter_account_id" in rows[0] && "my_amount_cents" in rows[0] && "category_id" in rows[0]);
+  assert.deepEqual(Object.keys(rows[0]).sort(), ["account_id", "amount_cents", "category_id", "counter_account_id", "date", "id", "merchant", "note", "type"]);
 });
 
 // ---- accountFlows --------------------------------------------------------------------------
@@ -157,4 +157,20 @@ test("debtProgress: pagado desde el saldo inicial y lo que queda", () => {
   assert.deepEqual(debtProgress({ openingCents: -600000, balanceCents: -650000 }), { paidCents: 0, pendingCents: 650000 });
   assert.deepEqual(debtProgress({ openingCents: -600000, balanceCents: 1000 }), { paidCents: 600000, pendingCents: 0 });
   assert.deepEqual(debtProgress({ openingCents: 0, balanceCents: -12000 }), { paidCents: 0, pendingCents: 12000 });
+});
+
+// ---- accountTypeChange ---------------------------------------------------------------------
+
+test("accountTypeChange: guarda el tipo nuevo; la cuota solo se conserva en un pasivo", () => {
+  const acc = { id: "a", name: " Préstamo ", type: "liability" };
+  assert.deepEqual(accountTypeChange(acc, "checking", 18000), { fields: { name: "Préstamo", type: "checking" }, monthlyCents: 0 });
+  assert.deepEqual(accountTypeChange({ ...acc, type: "checking" }, "liability", 18000), { fields: { name: "Préstamo", type: "liability" }, monthlyCents: 18000 });
+  assert.deepEqual(accountTypeChange({ ...acc, type: "checking" }, "liability"), { fields: { name: "Préstamo", type: "liability" }, monthlyCents: 0 });
+});
+
+test("accountTypeChange: nada que guardar con el mismo tipo o uno desconocido; nombre vacío no pasa", () => {
+  assert.equal(accountTypeChange({ name: "N26", type: "checking" }, "checking"), null);
+  assert.equal(accountTypeChange({ name: "N26", type: "checking" }, "crypto"), null);
+  assert.equal(accountTypeChange(null, "savings"), null);
+  assert.deepEqual(accountTypeChange({ name: "  ", type: "checking" }, "savings"), { error: "name" });
 });

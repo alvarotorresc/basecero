@@ -75,3 +75,21 @@ export function debtProgress({ openingCents, balanceCents }) {
   const paidCents = Math.min(owedAtStart, Math.max(0, balanceCents - openingCents));
   return { paidCents, pendingCents: Math.max(0, -balanceCents) };
 }
+
+export const ACCOUNT_TYPES = ["checking", "savings", "liability"];
+
+/** Cambio de tipo en el detalle (B-Cuenta: selector segmentado en el grupo, guarda al cambiar).
+ *  Mismas reglas que guardar el formulario de Patrimonio: el tipo tiene que ser uno de los tres y
+ *  el nombre no puede quedar vacío; la cuota mensual solo vive en un pasivo (otro tipo manda 0,
+ *  que setAccountLoan lee como «borrar la cuota»). El saldo inicial no cambia. Devuelve null si
+ *  no hay nada que guardar (mismo tipo o tipo desconocido), o { error } si no pasa la validación.
+ *  @returns {null | {error:string} | {fields:{name:string,type:string}, monthlyCents:number}} */
+export function accountTypeChange(account, newType, currentMonthlyCents = 0) {
+  if (!account || !ACCOUNT_TYPES.includes(newType) || newType === account.type) return null;
+  const name = String(account.name ?? "").trim();
+  if (!name) return { error: "name" };
+  return {
+    fields: { name, type: newType },
+    monthlyCents: newType === "liability" ? Math.max(0, Number(currentMonthlyCents) || 0) : 0,
+  };
+}

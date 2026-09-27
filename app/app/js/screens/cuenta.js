@@ -1,8 +1,8 @@
 import {
   getAccount, listGoals, getAccountStyle, getAccountLoans, getOpenPeriod, allCategoriesById, listAccounts,
-  getMetaAll, setMeta, accountBalanceSeries, accountTxOfPeriod, accountRecentTx,
+  getMetaAll, setMeta, updateAccount, setAccountLoan, accountBalanceSeries, accountTxOfPeriod, accountRecentTx,
 } from "../repo.js";
-import { accountFlows, debtProgress, signedForAccount } from "../cuenta-logic.js";
+import { accountFlows, debtProgress, signedForAccount, accountTypeChange, ACCOUNT_TYPES } from "../cuenta-logic.js";
 import { familyForAccount } from "../account-colors.js";
 import { resolveAccountId } from "../account-defaults.js";
 import { familyForCategory, iconForCategory, famClass } from "../category-colors.js";
@@ -13,7 +13,7 @@ import { openTxDetail } from "../open-tx.js";
 import { goToTab } from "../tabs.js";
 import { sparklineSvg } from "../charts.js";
 import { subHeaderHtml } from "../ui.js";
-import { switchHtml } from "../controls.js";
+import { switchHtml, segmentedHtml, wireSegmented } from "../controls.js";
 import { tileHtml, txRowHtml, settingRowHtml, sectionHeaderHtml } from "../entity.js";
 import { displayHtml, stackedBarHtml, containerHtml, emptyStateHtml } from "../instrument.js";
 import { escHtml, escAttr } from "../esc.js";
@@ -31,7 +31,6 @@ const MINUS = "−";
 const DISPLAY_PX = 44;        // B-Cuenta: la cifra del Display a 44, como Patrimonio.
 const SERIES_MONTHS = 6;      // Decisión B-6: saldo de 6 meses.
 const RECENT_LIMIT = 5;
-const ACCOUNT_TYPES = ["checking", "savings", "liability"];
 
 const signedMoney = (cents, { plus = false } = {}) =>
   (cents < 0 ? `${MINUS}${fmtMoney(Math.abs(cents))}` : `${plus ? "+" : ""}${fmtMoney(cents)}`);
@@ -201,8 +200,8 @@ export async function renderCuenta(container, accountId, { onBack, onEdit }) {
 
   // ---- Ajustes de la cuenta --------------------------------------------------------------
 
-  /** B-Cuenta: grupo teñido con las filas de la cuenta. Cada fila (nombre, tipo, saldo inicial,
-   *  cuota, color) abre el formulario completo de Patrimonio, donde se edita todo como hasta
+  /** B-Cuenta: grupo teñido con las filas de la cuenta. El tipo es un segmentado que guarda al
+   *  cambiar; cada otra fila (nombre, saldo inicial, cuota, color) abre el formulario completo de Patrimonio, donde se edita todo como hasta
    *  ahora. «Cuenta por defecto» es meta.default_account_id (Registro, Liquidar e Inicio ya la
    *  leen): se enciende aquí; apagada no hay nada que hacer, así que la encendida no se apaga —
    *  se cambia encendiendo otra. No aplica a un pasivo. */
@@ -213,17 +212,21 @@ export async function renderCuenta(container, accountId, { onBack, onEdit }) {
     const monthly = Object.hasOwn(loans, accountId) ? loans[accountId]?.monthlyCents ?? 0 : 0;
     const rows = [
       row("pencil", t("common.name"), acc.name, "name"),
-      row("grid", t("common.typeLabel"), typeLabel(acc.type), "type"),
+      // Tipo (B-Cuenta): segmentado en su sitio, guarda al cambiar (wire → saveType).
+      `<div class="cta-sub">
+        <div class="ent-set cta-sub-head">${tileHtml({ fam: f, icon: "grid", size: 30, filled: true })}<span class="ent-set-label" id="cta-tipo-label">${escHtml(t("common.typeLabel"))}</span></div>
+        ${segmentedHtml({ id: "cta-tipo", name: t("common.typeLabel"), labelledBy: "cta-tipo-label", value: acc.type, options: ACCOUNT_TYPES.map((k) => ({ value: k, label: typeLabel(k) })) })}
+      </div>`,
       row("chart", t("patrimonio.account.openingBalance"), signedMoney(acc.opening_balance_cents), "opening", { valueNum: true }),
     ];
     if (acc.type === "liability") rows.push(row("calendar", t("patrimonio.account.monthlyInstallment"), monthly ? fmtMoney(monthly) : "—", "loan", { valueNum: true }));
     rows.push(row("theme", t("patrimonio.account.color"), f ? t(`families.${f}`) : "—", "color"));
     if (acc.type !== "liability") {
       const isDefault = resolveAccountId(meta.default_account_id, accounts) === accountId;
-      const sw = switchHtml({ id: "cta-default", checked: isDefault, label: t("cuenta.defaultAccount") });
+      const sw = switchHtml({ id: "cta-default", checked: isDefault, label: t("cuenta.defaultAccount"), disabled: isDefault });
       rows.push(settingRowHtml({
         id: "cta-default-row", icon: "estrella", fam: f, tileFilled: true, label: t("cuenta.defaultAccount"),
-        controlHtml: isDefault ? sw.replace('role="switch"', 'role="switch" disabled') : sw,
+        controlHtml: sw,
       }));
     }
     return `<section class="cta-group">
@@ -257,6 +260,8 @@ export async function renderCuenta(container, accountId, { onBack, onEdit }) {
     // «Ver todos»: Movimientos con el filtro de esta cuenta (lo aplica el filtro por cuenta de B-2).
     const seeAll = container.querySelector("#cta-see-all");
     if (seeAll) seeAll.onclick = () => goToTab("movimientos", { accountId });
+    const tipo = container.querySelector("#cta-tipo");
+    if (tipo) wireSegmented(tipo, (type) => saveType(type));
     const sw = container.querySelector("#cta-default");
     if (sw && !sw.disabled) {
       sw.onclick = async () => {
@@ -266,13 +271,43 @@ export async function renderCuenta(container, accountId, { onBack, onEdit }) {
           meta = { ...meta, default_account_id: accountId };
         } catch (e) {
           sw.disabled = false;
-          container.querySelector(".cta")?.insertAdjacentHTML("afterbegin", `<div class="banner-aviso is-error">${escHtml(t("common.saveFailed", { error: userMessage(e) }))}</div>`);
+          showError(t("common.saveFailed", { error: userMessage(e) }));
           return;
         }
         render();
         container.querySelector("#cta-default")?.focus();
       };
     }
+  }
+
+  /** Cambio de tipo desde el segmentado: las reglas del formulario (cuenta-logic.js#
+   *  accountTypeChange), guardado y repintado con los datos nuevos (la familia sigue al tipo si no
+   *  se eligió a mano, como en el formulario). Si falla, se repinta lo que había con el aviso. */
+  let savingType = false;
+  async function saveType(type) {
+    if (savingType) return;
+    const monthly = Object.hasOwn(loans, accountId) ? loans[accountId]?.monthlyCents ?? 0 : 0;
+    const change = accountTypeChange(acc, type, monthly);
+    if (!change) return;
+    if (change.error) { showError(t("patrimonio.account.validation.name")); return; }
+    savingType = true;
+    try {
+      await updateAccount(accountId, change.fields);
+      await setAccountLoan(accountId, change.monthlyCents);
+      if (!(await load())) { onBack(); return; }
+    } catch (e) {
+      render();
+      showError(t("common.saveFailed", { error: userMessage(e) }));
+      return;
+    } finally {
+      savingType = false;
+    }
+    render();
+    container.querySelector('#cta-tipo [aria-checked="true"]')?.focus();
+  }
+
+  function showError(msg) {
+    container.querySelector(".cta")?.insertAdjacentHTML("afterbegin", `<div class="banner-aviso is-error">${escHtml(msg)}</div>`);
   }
 
   render();

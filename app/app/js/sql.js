@@ -376,8 +376,8 @@ export const SQL = {
     FROM transactions t
     WHERE t.period_id=? AND t.deleted=0 AND (t.account_id=? OR t.counter_account_id=?)`,
   accountRecentTx: `SELECT t.id, t.date, t.type, t.amount_cents, t.account_id, t.counter_account_id, t.category_id,
-      t.merchant, t.note, t.is_shared, t.paid_by, ${MY_AMOUNT} AS my_amount_cents
-    FROM transactions t JOIN periods p ON p.id=t.period_id
+      t.merchant, t.note
+    FROM transactions t
     WHERE t.deleted=0 AND (t.account_id=? OR t.counter_account_id=?)
     ORDER BY t.date DESC, t.created_at DESC LIMIT ?`,
 
