@@ -80,7 +80,7 @@ function coverSegmentsHtml(cover, targetMonths) {
 function displaySlotHtml(d) {
   const { goal, progress } = d;
   if (goal.type === "emergency_fund") {
-    const cover = coverMonths(progress.currentCents, d.avgSpent3Cents);
+    const cover = coverMonths(progress.currentCents, d.avgSpentCents);
     if (cover === null) return `<span class="obj-disp-line">${escHtml(t("objetivo.display.coverNoAvg"))}</span>`;
     const months = Number(goal.target_months) || 0;
     const line = tHtml("objetivo.display.cover", { months: dispInkHtml(fmtDec1(cover), { tone: "amber" }) }, { n: Math.abs(cover - 1) < 0.05 ? 1 : 2 });
@@ -137,7 +137,7 @@ const BAR_MAX = 64; // px de la columna más alta (B-Objetivo: 200 → 64)
 function contributionsHtml(contrib, fam, avg) {
   const cur = contrib.months.at(-1);
   // El mes en curso sin aportar todavía: casilla discontinua a la altura de la media (lo previsto).
-  const expected = cur.cents <= 0 && avg ? avg : 0;
+  const expected = cur.cents === 0 && avg ? avg : 0;
   const max = Math.max(0, expected, ...contrib.months.map((m) => m.cents));
   const h = (c) => (max > 0 && c > 0 ? Math.max(4, Math.round((c / max) * BAR_MAX)) : 0);
   const cols = contrib.months.map((m) => {
@@ -347,7 +347,8 @@ export async function renderObjetivo(container, { goalId, onEdit }) {
 
   function openTransfer() {
     const hucha = d.account;
-    const sources = accounts.filter((a) => a.id !== hucha.id);
+    // Sin la propia hucha ni los pasivos (una deuda no es de donde sale el ahorro).
+    const sources = accounts.filter((a) => a.id !== hucha.id && a.type !== "liability");
     const draft = {
       raw: "",
       cents: 0,
