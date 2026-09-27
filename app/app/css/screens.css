@@ -1383,6 +1383,34 @@
 .mov-flt #mov-flt-clear { font-size: var(--fs-14); }
 .mov-flt-chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); margin: calc(-1 * var(--sp-4)); padding: var(--sp-4); }
 .mov-flt-foot { position: sticky; bottom: 0; margin-top: auto; padding-top: var(--sp-8); background: var(--surface); }
+/* B-2 · Importe: dos pozos en píldora lado a lado, «Desde»/«Hasta» dentro a la izquierda, la cifra
+   a la derecha y el símbolo detrás (B-Movimientos-Filtros). */
+.mov-flt-amt { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.mov-flt-amt .ctl-field.has-lead { padding: 0 var(--sp-16); gap: var(--sp-8); }
+.mov-flt-amt .ctl-field-input { min-width: 0; text-align: right; }
+.mov-flt-amt .ctl-field-input:placeholder-shown { font-family: var(--font-body); }
+.mov-flt-amt .ctl-field-suffix { margin-left: 0; }
+.mov-flt-amt-lead { font-size: var(--fs-13); font-weight: 600; color: var(--text-dim); }
+/* B-2 · «Solo compartidos»: toda la fila es el interruptor (52 en píldora --raised con borde),
+   icono dim, texto 15/600 y la pista naranja al final. */
+.mov-flt-shared {
+  flex: none;
+  height: 52px;
+  padding: 0 var(--sp-12) 0 var(--sp-16);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  border-radius: var(--radius-pill);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: var(--fs-15);
+  font-weight: 600;
+  text-align: left;
+}
+.mov-flt-shared > svg { flex: none; color: var(--text-dim); }
+.mov-flt-shared-label { flex: 1; min-width: 0; }
+.mov-flt-shared:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
 /* === fin: movimientos === */
 
 /* === pantalla: onboarding === */
