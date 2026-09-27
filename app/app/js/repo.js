@@ -1227,18 +1227,24 @@ export async function archiveCategory(id) {
   await execMany(stmts);
 }
 
-/** Desarchiva una categoría. Una raíz vuelve CON sus subcategorías (restoreCategoryTree, en una
- *  sola sentencia): archiveCategory las archivó en cascada, así que desarchivar deshace lo mismo
- *  (revisión global de la PR de lógica). Una hija no tiene hijas propias: vuelve solo ella. PURO
- *  el statement (unarchiveCategoryStmt) para que el test lo ejecute sobre SQLite real. */
-export const unarchiveCategoryStmt = (id, now) => ({ sql: SQL.restoreCategoryTree, bind: [now, id, id] });
-export const unarchiveCategory = (id) => {
-  const st = unarchiveCategoryStmt(id, nowIso());
+/** Desarchiva una categoría. Una raíz cuyas hijas vivas estaban TODAS archivadas (se archivaron
+ *  en cascada con ella, archiveCategory) vuelve con ellas, en una sola sentencia
+ *  (restoreCategoryTree). Si alguna hija seguía activa, las archivadas lo fueron por separado y se
+ *  quedan archivadas: solo vuelve la raíz. Una hija (sin hijas propias) vuelve sola. El statement
+ *  es PURO (`children`: SQL.liveChildrenOf) para que el test lo ejecute sobre SQLite real. */
+export function unarchiveCategoryStmt(id, now, children = []) {
+  const cascade = children.length > 0 && children.every((c) => c.is_archived);
+  return cascade
+    ? { sql: SQL.restoreCategoryTree, bind: [now, id, id] }
+    : { sql: SQL.setCategoryArchived, bind: [0, now, id] };
+}
+export async function unarchiveCategory(id) {
+  const st = unarchiveCategoryStmt(id, nowIso(), await query(SQL.liveChildrenOf, [id]));
   return exec(st.sql, st.bind);
-};
+}
 
 /** B-8 (onboarding, paso Categorías): recupera una raíz y TODAS sus hijas vivas en una sola
- *  sentencia, para deshacer un desmarcado del propio onboarding (mismo SQL que unarchiveCategory). */
+ *  sentencia, para deshacer un desmarcado del propio onboarding. */
 export const restoreCategoryTree = (id) => exec(SQL.restoreCategoryTree, [nowIso(), id, id]);
 
 /** i18n (PR i18n, Task 6, fix round 1): retraduce las categorías SEMILLA (SEED_NAMES, seeds.js)

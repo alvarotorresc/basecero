@@ -123,7 +123,7 @@ test("categoryArchiveDiff: tras recargar a mitad (roots releídas de la BD), vol
 });
 
 // ---- SQL.restoreCategoryTree (B-8): volver a marcar en el onboarding recupera la raíz Y sus hijas
-// (archiveCategory las archivó en cascada; unarchiveCategory usa la misma sentencia).
+// (archiveCategory las archivó en cascada).
 test("SQL.restoreCategoryTree: desarchiva la raíz y todas sus hijas vivas, y nada de otras raíces", () => {
   const db = openDb();
   seedMinimal(db); // cat-casa (raíz) + cat-casa-alquiler (hija)

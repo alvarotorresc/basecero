@@ -353,7 +353,7 @@ function archiveCategoryReproduced(db, id, now = T2) {
 
 /** Ejecuta el statement REAL de repo.unarchiveCategory (unarchiveCategoryStmt). */
 function unarchiveCategoryReal(db, id, now = T2) {
-  const st = unarchiveCategoryStmt(id, now);
+  const st = unarchiveCategoryStmt(id, now, db.prepare(SQL.liveChildrenOf).all(id));
   db.prepare(st.sql).run(...st.bind);
 }
 
@@ -565,7 +565,7 @@ test("archiveCategory (reproducido): una hija (sin hijas propias) archiva solo s
   assert.equal(getCategoryRow(db, "cat-casa").is_archived, 0, "la raíz no se ve afectada al archivar una hija");
 });
 
-test("unarchiveCategory: desarchivar una raíz restaura también sus subcategorías", () => {
+test("unarchiveCategory: si todas sus hijas estaban archivadas (cascada), desarchivar la raíz las restaura", () => {
   const db = openDb();
   seedMinimal(db);
   archiveCategoryReproduced(db, "cat-casa"); // cascada: casa + alquiler archivadas
@@ -575,6 +575,21 @@ test("unarchiveCategory: desarchivar una raíz restaura también sus subcategor�
   assert.equal(getCategoryRow(db, "cat-casa").is_archived, 0, "la raíz vuelve a estar activa");
   assert.equal(getCategoryRow(db, "cat-casa-alquiler").is_archived, 0, "la hija vuelve con ella");
   assert.equal(getCategoryRow(db, "cat-nomina").is_archived, 0);
+});
+
+test("unarchiveCategory: si alguna hija seguía activa, las archivadas por separado se quedan archivadas", () => {
+  const db = openDb();
+  seedMinimal(db);
+  db.prepare(`INSERT INTO categories (id,name,parent_id,flow,need_type,display_order,is_archived,created_at,updated_at,deleted)
+    VALUES ('cat-casa-luz','Luz','cat-casa','expense','need',2,0,?,?,0)`).run(T2, T2);
+  archiveCategoryReproduced(db, "cat-casa-alquiler");          // archivada ella sola
+  db.prepare("UPDATE categories SET is_archived=1 WHERE id='cat-casa'").run(); // la raíz, sin cascada: Luz sigue activa
+
+  unarchiveCategoryReal(db, "cat-casa");
+
+  assert.equal(getCategoryRow(db, "cat-casa").is_archived, 0);
+  assert.equal(getCategoryRow(db, "cat-casa-luz").is_archived, 0);
+  assert.equal(getCategoryRow(db, "cat-casa-alquiler").is_archived, 1, "se archivó por separado: se queda");
 });
 
 test("unarchiveCategory: desarchivar una hija solo la toca a ella, no a la raíz ni a sus hermanas", () => {
