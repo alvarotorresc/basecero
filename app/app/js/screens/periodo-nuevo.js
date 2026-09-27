@@ -22,7 +22,7 @@ import { displayHtml, dispInkHtml, stackedBarHtml, meterHtml } from "../instrume
 import { escHtml, escAttr } from "../esc.js";
 
 // Ventana de días seleccionables del picker de fecha: ±2 alrededor de la fecha propuesta (B-1: el
-// día de cobro de meta.pay_day, o hoy si no toca — pay-day.js#proposedPeriodStart).
+// día de cobro de meta.pay_day si está puesto (≥ 2); si no, hoy, como siempre — pay-day.js#proposedPeriodStart).
 const DAY_WINDOW = 2;
 
 function addDaysIso(iso, n) {
@@ -115,9 +115,11 @@ export async function renderPeriodoNuevo(container, { mode, onDone, onBack, embe
   }
   const partnerName = (meta.partner_name || "").trim();
   const payDay = normalizePayDay(meta.pay_day);
-  // Nombre por defecto del periodo que empieza en `iso` (B-1): el mes que ocupa casi todo, con el
-  // locale de formato (el mismo que usa nombrePorDefecto).
+  // Nombre por defecto del periodo que empieza en `iso`. Sin ajuste (día 1), nombrePorDefecto() de
+  // siempre (el mes de hoy), EXACTAMENTE como antes de B-1; con día de cobro (≥ 2), el mes que ocupa
+  // casi todo el periodo, con el locale de formato.
   const nameFor = (iso) => {
+    if (payDay <= 1) return nombrePorDefecto();
     try { return periodNameFor(iso, meta.locale || "es-ES"); } catch { return nombrePorDefecto(); }
   };
   const accountsById = Object.fromEntries(allAccounts.map((a) => [a.id, a]));

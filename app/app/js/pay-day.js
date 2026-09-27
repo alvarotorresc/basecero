@@ -66,24 +66,44 @@ function addDays(iso, n) {
   return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`;
 }
 
-/** Fecha que Nuevo periodo propone para empezar. Sin periodo abierto (onboarding), el último día
- *  de cobro que ya llegó. Al cerrar, ese mismo día si cae al menos MIN_PERIOD_DAYS después del
- *  inicio del abierto (así nunca choca con periodStartTooEarly); si no —cierre adelantado, o un
- *  ajuste que no casa con la historia—, hoy, como antes de B-1. */
+/** Fecha que Nuevo periodo propone para empezar. Sin ajuste (día 1: ausente, "0" o "1"), hoy —
+ *  EXACTAMENTE como antes de B-1, sin guard ni retrocesos. Con día de cobro (≥ 2): sin periodo
+ *  abierto (onboarding), el último día de cobro que ya llegó; al cerrar, ese mismo día si cae al
+ *  menos MIN_PERIOD_DAYS después del inicio del abierto (así nunca choca con periodStartTooEarly),
+ *  y si no —cierre adelantado, o un ajuste que no casa con la historia—, hoy. */
 export function proposedPeriodStart({ payDay, todayIso, openStartIso = "" }) {
+  if (normalizePayDay(payDay) <= PAY_DAY_MIN) return todayIso;
   const last = lastPayDate(payDay, todayIso);
   if (!openStartIso) return last;
   return last >= addDays(openStartIso, MIN_PERIOD_DAYS) ? last : todayIso;
 }
 
-/** Nombre del periodo que empieza en `startIso`: el mes que ocupa casi todo (desde el día 16, el
- *  siguiente: empezar el 28 de septiembre es «Octubre»). Mismo formato que nombrePorDefecto
- *  (format.js): «Octubre 2026», con el año al final para que periodTitle lo quite. */
+const capitalizedMonth = (y, m, locale) => {
+  const raw = new Date(y, m, 1, 12).toLocaleDateString(locale, { month: "long", year: "numeric" }).replace(" de ", " ");
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+};
+
+/** Nombre del mes de la fecha, sin umbral: lo mismo que nombrePorDefecto (format.js) para hoy. */
+export function monthNameOf(iso, locale) {
+  const { y, m } = parts(iso);
+  return capitalizedMonth(y, m, locale);
+}
+
+/** Nombre del periodo que empieza en `startIso` con día de cobro: el mes que ocupa casi todo
+ *  (desde el día 16, el siguiente: empezar el 28 de septiembre es «Octubre»). Mismo formato que
+ *  nombrePorDefecto: «Octubre 2026», con el año al final para que periodTitle lo quite. */
 export function periodNameFor(startIso, locale) {
   const { y, m, d } = parts(startIso);
-  const month = new Date(y, d > 15 ? m + 1 : m, 1, 12);
-  const raw = month.toLocaleDateString(locale, { month: "long", year: "numeric" }).replace(" de ", " ");
-  return raw.charAt(0).toUpperCase() + raw.slice(1);
+  return capitalizedMonth(y, d > 15 ? m + 1 : m, locale);
+}
+
+/** Propuesta completa de Nuevo periodo: fecha, nombre y si sale del día de cobro. Sin ajuste, hoy y
+ *  el mes de hoy (nombrePorDefecto de siempre); con día de cobro (≥ 2), la fecha de
+ *  proposedPeriodStart y el nombre del mes mayoritario. */
+export function periodProposal({ payDay, todayIso, openStartIso = "", locale }) {
+  if (normalizePayDay(payDay) <= PAY_DAY_MIN) return { startIso: todayIso, name: monthNameOf(todayIso, locale), byPayDay: false };
+  const startIso = proposedPeriodStart({ payDay, todayIso, openStartIso });
+  return { startIso, name: periodNameFor(startIso, locale), byPayDay: true };
 }
 
 /** Aviso de Inicio: el día de cobro que ya llegó con el periodo abierto sin cerrar, o null. Solo

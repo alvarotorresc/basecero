@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   normalizePayDay, payDayToMeta, stepPayDay, payDateIn, lastPayDate, nextPayDateAfter,
-  proposedPeriodStart, periodNameFor, payDayDue, isPayDate, MIN_PERIOD_DAYS,
+  proposedPeriodStart, periodNameFor, payDayDue, isPayDate, MIN_PERIOD_DAYS, periodProposal, monthNameOf,
 } from "../../app/app/js/pay-day.js";
 
 test("normalizePayDay: 0, vacío, ausente o basura = día 1; 1..31 tal cual", () => {
@@ -55,14 +55,15 @@ test("nextPayDateAfter: el primero ESTRICTAMENTE posterior, con el mes corto rec
 test("proposedPeriodStart (primer periodo): el último día de cobro que ya llegó", () => {
   assert.equal(proposedPeriodStart({ payDay: 28, todayIso: "2026-09-28" }), "2026-09-28");
   assert.equal(proposedPeriodStart({ payDay: 28, todayIso: "2026-10-10" }), "2026-09-28");
-  assert.equal(proposedPeriodStart({ payDay: 1, todayIso: "2026-09-27" }), "2026-09-01");
+  // Sin ajuste (día 1): hoy, como antes de B-1.
+  assert.equal(proposedPeriodStart({ payDay: 1, todayIso: "2026-09-27" }), "2026-09-27");
 });
 
 test("proposedPeriodStart (cierre): el día de cobro si ya llegó y es posterior al inicio del abierto", () => {
   assert.equal(proposedPeriodStart({ payDay: 28, todayIso: "2026-09-28", openStartIso: "2026-08-28" }), "2026-09-28");
   // Se cierra tarde: la propuesta sigue siendo el día de cobro que abrió el periodo nuevo.
   assert.equal(proposedPeriodStart({ payDay: 28, todayIso: "2026-10-02", openStartIso: "2026-08-28" }), "2026-09-28");
-  assert.equal(proposedPeriodStart({ payDay: 1, todayIso: "2026-10-03", openStartIso: "2026-09-01" }), "2026-10-01");
+  assert.equal(proposedPeriodStart({ payDay: 1, todayIso: "2026-10-03", openStartIso: "2026-09-01" }), "2026-10-03", "sin ajuste: hoy");
 });
 
 test("proposedPeriodStart (cierre adelantado): sin día de cobro nuevo, hoy (nunca una fecha que el guard rechace)", () => {
@@ -74,10 +75,9 @@ test("proposedPeriodStart (cierre adelantado): sin día de cobro nuevo, hoy (nun
 
 test("proposedPeriodStart: un ajuste que no casa con la historia no parte el periodo abierto (MIN_PERIOD_DAYS)", () => {
   assert.equal(MIN_PERIOD_DAYS, 15);
-  // Usuario de siempre SIN ajuste (día 1) cuyos periodos empiezan el 28: el 1 de septiembre está a
-  // 4 días del inicio del abierto — proponerlo cerraría agosto el 31 con un mes de movimientos
-  // dentro. Se propone hoy, como antes de B-1.
-  assert.equal(proposedPeriodStart({ payDay: 1, todayIso: "2026-09-28", openStartIso: "2026-08-28" }), "2026-09-28");
+  // Ajuste que no casa con la historia: cobro el 10 y periodo abierto el 1 — el 10 de septiembre
+  // queda a 9 días del inicio y el guard exige medio mes: hoy.
+  assert.equal(proposedPeriodStart({ payDay: 10, todayIso: "2026-09-12", openStartIso: "2026-09-01" }), "2026-09-12");
   // Recién cambiado el ajuste del 1 al 28: el 28 está a 27 días del inicio, se propone.
   assert.equal(proposedPeriodStart({ payDay: 28, todayIso: "2026-09-28", openStartIso: "2026-09-01" }), "2026-09-28");
 });
@@ -115,4 +115,34 @@ test("payDayDue: un periodo recién abierto no avisa a los pocos días (MIN_PERI
   // Abierto el 25 con el cobro el 28 (ajuste recién cambiado): el aviso espera al 28 de octubre.
   assert.equal(payDayDue({ payDay: 28, openStartIso: "2026-09-25", todayIso: "2026-09-28" }), null);
   assert.equal(payDayDue({ payDay: 28, openStartIso: "2026-09-25", todayIso: "2026-10-28" }), "2026-10-28");
+});
+
+// ---- Ronda 1 (regla): sin pay_day configurado (ausente, 0 o 1) todo EXACTAMENTE como antes de B-1:
+// fecha = hoy, nombre = mes de hoy (nombrePorDefecto), sin guard ni umbral. Solo con pay_day ≥ 2 la
+// propuesta del día de cobro, el guard de 15 días y el nombre por mes mayoritario.
+
+test("monthNameOf: el mes de la fecha, formato de nombrePorDefecto, sin umbral", () => {
+  assert.equal(monthNameOf("2026-09-28", "es-ES"), "Septiembre 2026");
+  assert.equal(monthNameOf("2026-09-01", "es-ES"), "Septiembre 2026");
+  assert.equal(monthNameOf("2026-12-31", "en-US"), "December 2026");
+});
+
+test("periodProposal: sin pay_day cerrando el 28 → hoy y «Septiembre 2026»", () => {
+  for (const payDay of [undefined, "", "0", 0, "1", 1]) {
+    assert.deepEqual(periodProposal({ payDay, todayIso: "2026-09-28", openStartIso: "2026-08-28", locale: "es-ES" }),
+      { startIso: "2026-09-28", name: "Septiembre 2026", byPayDay: false }, String(payDay));
+  }
+});
+
+test("periodProposal: sin pay_day con el periodo abierto el 15 → hoy (sin guard ni retroceso)", () => {
+  assert.deepEqual(periodProposal({ payDay: "0", todayIso: "2026-09-20", openStartIso: "2026-09-15", locale: "es-ES" }),
+    { startIso: "2026-09-20", name: "Septiembre 2026", byPayDay: false });
+  assert.equal(periodProposal({ payDay: "", todayIso: "2026-09-27", locale: "es-ES" }).startIso, "2026-09-27", "primer periodo: hoy");
+});
+
+test("periodProposal: con pay_day = 28 → el día de cobro y el nombre del mes mayoritario", () => {
+  assert.deepEqual(periodProposal({ payDay: "28", todayIso: "2026-09-29", openStartIso: "2026-08-28", locale: "es-ES" }),
+    { startIso: "2026-09-28", name: "Octubre 2026", byPayDay: true });
+  assert.deepEqual(periodProposal({ payDay: "28", todayIso: "2026-10-05", locale: "es-ES" }),
+    { startIso: "2026-09-28", name: "Octubre 2026", byPayDay: true });
 });
