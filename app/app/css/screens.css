@@ -1826,6 +1826,50 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 .onb-imp-file .btn-secondary { flex: none; }
 .onb-imp-block { padding: var(--sp-16); display: flex; flex-direction: column; gap: var(--sp-12); }
 .onb-imp-summary { margin: 0; font-size: var(--fs-13); font-weight: 500; color: var(--text-dim); }
+/* --- Día de cobro (B-1, B-Onb-Ajustes): fila de 68 con la línea en el -x del grupo y el paso a
+   paso de teclas sueltas con borde, como el del reparto. --- */
+.onb-row-pay { min-height: 68px; }
+.onb-row-stack { display: flex; flex-direction: column; gap: var(--sp-2); }
+.onb-row-sub { font-size: var(--fs-12); font-weight: 500; color: var(--fx); }
+.onb-row-pay .ctl-stepper { padding: 0; gap: 0; background: none; box-shadow: none; }
+.onb-row-pay .ctl-stepper-btn { border: 1px solid var(--border); box-shadow: none; }
+.onb-row-pay .ctl-stepper-value { min-width: 40px; }
+
+/* --- Categorías (B-8, B-Onb-Categorias): recuento a la derecha del título, franja de colores y
+   rejilla de 2 de tarjetas-casilla. Marcada: tinte de su familia y la línea en su -x; desmarcada:
+   --surface con filete y todo en dim. --- */
+.onb-head-row { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: var(--sp-12); }
+.onb-head-text { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.onb-cats-count { flex: none; font-size: var(--fs-12); font-weight: 600; color: var(--text-dim); }
+.onb-cats-n { font-size: var(--fs-17); color: var(--text); }
+.onb-cats-strip { display: flex; gap: 3px; height: 10px; border-radius: var(--radius-pill); overflow: hidden; }
+.onb-cats-seg { flex: 1; background: var(--fb); }
+.onb-cats-seg.is-off { opacity: .35; }
+.onb-cats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.onb-cat {
+  min-height: 68px;
+  padding: 0 10px 0 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--ft);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  overflow: hidden;
+  font: inherit;
+  cursor: pointer;
+}
+.onb-cat[aria-checked="false"] { background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); }
+.onb-cat:focus-visible { outline: var(--focus); outline-offset: var(--focus-offset); }
+.onb-cat-bar { flex: none; width: 6px; align-self: stretch; background: var(--fb); }
+.onb-cat-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.onb-cat-name { font-size: var(--fs-14); font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.onb-cat-sub { font-size: var(--fs-12); font-weight: 500; line-height: 1.2; color: var(--fx); }
+.onb-cat[aria-checked="false"] .onb-cat-name,
+.onb-cat[aria-checked="false"] .onb-cat-sub { color: var(--text-dim); }
+.onb-cat[aria-checked="true"] .ctl-checkbox-box { background: var(--text); box-shadow: none; }
 /* === fin: onboarding === */
 
 /* === pantalla: patrimonio === */
@@ -2143,6 +2187,12 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
 /* --- Paneles de error y de cierre completado. --- */
 .pn-error-actions { display: flex; flex-direction: column; gap: var(--sp-8); margin-top: var(--sp-16); }
 .pn-closed-panel { display: flex; flex-direction: column; gap: var(--sp-16); padding-top: var(--sp-24); }
+/* Día de cobro (B-1, B-PeriodoNuevo): «Tu día de cobro» a la derecha del título, 12/600 dim con
+   el punto de 8 en --pos (el verde del original). */
+.pn-date-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-12); }
+.pn-date-head .ent-sec { flex: 1; min-width: 0; }
+.pn-payday-legend { flex: none; display: flex; align-items: center; gap: 6px; font-size: var(--fs-12); font-weight: 600; color: var(--text-dim); }
+.pn-payday-dot { width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--pos); }
 /* === fin: periodo-nuevo === */
 
 /* === pantalla: recurrentes === */

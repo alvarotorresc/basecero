@@ -126,17 +126,25 @@ export const HUCHA = { RENEWAL_DAYS: 7, LIMIT_PCT: 90, IDLE_DAYS: 3, PERIOD_END_
 const daysUntil = (iso, todayIso) =>
   Math.round((new Date(iso + "T12:00:00") - new Date(todayIso + "T12:00:00")) / 86400000);
 
-/** La frase de la hucha (§8): cuatro reglas evaluadas EN ORDEN, gana la primera que dispara.
+/** La frase de la hucha (§8): cuatro reglas evaluadas EN ORDEN, gana la primera que dispara —y
+ *  delante de todas, el día de cobro (B-1): `payDayDueIso` (pay-day.js#payDayDue) es el día de
+ *  cobro que ya llegó con el periodo abierto sin cerrar. Mientras siga pendiente, el fin de periodo
+ *  no sale ni tras «Ahora no» (sería el mismo aviso con otras palabras).
  *  `dismissed` (claves "kind:id") salta ese candidato concreto y sigue probando el resto — «Ahora
  *  no» en Spotify no debe esconder también el aviso de Ocio. Sin nada que decir, null: no existe
  *  el estado «hola, todo bien» (SISTEMA §4.15).
  *  ctx = { renewals:[{id,name,amountCents,dueDateIso}], categories:[{id,name,pct}],
- *          daysSinceLastEntry, daysLeftOfPeriod, todayIso, dismissed:Set<string> } */
+ *          daysSinceLastEntry, daysLeftOfPeriod, todayIso, dismissed:Set<string>, payDayDueIso } */
 export function huchaMessage(ctx) {
   const {
     renewals = [], categories = [], daysSinceLastEntry: sinceLast, daysLeftOfPeriod: daysLeft,
-    todayIso, dismissed = new Set(),
+    todayIso, dismissed = new Set(), payDayDueIso = null,
   } = ctx;
+
+  // Regla 0 — día de cobro (B-1): toca cerrar el periodo.
+  if (payDayDueIso && !dismissed.has("payday")) {
+    return { kind: "payday", key: "payday", params: { date: payDayDueIso } };
+  }
 
   // Regla 1 — renovación: la más próxima dentro de RENEWAL_DAYS.
   const dueRenewals = renewals
@@ -164,7 +172,7 @@ export function huchaMessage(ctx) {
   }
 
   // Regla 4 — cierre de periodo próximo (o ya pasado de largo: dispara igual, con n=0 → «hoy»).
-  if (daysLeft <= HUCHA.PERIOD_END_DAYS && !dismissed.has("periodEnd")) {
+  if (daysLeft <= HUCHA.PERIOD_END_DAYS && !payDayDueIso && !dismissed.has("periodEnd")) {
     return { kind: "periodEnd", key: "periodEnd", params: { n: Math.max(0, daysLeft) } };
   }
 

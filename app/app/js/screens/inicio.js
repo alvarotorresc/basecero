@@ -5,6 +5,7 @@ import {
   getMetaAll, setMeta, hasSharedData, listRules, getSnoozedRenewals, snoozeRenewal, listGoals,
 } from "../repo.js";
 import { renewalNotice } from "../subscriptions.js";
+import { normalizePayDay, payDayDue } from "../pay-day.js";
 import { familyForCategory, iconForCategory, famClass } from "../category-colors.js";
 import { familyForAccount, parseAccountStyle } from "../account-colors.js";
 import { fmtMoney, fmtMoneyParts, moneyPartsHtml, fmtDiaCorto, fmtDiaIni, hoyISO, fmtPct0, periodTitle } from "../format.js";
@@ -218,10 +219,18 @@ function savingsBlockHtml(income, spent, periodName) {
  *  (secundario, «Revisar») a la derecha. El mockup no pinta «Ahora no», pero descartar el aviso es
  *  comportamiento que ya funciona y no se pierde: queda como un aspa de 44 en la esquina, con
  *  «Ahora no» como nombre accesible, para no romper la fila del pie. */
-function noticeHtml(msg, { byId, rules, leftAfterRenewal }) {
+function noticeHtml(msg, { byId, rules, leftAfterRenewal, periodName, todayIso }) {
   if (!msg) return "";
   let fam = null, iconKey = "otr", title, line2 = "", foot = "", actionLabel;
-  if (msg.kind === "renewal") {
+  if (msg.kind === "payday") {
+    // Día de cobro (B-1): neutro, como el fin de periodo; «Cerrar periodo» abre Nuevo periodo y el
+    // aspa es «Ahora no» (sesión).
+    iconKey = "calendar";
+    title = msg.params.date === todayIso
+      ? t("payday.noticeToday") : t("payday.noticePast", { date: fmtDiaCorto(msg.params.date) });
+    line2 = escHtml(t("payday.noticeOpen", { name: periodName }));
+    actionLabel = t("payday.noticeAction");
+  } else if (msg.kind === "renewal") {
     const rule = rules.find((r) => r.id === msg.key.slice("renewal:".length));
     fam = rule ? familyForCategory(rule.category_id, byId) : null;
     iconKey = rule ? iconForCategory(rule.category_id, byId) : "sus";
@@ -456,6 +465,8 @@ export async function renderInicio(container) {
     daysLeftOfPeriod: daysLeft,
     todayIso: hoy,
     dismissed: huchaDismissed,
+    // B-1: el día de cobro que ya llegó con este periodo sin cerrar (solo con el ajuste puesto).
+    payDayDueIso: payDayDue({ payDay: normalizePayDay(meta.pay_day), openStartIso: period.start_date, todayIso: hoy }),
   });
   // «Tras pagarlo te quedarán» (B-Home): lo que queda del periodo menos ESA renovación. Sin
   // límites no hay «lo que queda».
@@ -480,7 +491,7 @@ export async function renderInicio(container) {
   });
   const accountHtml = cuentaActual ? accountBlockHtml(cuentaActual, accountOpts) : "";
   const shared = sharedBlockHtml(sharedRows, netCents, partnerName);
-  const noticeBlock = noticeHtml(hucha, { byId, rules, leftAfterRenewal });
+  const noticeBlock = noticeHtml(hucha, { byId, rules, leftAfterRenewal, periodName: periodTitle(period.name, hoy), todayIso: hoy });
 
   // Con límites, el Display es «Hoy puedes gastar» (también recién hecho el onboarding, sin
   // movimientos) y la cuenta va en su bento; sin límites, el saldo de la cuenta es el Display.
@@ -585,6 +596,7 @@ export async function renderInicio(container) {
         pushBack(() => renderInicio(container));
         renderRegistro(container, goBack, undefined, () => renderInicio(container));
       } else {
+        // periodEnd y payday (B-1, «Cerrar periodo»): el asistente de Nuevo periodo.
         document.body.classList.add("onboarding");
         pushBack(() => {
           document.body.classList.remove("onboarding");

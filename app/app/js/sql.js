@@ -456,6 +456,9 @@ export const SQL = {
   // Hijas ACTIVAS de una categoría: archiveCategory las recorre para archivarlas en cascada (una
   // SQL.setCategoryArchived por cada una, en el MISMO execMany que la de la propia raíz).
   childrenOf: `SELECT id FROM categories WHERE parent_id=? AND deleted=0 AND is_archived=0`,
+  // B-8 (onboarding, paso Categorías): volver a marcar una raíz desmarcada la recupera CON sus hijas
+  // —archiveCategory las archivó en cascada—, en una sola sentencia. Bind [updated_at, id, id].
+  restoreCategoryTree: `UPDATE categories SET is_archived=0, updated_at=? WHERE (id=? OR parent_id=?) AND deleted=0`,
   // ¿Tiene `id` alguna hija ACTIVA? Ya NO la usa el guard de updateCategory (ver hasChildren) —
   // se conserva porque el label de cascada de archivar SÍ es active-only a propósito (archiveCategory
   // solo archiva en cascada las hijas activas, ver childrenOf) y porque tests/app/categorias.test.mjs

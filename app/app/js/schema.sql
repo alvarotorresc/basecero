@@ -11,6 +11,10 @@ CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 -- PR), account-colors.js#parseAccountStyle/repo.getAccountStyle devuelven {} y cada cuenta cae a
 -- la familia por defecto de su tipo (defaultFamilyForAccount).
 INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version','5'),('currency','EUR'),('created_with','basecero-pwa'),('locale','es-ES'),('import_account_id',''),('default_account_id',''),('partner_name',''),('category_style','{}'),('csv_profile',''),('lang',''),('account_loans','{}'),('quick_register','1'),('subscription_ignored','[]'),('renewal_snoozed','{}'),('account_style','{}');
+-- pay_day (B-1, día de cobro): CONFIG-IN-META — "0" (o ausente, en una hoja anterior) es el día 1
+-- del mes; N es el día de cobro con el que empieza cada periodo (pay-day.js#normalizePayDay). En su
+-- propia sentencia para no tocar la fila de semillas de arriba.
+INSERT OR IGNORE INTO meta (key, value) VALUES ('pay_day','0');
 
 CREATE TABLE IF NOT EXISTS accounts (
   id TEXT PRIMARY KEY, name TEXT NOT NULL,

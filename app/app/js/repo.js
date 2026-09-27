@@ -1208,6 +1208,11 @@ export async function archiveCategory(id) {
  *  quizá había archivado ella sola antes de archivar la raíz. */
 export const unarchiveCategory = (id) => exec(SQL.setCategoryArchived, [0, nowIso(), id]);
 
+/** B-8 (onboarding, paso Categorías): recupera una raíz y TODAS sus hijas vivas en una sola
+ *  sentencia. Solo para deshacer un desmarcado del propio onboarding, donde el archivado lo hizo
+ *  archiveCategory en cascada; Categorías sigue usando unarchiveCategory (sin cascada, a propósito). */
+export const restoreCategoryTree = (id) => exec(SQL.restoreCategoryTree, [nowIso(), id, id]);
+
 /** i18n (PR i18n, Task 6, fix round 1): retraduce las categorías SEMILLA (SEED_NAMES, seeds.js)
  *  a `toLang`. IDEMPOTENTE y basada en el ESTADO de cada fila, no en si el idioma "cambió": cada
  *  UPDATE matchea una fila solo si su nombre actual es EXACTAMENTE el nombre semilla del OTRO

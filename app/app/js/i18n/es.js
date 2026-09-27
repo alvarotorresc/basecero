@@ -1468,4 +1468,32 @@ export const ES = {
       billete: "Billete", bebe: "Bebé", portatil: "Portátil", mando: "Mando de juego", paquete: "Paquete", birrete: "Birrete",
     },
   },
+  // B-1 · Día de cobro (meta.pay_day): fila de Ajustes, paso de Ajustes del onboarding, leyenda de
+  // Nuevo periodo y aviso de Inicio.
+  payday: {
+    label: "El periodo empieza",
+    valueDay1: "Día 1",
+    valuePayDay: "Día de cobro, {n}",
+    help: "Con el día 1, cada periodo es un mes natural. Con otro día, empieza el día que cobras (en los meses más cortos, el último). Cerrarlo sigue siendo cosa tuya.",
+    decAria: "Día anterior",
+    incAria: "Día siguiente",
+    onbLabel: "Día de cobro",
+    onbSub: "Ese día empieza tu mes",
+    legend: "Tu día de cobro",
+    noticeToday: "Hoy es tu día de cobro",
+    noticePast: "Tu día de cobro fue el {date}",
+    noticeOpen: "{name} sigue abierto.",
+    noticeAction: "Cerrar periodo",
+  },
+  // B-8 · Paso «Categorías» del onboarding (B-Onb-Categorias): desmarcar = archivar.
+  onboardingCategories: {
+    title: "Categorías",
+    subtitle: "Cada una tiene su color en toda la app.",
+    count: "{n} de {total}",
+    subs: { one: "{n} subcategoría", other: "{n} subcategorías" },
+    noSubs: "Sin subcategorías",
+    unchecked: "Desmarcada",
+    note: "Subcategorías y nombres, luego en Ajustes. Las desmarcadas se recuperan en Categorías.",
+    needOne: "Deja al menos una categoría marcada.",
+  },
 };
