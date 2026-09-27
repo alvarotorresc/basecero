@@ -102,7 +102,10 @@ test("categoryArchiveDiff: archiva las desmarcadas y recupera las que se vuelven
   const roots = onbCategoryRoots(CATS);
   assert.deepEqual(categoryArchiveDiff(roots, new Set(["cat-casa", "cat-ocio"])), { archive: [], restore: [] });
   assert.deepEqual(categoryArchiveDiff(roots, new Set(["cat-casa"])), { archive: ["cat-ocio"], restore: [] });
-  assert.deepEqual(categoryArchiveDiff(roots, new Set(["cat-casa", "cat-ocio", "cat-regalos"])), { archive: [], restore: ["cat-regalos"] });
+  // Solo se recupera lo que archivó ESTE paso: cat-regalos ya venía archivada de antes.
+  assert.deepEqual(categoryArchiveDiff(roots, new Set(["cat-casa", "cat-ocio", "cat-regalos"])), { archive: [], restore: [] });
+  assert.deepEqual(categoryArchiveDiff(roots, new Set(["cat-casa", "cat-ocio", "cat-regalos"]), new Set(["cat-regalos"])),
+    { archive: [], restore: ["cat-regalos"] });
 });
 
 // ---- SQL.restoreCategoryTree (B-8): volver a marcar en el onboarding recupera la raíz Y sus hijas
