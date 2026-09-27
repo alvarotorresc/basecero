@@ -346,6 +346,8 @@ export const EN = {
       photoClose: "Close the photo",
       // S6 (B-Movimiento-Detalle): view with «Edit», the row date and the split summary.
       edit: "Edit",
+      // B-5: shares its row with «Delete» in the view's footer.
+      duplicate: "Duplicate",
       dateToday: "Today, {date}",
       dateYesterday: "Yesterday, {date}",
       sharedMine: "Your share {amount}, {pct} %",

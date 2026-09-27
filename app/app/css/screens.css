@@ -1355,11 +1355,15 @@ button.imp-rev-body:disabled { cursor: default; }
 .mdet-note-text { font-size: var(--fs-15); font-weight: 500; line-height: var(--lh-body); color: var(--text); overflow-wrap: anywhere; }
 .mdet-note-field { flex: 1; min-width: 0; }
 
-/* Abajo del todo: vista, «Editar» primario a todo el ancho (B-Movimiento-Detalle) y, debajo,
-   «Borrar» (entrada destructiva, C5, D-1) solo en su fila: el mockup lo pone en una rejilla de dos
-   junto a «Duplicar», bloqueado (B-5). Edición, «Guardar cambios» y «Cancelar». */
+/* Abajo del todo: vista, «Editar» primario a todo el ancho (B-Movimiento-Detalle) y, debajo, una
+   rejilla de dos con «Duplicar» (secundario, B-5) y «Borrar» (entrada destructiva, C5, D-1),
+   exactamente como el mockup. Edición, «Guardar cambios» y «Cancelar». */
 .mdet-foot { display: flex; flex-direction: column; gap: var(--sp-8); margin-top: auto; }
 .mdet-actions { display: flex; flex-direction: column; gap: var(--sp-8); }
+/* .btn-secondary es inline-flex sin ancho propio: sin esto, dentro de la rejilla se queda al
+   ancho de su contenido en vez de ocupar su columna (.btn-danger ya es width:100%). */
+.mdet-actions-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.mdet-actions-row .btn-secondary { width: 100%; }
 .mdet-actions-edit { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-4); }
 .mdet-actions-edit .btn-tertiary { align-self: center; }
 .mdet-error {

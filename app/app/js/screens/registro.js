@@ -86,6 +86,9 @@ let registroOpenings = 0;
 /** Monta la pantalla completa de registro rápido de un movimiento (5 tipos).
  *  onDone() se llama tanto al cerrar (✕) como tras guardar con éxito.
  *  prefill opcional (Task 11): {type, amountCents, categoryId, accountId, merchant, ruleId, isShared}.
+ *  B-5 (duplicar un movimiento, movimiento-detalle.js#buildDuplicatePrefill) añade: note, paidBy,
+ *  sharePct, counterAccountId, tagId, adjustmentSign — todos opcionales y retrocompatibles: un
+ *  prefill que no los trae (el de una regla recurrente, p. ej.) se comporta exactamente como antes.
  *  onUndone opcional (reskin v2, Task 12): refresca la pantalla de detrás cuando se pulsa
  *  «Deshacer» en el recibo — sin esto, el movimiento borrado se queda pintado hasta la siguiente
  *  navegación. */
@@ -146,13 +149,18 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     cents: prefill?.amountCents ?? 0,
     categoryId: prefill?.categoryId ?? null,
     accountId: prefill?.accountId ?? resolveAccountId(meta.default_account_id, accounts) ?? "",
-    counterAccountId: "",
+    // B-5: la cuenta destino de una transferencia duplicada (si la fila original la tenía).
+    counterAccountId: prefill?.counterAccountId ?? "",
     isShared: partnerName ? (prefill?.isShared ?? false) : false,
-    paidBy: "me",
-    sharePct: normalizePct(period?.my_share_pct, 100),
+    // B-5: quién pagó y el % del reparto de la fila duplicada; sin prefill, como antes ("yo" y el
+    // % del periodo abierto).
+    paidBy: prefill?.paidBy ?? "me",
+    sharePct: normalizePct(prefill?.sharePct ?? period?.my_share_pct, 100),
     fecha: hoyISO(),
     merchant: prefill?.merchant ?? "",
-    note: "",
+    // B-5: la nota de la fila duplicada. noteVisible() ya la enseña sola con solo tener texto (no
+    // hace falta tocar noteOpen).
+    note: prefill?.note ?? "",
     refId: "",
     ruleId: prefill?.ruleId ?? "",
     // Etiquetas de proyecto (N11, Task 13): D11 — jamás llega de merchantMemory/memoryPatch (ver
@@ -161,7 +169,8 @@ export async function renderRegistro(container, onDone, prefill, onUndone) {
     tagId: prefill?.tagId ?? null,
     tagPickerOpen: false,
     newTagDraft: null,
-    adjustmentSign: "+",
+    // B-5: el signo del ajuste duplicado (el importe siempre llega en valor absoluto).
+    adjustmentSign: prefill?.adjustmentSign ?? "+",
     refundPickerOpen: false,
     // Registro v2 §8.6: caja de lenguaje natural. `text` es lo tecleado o dictado (NO se
     // interpreta en el oninput: eso mataría el cursor); `parsed` es el último resultado de
