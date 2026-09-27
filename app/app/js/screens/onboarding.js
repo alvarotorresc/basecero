@@ -47,6 +47,18 @@ const PROMISES = [
 const QUICK_CURRENCIES = ["EUR", "USD", "GBP"];
 const OTHER_CURRENCY = "__other";
 
+// Logo (D-impl-5): marca, no sistema. Sin un solo color en el marcado: el fondo y la tinta los
+// pinta la sección «onboarding» de screens.css con el naranja de marca y su tinta, la única
+// lectura de naranja fuera de primario y seleccionado que admite design-rules.test (§Desviaciones).
+const LOGO_SVG = `<svg class="onb-logo" width="48" height="48" viewBox="0 0 512 512" aria-hidden="true">
+  <rect class="onb-logo-bg" width="512" height="512" rx="112"></rect>
+  <path class="onb-logo-line" d="M193.43 112.79A41 42 0 1 0 166 186A41 42 0 1 1 138.57 259.21" stroke-width="40" stroke-linecap="round"></path>
+  <rect class="onb-logo-ink" x="149" y="78" width="34" height="216" rx="17"></rect>
+  <path class="onb-logo-line" d="M373.43 112.79A41 42 0 1 0 346 186A41 42 0 1 1 318.57 259.21" stroke-width="40" stroke-linecap="round"></path>
+  <rect class="onb-logo-ink" x="329" y="78" width="34" height="216" rx="17"></rect>
+  <rect class="onb-logo-ink" x="138" y="349" width="236" height="50" rx="25"></rect>
+</svg>`;
+
 // Regla bajo la cifra del Display de Bienvenida: la aguja en el cero, marcas cada décima. Las
 // clases disp-chart-* son las del gráfico del Display (components.css); la aguja es su línea.
 const RULER_SVG = (() => {
@@ -115,7 +127,7 @@ export async function renderOnboarding(container, { onDone }) {
       + t("onboarding.welcome.importHint.mid") + `<span class="num">.bce</span>` + t("onboarding.welcome.importHint.post");
     return `
     <header class="onb-brand">
-      <h1 class="onb-wordmark">${escHtml(t("onboarding.welcome.brand"))}</h1>
+      <div class="onb-brand-row">${LOGO_SVG}<h1 class="onb-wordmark">${escHtml(t("onboarding.welcome.brand"))}</h1></div>
       <span class="onb-tagline">${escHtml(t("onboarding.welcome.tagline"))}</span>
     </header>
     ${displayHtml({
