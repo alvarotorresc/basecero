@@ -2301,12 +2301,11 @@ body.onboarding main#screen { padding-bottom: calc(env(safe-area-inset-bottom, 0
   justify-content: flex-start;
   gap: var(--sp-16);
   padding: max(var(--sp-16), min(108px, 12.8vh)) var(--sp-16) var(--sp-16);
-  /* Velo y sombra de B-Recibo (.62 y 0 14 28 .4, más densos que --scrim y --sh-alert), sacados de
-     --disp (casi negro en los dos temas) para no añadir tokens. */
-  background: color-mix(in srgb, var(--disp) 62%, transparent);
+  /* Velo de B-Recibo (.62, más denso que --scrim). */
+  background: var(--scrim-recibo);
   animation: bc-recibo-veil 150ms ease-out;
 }
-.recibo-ticket { width: 310px; max-width: 100%; filter: drop-shadow(0 14px 28px color-mix(in srgb, var(--disp) 40%, transparent)); animation: bc-recibo-in 250ms ease-out; }
+.recibo-ticket { width: 310px; max-width: 100%; filter: drop-shadow(var(--sh-ticket)); animation: bc-recibo-in 250ms ease-out; }
 .recibo-edge { display: block; width: 100%; height: 10px; color: var(--raised); }
 .recibo-body { display: flex; flex-direction: column; gap: var(--sp-12); padding: 14px var(--sp-20) 18px; background: var(--raised); color: var(--text); }
 .recibo-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
