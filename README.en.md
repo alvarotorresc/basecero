@@ -34,12 +34,11 @@ browser, installs like an app, and works offline.
 
 ## What it does
 
-- **Your month starts the day you get paid.** A period runs from one payday to the next, or from
-  the 1st if you prefer. You close it yourself, and Home reminds you on the day. When you close
-  it you see what you spent, what you saved, and your savings rate for the stretch.
+- **Your month starts the day you get paid.** Payday-to-payday periods, not the 1st to the 30th.
+  Close one and you see what you spent, what you saved, and your savings rate for the stretch.
 - **Logging, fast.** One screen: the amount on the phone keypad and the category from a grid of
   tiles, each in its own colour. You can also type or dictate "12.50 at the bar with Marta" and
-  the app pulls the amount, the category and the split out of the sentence. Five kinds of entry:
+  the app pulls the amount, the shop and who you split it with out of the sentence. Five kinds of entry:
   expense, income, transfer, refund and adjustment.
 - **Spending by category.** All your categories, sorted by what you have spent so far, each with
   its bar and its percentage. Each one expands into its subcategories. You set a limit only
@@ -58,12 +57,13 @@ browser, installs like an app, and works offline.
 - **Period report.** What came in, what went out and what you saved, against the previous period
   and by category. You download it as a PDF, and the PDF is generated on your phone.
 - **Import your bank statement.** N26 CSVs are recognised on their own; for any other bank an
-  assistant asks once what each column is. Before anything is saved you go over the list: drop
-  rows and change categories. It reconciles what you already logged and skips duplicates.
+  assistant asks once what each column is. It reconciles what you already logged and skips
+  duplicates.
 - **In Spanish and in English,** with the currency and the number and date formats you pick.
 
-And the small things: a configurable payday, combined filters in Transactions, duplicating a
-transaction, moving money into a goal's pot, and a page of its own for every account and goal.
+And the small things: a configurable payday, combined filters in Transactions, a review step
+before importing, duplicating a transaction, moving money into a goal's pot, a page for every
+account and goal, and unticking categories when you start.
 
 ## What it looks like
 

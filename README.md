@@ -34,12 +34,11 @@ como una app y funciona sin conexión.
 
 ## Qué hace
 
-- **Tu mes empieza cuando cobras.** El periodo va de nómina a nómina, o del día 1 si lo
-  prefieres. Lo cierras tú, e Inicio te avisa el día que toca. Al cerrarlo ves lo gastado, lo
-  ahorrado y tu tasa de ahorro del tramo.
+- **Tu mes empieza cuando cobras.** Periodos de nómina a nómina, no del 1 al 30. Al cerrar uno
+  ves lo gastado, lo ahorrado y tu tasa de ahorro del tramo.
 - **Registrar, rápido.** Una sola pantalla: el importe con el teclado del móvil y la categoría en
   una rejilla de baldosas, cada una con su color. También puedes escribir o dictar «12,50 en el
-  bar con Marta» y la app saca de la frase el importe, la categoría y el reparto. Cinco tipos de apunte: gasto, ingreso, transferencia,
+  bar con Marta» y la app saca de la frase el importe, el comercio y con quién lo compartes. Cinco tipos de apunte: gasto, ingreso, transferencia,
   devolución y ajuste.
 - **Gasto por categoría.** Todas tus categorías ordenadas por lo que llevas gastado, con su barra
   y su porcentaje. Cada una se despliega en subcategorías. Pones límite solo donde te sirve, y
@@ -58,13 +57,12 @@ como una app y funciona sin conexión.
 - **Informe del periodo.** Lo ingresado, lo gastado y lo ahorrado, frente al periodo anterior y
   por categoría. Lo descargas en PDF, y el PDF se genera en tu móvil.
 - **Importar el extracto del banco.** Los CSV de N26 se reconocen solos; para el resto, un
-  asistente pregunta una vez qué es cada columna. Antes de guardar nada repasas la lista: quitas
-  filas y cambias categorías. Concilia lo ya apuntado y se salta duplicados.
+  asistente pregunta una vez qué es cada columna. Concilia lo ya apuntado y se salta duplicados.
 - **En español y en inglés,** con la moneda y el formato de números y fechas que elijas.
 
-Y lo pequeño: día de cobro configurable, filtros combinados en Movimientos, duplicar un
-movimiento, pasar dinero a la hucha de un objetivo y una ficha propia para cada cuenta y cada
-objetivo.
+Y lo pequeño: día de cobro configurable, filtros combinados en Movimientos, revisión antes de
+importar, duplicar un movimiento, pasar dinero a la hucha de un objetivo, una ficha para cada
+cuenta y cada objetivo, y desmarcar categorías al empezar.
 
 ## Cómo se ve
 
