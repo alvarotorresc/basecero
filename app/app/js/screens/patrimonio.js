@@ -297,9 +297,10 @@ const SEP = '<div class="pat-sep" aria-hidden="true"></div>';
 
 /** Pantalla «Patrimonio»: Display, composición, cuentas y objetivos, con subvistas de formulario
  *  para crear/editar cuentas y objetivos (view interno 'main' | 'account-form' | 'goal-form', sin
- *  onBack: Patrimonio es pestaña de nivel superior y la subvista vuelve a su propio 'main'). El
- *  detalle de cuenta (B-6) y de objetivo (B-7) es lógica nueva bloqueada: un toque sigue abriendo
- *  la edición. */
+ *  onBack: Patrimonio es pestaña de nivel superior y la subvista vuelve a su propio 'main').
+ *  Tocar una cuenta abre su detalle (B-6, screens/cuenta.js), con su propia entrada de historial;
+ *  el formulario de la cuenta se abre desde ahí y vuelve al detalle. Igual con un objetivo:
+ *  su detalle (B-7, screens/objetivo.js), y desde él su formulario. */
 export async function renderPatrimonio(container) {
   let series, accounts, goals, expenseRootCats, byId, accountLoans, accountStyle;
   let defaultAccId = null;
