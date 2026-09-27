@@ -34,9 +34,6 @@ export const EN = {
     // §1.4/§4, liquidar.js#rowHtml.
     dateValue: "{date}",
     amountValue: "{amount}",
-    // myPartSuffix stays prose (dot-free separator): inicio.js/semana.js keep concatenating it
-    // as-is (§9.1/§9.2 don't touch it).
-    myPartSuffix: ", your share {amount}",
     sharedWith: "Shared with {name}",
     settlement: {
       theyOwe: "{name} owes you",
@@ -359,10 +356,10 @@ export const EN = {
       fallbackName: "the other party",
       fallbackLabel: "Other party",
     },
-    // partnerPaid: prose that Inicio and Semana append to the merchant. paidBy and sharedOf: the
-    // note under a shared Movimientos row's figure (B-Movimientos), where the figure is my share;
-    // {amount} is the whole receipt, without symbol and already wrapped in mono by movimientos.js.
-    row: { partnerPaid: ", {name} paid, your share {amount}", paidBy: "{name} paid", sharedOf: "with {name}, of {amount}" },
+    // paidBy and sharedOf: the note under a shared row's figure in Movimientos, Inicio and Semana
+    // (B-Movimientos, ui.js#sharedNoteHtml), where the figure is my share; {amount} is the whole
+    // receipt, without symbol and already wrapped in mono.
+    row: { paidBy: "{name} paid", sharedOf: "with {name}, of {amount}" },
     delete: {
       button: "Delete",
       title: "Delete this transaction?",

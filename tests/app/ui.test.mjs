@@ -1,9 +1,9 @@
 // Las piezas de chrome compartidas por las pantallas (DESIGN.md §9). Módulo PURO:
-// solo importa icons.js y t(), así que se prueba sin Worker ni DOM.
+// solo importa icons.js, t() y format.js, así que se prueba sin Worker ni DOM.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { subHeaderHtml, rootHeaderHtml, buttonHtml, metaHtml, radioKeyIndex } from "../../app/app/js/ui.js";
+import { subHeaderHtml, rootHeaderHtml, buttonHtml, metaHtml, radioKeyIndex, sharedNoteHtml } from "../../app/app/js/ui.js";
 
 // Cabecera con atrás, forma canónica B/C (DESIGN.md §9, inventario-B I-15): atrás · título a la
 // izquierda · acción opcional. Ya no hay tres celdas ni huecos de relleno.
@@ -201,4 +201,15 @@ test("subHeaderHtml: leadHtml va entre el atrás y el título (baldosa de B-Cuen
   const html = subHeaderHtml({ title: "Cuenta corriente", id: "c-back", leadHtml: '<span class="ent-tile"></span>' });
   const [b, l, t] = ["c-back", "sub-header-lead", "Cuenta corriente"].map((s) => html.indexOf(s));
   assert.ok(b < l && l < t);
+});
+
+// Fila compartida (B-Movimientos, y lo mismo en Inicio y Semana): la cifra es mi parte y la nota
+// dice con quién y de cuánto era el ticket, o quién pagó.
+test("sharedNoteHtml: «con Marta, de 24,00», «pagó Marta» y nada sin compartir", () => {
+  const norm = (s) => s.replace(/\u00A0|\u202F/g, " ");
+  assert.equal(sharedNoteHtml({ is_shared: 0, amount_cents: 2400 }, "Marta"), "");
+  assert.equal(norm(sharedNoteHtml({ is_shared: 1, paid_by: "me", amount_cents: -2400 }, "Marta")), 'con Marta, de <span class="num">24,00</span>');
+  assert.equal(sharedNoteHtml({ is_shared: 1, paid_by: "partner", amount_cents: 2400 }, "Marta"), "pagó Marta");
+  assert.equal(sharedNoteHtml({ is_shared: 1, paid_by: "partner", amount_cents: 2400 }, "<b>"), "pagó &lt;b&gt;", "el nombre se escapa");
+  assert.match(sharedNoteHtml({ is_shared: 1, paid_by: "me", amount_cents: 1000 }, ""), /^con la contraparte, de /, "sin nombre, el de reserva");
 });

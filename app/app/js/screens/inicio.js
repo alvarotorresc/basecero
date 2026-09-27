@@ -19,7 +19,7 @@ import { resolveAccountId } from "../account-defaults.js";
 import { icon } from "../icons.js";
 import { t } from "../i18n/index.js";
 import { budgetMap, pctOf } from "../category-spend.js";
-import { rootHeaderHtml, buttonHtml } from "../ui.js";
+import { rootHeaderHtml, buttonHtml, sharedNoteHtml } from "../ui.js";
 import { fieldHtml } from "../controls.js";
 import { tileHtml, txRowHtml, dayHeaderHtml } from "../entity.js";
 import {
@@ -300,20 +300,16 @@ function movementRowHtml(r, byId, partnerName) {
   const cat = byId[r.category_id];
   const parent = cat?.parent_id ? byId[cat.parent_id] : null;
   const path = cat ? (parent ? `${parent.name} › ${cat.name}` : cat.name) : "";
-  const shareNote = !r.is_shared ? ""
-    : r.paid_by === "partner"
-      ? t("movimientos.row.partnerPaid", { name: partnerName || t("movimientos.shared.fallbackName"), amount: fmtMoney(r.my_amount_cents) })
-      : t("common.myPartSuffix", { amount: fmtMoney(r.my_amount_cents) });
   return txRowHtml({
     fam: familyForCategory(r.category_id, byId),
     icon: iconForCategory(r.category_id, byId),
     // Sin comercio ni categoría, el mismo «Sin categorizar» que Movimientos: la fila nunca sin nombre.
     title: r.merchant || cat?.name || t("movimientos.uncategorized"),
     line2: path,
-    amountHtml: moneyPartsHtml(Math.abs(r.amount_cents)),
+    // Compartido: MI parte, con la nota de Movimientos debajo («con Marta, de 24,00» / «pagó Marta»).
+    amountHtml: moneyPartsHtml(Math.abs(r.is_shared ? r.my_amount_cents : r.amount_cents)),
     sign: r.type === "expense" ? "expense" : "income",
-    // La nota de compartido va debajo de la cifra, como en Movimientos y Semana.
-    amountNote: shareNote.replace(/^,\s*/, ""),
+    amountNoteHtml: sharedNoteHtml(r, partnerName),
     data: { tx: r.id },
     height: 52,
     amountWeight: 500,

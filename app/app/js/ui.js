@@ -3,6 +3,7 @@
 import { icon } from "./icons.js";
 import { t } from "./i18n/index.js";
 import { escHtml, escAttr } from "./esc.js";
+import { fmtMoneyParts } from "./format.js";
 
 /** Cabecera de raíz (DESIGN.md §9, B-Home): `h1` de 24 en Unbounded y subtítulo opcional 13/500
  *  dim debajo. La llevan los 4 destinos de la barra de pestañas; es el único `h1` de la pantalla.
@@ -148,4 +149,19 @@ export function radioKeyIndex(key, index, count) {
     case "End": return count - 1;
     default: return -1;
   }
+}
+
+/** Nota bajo la cifra de una fila de gasto COMPARTIDO (B-Movimientos; la misma en Inicio y Semana
+ *  para que las tres listas coincidan con el mockup). La fila pinta MI parte (my_amount_cents) y
+ *  debajo «con Marta, de 24,00» (el ticket entero, en mono y sin símbolo) o, si pagó la contraparte,
+ *  «pagó Marta». Sin compartir, cadena vacía.
+ *  @param {{is_shared?:number|boolean, paid_by?:string, amount_cents:number}} r  Fila de movimiento.
+ *  @param {string} [partnerName]  Nombre de la contraparte. Vacío → movimientos.shared.fallbackName.
+ *  @returns {string} HTML (el nombre va escapado) para txRowHtml `amountNoteHtml`. */
+export function sharedNoteHtml(r, partnerName = "") {
+  if (!r?.is_shared) return "";
+  const who = escHtml(partnerName || t("movimientos.shared.fallbackName"));
+  if (r.paid_by === "partner") return t("movimientos.row.paidBy", { name: who });
+  const { main, cents } = fmtMoneyParts(Math.abs(r.amount_cents));
+  return t("movimientos.row.sharedOf", { name: who, amount: `<span class="num">${escHtml(`${main}${cents}`.trim())}</span>` });
 }
