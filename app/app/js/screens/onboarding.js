@@ -1,18 +1,22 @@
 // app/js/screens/onboarding.js
-// Onboarding de primera ejecución (S13, sistema B): Bienvenida y tres pasos —Cuentas, Ajustes y
-// Periodo— sobre #screen con el chrome oculto (body.onboarding lo pone el caller,
+// Onboarding de primera ejecución (S13, sistema B): Bienvenida y cuatro pasos —Cuentas, Ajustes,
+// Categorías (B-8) y Periodo— sobre #screen con el chrome oculto (body.onboarding lo pone el caller,
 // app/js/onboarding.js). Referencia visual: design/exploracion/2026-09-26-tres-direcciones/
-// B-Onb-{Bienvenida,Cuentas,Ajustes}.dc.html y sus BD-*. El paso «Categorías» (B-Onb-Categorias)
-// NO existe: desmarcar raíces es lógica nueva bloqueada (B-8), y el progreso no lo cuenta.
-// Sin estado en borrador: cada cuenta se crea en BD al pulsar «Añadir cuenta» y las preferencias
-// se guardan al salir de Ajustes — si se cierra la pestaña a mitad, el gate (0 periodos) reabre el
-// onboarding con lo ya guardado.
+// B-Onb-{Bienvenida,Cuentas,Ajustes,Categorias}.dc.html y sus BD-*.
+// Sin estado en borrador: cada cuenta se crea en BD al pulsar «Añadir cuenta», las preferencias
+// (día de cobro incluido, B-1) se guardan al salir de Ajustes y las categorías desmarcadas se
+// archivan al salir de Categorías — antes del Periodo, cuyos límites solo listan raíces activas. Si
+// se cierra la pestaña a mitad, el gate (0 periodos) reabre el onboarding con lo ya guardado.
 import { fmtMoney, initFormat, hoyISO, currencySymbol } from "../format.js";
 import {
   getMetaAll, setMeta, setMetaMany, balancesAt, createAccount, deleteEmptyAccount, replaceAll, retranslateSeedNames,
-  getAccountStyle, setAccountFamily,
+  getAccountStyle, setAccountFamily, listCategoriesAdmin, archiveCategory, restoreCategoryTree,
 } from "../repo.js";
-import { canLeaveAccounts, accountDraft, ACCOUNT_KINDS, accountKindOf, stepProgress } from "../onboarding-steps.js";
+import {
+  canLeaveAccounts, accountDraft, ACCOUNT_KINDS, accountKindOf, stepProgress, ONB_STEP,
+  onbCategoryRoots, canLeaveCategories, categoryArchiveDiff,
+} from "../onboarding-steps.js";
+import { normalizePayDay, payDayToMeta, stepPayDay } from "../pay-day.js";
 import { familyForAccount } from "../account-colors.js";
 import { currencyOptionsHtml, localeOptionsHtml } from "./ajustes.js";
 import { renderPeriodoNuevo } from "./periodo-nuevo.js";
@@ -26,7 +30,7 @@ import { subHeaderHtml, buttonHtml } from "../ui.js";
 import { segmentedHtml, wireSegmented, stepperHtml, stepsHtml, fieldHtml } from "../controls.js";
 import { tileHtml, pickTileHtml, sectionHeaderHtml } from "../entity.js";
 import { displayHtml } from "../instrument.js";
-import { famClass } from "../category-colors.js";
+import { famClass, familyForCategory } from "../category-colors.js";
 import { PCT_STEP, stepPct } from "../share-pct.js";
 import { applyTheme, readPref, writePref, getStorage, systemDarkQuery, THEME_PREFS } from "../theme.js";
 import { showConfirm } from "../modal.js";
@@ -77,7 +81,7 @@ const RULER_SVG = (() => {
 export async function renderOnboarding(container, { onDone }) {
   const meta = await getMetaAll();
   const state = {
-    step: 0, // 0 bienvenida · 1 cuentas · 2 ajustes · 3 periodo
+    step: ONB_STEP.welcome, // 0 bienvenida · 1 cuentas · 2 ajustes · 3 categorías · 4 periodo
     accounts: await balancesAt(hoyISO()),
     accountStyle: await getAccountStyle(),
     form: { name: "", type: "checking", raw: "" },
@@ -87,7 +91,11 @@ export async function renderOnboarding(container, { onDone }) {
       partner: meta.partner_name || "",
       sharePct: 50,
       otherCurrency: !QUICK_CURRENCIES.includes(meta.currency || "EUR"),
+      payDay: normalizePayDay(meta.pay_day),
     },
+    // Paso Categorías (B-8): raíces de gasto tal como están en la BD y las marcadas en pantalla.
+    cats: null,
+    checked: new Set(),
     view: "steps", // "steps" | "import"
     imp: null,
     busy: false,
@@ -97,7 +105,7 @@ export async function renderOnboarding(container, { onDone }) {
 
   // ---------- piezas comunes ----------
 
-  /** Barra superior de los pasos 1-3 (B-Onb-Cuentas): atrás, progreso por pasos y «1 de 3». El
+  /** Barra superior de los pasos 1-4 (B-Onb-Cuentas): atrás, progreso por pasos y «1 de 4». El
    *  atrás vive aquí también en el paso Periodo: #onb-periodo lo reescribe renderPeriodoNuevo. */
   function topBarHtml() {
     const { current, total } = stepProgress(state.step);
@@ -251,10 +259,68 @@ export async function renderOnboarding(container, { onDone }) {
         <div class="onb-hr"></div>
         ${prefRowHtml("onb-locale-label", "onboarding.prefs.formatLabel",
           `<span class="ctl-field onb-select-wrap"><select class="onb-select" id="onb-locale" aria-labelledby="onb-locale-label">${localeOptionsHtml(p.locale)}</select></span>`)}
+        <div class="onb-hr"></div>
+        <div class="onb-row onb-row-pay">
+          <span class="onb-row-label onb-row-stack">
+            <span id="onb-pay-label">${escHtml(t("payday.onbLabel"))}</span>
+            <span class="onb-row-sub">${escHtml(t("payday.onbSub"))}</span>
+          </span>
+          ${stepperHtml({
+            id: "onb-pay-stepper", value: String(p.payDay), decId: "onb-pay-down", incId: "onb-pay-up",
+            decLabel: t("payday.decAria"), incLabel: t("payday.incAria"),
+          })}
+        </div>
       </div>
       ${errorHtml()}
     </section>
     ${footHtml("onb-next-3")}`;
+  }
+
+  // ---------- Categorías (B-8) ----------
+
+  /** Tarjeta de una raíz (B-Onb-Categorias): barra del sólido de su familia, nombre y cuántas
+   *  subcategorías, y la casilla en tinta. Toda la tarjeta es la casilla (role=checkbox). Marcada,
+   *  con el tinte de la familia; desmarcada, neutra con el texto en dim. */
+  function catCardHtml(c) {
+    const on = state.checked.has(c.id);
+    const fam = familyForCategory(c.id, { [c.id]: { id: c.id, parent_id: "" } });
+    const sub = !on ? t("onboardingCategories.unchecked")
+      : c.subCount ? t("onboardingCategories.subs", { n: c.subCount }) : t("onboardingCategories.noSubs");
+    return `<button type="button" class="onb-cat ${famClass(fam)}" role="checkbox" aria-checked="${on ? "true" : "false"}" data-onb-cat="${escAttr(c.id)}">
+      <span class="onb-cat-bar" aria-hidden="true"></span>
+      <span class="onb-cat-body"><span class="onb-cat-name">${escHtml(c.name)}</span><span class="onb-cat-sub">${escHtml(sub)}</span></span>
+      <span class="ctl-checkbox-box onb-cat-box" aria-hidden="true">${on ? icon("check", { size: 16, width: 2.6 }) : ""}</span>
+    </button>`;
+  }
+
+  function categoriesHtml() {
+    const cats = state.cats ?? [];
+    const n = cats.filter((c) => state.checked.has(c.id)).length;
+    const count = t("onboardingCategories.count", {
+      n: `<span class="num onb-cats-n">${n}</span>`, total: `<span class="num">${cats.length}</span>`,
+    });
+    return `
+    <header class="onb-head onb-head-row">
+      <span class="onb-head-text">
+        <h1 class="onb-title" id="onb-cats-title">${escHtml(t("onboardingCategories.title"))}</h1>
+        <span class="onb-sub">${escHtml(t("onboardingCategories.subtitle"))}</span>
+      </span>
+      <span class="onb-cats-count" id="onb-cats-count">${count}</span>
+    </header>
+    <div class="onb-cats-strip" aria-hidden="true">${cats.map((c) => {
+      const fam = familyForCategory(c.id, { [c.id]: { id: c.id, parent_id: "" } });
+      return `<span class="onb-cats-seg ${famClass(fam)}${state.checked.has(c.id) ? "" : " is-off"}"></span>`;
+    }).join("")}</div>
+    <div class="onb-cats" role="group" aria-labelledby="onb-cats-title">${cats.map(catCardHtml).join("")}</div>
+    <p class="onb-help">${escHtml(t("onboardingCategories.note"))}</p>
+    ${errorHtml()}
+    ${footHtml("onb-next-cats")}`;
+  }
+
+  async function loadCategories() {
+    const roots = onbCategoryRoots(await listCategoriesAdmin());
+    state.cats = roots;
+    state.checked = new Set(roots.filter((r) => r.checked).map((r) => r.id));
   }
 
   // ---------- Periodo ----------
@@ -271,7 +337,7 @@ export async function renderOnboarding(container, { onDone }) {
 
   function render({ focus = "" } = {}) {
     if (state.view === "import") { renderImportView(); return; }
-    const body = [welcomeHtml, accountsHtml, prefsHtml, periodHtml][state.step]();
+    const body = [welcomeHtml, accountsHtml, prefsHtml, categoriesHtml, periodHtml][state.step]();
     container.innerHTML = `<div class="onb-screen${state.step === 0 ? " onb-welcome" : ""}">
       ${state.step > 0 ? topBarHtml() : ""}
       ${body}
@@ -282,15 +348,16 @@ export async function renderOnboarding(container, { onDone }) {
 
   function wire() {
     const q = (sel) => container.querySelector(sel);
-    if (state.step === 0) {
-      q("#onb-start").onclick = () => { state.step = 1; render(); };
+    if (state.step === ONB_STEP.welcome) {
+      q("#onb-start").onclick = () => { state.step = ONB_STEP.accounts; render(); };
       q("#onb-import-link").onclick = () => { state.view = "import"; state.imp = null; render(); };
       return;
     }
     q("#onb-back").onclick = () => { if (state.busy) return; state.step -= 1; state.errorMsg = ""; render(); };
-    if (state.step === 1) wireAccounts(q);
-    if (state.step === 2) wirePrefs(q);
-    if (state.step === 3) {
+    if (state.step === ONB_STEP.accounts) wireAccounts(q);
+    if (state.step === ONB_STEP.prefs) wirePrefs(q);
+    if (state.step === ONB_STEP.categories) wireCategories(q);
+    if (state.step === ONB_STEP.period) {
       // partner_name ya está persistido (paso Ajustes): renderPeriodoNuevo lo lee de meta al
       // montarse y pinta (o no) su bloque de reparto, que arranca en la parte elegida aquí.
       renderPeriodoNuevo(q("#onb-periodo"), {
@@ -361,7 +428,7 @@ export async function renderOnboarding(container, { onDone }) {
     };
     q("#onb-next-2").onclick = () => {
       if (!canLeaveAccounts(state.accounts.length)) { state.errorMsg = t("onboarding.account.needOne"); render(); return; }
-      state.step = 2; state.errorMsg = ""; render();
+      state.step = ONB_STEP.prefs; state.errorMsg = ""; render();
     };
   }
 
@@ -390,6 +457,11 @@ export async function renderOnboarding(container, { onDone }) {
     };
     q("#onb-pct-down").onclick = () => { p.sharePct = stepPct(p.sharePct, -PCT_STEP); paintShare(q); };
     q("#onb-pct-up").onclick = () => { p.sharePct = stepPct(p.sharePct, PCT_STEP); paintShare(q); };
+    // Día de cobro (B-1): se pinta en su sitio (sin repintar, para no llevarse el foco) y se guarda
+    // con el resto al pulsar «Seguir».
+    const paintPay = () => { q("#onb-pay-stepper .ctl-stepper-value").textContent = String(p.payDay); };
+    q("#onb-pay-down").onclick = () => { p.payDay = stepPayDay(p.payDay, -1); paintPay(); };
+    q("#onb-pay-up").onclick = () => { p.payDay = stepPayDay(p.payDay, 1); paintPay(); };
 
     wireSegmented(q("#onb-cur-seg"), (v) => {
       p.otherCurrency = v === OTHER_CURRENCY;
@@ -427,18 +499,67 @@ export async function renderOnboarding(container, { onDone }) {
       const { currency, locale } = p;
       const partner = p.partner.trim();
       try {
-        await setMetaMany([["currency", currency], ["locale", locale], ["partner_name", partner]]);
+        await setMetaMany([["currency", currency], ["locale", locale], ["partner_name", partner], ["pay_day", payDayToMeta(p.payDay)]]);
         p.partner = partner;
         // Sin location.reload() (reiniciaría el onboarding): formateadores en caliente, como boot().
         initFormat({ currency, locale });
         // documentElement.lang es el IDIOMA de la UI (activeLang()), no el locale de formato.
         document.documentElement.lang = activeLang();
-        state.step = 3;
+        await loadCategories();
+        state.step = ONB_STEP.categories;
         state.errorMsg = "";
       } catch (e) { state.errorMsg = t("common.saveFailed", { error: userMessage(e) }); }
       state.busy = false;
       render();
     };
+  }
+
+  /** Categorías (B-8): marcar y desmarcar solo cambia la pantalla (en su sitio, sin repintar: el
+   *  foco se queda en la tarjeta). Al pulsar «Seguir» se escribe la diferencia con la BD: las
+   *  desmarcadas se archivan (archiveCategory, con sus hijas en cascada) y las que se vuelven a
+   *  marcar tras un «atrás» se recuperan con sus hijas (restoreCategoryTree). */
+  function wireCategories(q) {
+    const cards = [...container.querySelectorAll("[data-onb-cat]")];
+    for (const b of cards) {
+      b.onclick = () => {
+        const id = b.dataset.onbCat;
+        if (state.checked.has(id)) state.checked.delete(id); else state.checked.add(id);
+        const c = state.cats.find((x) => x.id === id);
+        b.outerHTML = catCardHtml(c);
+        state.errorMsg = "";
+        paintCategoriesChrome();
+        wireCategories(q);
+        container.querySelector(`[data-onb-cat="${CSS.escape(id)}"]`)?.focus();
+      };
+    }
+    q("#onb-next-cats").onclick = async () => {
+      if (state.busy) return;
+      if (!canLeaveCategories(state.checked.size)) { state.errorMsg = t("onboardingCategories.needOne"); render(); return; }
+      state.busy = true;
+      try {
+        const { archive, restore } = categoryArchiveDiff(state.cats, state.checked);
+        for (const id of archive) await archiveCategory(id);
+        for (const id of restore) await restoreCategoryTree(id);
+        await loadCategories();
+        state.step = ONB_STEP.period;
+        state.errorMsg = "";
+      } catch (e) { state.errorMsg = t("common.saveFailed", { error: userMessage(e) }); }
+      state.busy = false;
+      render();
+    };
+  }
+
+  /** Recuento «10 de 12» y franja de colores del paso Categorías, sin repintar la rejilla. */
+  function paintCategoriesChrome() {
+    const n = state.cats.filter((c) => state.checked.has(c.id)).length;
+    const countEl = container.querySelector("#onb-cats-count");
+    if (countEl) countEl.innerHTML = t("onboardingCategories.count", {
+      n: `<span class="num onb-cats-n">${n}</span>`, total: `<span class="num">${state.cats.length}</span>`,
+    });
+    const segs = container.querySelectorAll(".onb-cats-seg");
+    state.cats.forEach((c, i) => segs[i]?.classList.toggle("is-off", !state.checked.has(c.id)));
+    const msg = container.querySelector(".onb-msg");
+    if (msg) msg.remove();
   }
 
   // ---------- Importar una hoja o copia ----------

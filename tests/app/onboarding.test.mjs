@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { needsOnboarding, canLeaveAccounts, accountDraft, ACCOUNT_KINDS, accountKindOf, stepProgress, ONB_STEP_COUNT } from "../../app/app/js/onboarding-steps.js";
+import {
+  needsOnboarding, canLeaveAccounts, accountDraft, ACCOUNT_KINDS, accountKindOf, stepProgress, ONB_STEP_COUNT,
+  ONB_STEP, onbCategoryRoots, canLeaveCategories, categoryArchiveDiff,
+} from "../../app/app/js/onboarding-steps.js";
 import { SQL } from "../../app/app/js/sql.js";
 import { openDb, seedMinimal } from "./helpers.mjs";
 
@@ -58,12 +61,68 @@ test("accountKindOf: una savings con familia imp se lee como Hucha; el resto, su
   assert.equal(accountKindOf({ type: "liability" }, "coc"), "liability");
 });
 
-test("stepProgress: Bienvenida sin progreso; Cuentas, Ajustes y Periodo son 1, 2 y 3 de 3 (B-8 fuera)", () => {
-  assert.equal(ONB_STEP_COUNT, 3);
+test("stepProgress: Bienvenida sin progreso; Cuentas, Ajustes, Categorías y Periodo son 1..4 de 4 (B-8)", () => {
+  assert.equal(ONB_STEP_COUNT, 4);
+  assert.deepEqual(ONB_STEP, { welcome: 0, accounts: 1, prefs: 2, categories: 3, period: 4 });
   assert.equal(stepProgress(0), null);
-  assert.deepEqual(stepProgress(1), { current: 1, total: 3 });
-  assert.deepEqual(stepProgress(2), { current: 2, total: 3 });
-  assert.deepEqual(stepProgress(3), { current: 3, total: 3 });
+  assert.deepEqual(stepProgress(1), { current: 1, total: 4 });
+  assert.deepEqual(stepProgress(2), { current: 2, total: 4 });
+  assert.deepEqual(stepProgress(3), { current: 3, total: 4 });
+  assert.deepEqual(stepProgress(4), { current: 4, total: 4 });
+});
+
+// ---- B-8: paso «Categorías» (B-Onb-Categorias) — desmarcar = archivar, recuperable en Categorías.
+
+const CATS = [
+  { id: "cat-ocio", name: "Ocio", parent_id: "", flow: "expense", is_archived: 0, deleted: 0, display_order: 80 },
+  { id: "cat-casa", name: "Casa", parent_id: "", flow: "expense", is_archived: 0, deleted: 0, display_order: 10 },
+  { id: "cat-casa-luz", name: "Luz", parent_id: "cat-casa", flow: "expense", is_archived: 0, deleted: 0, display_order: 11 },
+  { id: "cat-casa-agua", name: "Agua", parent_id: "cat-casa", flow: "expense", is_archived: 1, deleted: 0, display_order: 12 },
+  { id: "cat-casa-vieja", name: "Vieja", parent_id: "cat-casa", flow: "expense", is_archived: 0, deleted: 1, display_order: 13 },
+  { id: "cat-regalos", name: "Regalos", parent_id: "", flow: "expense", is_archived: 1, deleted: 0, display_order: 90 },
+  { id: "cat-regalos-cumple", name: "Cumple", parent_id: "cat-regalos", flow: "expense", is_archived: 1, deleted: 0, display_order: 91 },
+  { id: "cat-nomina", name: "Nómina", parent_id: "", flow: "income", is_archived: 0, deleted: 0, display_order: 100 },
+  { id: "cat-borrada", name: "Borrada", parent_id: "", flow: "expense", is_archived: 0, deleted: 1, display_order: 5 },
+];
+
+test("onbCategoryRoots: raíces de gasto vivas en su orden, marcadas si no están archivadas, con sus subcategorías", () => {
+  assert.deepEqual(onbCategoryRoots(CATS), [
+    { id: "cat-casa", name: "Casa", subCount: 2, checked: true },
+    { id: "cat-ocio", name: "Ocio", subCount: 0, checked: true },
+    { id: "cat-regalos", name: "Regalos", subCount: 1, checked: false },
+  ]);
+});
+
+test("canLeaveCategories: exige al menos una categoría marcada", () => {
+  assert.equal(canLeaveCategories(0), false);
+  assert.equal(canLeaveCategories(1), true);
+});
+
+test("categoryArchiveDiff: archiva las desmarcadas y recupera las que se vuelven a marcar; nada más", () => {
+  const roots = onbCategoryRoots(CATS);
+  assert.deepEqual(categoryArchiveDiff(roots, new Set(["cat-casa", "cat-ocio"])), { archive: [], restore: [] });
+  assert.deepEqual(categoryArchiveDiff(roots, new Set(["cat-casa"])), { archive: ["cat-ocio"], restore: [] });
+  assert.deepEqual(categoryArchiveDiff(roots, new Set(["cat-casa", "cat-ocio", "cat-regalos"])), { archive: [], restore: ["cat-regalos"] });
+});
+
+// ---- SQL.restoreCategoryTree (B-8): volver a marcar en el onboarding recupera la raíz Y sus hijas
+// (archiveCategory las archivó en cascada; unarchiveCategory, a propósito, no las recupera).
+test("SQL.restoreCategoryTree: desarchiva la raíz y todas sus hijas vivas, y nada de otras raíces", () => {
+  const db = openDb();
+  seedMinimal(db); // cat-casa (raíz) + cat-casa-alquiler (hija)
+  db.prepare("UPDATE categories SET is_archived=1 WHERE id IN ('cat-casa','cat-casa-alquiler')").run();
+  db.prepare(`INSERT INTO categories (id,name,parent_id,flow,need_type,display_order,is_archived,created_at,updated_at,deleted)
+    VALUES ('cat-otra','Otra','','expense','want',9,1,?,?,0)`).run(T, T);
+  db.prepare(`INSERT INTO categories (id,name,parent_id,flow,need_type,display_order,is_archived,created_at,updated_at,deleted)
+    VALUES ('cat-casa-borrada','Borrada','cat-casa','expense','need',3,1,?,?,1)`).run(T, T);
+  const T2 = "2026-09-27T10:00:00Z";
+  db.prepare(SQL.restoreCategoryTree).run(T2, "cat-casa", "cat-casa");
+  const row = (id) => db.prepare("SELECT is_archived, updated_at FROM categories WHERE id=?").get(id);
+  assert.equal(row("cat-casa").is_archived, 0);
+  assert.equal(row("cat-casa").updated_at, T2);
+  assert.equal(row("cat-casa-alquiler").is_archived, 0);
+  assert.equal(row("cat-otra").is_archived, 1, "otra raíz no se toca");
+  assert.equal(row("cat-casa-borrada").is_archived, 1, "una hija borrada no se toca");
 });
 
 // ---- SQL.deleteEmptyAccount (D9): reproduce el statement sobre la BD de helpers.mjs, mismo

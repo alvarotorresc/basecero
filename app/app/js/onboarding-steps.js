@@ -33,11 +33,43 @@ const HUCHA = ACCOUNT_KINDS.find((k) => k.id === "hucha");
 export const accountKindOf = (account, fam) =>
   (account.type === HUCHA.type && fam === HUCHA.fam ? HUCHA.id : account.type);
 
-// Progreso del asistente (stepsHtml): la Bienvenida (paso 0) no lo lleva; Cuentas, Ajustes y
-// Periodo son 1, 2 y 3. «Categorías» (B-Onb-Categorias) no cuenta: desmarcar raíces es lógica
-// nueva bloqueada (B-8), así que el paso no existe todavía.
-export const ONB_STEP_COUNT = 3;
+// Pasos del asistente (B-8): la Bienvenida (0) no lleva progreso; Cuentas, Ajustes, Categorías y
+// Periodo son 1, 2, 3 y 4 — «3 de 4» en B-Onb-Categorias.
+export const ONB_STEP = { welcome: 0, accounts: 1, prefs: 2, categories: 3, period: 4 };
+export const ONB_STEP_COUNT = 4;
 export const stepProgress = (step) => (step >= 1 ? { current: Math.min(step, ONB_STEP_COUNT), total: ONB_STEP_COUNT } : null);
+
+// ---- Paso «Categorías» (B-8, B-Onb-Categorias): las raíces de gasto semilla, marcadas; desmarcar
+// = archivar (recuperable en Categorías). El estado vive en la BD (is_archived), no en un borrador:
+// si se cierra la pestaña a mitad, el paso se retoma con lo ya guardado.
+
+/** Raíces de gasto vivas (listCategoriesAdmin: todas, archivadas incluidas) en su orden, con cuántas
+ *  subcategorías vivas tienen (archivadas incluidas: desmarcar archiva la raíz y sus hijas en
+ *  cascada, y volver a marcar las recupera) y si están marcadas (no archivadas). */
+export function onbCategoryRoots(rows) {
+  const live = rows.filter((c) => !c.deleted);
+  return live
+    .filter((c) => c.flow === "expense" && !c.parent_id)
+    .sort((a, b) => a.display_order - b.display_order)
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      subCount: live.filter((h) => h.parent_id === c.id).length,
+      checked: !c.is_archived,
+    }));
+}
+
+/** Sin ninguna categoría de gasto no hay dónde apuntar un gasto: al menos una marcada. */
+export const canLeaveCategories = (checkedCount) => checkedCount >= 1;
+
+/** Qué cambia al salir del paso: `archive`, las raíces marcadas en la BD que el usuario desmarcó;
+ *  `restore`, las archivadas que volvió a marcar. Las que no cambian no se tocan. */
+export function categoryArchiveDiff(roots, checkedIds) {
+  return {
+    archive: roots.filter((r) => r.checked && !checkedIds.has(r.id)).map((r) => r.id),
+    restore: roots.filter((r) => !r.checked && checkedIds.has(r.id)).map((r) => r.id),
+  };
+}
 
 // Borrador del form de cuenta del paso 2 → cuenta lista para createAccount, o {error}.
 // "liability" guarda el saldo en negativo aunque se teclee en positivo: es lo que debes.
