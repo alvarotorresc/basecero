@@ -5,8 +5,28 @@ Versionado según [SemVer](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+## [1.1.0] — 2026-09-30
+
+La app entera, rediseñada: tema claro y oscuro, logo nuevo y cada pantalla rehecha. Además llegan
+el día de cobro, el informe del periodo en PDF, el radar de suscripciones, las etiquetas de
+proyecto y apuntar un gasto con una frase, con la voz o con la foto del ticket.
+
 ### Cambiado
 
+- **Diseño nuevo en todas las pantallas.** Tema claro y oscuro («grafito»), tipografía nueva
+  (Unbounded, Instrument Sans e IBM Plex Mono), iconos de trazo y colores por familia de categoría
+  y de cuenta.
+- **Logo nuevo**: la hucha con ojos de dólar, ahora en naranja.
+- **Inicio pone el saldo primero.** El saldo de tu cuenta principal arriba, el disponible del
+  periodo con «Hoy puedes gastar X €», una frase de la hucha cuando hay algo que contar
+  (una renovación cerca, una categoría al límite, días sin apuntar), los movimientos de hoy y la
+  semana como línea de tiempo.
+- **Registrar es más rápido.** Modo rápido por defecto —importe, categoría y guardar; lo demás
+  tras «Más»—, rejilla de categorías y un recibo que se imprime al guardar, con «Deshacer».
+- **Borrar pide confirmación en un diálogo**, en vez del botón que se armaba solo.
+- **Liquidar deja elegir qué filas cierras**, todas marcadas de entrada.
+- **Cambiar de pantalla vuelve arriba**, y la barra de pestañas y el botón de añadir solo salen en
+  las cuatro pestañas principales: ya no tapan «Guardar» al final de un formulario.
 - **«Presupuesto» pasa a ser «Gasto por categoría».** La pantalla ahora lista TODAS tus categorías
   de gasto —no solo las que tienen límite—, ordenadas por lo que llevas gastado, y se abre tocando
   la tarjeta de Gasto por categoría del inicio (antes hacía falta tener algún límite puesto para
@@ -30,6 +50,34 @@ Versionado según [SemVer](https://semver.org/lang/es/).
 
 ### Añadido
 
+- **Día de cobro.** Dices qué día cobras y la app propone cuándo abrir el periodo nuevo y avisa en
+  Inicio cuando toca. Si cierras tarde, los apuntes desde el cobro pasan al periodo nuevo (y te
+  dice cuántos antes de confirmar). Sin configurarlo, todo funciona como antes.
+- **Semana**, una pantalla nueva: total y media al día, cada día con su barra por categoría y sus
+  movimientos al desplegarlo.
+- **Apuntar con una frase, con la voz o con la foto del ticket.** «12,50 en el bar con Marta»
+  rellena importe, comercio, categoría y compartido. La voz usa el dictado del navegador (y lo
+  dice bajo la caja); la foto del ticket se guarda en el dispositivo y viaja dentro de la copia
+  cifrada.
+- **Memoria de comercios.** Al escribir un comercio conocido se rellenan categoría, cuenta y
+  compartido como la última vez, sin pisar lo que ya hayas tocado.
+- **Aviso de límite al registrar**: «Con este gasto quedan 8,50 € de Restauración», en ámbar
+  cerca del límite y en rojo si lo pasas.
+- **Radar de suscripciones.** Marca una recurrente como suscripción y ve cuánto cuestan al año,
+  cuándo se renuevan y cuánto has ahorrado con las que cancelaste. La app propone las que detecta
+  por cargos repetidos del mismo comercio.
+- **Etiquetas de proyecto** (un viaje, una reforma) que cruzan categorías, con su total, su límite
+  opcional y su filtro en Movimientos.
+- **Comparativa con el periodo anterior** en Gasto por categoría, con la tendencia de los tres
+  últimos.
+- **Filtros múltiples en Movimientos**: varias categorías a la vez, cuenta, rango de importe y
+  solo compartidos.
+- **Revisar el extracto antes de importarlo**, fila a fila.
+- **Detalle de cuenta** con su saldo de los últimos seis meses y sus movimientos, y **detalle de
+  objetivo** con aportaciones, proyección y «Pasar a la hucha».
+- **Duplicar un movimiento** desde su detalle.
+- **El onboarding pregunta tu día de cobro y qué categorías quieres**; las que desmarques se
+  archivan y se recuperan cuando quieras.
 - **Detalle por subcategoría.** Toca una categoría y se despliega en qué se ha ido su dinero este
   periodo, con el gasto anotado directamente en la categoría como una línea más.
 - **Los límites se editan desde ahí.** Poner, cambiar o quitar el límite de una categoría ya no
@@ -38,7 +86,7 @@ Versionado según [SemVer](https://semver.org/lang/es/).
   de coma; ahora el separador se detecta al vuelo —coma, punto y coma o tabulador— y el asistente ve
   las columnas de verdad en lugar de una sola.
 - **Avisos de terceros.** Un `THIRD_PARTY_NOTICES.md` con la licencia y la atribución de todo lo que
-  viaja dentro del repositorio: SheetJS, la fuente Outfit y SQLite WASM.
+  viaja dentro del repositorio: SheetJS, pdf-lib, las fuentes, los iconos Lucide y SQLite WASM.
 - **Inicio enseña los dos apuntes de una liquidación.** Antes solo se veía el dinero que entraba;
   el pago a la otra persona no aparecía por ninguna parte de la pantalla principal.
 - **Un periodo nuevo hereda los límites del que cierras.** Vienen puestos y editables: cambias lo
@@ -86,6 +134,11 @@ Versionado según [SemVer](https://semver.org/lang/es/).
 - **Los extractos con BOM y los de punto y coma con comas en el concepto se importan bien.** El
   primero ensuciaba la primera columna; el segundo se troceaba por la coma equivocada.
 
+### Notas
+
+- La base de datos sube a la versión 5 (suscripciones, etiquetas y fotos del ticket) y migra sola
+  en el primer arranque. Las copias `.xlsx` y `.bce` de la 1.0.0 se siguen importando.
+
 ## [1.0.0] — 2026-09-02
 
 La primera versión para compartir. BaseCero ya se instala desde el navegador de cualquiera y
@@ -128,4 +181,6 @@ funciona sin conexión, sin cuentas y sin nube.
 - Las instalaciones que ya existen migran su base de datos solas en el primer arranque: no hay
   nada que hacer, ni nada que se pierda.
 
+[Sin publicar]: https://github.com/alvarotorresc/basecero/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/alvarotorresc/basecero/releases/tag/v1.1.0
 [1.0.0]: https://github.com/alvarotorresc/basecero/releases/tag/v1.0.0
